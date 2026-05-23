@@ -45,6 +45,8 @@ app.get('/api/debug', (req, res) => {
     matchingEnvKeys: Object.keys(process.env).filter(k =>
       k.includes('ANTHROPIC') || k.includes('APP') || k.includes('PASSWORD')
     ),
+    railwayKeys: Object.keys(process.env).filter(k => k.startsWith('RAILWAY')),
+    port: process.env.PORT,
   });
 });
 
