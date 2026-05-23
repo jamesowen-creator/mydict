@@ -35,10 +35,16 @@ Respond in the following JSON format:
 Always respond with valid JSON only, no additional text. Provide 2-4 definitions when applicable. If the input is not a valid English word or phrase, return {"error": "유효하지 않은 단어입니다"}.`;
 
 app.get('/api/debug', (req, res) => {
+  const ak = process.env.ANTHROPIC_API_KEY;
+  const pw = process.env.APP_PASSWORD;
   res.json({
-    hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
-    hasAppPassword: !!process.env.APP_PASSWORD,
-    nodeEnv: process.env.NODE_ENV || 'not set',
+    hasAnthropicKey: !!ak,
+    anthropicKeyLength: ak ? ak.length : 0,
+    hasAppPassword: !!pw,
+    appPasswordLength: pw ? pw.length : 0,
+    matchingEnvKeys: Object.keys(process.env).filter(k =>
+      k.includes('ANTHROPIC') || k.includes('APP') || k.includes('PASSWORD')
+    ),
   });
 });
 
