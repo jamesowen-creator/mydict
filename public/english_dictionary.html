@@ -655,6 +655,16 @@
 </head>
 <body>
 
+<div class="modal-overlay" id="auth-overlay">
+  <div class="modal-box">
+    <div class="modal-title">접근 제한</div>
+    <div class="modal-desc">이 서비스를 이용하려면 비밀번호를 입력하세요.</div>
+    <input class="modal-input" id="auth-input" type="password" placeholder="비밀번호" autocomplete="current-password" autofocus />
+    <div class="modal-error" id="auth-error">비밀번호가 올바르지 않습니다.</div>
+    <button class="btn" style="width:100%" onclick="submitAuth()">확인</button>
+  </div>
+</div>
+
 <nav>
   <div class="nav-logo">📖 MyDict</div>
   <div class="nav-tabs">
@@ -704,6 +714,38 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+if (localStorage.getItem('mydict_auth') === 'true') {
+  document.getElementById('auth-overlay').classList.add('hidden');
+}
+document.getElementById('auth-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitAuth();
+});
+async function submitAuth() {
+  const pw = document.getElementById('auth-input').value;
+  const errEl = document.getElementById('auth-error');
+  errEl.style.display = 'none';
+  try {
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      localStorage.setItem('mydict_auth', 'true');
+      document.getElementById('auth-overlay').classList.add('hidden');
+    } else {
+      errEl.style.display = 'block';
+      document.getElementById('auth-input').value = '';
+      document.getElementById('auth-input').focus();
+    }
+  } catch {
+    errEl.textContent = '서버 오류가 발생했습니다.';
+    errEl.style.display = 'block';
+  }
+}
+
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let wordbook = JSON.parse(localStorage.getItem('mydict_wordbook') || '[]');
 let wrongNote = JSON.parse(localStorage.getItem('mydict_wrong') || '[]');

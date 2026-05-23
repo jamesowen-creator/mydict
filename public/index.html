@@ -160,9 +160,66 @@
 
     #result { display: none; }
     #error  { display: none; }
+
+    #auth-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    #auth-overlay.hidden { display: none; }
+    .auth-box {
+      background: white;
+      border-radius: 12px;
+      padding: 2rem 1.5rem;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+    }
+    .auth-box h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .auth-box p { font-size: 0.85rem; color: #666; margin-bottom: 1.25rem; line-height: 1.5; }
+    .auth-input {
+      width: 100%;
+      padding: 0.65rem 1rem;
+      font-size: 1rem;
+      border: 1.5px solid #ccc;
+      border-radius: 8px;
+      outline: none;
+      margin-bottom: 0.75rem;
+      transition: border-color 0.2s;
+    }
+    .auth-input:focus { border-color: #2d6cdf; }
+    .auth-btn {
+      width: 100%;
+      padding: 0.65rem;
+      background: #2d6cdf;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .auth-btn:hover { background: #1a55cc; }
+    .auth-error { font-size: 0.85rem; color: #c0392b; margin-bottom: 0.5rem; display: none; }
   </style>
 </head>
 <body>
+
+<div id="auth-overlay">
+  <div class="auth-box">
+    <h2>접근 제한</h2>
+    <p>이 서비스를 이용하려면 비밀번호를 입력하세요.</p>
+    <input id="auth-input" class="auth-input" type="password" placeholder="비밀번호" autocomplete="current-password" autofocus />
+    <p class="auth-error" id="auth-error">비밀번호가 올바르지 않습니다.</p>
+    <button class="auth-btn" onclick="submitAuth()">확인</button>
+  </div>
+</div>
 
 <header>
   <h1>영어 사전</h1>
@@ -181,6 +238,37 @@
 </main>
 
 <script>
+  if (localStorage.getItem('mydict_auth') === 'true') {
+    document.getElementById('auth-overlay').classList.add('hidden');
+  }
+  document.getElementById('auth-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitAuth();
+  });
+  async function submitAuth() {
+    const pw = document.getElementById('auth-input').value;
+    const errEl = document.getElementById('auth-error');
+    errEl.style.display = 'none';
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        localStorage.setItem('mydict_auth', 'true');
+        document.getElementById('auth-overlay').classList.add('hidden');
+      } else {
+        errEl.style.display = 'block';
+        document.getElementById('auth-input').value = '';
+        document.getElementById('auth-input').focus();
+      }
+    } catch {
+      errEl.textContent = '서버 오류가 발생했습니다.';
+      errEl.style.display = 'block';
+    }
+  }
+
   const queryInput  = document.getElementById('query');
   const searchBtn   = document.getElementById('search-btn');
   const spinner     = document.getElementById('spinner');
