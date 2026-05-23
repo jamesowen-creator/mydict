@@ -34,6 +34,14 @@ Respond in the following JSON format:
 
 Always respond with valid JSON only, no additional text. Provide 2-4 definitions when applicable. If the input is not a valid English word or phrase, return {"error": "유효하지 않은 단어입니다"}.`;
 
+app.get('/api/debug', (req, res) => {
+  res.json({
+    hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
+    hasAppPassword: !!process.env.APP_PASSWORD,
+    nodeEnv: process.env.NODE_ENV || 'not set',
+  });
+});
+
 app.post('/api/auth', (req, res) => {
   const { password } = req.body;
   if (!process.env.APP_PASSWORD) {
