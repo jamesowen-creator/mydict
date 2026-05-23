@@ -1,0 +1,15 @@
+{
+  "name": "mydict",
+  "version": "1.0.0",
+  "description": "English dictionary web app powered by Claude Haiku",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.54.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}
