@@ -67,45 +67,55 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Google OAuth ─────────────────────────────────────────────────────────────
 
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: process.env.GOOGLE_CALLBACK_URL || '/auth/google/callback',
-}, async (accessToken, refreshToken, profile, done) => {
-  try {
-    const { rows } = await pool.query(
-      `INSERT INTO users (google_id, email, name)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (google_id) DO UPDATE
-         SET email = EXCLUDED.email, name = EXCLUDED.name
-       RETURNING *`,
-      [profile.id, profile.emails?.[0]?.value, profile.displayName]
-    );
-    done(null, rows[0]);
-  } catch (err) {
-    done(err);
-  }
-}));
+const googleOAuthEnabled = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 
-passport.serializeUser((user, done) => done(null, user.id));
-passport.deserializeUser(async (id, done) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-    done(null, rows[0] || null);
-  } catch (err) {
-    done(err);
-  }
-});
+if (googleOAuthEnabled) {
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: process.env.GOOGLE_CALLBACK_URL || '/auth/google/callback',
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO users (google_id, email, name)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (google_id) DO UPDATE
+           SET email = EXCLUDED.email, name = EXCLUDED.name
+         RETURNING *`,
+        [profile.id, profile.emails?.[0]?.value, profile.displayName]
+      );
+      done(null, rows[0]);
+    } catch (err) {
+      done(err);
+    }
+  }));
+
+  passport.serializeUser((user, done) => done(null, user.id));
+  passport.deserializeUser(async (id, done) => {
+    try {
+      const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+      done(null, rows[0] || null);
+    } catch (err) {
+      done(err);
+    }
+  });
+}
 
 // ─── Auth routes ──────────────────────────────────────────────────────────────
 
-app.get('/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
+app.get('/auth/google', (req, res, next) => {
+  if (!googleOAuthEnabled) {
+    return res.status(503).json({ error: 'OAuth 설정이 필요합니다.' });
+  }
+  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+});
 
-app.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/?login=failed' }),
-  (req, res) => {
+app.get('/auth/google/callback', (req, res, next) => {
+  if (!googleOAuthEnabled) {
+    return res.status(503).json({ error: 'OAuth 설정이 필요합니다.' });
+  }
+  passport.authenticate('google', { failureRedirect: '/?login=failed' })(req, res, next);
+}, (req, res) => {
     const token = jwt.sign(
       { id: req.user.id, email: req.user.email, name: req.user.name },
       JWT_SECRET,
