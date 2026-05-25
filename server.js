@@ -3,20 +3,166 @@ const express = require('express');
 const cors = require('cors');
 const Anthropic = require('@anthropic-ai/sdk');
 const path = require('path');
+const { Pool } = require('pg');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const session = require('express-session');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'mydict-jwt-secret';
+
+// ─── PostgreSQL ───────────────────────────────────────────────────────────────
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+});
+
+async function initDB() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id         SERIAL PRIMARY KEY,
+      google_id  VARCHAR(255) UNIQUE NOT NULL,
+      email      VARCHAR(255),
+      name       VARCHAR(255),
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS wordbook (
+      id         SERIAL PRIMARY KEY,
+      user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      word       VARCHAR(255) NOT NULL,
+      lang       VARCHAR(50)  DEFAULT 'en',
+      data       JSONB,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+}
+
+if (process.env.DATABASE_URL) {
+  initDB().catch(err => console.error('DB init error:', err.message));
+}
+
+// ─── Middleware ───────────────────────────────────────────────────────────────
 
 app.use(cors());
 app.use(express.json());
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'mydict-session-secret',
+  resave: false,
+  saveUninitialized: false,
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+
+// ─── Static files ─────────────────────────────────────────────────────────────
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'english_dictionary.html'));
 });
-
 app.use(express.static(path.join(__dirname, 'public')));
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// ─── Google OAuth ─────────────────────────────────────────────────────────────
+
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: process.env.GOOGLE_CALLBACK_URL || '/auth/google/callback',
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO users (google_id, email, name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (google_id) DO UPDATE
+         SET email = EXCLUDED.email, name = EXCLUDED.name
+       RETURNING *`,
+      [profile.id, profile.emails?.[0]?.value, profile.displayName]
+    );
+    done(null, rows[0]);
+  } catch (err) {
+    done(err);
+  }
+}));
+
+passport.serializeUser((user, done) => done(null, user.id));
+passport.deserializeUser(async (id, done) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    done(null, rows[0] || null);
+  } catch (err) {
+    done(err);
+  }
+});
+
+// ─── Auth routes ──────────────────────────────────────────────────────────────
+
+app.get('/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+app.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/?login=failed' }),
+  (req, res) => {
+    const token = jwt.sign(
+      { id: req.user.id, email: req.user.email, name: req.user.name },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.redirect(`/?token=${token}`);
+  }
+);
+
+app.get('/auth/logout', (req, res) => {
+  req.logout(() => res.redirect('/'));
+});
+
+// ─── JWT middleware ───────────────────────────────────────────────────────────
+
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: '로그인이 필요합니다.' });
+  }
+  try {
+    req.user = jwt.verify(authHeader.slice(7), JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: '유효하지 않은 토큰입니다.' });
+  }
+}
+
+// ─── Existing endpoints ───────────────────────────────────────────────────────
+
+app.get('/api/files', (req, res) => {
+  const fs = require('fs');
+  const files = fs.readdirSync(path.join(__dirname, 'public'));
+  res.json({ files });
+});
+
+app.get('/api/debug', (req, res) => {
+  const ak = process.env.ANTHROPIC_API_KEY;
+  const pw = process.env.APP_PASSWORD;
+  res.json({
+    hasAnthropicKey: !!ak,
+    anthropicKeyLength: ak ? ak.length : 0,
+    hasAppPassword: !!pw,
+    appPasswordLength: pw ? pw.length : 0,
+    matchingEnvKeys: Object.keys(process.env).filter(k =>
+      k.includes('ANTHROPIC') || k.includes('APP') || k.includes('PASSWORD')
+    ),
+    railwayKeys: Object.keys(process.env).filter(k => k.startsWith('RAILWAY')),
+    port: process.env.PORT,
+  });
+});
+
+app.post('/api/auth', (req, res) => {
+  const { password } = req.body;
+  if (!process.env.APP_PASSWORD) return res.json({ ok: true });
+  res.json({ ok: password === process.env.APP_PASSWORD });
+});
 
 const SYSTEM_PROMPT = `You are an English dictionary assistant. When given an English word or phrase, provide a clear and structured dictionary entry in Korean-friendly format.
 
@@ -39,44 +185,13 @@ Respond in the following JSON format:
 
 Always respond with valid JSON only, no additional text. Provide 2-4 definitions when applicable. If the input is not a valid English word or phrase, return {"error": "유효하지 않은 단어입니다"}.`;
 
-app.get('/api/files', (req, res) => {
-  const fs = require('fs');
-  const publicDir = path.join(__dirname, 'public');
-  const files = fs.readdirSync(publicDir);
-  res.json({ files, publicDir });
-});
-
-app.get('/api/debug', (req, res) => {
-  const ak = process.env.ANTHROPIC_API_KEY;
-  const pw = process.env.APP_PASSWORD;
-  res.json({
-    hasAnthropicKey: !!ak,
-    anthropicKeyLength: ak ? ak.length : 0,
-    hasAppPassword: !!pw,
-    appPasswordLength: pw ? pw.length : 0,
-    matchingEnvKeys: Object.keys(process.env).filter(k =>
-      k.includes('ANTHROPIC') || k.includes('APP') || k.includes('PASSWORD')
-    ),
-    railwayKeys: Object.keys(process.env).filter(k => k.startsWith('RAILWAY')),
-    port: process.env.PORT,
-  });
-});
-
-app.post('/api/auth', (req, res) => {
-  const { password } = req.body;
-  if (!process.env.APP_PASSWORD) {
-    return res.json({ ok: true });
-  }
-  res.json({ ok: password === process.env.APP_PASSWORD });
-});
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 app.post('/api/search', async (req, res) => {
   const { query } = req.body;
-
   if (!query || !query.trim()) {
     return res.status(400).json({ error: '검색어를 입력해주세요.' });
   }
-
   try {
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -84,14 +199,12 @@ app.post('/api/search', async (req, res) => {
       messages: [{ role: 'user', content: query.trim() }],
       system: SYSTEM_PROMPT,
     });
-
     if (!message.content?.length) {
       return res.status(500).json({ error: '응답이 없습니다.' });
     }
     const raw = message.content[0].type === 'text' ? (message.content[0].text ?? '') : '';
     const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-    const result = JSON.parse(text);
-    res.json(result);
+    res.json(JSON.parse(text));
   } catch (err) {
     if (err instanceof SyntaxError) {
       res.status(500).json({ error: '응답 파싱 오류가 발생했습니다.' });
@@ -104,18 +217,15 @@ app.post('/api/search', async (req, res) => {
 
 app.post('/api/ai', async (req, res) => {
   const { prompt } = req.body;
-
   if (!prompt || !prompt.trim()) {
     return res.status(400).json({ error: '프롬프트를 입력해주세요.' });
   }
-
   try {
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       messages: [{ role: 'user', content: prompt.trim() }],
     });
-
     if (!message.content?.length) {
       return res.status(500).json({ error: '응답이 없습니다.' });
     }
@@ -126,6 +236,52 @@ app.post('/api/ai', async (req, res) => {
     res.status(500).json({ error: '서버 오류가 발생했습니다.' });
   }
 });
+
+// ─── Wordbook endpoints ───────────────────────────────────────────────────────
+
+app.get('/api/wordbook', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM wordbook WHERE user_id = $1 ORDER BY created_at DESC',
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('DB error:', err.message);
+    res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+  }
+});
+
+app.post('/api/wordbook', requireAuth, async (req, res) => {
+  const { word, lang = 'en', data } = req.body;
+  if (!word) return res.status(400).json({ error: '단어를 입력해주세요.' });
+  try {
+    const { rows } = await pool.query(
+      'INSERT INTO wordbook (user_id, word, lang, data) VALUES ($1, $2, $3, $4) RETURNING *',
+      [req.user.id, word, lang, data ? JSON.stringify(data) : null]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('DB error:', err.message);
+    res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+  }
+});
+
+app.delete('/api/wordbook/:id', requireAuth, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      'DELETE FROM wordbook WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: '항목을 찾을 수 없습니다.' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DB error:', err.message);
+    res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
   console.log(`사전 서버 실행 중: http://localhost:${PORT}`);
