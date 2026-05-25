@@ -155,13 +155,18 @@ app.get('/api/files', (req, res) => {
 app.get('/api/debug', (req, res) => {
   const ak = process.env.ANTHROPIC_API_KEY;
   const pw = process.env.APP_PASSWORD;
+  const gcid = process.env.GOOGLE_CLIENT_ID;
+  const gcs = process.env.GOOGLE_CLIENT_SECRET;
   res.json({
     hasAnthropicKey: !!ak,
     anthropicKeyLength: ak ? ak.length : 0,
     hasAppPassword: !!pw,
-    appPasswordLength: pw ? pw.length : 0,
+    hasGoogleClientId: !!gcid,
+    googleClientIdLength: gcid ? gcid.length : 0,
+    hasGoogleClientSecret: !!gcs,
+    googleOAuthEnabled: !!(gcid && gcs),
     matchingEnvKeys: Object.keys(process.env).filter(k =>
-      k.includes('ANTHROPIC') || k.includes('APP') || k.includes('PASSWORD')
+      k.includes('ANTHROPIC') || k.includes('APP') || k.includes('PASSWORD') || k.includes('GOOGLE') || k.includes('JWT') || k.includes('SESSION')
     ),
     railwayKeys: Object.keys(process.env).filter(k => k.startsWith('RAILWAY')),
     port: process.env.PORT,
