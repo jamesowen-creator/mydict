@@ -120,7 +120,7 @@ app.post('/api/ai', async (req, res) => {
       return res.status(500).json({ error: '응답이 없습니다.' });
     }
     const text = message.content[0].type === 'text' ? (message.content[0].text ?? '') : '';
-    res.json({ text });
+    res.json({ result: text });
   } catch (err) {
     console.error('API error:', err.message);
     res.status(500).json({ error: '서버 오류가 발생했습니다.' });
