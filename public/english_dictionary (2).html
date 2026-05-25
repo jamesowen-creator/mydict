@@ -1,0 +1,1916 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gotcha 1.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f7ff;
+    --surface: #ffffff;
+    --surface2: #eef1fb;
+    --border: #dde2f5;
+    --accent: #4a6ef5;
+    --accent2: #f54a7a;
+    --accent3: #16a34a;
+    --accent-ko: #e67e22;
+    --accent-ja: #e74c3c;
+    --accent-zh: #c0392b;
+    --text: #1a1f3c;
+    --text2: #4a5070;
+    --text3: #9398b5;
+    --correct: #16a34a;
+    --wrong: #dc2626;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* NAV */
+  nav {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 8px rgba(74,110,245,0.07);
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    height: 52px;
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    padding: 4px 14px 4px 0;
+    border-right: 1px solid var(--border);
+    margin-right: 8px;
+    cursor: default;
+  }
+
+  .nav-tabs {
+    display: flex;
+    flex: 1;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+
+  .nav-tab {
+    padding: 14px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all 0.2s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+  }
+  .nav-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .nav-tab:hover:not(.active) { color: var(--text); }
+
+  .badge {
+    display: inline-block;
+    background: var(--accent2);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 20px;
+    margin-left: 5px;
+    vertical-align: middle;
+  }
+
+  /* SEARCH BAR - sticky below nav */
+  .search-bar-wrap {
+    background: var(--bg);
+    padding: 12px 16px;
+    position: sticky;
+    top: 52px;
+    z-index: 90;
+    border-bottom: 1px solid var(--border);
+  }
+  .search-page-wrap {
+    position: sticky;
+    top: 52px;
+    z-index: 90;
+    background: var(--bg);
+    padding: 10px 16px 8px;
+    border-bottom: 1px solid var(--border);
+    margin: 0 -16px 16px -16px;
+  }
+
+  .search-wrap {
+    display: flex;
+    gap: 8px;
+  }
+
+  .search-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'Sora', sans-serif;
+    font-size: 16px;
+    padding: 12px 16px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text3); }
+
+  .btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    white-space: nowrap;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .btn:hover { opacity: 0.88; }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn.danger { background: var(--wrong); }
+
+  /* LANG INDICATOR */
+  .lang-indicator {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .lang-tag {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 20px;
+    background: var(--surface2);
+    color: var(--text3);
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .lang-tag.active-en {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .lang-tag.active-ko {
+    background: var(--accent-ko);
+    color: white;
+    border-color: var(--accent-ko);
+  }
+  .lang-tag.active-ja {
+    background: var(--accent-ja);
+    color: white;
+    border-color: var(--accent-ja);
+  }
+  .lang-tag.active-zh {
+    background: var(--accent-zh);
+    color: white;
+    border-color: var(--accent-zh);
+  }
+
+  /* MAIN */
+  main {
+    flex: 1;
+    padding: 0 16px 40px;
+    max-width: 680px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* RESULT CARD */
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    animation: fadeUp 0.3s ease;
+    box-shadow: 0 4px 20px rgba(74,110,245,0.08);
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-word {
+    font-family: 'Sora', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .result-pronunciation {
+    font-family: 'Sora', sans-serif;
+    font-size: 14px;
+    color: var(--text3);
+    margin-bottom: 10px;
+    letter-spacing: 0.03em;
+  }
+
+  .result-pos-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .result-pos-tag {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--accent);
+  }
+
+  .result-pos-tag.ko {
+    color: var(--accent-ko);
+    border-color: var(--accent-ko);
+  }
+  .result-pos-tag.ja {
+    color: var(--accent-ja);
+    border-color: var(--accent-ja);
+  }
+  .result-pos-tag.zh {
+    color: var(--accent-zh);
+    border-color: var(--accent-zh);
+  }
+
+  .result-section {
+    margin-bottom: 20px;
+  }
+
+  .result-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  .result-section-body {
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--text);
+  }
+
+  .usage-item {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--accent);
+  }
+
+  .usage-item.ko { border-left-color: var(--accent-ko); }
+
+  .usage-context {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .usage-desc {
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 6px;
+    line-height: 1.6;
+  }
+
+  .usage-example {
+    font-family: 'Sora', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    font-style: italic;
+    margin-bottom: 4px;
+  }
+
+  .usage-translation {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  .similar-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .similar-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+  }
+
+  .similar-word {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text);
+    min-width: 100px;
+    cursor: pointer;
+  }
+  .similar-word:hover { color: var(--accent); }
+
+  .similar-diff {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  /* KO RESULT - English word entries */
+  .ko-entry {
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    margin-bottom: 12px;
+    border-left: 3px solid var(--accent-ko);
+  }
+  .ko-entry.ja { border-left-color: var(--accent-ja); }
+  .ko-entry.zh { border-left-color: var(--accent-zh); }
+
+  .ko-entry-word {
+    font-family: 'Sora', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .ko-entry-pronunciation {
+    font-size: 12px;
+    color: var(--text3);
+    font-family: 'Sora', sans-serif;
+    margin-bottom: 6px;
+  }
+
+  .ko-entry-meaning {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.6;
+  }
+
+  /* LOADING */
+  .loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text2);
+    font-size: 14px;
+    padding: 20px 0;
+  }
+
+  .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* SECTION HEADER */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-family: 'Sora', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  /* WORDBOOK TABS */
+  .wordbook-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .wordbook-tab {
+    flex: 1;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--text2);
+    transition: all 0.2s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+
+  .wordbook-tab.active-en {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(74,110,245,0.06);
+  }
+
+  .wordbook-tab.active-ko {
+    border-color: var(--accent-ko);
+    color: var(--accent-ko);
+    background: rgba(230,126,34,0.06);
+  }
+  .wordbook-tab.active-ja {
+    border-color: var(--accent-ja);
+    color: var(--accent-ja);
+    background: rgba(231,76,60,0.06);
+  }
+  .wordbook-tab.active-zh {
+    border-color: var(--accent-zh);
+    color: var(--accent-zh);
+    background: rgba(192,57,43,0.06);
+  }
+
+  /* WORD GRID */
+  .word-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .alpha-section {
+    margin-bottom: 8px;
+  }
+
+  .alpha-header {
+    font-family: 'Sora', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    padding: 6px 4px 4px;
+    border-bottom: 2px solid var(--accent);
+    margin-bottom: 6px;
+  }
+
+  .alpha-header.ko { color: var(--accent-ko); border-bottom-color: var(--accent-ko); }
+  .alpha-header.ja { color: var(--accent-ja); border-bottom-color: var(--accent-ja); }
+  .alpha-header.zh { color: var(--accent-zh); border-bottom-color: var(--accent-zh); }
+
+  .alpha-words {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .word-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .word-chip:hover { border-color: var(--accent); }
+  .word-chip.ko:hover { border-color: var(--accent-ko); }
+  .word-chip.ja:hover { border-color: var(--accent-ja); }
+  .word-chip.zh:hover { border-color: var(--accent-zh); }
+
+  .word-chip-text {
+    font-family: 'Sora', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .word-chip-del {
+    color: var(--text3);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+  .word-chip-del:hover { color: var(--wrong); }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text3);
+  }
+
+  .empty-state-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state-text { font-size: 14px; line-height: 1.6; }
+
+  /* QUIZ */
+  .quiz-start-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px 24px;
+    text-align: center;
+  }
+
+  .quiz-type-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin: 24px 0;
+  }
+
+  .quiz-type-btn {
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .quiz-type-btn:hover, .quiz-type-btn.selected {
+    border-color: var(--accent);
+    background: rgba(108,143,255,0.08);
+  }
+
+  .quiz-type-label {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+
+  .quiz-type-desc {
+    font-size: 12px;
+    color: var(--text3);
+  }
+
+  /* QUIZ CARD */
+  .quiz-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .progress-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .progress-text {
+    font-size: 12px;
+    color: var(--text3);
+    white-space: nowrap;
+    font-family: 'Sora', sans-serif;
+  }
+
+  .quiz-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    animation: fadeUp 0.25s ease;
+  }
+
+  .quiz-type-tag {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 12px;
+  }
+
+  .quiz-question {
+    font-family: 'Sora', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 24px;
+    line-height: 1.3;
+    color: var(--text);
+  }
+
+  .quiz-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .quiz-option {
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text);
+    text-align: left;
+    font-family: 'Noto Sans KR', sans-serif;
+    transition: all 0.15s;
+    line-height: 1.5;
+  }
+  .quiz-option:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: rgba(108,143,255,0.08);
+  }
+  .quiz-option.correct {
+    border-color: var(--correct);
+    background: rgba(74,222,128,0.1);
+    color: var(--correct);
+  }
+  .quiz-option.wrong {
+    border-color: var(--wrong);
+    background: rgba(248,113,113,0.1);
+    color: var(--wrong);
+  }
+  .quiz-option:disabled { cursor: not-allowed; }
+
+  .quiz-feedback {
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    display: none;
+  }
+  .quiz-feedback.correct {
+    background: rgba(74,222,128,0.1);
+    color: var(--correct);
+    border: 1px solid rgba(74,222,128,0.3);
+    display: block;
+  }
+  .quiz-feedback.wrong {
+    background: rgba(248,113,113,0.1);
+    color: var(--wrong);
+    border: 1px solid rgba(248,113,113,0.3);
+    display: block;
+  }
+
+  .quiz-next-btn {
+    width: 100%;
+    margin-top: 16px;
+    display: none;
+  }
+
+  /* RESULT */
+  .quiz-result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px 24px;
+    text-align: center;
+    animation: fadeUp 0.3s ease;
+  }
+
+  .result-score {
+    font-family: 'Sora', sans-serif;
+    font-size: 56px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+    margin: 12px 0 4px;
+  }
+
+  .result-score-label {
+    font-size: 14px;
+    color: var(--text2);
+    margin-bottom: 24px;
+  }
+
+  .result-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 40px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 999;
+    transition: transform 0.3s ease;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  /* 클릭 가능한 영어 단어 */
+  .ko-entry-word-link {
+    font-family: 'Sora', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    cursor: pointer;
+    display: inline-block;
+  }
+  .ko-entry-word-link:hover {
+    color: var(--accent);
+  }
+
+  /* 추가 번역 버튼 */
+  .extra-trans-wrap {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .extra-trans-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 8px;
+  }
+  .extra-trans-btns {
+    display: flex;
+    gap: 8px;
+  }
+  .extra-trans-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px solid var(--border);
+    background: var(--surface2);
+    color: var(--text2);
+    transition: all 0.2s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .extra-trans-btn.ja:hover {
+    border-color: var(--accent-ja);
+    color: var(--accent-ja);
+    background: rgba(231,76,60,0.06);
+  }
+  .extra-trans-btn.zh:hover {
+    border-color: var(--accent-zh);
+    color: var(--accent-zh);
+    background: rgba(192,57,43,0.06);
+  }
+  .extra-trans-btn.loading {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .extra-trans-result {
+    margin-top: 12px;
+    animation: fadeUp 0.25s ease;
+  }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <img src="/Gotcha_1_0.PNG" alt="Gotcha" style="height:40px;width:auto;object-fit:contain;"/>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('search')">검색</button>
+    <button class="nav-tab" onclick="showPage('wordbook')">단어장 <span class="badge" id="wordbook-count">0</span></button>
+    <button class="nav-tab" onclick="showPage('quiz')">퀴즈</button>
+    <button class="nav-tab" onclick="showPage('wrong')">오답노트 <span class="badge" id="wrong-count">0</span></button>
+  </div>
+</nav>
+
+<!-- STICKY SEARCH BAR -->
+<div class="search-bar-wrap" id="search-bar-wrap" style="display:none">
+  <div class="search-wrap">
+    <input class="search-input" id="search-input-sticky" type="text" placeholder="영어 또는 한국어 입력..." autocomplete="off" autocorrect="off" spellcheck="false">
+    <button class="btn" onclick="doSearch()">검색</button>
+  </div>
+  <div class="lang-indicator">
+    <span class="lang-tag" id="lang-tag-en">🇺🇸 영어</span>
+    <span class="lang-tag" id="lang-tag-ko">🇰🇷 한국어</span>
+  </div>
+</div>
+
+<main>
+
+  <!-- SEARCH PAGE -->
+  <div class="page active" id="page-search">
+    <div class="search-page-wrap">
+      <div class="search-wrap" style="margin-bottom:8px">
+        <input class="search-input" id="search-input" type="text" placeholder="영어 또는 한국어 입력..." autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="btn" id="search-btn" onclick="doSearch()">검색</button>
+      </div>
+      <div class="lang-indicator">
+        <span class="lang-tag" id="lang-tag-en2">🇺🇸 영어</span>
+        <span class="lang-tag" id="lang-tag-ko2">🇰🇷 한국어</span>
+        <span class="lang-tag" id="lang-tag-ja2">🇯🇵 일본어</span>
+        <span class="lang-tag" id="lang-tag-zh2">🇨🇳 중국어</span>
+      </div>
+    </div>
+    <div id="search-result"></div>
+  </div>
+
+  <!-- WORDBOOK PAGE -->
+  <div class="page" id="page-wordbook">
+    <div class="section-header">
+      <div class="section-title">단어장</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn secondary" onclick="downloadCSV()" style="font-size:12px;padding:8px 12px;">📊 CSV</button>
+        <button class="btn secondary" onclick="downloadJSON()" style="font-size:12px;padding:8px 12px;">💾 JSON</button>
+        <button class="btn secondary" onclick="importJSON()" style="font-size:12px;padding:8px 12px;">📥 가져오기</button>
+        <button class="btn danger" onclick="clearWordbook()" style="font-size:12px;padding:8px 12px;">삭제</button>
+      </div>
+    </div>
+    <div class="wordbook-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <button class="wordbook-tab active-en" id="wb-tab-en" onclick="switchWordbookTab('en')">🇺🇸 영어</button>
+      <button class="wordbook-tab" id="wb-tab-ko" onclick="switchWordbookTab('ko')">🇰🇷 한국어</button>
+      <button class="wordbook-tab" id="wb-tab-ja" onclick="switchWordbookTab('ja')">🇯🇵 일본어</button>
+      <button class="wordbook-tab" id="wb-tab-zh" onclick="switchWordbookTab('zh')">🇨🇳 중국어</button>
+    </div>
+    <div id="wordbook-list"></div>
+  </div>
+
+  <!-- QUIZ PAGE -->
+  <div class="page" id="page-quiz">
+    <div id="quiz-container"></div>
+  </div>
+
+  <!-- WRONG NOTE PAGE -->
+  <div class="page" id="page-wrong">
+    <div class="section-header">
+      <div class="section-title">오답 노트</div>
+      <button class="btn secondary" onclick="clearWrong()" style="font-size:12px;padding:8px 14px;">전체 삭제</button>
+    </div>
+    <div id="wrong-list"></div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let wordbook = JSON.parse(localStorage.getItem('mydict_wordbook') || '[]');
+let wrongNote = JSON.parse(localStorage.getItem('mydict_wrong') || '[]');
+let quizState = null;
+let currentResult = null;
+let wordbookTab = 'en'; // 'en' | 'ko'
+
+// ─── API CALL ─────────────────────────────────────────────────────────────────
+async function callAI(prompt) {
+  const response = await fetch('/api/ai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt })
+  });
+  const data = await response.json();
+  if (data.error) throw new Error(data.error);
+  return data.result.replace(/```json|```/g, '').trim();
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function save() {
+  localStorage.setItem('mydict_wordbook', JSON.stringify(wordbook));
+  localStorage.setItem('mydict_wrong', JSON.stringify(wrongNote));
+  updateBadges();
+}
+
+function updateBadges() {
+  document.getElementById('wordbook-count').textContent = wordbook.length;
+  document.getElementById('wrong-count').textContent = wrongNote.length;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.nav-tab')[['search','wordbook','quiz','wrong'].indexOf(name)].classList.add('active');
+
+  const stickyBar = document.getElementById('search-bar-wrap');
+  stickyBar.style.display = name === 'search' ? 'none' : 'none'; // 검색탭에서는 숨김
+
+  if (name === 'wordbook') renderWordbook();
+  if (name === 'quiz') renderQuizStart(false);
+  if (name === 'wrong') renderWrongNote();
+}
+
+// ─── LANGUAGE DETECTION ───────────────────────────────────────────────────────
+function detectLang(text) {
+  if (/[가-힣]/.test(text)) return 'ko';
+  if (/[ぁ-んァ-ン]/.test(text)) return 'ja';
+  if (/[一-鿿]/.test(text)) return 'zh';
+  return 'en';
+}
+
+function updateLangIndicator(lang) {
+  var tags = {
+    'en': ['lang-tag-en2', 'active-en'],
+    'ko': ['lang-tag-ko2', 'active-ko'],
+    'ja': ['lang-tag-ja2', 'active-ja'],
+    'zh': ['lang-tag-zh2', 'active-zh']
+  };
+  Object.keys(tags).forEach(function(l) {
+    var el = document.getElementById(tags[l][0]);
+    if (el) el.className = 'lang-tag' + (l === lang ? ' ' + tags[l][1] : '');
+  });
+}
+
+// ─── SEARCH ───────────────────────────────────────────────────────────────────
+document.getElementById('search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+document.getElementById('search-input').addEventListener('input', e => {
+  updateLangIndicator(detectLang(e.target.value));
+});
+
+function selectSearchInput() {
+  const input = document.getElementById('search-input');
+  input.focus();
+  input.select();
+}
+
+async function doSearch() {
+  const query = document.getElementById('search-input').value.trim();
+  if (!query) return;
+
+  const lang = detectLang(query);
+  updateLangIndicator(lang);
+
+  const resultDiv = document.getElementById('search-result');
+  const btn = document.getElementById('search-btn');
+
+  // 단어장 캐시 확인
+  const cached = wordbook.find(w => {
+    if (lang === 'en') return w.word.toLowerCase() === query.toLowerCase() && w.lang === 'en';
+    return w.word === query && w.lang === lang;
+  });
+  if (cached) {
+    if (lang === 'en') renderResultEN(cached, true);
+    else if (lang === 'ko') renderResultKO(cached, true);
+    else if (lang === 'ja') renderResultJA(cached, true);
+    else if (lang === 'zh') renderResultZH(cached, true);
+    selectSearchInput();
+    return;
+  }
+
+  resultDiv.innerHTML = `<div class="loading"><div class="spinner"></div>검색 중...</div>`;
+  btn.disabled = true;
+
+  try {
+    if (lang === 'en') {
+      await searchEnglish(query, resultDiv);
+    } else if (lang === 'ko') {
+      await searchKorean(query, resultDiv);
+    } else if (lang === 'ja') {
+      await searchJapanese(query, resultDiv);
+    } else if (lang === 'zh') {
+      await searchChinese(query, resultDiv);
+    }
+    selectSearchInput();
+  } catch (err) {
+    resultDiv.innerHTML = `<div class="result-card" style="color:var(--wrong)">오류가 발생했습니다. 다시 시도해주세요.<br><small>${err.message}</small></div>`;
+  }
+
+  btn.disabled = false;
+}
+
+// ─── ENGLISH SEARCH ───────────────────────────────────────────────────────────
+async function searchEnglish(query, resultDiv) {
+  const prompt = `You are an English dictionary assistant for a Korean learner.
+For the English word or phrase: "${query}"
+
+Respond ONLY in valid JSON with this exact structure:
+{
+  "word": "the word/phrase",
+  "pronunciation": "/prəˌnʌnsiˈeɪʃən/",
+  "pos": ["noun", "verb"],
+  "short_meaning": "핵심 뜻만 한국어로 5단어 이내",
+  "nuance": "한국어로 통상적인 의미와 뉘앙스 설명 (2-4문장)",
+  "usages": [
+    {
+      "context": "맥락 라벨",
+      "description": "한국어로 이 맥락에서의 쓰임새 설명",
+      "example": "English example sentence.",
+      "translation": "예문의 한국어 해석"
+    }
+  ],
+  "similar": [
+    {
+      "word": "similar English word",
+      "diff": "한국어로 뉘앙스 차이 설명"
+    }
+  ]
+}
+
+Return 2-3 usages and 3-4 similar words. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
+
+  const text = await callAI(prompt);
+  const result = JSON.parse(text);
+  result.lang = 'en';
+  currentResult = result;
+
+  const alreadySaved = wordbook.some(w => w.word.toLowerCase() === result.word.toLowerCase() && w.lang === 'en');
+  if (!alreadySaved) {
+    wordbook.push({ ...result, savedAt: Date.now() });
+    save();
+  }
+  renderResultEN(result, alreadySaved);
+}
+
+function renderResultEN(result, alreadySaved) {
+  const posMap = {
+    'noun': '명사', 'verb': '동사', 'adjective': '형용사', 'adverb': '부사',
+    'preposition': '전치사', 'conjunction': '접속사', 'pronoun': '대명사',
+    'interjection': '감탄사', 'phrase': '구', 'idiom': '관용어'
+  };
+
+  const posHtml = (result.pos || []).map(p =>
+    `<span class="result-pos-tag">${posMap[p.toLowerCase()] || p}</span>`
+  ).join('');
+
+  const usagesHtml = (result.usages || []).map(u => `
+    <div class="usage-item">
+      <div class="usage-context">${u.context}</div>
+      <div class="usage-desc">${u.description}</div>
+      <div class="usage-example">${u.example}</div>
+      ${u.translation ? `<div class="usage-translation">→ ${u.translation}</div>` : ''}
+    </div>
+  `).join('');
+
+  const similarHtml = (result.similar || []).map(s => `
+    <div class="similar-item">
+      <div class="similar-word" onclick="searchWord('${s.word}', 'en')">${s.word}</div>
+      <div class="similar-diff">${s.diff}</div>
+    </div>
+  `).join('');
+
+  document.getElementById('search-result').innerHTML = `
+    <div class="result-card">
+      <div class="result-word">${result.word}</div>
+      ${result.pronunciation ? `<div class="result-pronunciation">${result.pronunciation}</div>` : ''}
+      ${posHtml ? `<div class="result-pos-list">${posHtml}</div>` : ''}
+
+      <div class="result-section">
+        <div class="result-section-title">의미 & 뉘앙스</div>
+        <div class="result-section-body">${result.nuance}</div>
+      </div>
+
+      <div class="result-section">
+        <div class="result-section-title">쓰임새</div>
+        ${usagesHtml}
+      </div>
+
+      <div class="result-section">
+        <div class="result-section-title">유사한 단어</div>
+        <div class="similar-list">${similarHtml}</div>
+      </div>
+
+      <div class="extra-trans-wrap">
+        <div class="extra-trans-label">추가 번역</div>
+        <div class="extra-trans-btns">
+          <button class="extra-trans-btn ja" onclick="loadExtraTrans('${result.word}', 'ja', this)">🇯🇵 일본어로 보기</button>
+          <button class="extra-trans-btn zh" onclick="loadExtraTrans('${result.word}', 'zh', this)">🇨🇳 중국어로 보기</button>
+        </div>
+        <div class="extra-trans-result" id="extra-trans-result"></div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── KOREAN SEARCH ────────────────────────────────────────────────────────────
+async function searchKorean(query, resultDiv) {
+  const prompt = `You are a Korean-English dictionary assistant.
+For the Korean word or phrase: "${query}"
+
+Respond ONLY in valid JSON:
+{
+  "word": "${query}",
+  "nuance": "이 한국어 단어/표현의 의미와 뉘앙스를 한국어로 설명 (2-3문장)",
+  "entries": [
+    {
+      "english": "English translation",
+      "pronunciation": "/prəˌnʌnsiˈeɪʃən/",
+      "pos": ["noun"],
+      "meaning": "이 영어 단어의 의미와 언제 쓰는지 한국어로 설명",
+      "example": "English example sentence.",
+      "translation": "예문의 한국어 해석"
+    }
+  ]
+}
+
+Return 2-4 English entries representing different nuances or usages. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
+
+  const text = await callAI(prompt);
+  const result = JSON.parse(text);
+  result.lang = 'ko';
+  currentResult = result;
+
+  const alreadySaved = wordbook.some(w => w.word === result.word && w.lang === 'ko');
+  if (!alreadySaved) {
+    wordbook.push({ ...result, short_meaning: result.nuance.slice(0, 20), savedAt: Date.now() });
+    save();
+  }
+  renderResultKO(result, alreadySaved);
+}
+
+function renderResultKO(result, alreadySaved) {
+  const posMap = {
+    'noun': '명사', 'verb': '동사', 'adjective': '형용사', 'adverb': '부사',
+    'preposition': '전치사', 'conjunction': '접속사', 'pronoun': '대명사',
+    'interjection': '감탄사', 'phrase': '구', 'idiom': '관용어'
+  };
+
+  const entriesHtml = (result.entries || []).map(e => `
+    <div class="ko-entry">
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
+        <span class="ko-entry-word-link" onclick="searchEnFromKO('${e.english}')" title="영한 사전에서 보기">${e.english}</span>
+        <span style="font-size:11px;color:var(--text3)">↗ 영한 검색</span>
+      </div>
+      ${e.pronunciation ? `<div class="ko-entry-pronunciation">${e.pronunciation}</div>` : ''}
+      <div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap">
+        ${(e.pos || []).map(p => `<span class="result-pos-tag ko">${posMap[p.toLowerCase()] || p}</span>`).join('')}
+      </div>
+      <div class="ko-entry-meaning">${e.meaning}</div>
+      ${e.example ? `<div class="usage-example" style="margin-top:8px">${e.example}</div>` : ''}
+      ${e.translation ? `<div class="usage-translation">→ ${e.translation}</div>` : ''}
+    </div>
+  `).join('');
+
+  document.getElementById('search-result').innerHTML = `
+    <div class="result-card">
+      <div class="result-word" style="color:var(--accent-ko)">${result.word}</div>
+      <div style="margin-bottom:16px">
+        <div class="result-section-title" style="margin-bottom:6px">의미 & 뉘앙스</div>
+        <div class="result-section-body">${result.nuance}</div>
+      </div>
+      <div class="result-section-title" style="margin-bottom:10px">영어 표현</div>
+      ${entriesHtml}
+
+      <div class="extra-trans-wrap">
+        <div class="extra-trans-label">추가 번역</div>
+        <div class="extra-trans-btns">
+          <button class="extra-trans-btn ja" onclick="loadExtraTransKO('${result.word}', 'ja', this)">🇯🇵 일본어로 보기</button>
+          <button class="extra-trans-btn zh" onclick="loadExtraTransKO('${result.word}', 'zh', this)">🇨🇳 중국어로 보기</button>
+        </div>
+        <div class="extra-trans-result" id="extra-trans-result"></div>
+      </div>
+    </div>
+  `;
+}
+
+
+
+// ─── 한→영 결과에서 영어 단어 클릭 시 영→한 검색 ─────────────────────────────
+function searchEnFromKO(word) {
+  searchWord(word, 'en');
+}
+
+
+// ─── 유사어/추가번역 단어 클릭 검색 ──────────────────────────────────────────
+function searchWord(word, lang) {
+  document.getElementById('search-input').value = word;
+  updateLangIndicator(lang);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  doSearch();
+}
+
+// ─── JAPANESE SEARCH ──────────────────────────────────────────────────────────
+async function searchJapanese(query, resultDiv) {
+  const prompt = `You are a Japanese-Korean dictionary assistant.
+For the Japanese word or phrase: "${query}"
+
+Respond ONLY in valid JSON:
+{
+  "word": "${query}",
+  "reading": "히라가나 읽기 (후리가나)",
+  "nuance": "이 일본어 단어/표현의 의미와 뉘앙스를 한국어로 설명 (2-3문장)",
+  "pos": ["noun"],
+  "entries": [
+    {
+      "korean": "한국어 번역",
+      "english": "English translation",
+      "meaning": "이 표현의 의미와 언제 쓰는지 한국어로 설명",
+      "example": "일본어 예문.",
+      "example_reading": "예문의 히라가나 읽기",
+      "translation": "예문의 한국어 해석"
+    }
+  ]
+}
+
+Return 2-3 entries. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
+
+  const text = await callAI(prompt);
+  const result = JSON.parse(text);
+  result.lang = 'ja';
+
+  const alreadySaved = wordbook.some(w => w.word === result.word && w.lang === 'ja');
+  if (!alreadySaved) {
+    wordbook.push({ ...result, short_meaning: result.nuance.slice(0, 20), savedAt: Date.now() });
+    save();
+  }
+  renderResultJA(result, alreadySaved);
+}
+
+function renderResultJA(result, alreadySaved) {
+  const posMap = {
+    'noun': '명사', 'verb': '동사', 'adjective': '형용사', 'adverb': '부사',
+    'particle': '조사', 'conjunction': '접속사', 'phrase': '구', 'expression': '표현'
+  };
+
+  const posHtml = (result.pos || []).map(p =>
+    `<span class="result-pos-tag ja">${posMap[p.toLowerCase()] || p}</span>`
+  ).join('');
+
+  const entriesHtml = (result.entries || []).map(e => `
+    <div class="ko-entry ja">
+      <div style="display:flex;gap:8px;align-items:baseline;margin-bottom:4px">
+        <div class="ko-entry-word">${e.korean}</div>
+        ${e.english ? `<div style="font-size:13px;color:var(--text3)">${e.english}</div>` : ''}
+      </div>
+      <div class="ko-entry-meaning">${e.meaning}</div>
+      ${e.example ? `<div class="usage-example" style="margin-top:8px">${e.example}</div>` : ''}
+      ${e.example_reading ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">${e.example_reading}</div>` : ''}
+      ${e.translation ? `<div class="usage-translation">→ ${e.translation}</div>` : ''}
+    </div>
+  `).join('');
+
+  document.getElementById('search-result').innerHTML = `
+    <div class="result-card">
+      <div class="result-word" style="color:var(--accent-ja)">${result.word}</div>
+      ${result.reading ? `<div class="result-pronunciation">${result.reading}</div>` : ''}
+      ${posHtml ? `<div class="result-pos-list">${posHtml}</div>` : ''}
+      <div style="margin-bottom:16px">
+        <div class="result-section-title" style="margin-bottom:6px">의미 & 뉘앙스</div>
+        <div class="result-section-body">${result.nuance}</div>
+      </div>
+      <div class="result-section-title" style="margin-bottom:10px">번역</div>
+      ${entriesHtml}
+    </div>
+  `;
+}
+
+// ─── CHINESE SEARCH ───────────────────────────────────────────────────────────
+async function searchChinese(query, resultDiv) {
+  const prompt = `You are a Chinese-Korean dictionary assistant.
+For the Chinese word or phrase (Simplified): "${query}"
+
+Respond ONLY in valid JSON:
+{
+  "word": "${query}",
+  "pinyin": "pīnyīn with tone marks",
+  "nuance": "이 중국어 단어/표현의 의미와 뉘앙스를 한국어로 설명 (2-3문장)",
+  "pos": ["noun"],
+  "entries": [
+    {
+      "korean": "한국어 번역",
+      "english": "English translation",
+      "meaning": "이 표현의 의미와 언제 쓰는지 한국어로 설명",
+      "example": "中文例句。",
+      "example_pinyin": "zhōngwén lìjù",
+      "translation": "예문의 한국어 해석"
+    }
+  ]
+}
+
+Return 2-3 entries. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
+
+  const text = await callAI(prompt);
+  const result = JSON.parse(text);
+  result.lang = 'zh';
+
+  const alreadySaved = wordbook.some(w => w.word === result.word && w.lang === 'zh');
+  if (!alreadySaved) {
+    wordbook.push({ ...result, short_meaning: result.nuance.slice(0, 20), savedAt: Date.now() });
+    save();
+  }
+  renderResultZH(result, alreadySaved);
+}
+
+function renderResultZH(result, alreadySaved) {
+  const posMap = {
+    'noun': '명사', 'verb': '동사', 'adjective': '형용사', 'adverb': '부사',
+    'measure word': '양사', 'conjunction': '접속사', 'phrase': '구', 'expression': '표현'
+  };
+
+  const posHtml = (result.pos || []).map(p =>
+    `<span class="result-pos-tag zh">${posMap[p.toLowerCase()] || p}</span>`
+  ).join('');
+
+  const entriesHtml = (result.entries || []).map(e => `
+    <div class="ko-entry zh">
+      <div style="display:flex;gap:8px;align-items:baseline;margin-bottom:4px">
+        <div class="ko-entry-word">${e.korean}</div>
+        ${e.english ? `<div style="font-size:13px;color:var(--text3)">${e.english}</div>` : ''}
+      </div>
+      <div class="ko-entry-meaning">${e.meaning}</div>
+      ${e.example ? `<div class="usage-example" style="margin-top:8px">${e.example}</div>` : ''}
+      ${e.example_pinyin ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">${e.example_pinyin}</div>` : ''}
+      ${e.translation ? `<div class="usage-translation">→ ${e.translation}</div>` : ''}
+    </div>
+  `).join('');
+
+  document.getElementById('search-result').innerHTML = `
+    <div class="result-card">
+      <div class="result-word" style="color:var(--accent-zh)">${result.word}</div>
+      ${result.pinyin ? `<div class="result-pronunciation">${result.pinyin}</div>` : ''}
+      ${posHtml ? `<div class="result-pos-list">${posHtml}</div>` : ''}
+      <div style="margin-bottom:16px">
+        <div class="result-section-title" style="margin-bottom:6px">의미 & 뉘앙스</div>
+        <div class="result-section-body">${result.nuance}</div>
+      </div>
+      <div class="result-section-title" style="margin-bottom:10px">번역</div>
+      ${entriesHtml}
+    </div>
+  `;
+}
+
+
+// ─── 추가 번역 (영어→일본어/중국어) ────────────────────────────────────────────
+async function loadExtraTrans(word, lang, btn) {
+  var resultDiv = document.getElementById('extra-trans-result');
+  var allBtns = btn.parentElement.querySelectorAll('.extra-trans-btn');
+  allBtns.forEach(function(b) { b.disabled = true; b.classList.add('loading'); });
+
+  var langName = lang === 'ja' ? '일본어' : '중국어';
+  resultDiv.innerHTML = '<div class="loading"><div class="spinner"></div>' + langName + '로 번역 중...</div>';
+
+  try {
+    var prompt;
+    if (lang === 'ja') {
+      prompt = 'Translate the English word "' + word + '" into Japanese. Respond ONLY in valid JSON: {"japanese": "일본어 번역 (한자+히라가나)", "reading": "히라가나 읽기", "meaning": "한국어로 의미 설명 (1-2문장)", "example": "일본어 예문", "example_reading": "예문 히라가나", "translation": "예문 한국어 해석"}. ONLY JSON.';
+    } else {
+      prompt = 'Translate the English word "' + word + '" into Simplified Chinese. Respond ONLY in valid JSON: {"chinese": "중국어 번역 (간체)", "pinyin": "pīnyīn", "meaning": "한국어로 의미 설명 (1-2문장)", "example": "中文例句", "example_pinyin": "pīnyīn", "translation": "예문 한국어 해석"}. ONLY JSON.';
+    }
+
+    var text = await callAI(prompt);
+    var r = JSON.parse(text);
+
+    if (lang === 'ja') {
+      resultDiv.innerHTML = '<div class="ko-entry ja" style="margin-top:0">' +
+        '<div class="ko-entry-word" style="cursor:pointer" onclick="searchWord(\'' + (r.japanese || '') + '\', \'ja\')" title="일본어 사전에서 보기">' + (r.japanese || '') + '</div>' +
+        (r.reading ? '<div class="ko-entry-pronunciation">' + r.reading + '</div>' : '') +
+        '<div class="ko-entry-meaning">' + (r.meaning || '') + '</div>' +
+        (r.example ? '<div class="usage-example" style="margin-top:8px">' + r.example + '</div>' : '') +
+        (r.example_reading ? '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + r.example_reading + '</div>' : '') +
+        (r.translation ? '<div class="usage-translation">→ ' + r.translation + '</div>' : '') +
+        '</div>';
+    } else {
+      resultDiv.innerHTML = '<div class="ko-entry zh" style="margin-top:0">' +
+        '<div class="ko-entry-word" style="cursor:pointer" onclick="searchWord(\'' + (r.chinese || '') + '\', \'zh\')" title="중국어 사전에서 보기">' + (r.chinese || '') + '</div>' +
+        (r.pinyin ? '<div class="ko-entry-pronunciation">' + r.pinyin + '</div>' : '') +
+        '<div class="ko-entry-meaning">' + (r.meaning || '') + '</div>' +
+        (r.example ? '<div class="usage-example" style="margin-top:8px">' + r.example + '</div>' : '') +
+        (r.example_pinyin ? '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + r.example_pinyin + '</div>' : '') +
+        (r.translation ? '<div class="usage-translation">→ ' + r.translation + '</div>' : '') +
+        '</div>';
+    }
+  } catch(e) {
+    resultDiv.innerHTML = '<div style="color:var(--wrong);font-size:13px">번역 오류: ' + e.message + '</div>';
+  }
+
+  allBtns.forEach(function(b) { b.disabled = false; b.classList.remove('loading'); });
+}
+
+async function loadExtraTransKO(word, lang, btn) {
+  var resultDiv = document.getElementById('extra-trans-result');
+  var allBtns = btn.parentElement.querySelectorAll('.extra-trans-btn');
+  allBtns.forEach(function(b) { b.disabled = true; b.classList.add('loading'); });
+
+  var langName = lang === 'ja' ? '일본어' : '중국어';
+  resultDiv.innerHTML = '<div class="loading"><div class="spinner"></div>' + langName + '로 번역 중...</div>';
+
+  try {
+    var prompt;
+    if (lang === 'ja') {
+      prompt = '한국어 단어 "' + word + '"를 일본어로 번역해줘. Respond ONLY in valid JSON: {"japanese": "일본어 번역", "reading": "히라가나 읽기", "meaning": "한국어로 의미 설명 (1-2문장)", "example": "일본어 예문", "example_reading": "예문 히라가나", "translation": "예문 한국어 해석"}. ONLY JSON.';
+    } else {
+      prompt = '한국어 단어 "' + word + '"를 중국어 간체로 번역해줘. Respond ONLY in valid JSON: {"chinese": "중국어 번역", "pinyin": "pīnyīn", "meaning": "한국어로 의미 설명 (1-2문장)", "example": "中文例句", "example_pinyin": "pīnyīn", "translation": "예문 한국어 해석"}. ONLY JSON.';
+    }
+
+    var text = await callAI(prompt);
+    var r = JSON.parse(text);
+
+    if (lang === 'ja') {
+      resultDiv.innerHTML = '<div class="ko-entry ja" style="margin-top:0">' +
+        '<div class="ko-entry-word" style="cursor:pointer" onclick="searchWord(\'' + (r.japanese || '') + '\', \'ja\')" title="일본어 사전에서 보기">' + (r.japanese || '') + '</div>' +
+        (r.reading ? '<div class="ko-entry-pronunciation">' + r.reading + '</div>' : '') +
+        '<div class="ko-entry-meaning">' + (r.meaning || '') + '</div>' +
+        (r.example ? '<div class="usage-example" style="margin-top:8px">' + r.example + '</div>' : '') +
+        (r.example_reading ? '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + r.example_reading + '</div>' : '') +
+        (r.translation ? '<div class="usage-translation">→ ' + r.translation + '</div>' : '') +
+        '</div>';
+    } else {
+      resultDiv.innerHTML = '<div class="ko-entry zh" style="margin-top:0">' +
+        '<div class="ko-entry-word" style="cursor:pointer" onclick="searchWord(\'' + (r.chinese || '') + '\', \'zh\')" title="중국어 사전에서 보기">' + (r.chinese || '') + '</div>' +
+        (r.pinyin ? '<div class="ko-entry-pronunciation">' + r.pinyin + '</div>' : '') +
+        '<div class="ko-entry-meaning">' + (r.meaning || '') + '</div>' +
+        (r.example ? '<div class="usage-example" style="margin-top:8px">' + r.example + '</div>' : '') +
+        (r.example_pinyin ? '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + r.example_pinyin + '</div>' : '') +
+        (r.translation ? '<div class="usage-translation">→ ' + r.translation + '</div>' : '') +
+        '</div>';
+    }
+  } catch(e) {
+    resultDiv.innerHTML = '<div style="color:var(--wrong);font-size:13px">번역 오류: ' + e.message + '</div>';
+  }
+
+  allBtns.forEach(function(b) { b.disabled = false; b.classList.remove('loading'); });
+}
+
+// ─── WORDBOOK ─────────────────────────────────────────────────────────────────
+let currentWordbookTab = 'en';
+
+function switchWordbookTab(tab) {
+  currentWordbookTab = tab;
+  ['en','ko','ja','zh'].forEach(function(l) {
+    var el = document.getElementById('wb-tab-' + l);
+    if (el) el.className = 'wordbook-tab' + (tab === l ? ' active-' + l : '');
+  });
+  renderWordbook();
+}
+
+// 한국어 초성 추출 (쌍자음 → 기본자음 통합)
+const KO_CHOSUNG_ALL = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+const KO_CHOSUNG_MAP = {'ㄲ':'ㄱ','ㄸ':'ㄷ','ㅃ':'ㅂ','ㅆ':'ㅅ','ㅉ':'ㅈ'};
+const KO_ORDER = ['ㄱ','ㄴ','ㄷ','ㄹ','ㅁ','ㅂ','ㅅ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+
+function getChosung(char) {
+  const code = char.charCodeAt(0);
+  if (code < 0xAC00 || code > 0xD7A3) return char.toUpperCase();
+  const idx = Math.floor((code - 0xAC00) / 588);
+  const ch = KO_CHOSUNG_ALL[idx];
+  return KO_CHOSUNG_MAP[ch] || ch;
+}
+
+function renderWordbook() {
+  var el = document.getElementById('wordbook-list');
+  var tab = currentWordbookTab;
+  var filtered = wordbook.filter(function(w) { return (w.lang || 'en') === tab; });
+
+  if (filtered.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">아직 저장된 단어가 없어요.<br>검색하면 자동으로 저장됩니다.</div></div>';
+    return;
+  }
+
+  var locale = {en:'en', ko:'ko', ja:'ja', zh:'zh'}[tab] || 'en';
+  var sorted = filtered.slice().sort(function(a, b) {
+    return a.word.localeCompare(b.word, locale);
+  });
+
+  var groups = {};
+  sorted.forEach(function(w) {
+    var letter = tab === 'ko' ? getChosung(w.word[0]) : w.word[0].toUpperCase();
+    if (!groups[letter]) groups[letter] = [];
+    groups[letter].push(w);
+  });
+
+  var sortedKeys;
+  if (tab === 'ko') {
+    sortedKeys = Object.keys(groups).sort(function(a, b) {
+      var ai = KO_ORDER.indexOf(a), bi = KO_ORDER.indexOf(b);
+      if (ai === -1 && bi === -1) return a.localeCompare(b, 'ko');
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  } else {
+    sortedKeys = Object.keys(groups).sort();
+  }
+
+  var chipClass = tab !== 'en' ? tab : '';
+  var headerClass = tab !== 'en' ? tab : '';
+
+  var html = sortedKeys.map(function(letter) {
+    var chips = groups[letter].map(function(w) {
+      var safeWord = w.word.split("'").join("\\'");
+      return '<div class="word-chip ' + chipClass + '" onclick="searchFromWordbook(\'' + safeWord + '\', \'' + tab + '\')">' +
+        '<span class="word-chip-text">' + w.word + '</span>' +
+        '<span class="word-chip-del" onclick="event.stopPropagation();deleteWord(\'' + safeWord + '\', \'' + tab + '\')">×</span>' +
+        '</div>';
+    }).join('');
+    return '<div class="alpha-section">' +
+      '<div class="alpha-header ' + headerClass + '">' + letter + '</div>' +
+      '<div class="alpha-words">' + chips + '</div>' +
+      '</div>';
+  }).join('');
+
+  el.innerHTML = '<div class="word-grid">' + html + '</div>';
+}
+function searchFromWordbook(word, lang) {
+  document.getElementById('search-input').value = word;
+  updateLangIndicator(lang);
+  showPage('search');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  doSearch();
+}
+
+function deleteWord(word, lang) {
+  wordbook = wordbook.filter(w => !(w.word === word && (w.lang || 'en') === lang));
+  save();
+  renderWordbook();
+  showToast('단어를 삭제했습니다.');
+}
+
+
+// ─── DOWNLOAD & IMPORT ────────────────────────────────────────────────────────
+function downloadCSV() {
+  if (wordbook.length === 0) { showToast('저장된 단어가 없습니다.'); return; }
+  var rows = [['언어', '단어', '핵심 뜻', '뉘앙스', '저장일']];
+  wordbook.forEach(function(w) {
+    var lang = (w.lang || 'en') === 'en' ? '영어' : '한국어';
+    var date = new Date(w.savedAt || Date.now()).toLocaleDateString('ko-KR');
+    var nuance = (w.nuance || '').split('"').join('""').split('\n').join(' ');
+    var short = (w.short_meaning || '').split('"').join('""');
+    rows.push([lang, w.word, '"' + short + '"', '"' + nuance + '"', date]);
+  });
+  var CRLF = '\r\n';
+  var csv = '\uFEFF' + rows.map(function(r){ return r.join(','); }).join(CRLF);
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'mydict_' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('CSV 파일 다운로드 완료!');
+}
+
+function downloadJSON() {
+  if (wordbook.length === 0) { showToast('저장된 단어가 없습니다.'); return; }
+
+  const data = {
+    exported_at: new Date().toISOString(),
+    total: wordbook.length,
+    wordbook: wordbook
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mydict_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('JSON 백업 파일 다운로드 완료!');
+}
+
+function importJSON() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const imported = data.wordbook || data;
+      if (!Array.isArray(imported)) throw new Error('올바른 형식이 아닙니다.');
+
+      let added = 0;
+      imported.forEach(w => {
+        const exists = wordbook.some(existing =>
+          existing.word === w.word && (existing.lang || 'en') === (w.lang || 'en')
+        );
+        if (!exists) { wordbook.push(w); added++; }
+      });
+
+      save();
+      renderWordbook();
+      showToast(`${added}개 단어를 가져왔습니다!`);
+    } catch (err) {
+      showToast('파일을 읽을 수 없습니다: ' + err.message);
+    }
+  };
+  input.click();
+}
+
+function clearWordbook() {
+  if (!confirm('단어장을 전체 삭제할까요?')) return;
+  wordbook = [];
+  save();
+  renderWordbook();
+  showToast('단어장을 비웠습니다.');
+}
+
+// ─── QUIZ ─────────────────────────────────────────────────────────────────────
+const QUIZ_TYPES = [
+  { id: 'en2ko', label: '영어 → 한국어', desc: '영어 단어를 보고 알맞은 뜻을 고르세요' },
+  { id: 'ko2en', label: '한국어 → 영어', desc: '한국어 뜻을 보고 알맞은 단어를 고르세요' },
+  { id: 'similar', label: '유사어 찾기', desc: '가장 유사한 단어를 고르세요' }
+];
+
+let selectedQuizType = 'en2ko';
+let isWrongQuiz = false;
+
+function renderQuizStart(wrongMode) {
+  isWrongQuiz = wrongMode;
+  const enWords = wordbook.filter(w => (w.lang || 'en') === 'en');
+  const pool = wrongMode ? wrongNote : enWords;
+  const container = document.getElementById('quiz-container');
+
+  if (pool.length < 10) {
+    container.innerHTML = `
+      <div class="quiz-start-card">
+        <div style="font-size:32px;margin-bottom:12px">${wrongMode ? '📝' : '📚'}</div>
+        <div style="font-size:17px;font-weight:700;margin-bottom:8px">${wrongMode ? '오답 퀴즈' : '퀴즈'}</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.7">
+          ${wrongMode
+            ? `오답 노트에 단어가 ${pool.length}개 있어요.<br>10개 이상 쌓이면 오답 퀴즈를 시작할 수 있어요.`
+            : `영어 단어장에 ${pool.length}개 있어요.<br>10개 이상 저장하면 퀴즈를 시작할 수 있어요.`}
+        </div>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="quiz-start-card">
+      <div style="font-size:32px;margin-bottom:12px">${wrongMode ? '📝' : '🎯'}</div>
+      <div style="font-size:17px;font-weight:700;margin-bottom:4px">${wrongMode ? '오답 퀴즈' : '퀴즈'}</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:20px">${pool.length}개 단어 준비됨</div>
+      <div style="font-size:12px;color:var(--text3);text-align:left;margin-bottom:8px;font-weight:700;letter-spacing:.05em;text-transform:uppercase">퀴즈 유형 선택</div>
+      <div class="quiz-type-grid">
+        ${QUIZ_TYPES.map(t => `
+          <button class="quiz-type-btn ${t.id === selectedQuizType ? 'selected' : ''}" onclick="selectQuizType('${t.id}')">
+            <div class="quiz-type-label">${t.label}</div>
+            <div class="quiz-type-desc">${t.desc}</div>
+          </button>
+        `).join('')}
+      </div>
+      <button class="btn" style="width:100%" onclick="startQuiz()">퀴즈 시작</button>
+      ${wrongMode ? '' : `<button class="btn secondary" style="width:100%;margin-top:8px" onclick="renderQuizStart(true)">오답 퀴즈 시작</button>`}
+    </div>`;
+}
+
+function selectQuizType(type) {
+  selectedQuizType = type;
+  document.querySelectorAll('.quiz-type-btn').forEach((b, i) => {
+    b.classList.toggle('selected', QUIZ_TYPES[i].id === type);
+  });
+}
+
+function startQuiz() {
+  const enWords = wordbook.filter(w => (w.lang || 'en') === 'en');
+  const pool = isWrongQuiz ? wrongNote : enWords;
+  const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(10, pool.length));
+
+  let questions;
+  if (selectedQuizType === 'similar') {
+    const eligible = shuffled.filter(w => w.similar && w.similar.length >= 1);
+    if (eligible.length < 4) { showToast('유사어 퀴즈를 위한 단어가 부족합니다.'); return; }
+    questions = eligible;
+  } else {
+    questions = shuffled;
+  }
+
+  quizState = { type: selectedQuizType, questions, current: 0, correct: 0, wrongWords: [] };
+  renderQuizQuestion();
+}
+
+function renderQuizQuestion() {
+  const { type, questions, current } = quizState;
+  const q = questions[current];
+  const container = document.getElementById('quiz-container');
+  const total = questions.length;
+  const enWords = wordbook.filter(w => (w.lang || 'en') === 'en');
+
+  let questionText, options, correctIndex;
+
+  if (type === 'en2ko') {
+    questionText = q.word;
+    const correctAnswer = q.short_meaning || q.nuance.slice(0, 30) + (q.nuance.length > 30 ? '...' : '');
+    const wrongPool = enWords.filter(w => w.word !== q.word).sort(() => Math.random() - 0.5);
+    const wrongs = wrongPool.slice(0, 3).map(w => w.short_meaning || w.nuance.slice(0, 30) + (w.nuance.length > 30 ? '...' : ''));
+    const fillers = ['해당 없음', '알 수 없음', '정의 없음'];
+    while (wrongs.length < 3) wrongs.push(fillers[wrongs.length]);
+    correctIndex = Math.floor(Math.random() * 4);
+    options = [...wrongs]; options.splice(correctIndex, 0, correctAnswer); options = options.slice(0, 4);
+
+  } else if (type === 'ko2en') {
+    questionText = q.short_meaning || q.nuance.slice(0, 30) + (q.nuance.length > 30 ? '...' : '');
+    const wrongPool = enWords.filter(w => w.word !== q.word).sort(() => Math.random() - 0.5);
+    const wrongs = wrongPool.slice(0, 3).map(w => w.word);
+    const fillers = ['other', 'none', 'unknown'];
+    while (wrongs.length < 3) wrongs.push(fillers[wrongs.length]);
+    correctIndex = Math.floor(Math.random() * 4);
+    options = [...wrongs]; options.splice(correctIndex, 0, q.word); options = options.slice(0, 4);
+
+  } else {
+    const correctSimilar = q.similar[Math.floor(Math.random() * q.similar.length)];
+    questionText = `"${q.word}"와 가장 유사한 단어는?`;
+    const allWords = enWords.flatMap(w => w.similar || []).map(s => s.word);
+    const pool = [...new Set(allWords)].filter(w => w !== correctSimilar.word);
+    const wrongs = pool.sort(() => Math.random() - 0.5).slice(0, 3);
+    const fillers = ['none', 'other', 'unknown'];
+    while (wrongs.length < 3) wrongs.push(fillers[wrongs.length]);
+    correctIndex = Math.floor(Math.random() * 4);
+    options = [...wrongs]; options.splice(correctIndex, 0, correctSimilar.word); options = options.slice(0, 4);
+  }
+
+  const typeLabel = QUIZ_TYPES.find(t => t.id === type).label;
+  const progress = ((current) / total * 100).toFixed(0);
+
+  container.innerHTML = `
+    <div class="quiz-progress">
+      <div class="progress-bar"><div class="progress-fill" style="width:${progress}%"></div></div>
+      <div class="progress-text">${current + 1} / ${total}</div>
+    </div>
+    <div class="quiz-card">
+      <div class="quiz-type-tag">${typeLabel}</div>
+      <div class="quiz-question">${questionText}</div>
+      <div class="quiz-options">
+        ${options.map((opt, i) => `
+          <button class="quiz-option" onclick="selectOption(this, ${i}, ${correctIndex})">${opt}</button>
+        `).join('')}
+      </div>
+      <div class="quiz-feedback" id="quiz-feedback"></div>
+      <button class="btn quiz-next-btn" id="quiz-next" onclick="nextQuestion()">
+        ${current + 1 === total ? '결과 보기' : '다음 →'}
+      </button>
+    </div>`;
+}
+
+function selectOption(btn, selected, correct) {
+  const options = document.querySelectorAll('.quiz-option');
+  options.forEach(o => o.disabled = true);
+  const isCorrect = selected === correct;
+  btn.classList.add(isCorrect ? 'correct' : 'wrong');
+  options[correct].classList.add('correct');
+  const feedback = document.getElementById('quiz-feedback');
+  feedback.className = 'quiz-feedback ' + (isCorrect ? 'correct' : 'wrong');
+  feedback.textContent = isCorrect ? '✓ 정답입니다!' : '✗ 틀렸습니다.';
+  if (isCorrect) {
+    quizState.correct++;
+  } else {
+    const q = quizState.questions[quizState.current];
+    quizState.wrongWords.push(q);
+    const already = wrongNote.some(w => w.word === q.word);
+    if (!already) wrongNote.push(q);
+    save();
+  }
+  document.getElementById('quiz-next').style.display = 'block';
+}
+
+function nextQuestion() {
+  quizState.current++;
+  if (quizState.current >= quizState.questions.length) renderQuizResult();
+  else renderQuizQuestion();
+}
+
+function renderQuizResult() {
+  const { correct, questions, wrongWords } = quizState;
+  const total = questions.length;
+  const pct = Math.round(correct / total * 100);
+  const emoji = pct >= 80 ? '🎉' : pct >= 50 ? '👍' : '💪';
+
+  document.getElementById('quiz-container').innerHTML = `
+    <div class="quiz-result-card">
+      <div style="font-size:36px">${emoji}</div>
+      <div class="result-score">${pct}%</div>
+      <div class="result-score-label">${correct} / ${total} 정답</div>
+      ${wrongWords.length > 0 ? `
+        <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:14px;margin-bottom:20px;text-align:left">
+          <div style="font-size:12px;color:var(--text3);margin-bottom:8px;font-weight:700">오답 단어 (${wrongWords.length}개)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${wrongWords.map(w => `<span style="background:rgba(248,113,113,0.15);color:var(--wrong);padding:4px 10px;border-radius:20px;font-size:13px;font-family:'Sora',sans-serif;font-weight:600">${w.word}</span>`).join('')}
+          </div>
+        </div>
+      ` : ''}
+      <div class="result-actions">
+        <button class="btn" onclick="startQuiz()">다시 풀기</button>
+        <button class="btn secondary" onclick="renderQuizStart(false)">퀴즈 메뉴로</button>
+        ${wrongWords.length > 0 ? `<button class="btn" style="background:var(--accent2)" onclick="renderQuizStart(true)">오답 퀴즈 바로 시작</button>` : ''}
+      </div>
+    </div>`;
+}
+
+// ─── WRONG NOTE ───────────────────────────────────────────────────────────────
+function renderWrongNote() {
+  const el = document.getElementById('wrong-list');
+  if (wrongNote.length === 0) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🎯</div><div class="empty-state-text">오답 노트가 비어있어요.<br>퀴즈를 풀면 틀린 단어가 여기 저장됩니다.</div></div>`;
+    return;
+  }
+  const startBtn = wrongNote.length >= 10
+    ? `<button class="btn" onclick="showPage('quiz');renderQuizStart(true)" style="font-size:12px;padding:8px 14px;">오답 퀴즈</button>`
+    : `<span style="font-size:12px;color:var(--text3)">10개부터 퀴즈 가능</span>`;
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-size:13px;color:var(--text2)">${wrongNote.length}개</span>
+      ${startBtn}
+    </div>
+    <div class="word-grid">${wrongNote.map((w, i) => `
+      <div class="word-chip" onclick="searchFromWordbook('${w.word.replace(/'/g, "\\'")}', 'en')">
+        <span class="word-chip-text" style="color:var(--accent2)">${w.word}</span>
+        <span class="word-chip-del" onclick="event.stopPropagation();deleteWrong(${i})">×</span>
+      </div>
+    `).join('')}</div>`;
+}
+
+function deleteWrong(i) {
+  wrongNote.splice(i, 1);
+  save();
+  renderWrongNote();
+  showToast('오답 노트에서 삭제했습니다.');
+}
+
+function clearWrong() {
+  if (!confirm('오답 노트를 전체 삭제할까요?')) return;
+  wrongNote = [];
+  save();
+  renderWrongNote();
+  showToast('오답 노트를 비웠습니다.');
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
+
+// short_meaning 백필
+async function backfillShortMeanings() {
+  const missing = wordbook.filter(w => !w.short_meaning && (w.lang || 'en') === 'en');
+  if (missing.length === 0) return;
+  for (const w of missing) {
+    try {
+      const text = await callAI(`영어 단어 또는 표현 "${w.word}"의 핵심 뜻을 한국어로 5단어 이내로만 답하세요. 다른 설명 없이 뜻만 출력하세요.`);
+      w.short_meaning = text.trim().replace(/"/g, '');
+    } catch (e) {
+      w.short_meaning = w.nuance ? w.nuance.slice(0, 20) : '';
+    }
+  }
+  save();
+}
+
+// 기존 단어에 lang 필드 추가
+wordbook = wordbook.map(w => ({ ...w, lang: w.lang || 'en' }));
+
+// Init
+updateBadges();
+backfillShortMeanings();
+</script>
+</body>
+</html>
