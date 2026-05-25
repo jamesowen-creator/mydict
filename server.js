@@ -39,6 +39,13 @@ Respond in the following JSON format:
 
 Always respond with valid JSON only, no additional text. Provide 2-4 definitions when applicable. If the input is not a valid English word or phrase, return {"error": "유효하지 않은 단어입니다"}.`;
 
+app.get('/api/files', (req, res) => {
+  const fs = require('fs');
+  const publicDir = path.join(__dirname, 'public');
+  const files = fs.readdirSync(publicDir);
+  res.json({ files, publicDir });
+});
+
 app.get('/api/debug', (req, res) => {
   const ak = process.env.ANTHROPIC_API_KEY;
   const pw = process.env.APP_PASSWORD;
