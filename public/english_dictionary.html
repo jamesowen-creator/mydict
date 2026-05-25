@@ -921,7 +921,8 @@ async function callAI(prompt) {
   });
   const data = await response.json();
   if (data.error) throw new Error(data.error);
-  return data.result.replace(/```json|```/g, '').trim();
+  if (!response.ok) throw new Error('서버 오류가 발생했습니다.');
+  return (data.result ?? '').replace(/```json|```/g, '').trim();
 }
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
