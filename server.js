@@ -85,7 +85,7 @@ app.post('/api/search', async (req, res) => {
       system: SYSTEM_PROMPT,
     });
 
-    const raw = message.content[0].type === 'text' ? message.content[0].text : '';
+    const raw = message.content[0]?.type === 'text' ? (message.content[0].text ?? '') : '';
     const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     const result = JSON.parse(text);
     res.json(result);
@@ -113,7 +113,7 @@ app.post('/api/ai', async (req, res) => {
       messages: [{ role: 'user', content: prompt.trim() }],
     });
 
-    const text = message.content[0].type === 'text' ? message.content[0].text : '';
+    const text = message.content[0]?.type === 'text' ? (message.content[0].text ?? '') : '';
     res.json({ text });
   } catch (err) {
     console.error('API error:', err.message);
