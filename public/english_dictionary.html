@@ -58,7 +58,7 @@
     padding: 4px 14px 4px 0;
     border-right: 1px solid var(--border);
     margin-right: 8px;
-    cursor: default;
+    cursor: pointer;
   }
 
   .nav-tabs {
@@ -870,7 +870,7 @@
 
   /* ─── NAV USER INFO ───────────────────────────────────────────── */
   .nav-user {
-    display: flex; align-items: center; gap: 4px;
+    display: flex; align-items: center;
     padding-left: 8px; flex-shrink: 0;
   }
   .nav-avatar {
@@ -880,14 +880,29 @@
     display: flex; align-items: center; justify-content: center;
     cursor: default; user-select: none;
   }
-  .nav-logout-btn {
-    width: 28px; height: 28px; border-radius: 8px;
-    background: none; border: none; flex-shrink: 0;
-    color: var(--text3); font-size: 16px; line-height: 1;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
+
+  /* ─── SEARCH WELCOME ─────────────────────────────────────────── */
+  .user-welcome-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    margin: 16px 16px 8px;
+    border: 1px solid var(--border);
   }
-  .nav-logout-btn:hover { color: var(--accent2); background: rgba(245,74,122,0.08); }
+  .user-welcome-name {
+    font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2px;
+  }
+  .user-welcome-sub {
+    font-size: 12px; color: var(--text3);
+  }
+  .logout-text-btn {
+    font-size: 13px; color: var(--text3);
+    background: none; border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px;
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .logout-text-btn:hover { color: var(--accent2); border-color: var(--accent2); }
 
 </style>
 </head>
@@ -912,7 +927,7 @@
 </div>
 
 <nav>
-  <div class="nav-logo">
+  <div class="nav-logo" onclick="goHome()">
     <img src="/Gotcha_1.0.PNG" alt="Gotcha" style="height:40px;width:auto;object-fit:contain;"/>
   </div>
   <div class="nav-tabs">
@@ -923,7 +938,6 @@
   </div>
   <div class="nav-user" id="nav-user-info" style="display:none">
     <div class="nav-avatar" id="nav-user-avatar" title=""></div>
-    <button class="nav-logout-btn" onclick="logout()" title="로그아웃">↩</button>
   </div>
 </nav>
 
@@ -956,6 +970,15 @@
         <span class="lang-tag" id="lang-tag-ko2">🇰🇷 한국어</span>
         <span class="lang-tag" id="lang-tag-ja2">🇯🇵 일본어</span>
         <span class="lang-tag" id="lang-tag-zh2">🇨🇳 중국어</span>
+      </div>
+    </div>
+    <div id="search-welcome" style="display:none">
+      <div class="user-welcome-bar">
+        <div>
+          <div class="user-welcome-name" id="user-welcome-name"></div>
+          <div class="user-welcome-sub">단어를 검색해보세요</div>
+        </div>
+        <button class="logout-text-btn" onclick="logout()">로그아웃</button>
       </div>
     </div>
     <div id="search-result"></div>
@@ -1043,6 +1066,11 @@ async function initAuth() {
   document.getElementById('nav-user-info').style.display = 'flex';
   document.getElementById('login-overlay').style.display = 'none';
 
+  const welcomeName = document.getElementById('user-welcome-name');
+  if (welcomeName) welcomeName.textContent = (payload.name || '') + ' 님';
+  const searchWelcome = document.getElementById('search-welcome');
+  if (searchWelcome) searchWelcome.style.display = 'block';
+
   await loadWordbookFromDB();
   updateBadges();
   backfillShortMeanings();
@@ -1057,7 +1085,21 @@ function logout() {
   wordbook = [];
   updateBadges();
   document.getElementById('nav-user-info').style.display = 'none';
+  const searchWelcome = document.getElementById('search-welcome');
+  if (searchWelcome) searchWelcome.style.display = 'none';
   showLoginScreen();
+}
+
+function goHome() {
+  showPage('search');
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-result').innerHTML = '';
+  const clearBtn = document.getElementById('search-clear-btn');
+  if (clearBtn) clearBtn.style.display = 'none';
+  const searchWelcome = document.getElementById('search-welcome');
+  if (searchWelcome && getToken()) searchWelcome.style.display = 'block';
+  const searchBarWrap = document.getElementById('search-bar-wrap');
+  if (searchBarWrap) searchBarWrap.style.display = 'none';
 }
 
 // ─── WORDBOOK DB API ──────────────────────────────────────────────────────────
@@ -1173,6 +1215,9 @@ function clearSearchInput() {
 async function doSearch() {
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
+
+  const searchWelcome = document.getElementById('search-welcome');
+  if (searchWelcome) searchWelcome.style.display = 'none';
 
   const lang = detectLang(query);
   updateLangIndicator(lang);
