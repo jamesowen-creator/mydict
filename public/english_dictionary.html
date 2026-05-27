@@ -913,6 +913,21 @@
   }
   .logout-text-btn:hover { color: var(--accent2); border-color: var(--accent2); }
 
+  /* TTS BUTTON */
+  .tts-btn {
+    background: none;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 3px 10px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1.4;
+    flex-shrink: 0;
+  }
+  .tts-btn:hover { border-color: var(--accent); background: rgba(74,110,245,0.06); }
+  .tts-btn.playing { border-color: var(--accent); background: rgba(74,110,245,0.12); }
+
 </style>
 </head>
 <body>
@@ -1340,7 +1355,10 @@ function renderResultEN(result, alreadySaved) {
 
   document.getElementById('search-result').innerHTML = `
     <div class="result-card">
-      <div class="result-word">${result.word}</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="result-word">${result.word}</div>
+        <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="en" onclick="playTTSFromBtn(this)" title="발음 듣기">🔊</button>
+      </div>
       ${result.pronunciation ? `<div class="result-pronunciation">${result.pronunciation}</div>` : ''}
       ${posHtml ? `<div class="result-pos-list">${posHtml}</div>` : ''}
 
@@ -1369,6 +1387,7 @@ function renderResultEN(result, alreadySaved) {
       </div>
     </div>
   `;
+  prefetchTTS(result.word, 'en');
 }
 
 // ─── KOREAN SEARCH ────────────────────────────────────────────────────────────
@@ -1434,7 +1453,10 @@ function renderResultKO(result, alreadySaved) {
 
   document.getElementById('search-result').innerHTML = `
     <div class="result-card">
-      <div class="result-word" style="color:var(--accent-ko)">${result.word}</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="result-word" style="color:var(--accent-ko)">${result.word}</div>
+        <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="ko" onclick="playTTSFromBtn(this)" title="발음 듣기">🔊</button>
+      </div>
       <div style="margin-bottom:16px">
         <div class="result-section-title" style="margin-bottom:6px">의미 & 뉘앙스</div>
         <div class="result-section-body">${result.nuance}</div>
@@ -1452,6 +1474,7 @@ function renderResultKO(result, alreadySaved) {
       </div>
     </div>
   `;
+  prefetchTTS(result.word, 'ko');
 }
 
 
@@ -1534,7 +1557,10 @@ function renderResultJA(result, alreadySaved) {
 
   document.getElementById('search-result').innerHTML = `
     <div class="result-card">
-      <div class="result-word" style="color:var(--accent-ja)">${result.word}</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="result-word" style="color:var(--accent-ja)">${result.word}</div>
+        <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="ja" onclick="playTTSFromBtn(this)" title="발음 듣기">🔊</button>
+      </div>
       ${result.reading ? `<div class="result-pronunciation">${result.reading}</div>` : ''}
       ${posHtml ? `<div class="result-pos-list">${posHtml}</div>` : ''}
       <div style="margin-bottom:16px">
@@ -1545,6 +1571,7 @@ function renderResultJA(result, alreadySaved) {
       ${entriesHtml}
     </div>
   `;
+  prefetchTTS(result.word, 'ja');
 }
 
 // ─── CHINESE SEARCH ───────────────────────────────────────────────────────────
@@ -1611,7 +1638,10 @@ function renderResultZH(result, alreadySaved) {
 
   document.getElementById('search-result').innerHTML = `
     <div class="result-card">
-      <div class="result-word" style="color:var(--accent-zh)">${result.word}</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="result-word" style="color:var(--accent-zh)">${result.word}</div>
+        <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="zh" onclick="playTTSFromBtn(this)" title="발음 듣기">🔊</button>
+      </div>
       ${result.pinyin ? `<div class="result-pronunciation">${result.pinyin}</div>` : ''}
       ${posHtml ? `<div class="result-pos-list">${posHtml}</div>` : ''}
       <div style="margin-bottom:16px">
@@ -1622,6 +1652,7 @@ function renderResultZH(result, alreadySaved) {
       ${entriesHtml}
     </div>
   `;
+  prefetchTTS(result.word, 'zh');
 }
 
 
@@ -2143,6 +2174,80 @@ async function backfillShortMeanings() {
     }
   }
   save();
+}
+
+// ─── TTS ─────────────────────────────────────────────────────────────────────
+const ttsMemCache = {};
+let ttsCurrentAudio = null;
+
+function playTTSFromBtn(btn) {
+  const text = decodeURIComponent(btn.dataset.tts);
+  const lang = btn.dataset.lang || 'en';
+  playTTS(text, lang, btn);
+}
+
+async function playTTS(text, lang, btnEl) {
+  const key = text + ':' + lang;
+
+  // 같은 버튼 재클릭 시 정지
+  if (ttsCurrentAudio) {
+    ttsCurrentAudio.pause();
+    ttsCurrentAudio = null;
+    document.querySelectorAll('.tts-btn').forEach(b => {
+      b.textContent = '🔊'; b.classList.remove('playing');
+    });
+    if (btnEl && btnEl.dataset._ttsKey === key) {
+      delete btnEl.dataset._ttsKey; return;
+    }
+  }
+
+  if (btnEl) {
+    btnEl.textContent = '⏳';
+    btnEl.classList.add('playing');
+    btnEl.dataset._ttsKey = key;
+  }
+
+  try {
+    let url = ttsMemCache[key];
+    if (!url) {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, lang })
+      });
+      if (!res.ok) throw new Error('TTS 요청 실패');
+      const blob = await res.blob();
+      url = URL.createObjectURL(blob);
+      ttsMemCache[key] = url;
+    }
+
+    if (btnEl) btnEl.textContent = '🔉';
+    ttsCurrentAudio = new Audio(url);
+    ttsCurrentAudio.play();
+    ttsCurrentAudio.onended = () => {
+      if (btnEl) { btnEl.textContent = '🔊'; btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
+      ttsCurrentAudio = null;
+    };
+  } catch (e) {
+    if (btnEl) { btnEl.textContent = '🔊'; btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
+    showToast('발음 재생 실패');
+    console.warn('TTS error:', e.message);
+  }
+}
+
+async function prefetchTTS(text, lang) {
+  const key = text + ':' + lang;
+  if (ttsMemCache[key]) return;
+  try {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, lang })
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    ttsMemCache[key] = URL.createObjectURL(blob);
+  } catch (e) { /* prefetch 실패는 무시 */ }
 }
 
 // Init
