@@ -1,0 +1,26 @@
+{
+  "name": "Gotcha",
+  "short_name": "Gotcha",
+  "description": "AI 기반 영어 사전 & 단어장",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f7ff",
+  "theme_color": "#4a6ef5",
+  "icons": [
+    {
+      "src": "/Gotcha_1.0.PNG",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/Gotcha_1.0.PNG",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "utilities"],
+  "lang": "ko"
+}
