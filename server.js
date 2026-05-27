@@ -308,6 +308,18 @@ app.delete('/api/wordbook/:id', requireAuth, async (req, res) => {
 
 // ─── TTS ─────────────────────────────────────────────────────────────────────
 
+// 음성/모델 업그레이드 시 캐시 초기화용
+app.delete('/api/tts/cache', async (req, res) => {
+  if (!process.env.DATABASE_URL) return res.json({ ok: true, deleted: 0 });
+  try {
+    const { rowCount } = await pool.query('DELETE FROM tts_cache');
+    console.log(`TTS cache cleared: ${rowCount} rows deleted`);
+    res.json({ ok: true, deleted: rowCount });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/api/tts', async (req, res) => {
   const { text, lang = 'en' } = req.body;
   if (!text || !text.trim()) return res.status(400).json({ error: 'text is required' });
@@ -344,9 +356,9 @@ app.post('/api/tts', async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'tts-1',
+        model: 'tts-1-hd',
         input: textKey,
-        voice: 'alloy',
+        voice: lang === 'en' ? 'onyx' : 'nova',
         response_format: 'mp3',
       }),
     });
