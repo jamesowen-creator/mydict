@@ -2215,7 +2215,10 @@ async function playTTS(text, lang, btnEl) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, lang })
       });
-      if (!res.ok) throw new Error('TTS 요청 실패');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `서버 오류 (${res.status})`);
+      }
       const blob = await res.blob();
       url = URL.createObjectURL(blob);
       ttsMemCache[key] = url;
@@ -2223,14 +2226,25 @@ async function playTTS(text, lang, btnEl) {
 
     if (btnEl) btnEl.textContent = '🔉';
     ttsCurrentAudio = new Audio(url);
-    ttsCurrentAudio.play();
     ttsCurrentAudio.onended = () => {
       if (btnEl) { btnEl.textContent = '🔊'; btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
       ttsCurrentAudio = null;
     };
+    ttsCurrentAudio.onerror = (e) => {
+      if (btnEl) { btnEl.textContent = '🔊'; btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
+      ttsCurrentAudio = null;
+      showToast('오디오 재생 오류');
+      console.warn('TTS audio error:', e);
+    };
+    ttsCurrentAudio.play().catch(e => {
+      if (btnEl) { btnEl.textContent = '🔊'; btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
+      ttsCurrentAudio = null;
+      showToast('발음 재생 실패: ' + e.message);
+      console.warn('TTS play() error:', e.message);
+    });
   } catch (e) {
     if (btnEl) { btnEl.textContent = '🔊'; btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
-    showToast('발음 재생 실패');
+    showToast('발음 재생 실패: ' + e.message);
     console.warn('TTS error:', e.message);
   }
 }
