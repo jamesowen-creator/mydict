@@ -240,8 +240,9 @@ app.get('/api/debug', (req, res) => {
     googleClientIdLength: gcid ? gcid.length : 0,
     hasGoogleClientSecret: !!gcs,
     googleOAuthEnabled: !!(gcid && gcs),
+    adminEmails: ADMIN_EMAILS,
     matchingEnvKeys: Object.keys(process.env).filter(k =>
-      k.includes('ANTHROPIC') || k.includes('APP') || k.includes('PASSWORD') || k.includes('GOOGLE') || k.includes('JWT') || k.includes('SESSION')
+      k.includes('ANTHROPIC') || k.includes('APP') || k.includes('PASSWORD') || k.includes('GOOGLE') || k.includes('JWT') || k.includes('SESSION') || k.includes('ADMIN')
     ),
     railwayKeys: Object.keys(process.env).filter(k => k.startsWith('RAILWAY')),
     port: process.env.PORT,
@@ -257,10 +258,11 @@ app.post('/api/auth', (req, res) => {
 // ─── /api/me ─────────────────────────────────────────────────────────────────
 
 app.get('/api/me', requireAuth, async (req, res) => {
+  const emailIsAdmin = ADMIN_EMAILS.includes(req.user.email);
   if (!process.env.DATABASE_URL) {
     return res.json({
       id: req.user.id, email: req.user.email, name: req.user.name,
-      role: req.user.role || 'user', is_blocked: false,
+      role: emailIsAdmin ? 'admin' : (req.user.role || 'user'), is_blocked: false,
       can_search: true, can_wordbook: true, can_quiz: true, can_tts: true, can_podcast: true,
     });
   }
@@ -272,7 +274,13 @@ app.get('/api/me', requireAuth, async (req, res) => {
       [req.user.id]
     );
     if (!rows.length) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
-    res.json(rows[0]);
+    const user = rows[0];
+    // Auto-upgrade to admin if email is in ADMIN_EMAILS but DB hasn't been updated yet
+    if (emailIsAdmin && user.role !== 'admin') {
+      await pool.query('UPDATE users SET role = $1 WHERE id = $2', ['admin', req.user.id]);
+      user.role = 'admin';
+    }
+    res.json(user);
   } catch (err) {
     console.error('DB error:', err.message);
     res.status(500).json({ error: '서버 오류가 발생했습니다.' });
