@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gotcha Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f7ff; --surface: #fff; --border: #dde2f5;
+    --accent: #4a6ef5; --danger: #dc2626; --success: #16a34a;
+    --warn: #d97706; --text: #1a1f3c; --text2: #4a5070; --text3: #9398b5;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans KR', sans-serif; min-height: 100vh; }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0 24px; height: 52px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 50;
+    box-shadow: 0 1px 8px rgba(74,110,245,0.07);
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .header-logo { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 18px; color: var(--accent); }
+  .header-badge {
+    background: var(--accent); color: #fff; font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 20px; letter-spacing: 0.5px;
+  }
+  .btn-back {
+    font-size: 13px; color: var(--text2); background: none; border: 1px solid var(--border);
+    border-radius: 8px; padding: 5px 12px; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .btn-back:hover { background: var(--bg); }
+
+  /* ── Layout ── */
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; overflow: hidden; }
+  .section-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .section-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .section-body { padding: 20px; }
+
+  /* ── Stats cards ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .stat-card {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-label { font-size: 11px; color: var(--text3); font-weight: 500; margin-bottom: 6px; }
+  .stat-value { font-size: 22px; font-weight: 700; color: var(--text); font-family: 'Sora', sans-serif; }
+  .stat-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .stat-card.accent .stat-value { color: var(--accent); }
+  .stat-card.success .stat-value { color: var(--success); }
+  .stat-card.warn .stat-value { color: var(--warn); }
+  .stat-card.danger .stat-value { color: var(--danger); }
+
+  /* ── Cost ── */
+  .cost-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .cost-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .cost-card-title { font-size: 11px; color: var(--text3); font-weight: 600; margin-bottom: 8px; }
+  .cost-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+  .cost-row .label { color: var(--text2); }
+  .cost-row .amount { font-weight: 600; font-family: 'Sora', sans-serif; }
+  .cost-row.total .amount { color: var(--accent); font-size: 15px; }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--bg); padding: 10px 12px; text-align: left; font-weight: 600; font-size: 11px; color: var(--text3); letter-spacing: 0.5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+
+  /* User name cell */
+  .user-cell { display: flex; align-items: center; gap: 8px; }
+  .user-avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--accent);
+    color: #fff; font-size: 11px; font-weight: 700; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .user-name { font-weight: 600; color: var(--text); }
+  .user-email { font-size: 11px; color: var(--text3); }
+
+  /* Role badge */
+  .role-badge {
+    display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px;
+    border-radius: 20px; letter-spacing: 0.3px;
+  }
+  .role-admin { background: #ede9fe; color: #6d28d9; }
+  .role-user  { background: var(--bg); color: var(--text3); border: 1px solid var(--border); }
+
+  /* ── Toggle switch ── */
+  .toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0; cursor: pointer;
+    background: #d1d5db; border-radius: 20px; transition: 0.2s;
+  }
+  .toggle-slider:before {
+    content: ''; position: absolute; width: 14px; height: 14px;
+    left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s;
+  }
+  input:checked + .toggle-slider { background: var(--accent); }
+  input:checked + .toggle-slider:before { transform: translateX(16px); }
+  .toggle-danger input:checked + .toggle-slider { background: var(--danger); }
+
+  /* ── Perms grid ── */
+  .perms { display: flex; gap: 6px; flex-wrap: wrap; }
+  .perm-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text2); }
+
+  /* ── Role select ── */
+  select.role-select {
+    font-size: 12px; padding: 3px 6px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer;
+  }
+
+  /* ── Action buttons ── */
+  .btn-save {
+    font-size: 12px; font-weight: 600; padding: 4px 12px;
+    background: var(--accent); color: #fff; border: none; border-radius: 6px;
+    cursor: pointer; transition: opacity 0.15s;
+  }
+  .btn-save:hover { opacity: 0.85; }
+  .btn-save:disabled { opacity: 0.4; cursor: default; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #1a1f3c; color: #fff; padding: 10px 20px; border-radius: 8px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: all 0.25s; z-index: 999;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Access denied ── */
+  #denied { display: none; flex-direction: column; align-items: center; justify-content: center; height: 80vh; gap: 12px; }
+  #denied h1 { font-size: 20px; color: var(--danger); }
+  #denied p { color: var(--text2); font-size: 14px; }
+
+  /* ── Loading ── */
+  #loading { display: flex; align-items: center; justify-content: center; height: 80vh; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #content { display: none; }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    th, td { padding: 8px; }
+    .cost-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <span class="header-logo">Gotcha</span>
+    <span class="header-badge">ADMIN</span>
+  </div>
+  <a href="/" class="btn-back">← 앱으로 돌아가기</a>
+</header>
+
+<main>
+  <div id="loading"><div class="spinner"></div></div>
+
+  <div id="denied">
+    <h1>접근 거부</h1>
+    <p>관리자 계정으로 로그인해야 합니다.</p>
+    <a href="/" class="btn-back">홈으로</a>
+  </div>
+
+  <div id="content">
+    <!-- Stats -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">사용자 현황</span>
+        <span id="stats-updated" style="font-size:11px;color:var(--text3)"></span>
+      </div>
+      <div class="section-body">
+        <div class="stats-grid" id="stats-grid"></div>
+      </div>
+    </div>
+
+    <!-- API Cost -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">API 비용 추정</span>
+        <span style="font-size:11px;color:var(--text3)">claude-haiku-4-5 / tts-1-hd 기준</span>
+      </div>
+      <div class="section-body">
+        <div class="cost-grid" id="cost-grid"></div>
+      </div>
+    </div>
+
+    <!-- Users -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">사용자 관리</span>
+        <button class="btn-save" onclick="loadData()">새로고침</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>사용자</th>
+              <th>역할</th>
+              <th>차단</th>
+              <th>검색</th>
+              <th>단어장</th>
+              <th>퀴즈</th>
+              <th>TTS</th>
+              <th>팟캐스트</th>
+              <th style="text-align:right">검색 횟수</th>
+              <th style="text-align:right">TTS 횟수</th>
+              <th style="text-align:right">단어장</th>
+              <th>저장</th>
+            </tr>
+          </thead>
+          <tbody id="user-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const TOKEN_KEY = 'mydict_token';
+
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+function parseJwt(t) { try { return JSON.parse(atob(t.split('.')[1])); } catch { return null; } }
+function authHeaders() { return { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' }; }
+
+function showToast(msg, ms = 2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), ms);
+}
+
+function fmt(n) { return Number(n).toLocaleString(); }
+function fmtCost(n) { return '$' + Number(n).toFixed(4); }
+
+// ── Check auth ────────────────────────────────────────────────────────────────
+async function checkAuth() {
+  const token = getToken();
+  if (!token) return false;
+  const payload = parseJwt(token);
+  if (!payload || payload.exp * 1000 < Date.now()) return false;
+  if (payload.role === 'admin') return true;
+  // Also check /api/me in case role was updated
+  try {
+    const r = await fetch('/api/me', { headers: authHeaders() });
+    if (!r.ok) return false;
+    const d = await r.json();
+    return d.role === 'admin';
+  } catch { return false; }
+}
+
+// ── Render stats ──────────────────────────────────────────────────────────────
+function renderStats(data) {
+  const u = data.users;
+  const grid = document.getElementById('stats-grid');
+  grid.innerHTML = `
+    <div class="stat-card accent">
+      <div class="stat-label">전체 사용자</div>
+      <div class="stat-value">${fmt(u.total)}</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-label">활성 사용자</div>
+      <div class="stat-value">${fmt(u.active)}</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="stat-label">차단된 사용자</div>
+      <div class="stat-value">${fmt(u.blocked)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">관리자</div>
+      <div class="stat-value">${fmt(u.admins)}</div>
+    </div>
+    ${renderUsageStat(data.usage, 'search', '총 검색', 'accent')}
+    ${renderUsageStat(data.usage, 'tts', '총 TTS', 'warn')}
+    ${renderUsageStat(data.monthly, 'search', '이번달 검색', '')}
+    ${renderUsageStat(data.monthly, 'tts', '이번달 TTS', '')}
+  `;
+  document.getElementById('stats-updated').textContent = '방금 업데이트';
+}
+
+function renderUsageStat(rows, type, label, cls) {
+  const row = rows.find(r => r.event_type === type);
+  const count = row ? fmt(row.count) : '0';
+  return `<div class="stat-card ${cls}"><div class="stat-label">${label}</div><div class="stat-value">${count}</div></div>`;
+}
+
+// ── Render cost ───────────────────────────────────────────────────────────────
+function renderCost(data) {
+  const grid = document.getElementById('cost-grid');
+  grid.innerHTML = `
+    ${renderCostCard('전체 누적', data.cost.total)}
+    ${renderCostCard('이번달', data.cost.monthly)}
+  `;
+}
+
+function renderCostCard(title, cost) {
+  const total = (cost.anthropic + cost.openai).toFixed(4);
+  return `
+    <div class="cost-card">
+      <div class="cost-card-title">${title}</div>
+      <div class="cost-row"><span class="label">Anthropic (Claude)</span><span class="amount">${fmtCost(cost.anthropic)}</span></div>
+      <div class="cost-row"><span class="label">OpenAI (TTS)</span><span class="amount">${fmtCost(cost.openai)}</span></div>
+      <div class="cost-row total" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px">
+        <span class="label" style="font-weight:700">합계</span>
+        <span class="amount">${fmtCost(total)}</span>
+      </div>
+    </div>
+  `;
+}
+
+// ── Render users ──────────────────────────────────────────────────────────────
+let usersData = [];
+let pendingChanges = {}; // { userId: { field: value } }
+let myId = null;
+
+function renderUsers(users) {
+  usersData = users;
+  const tbody = document.getElementById('user-tbody');
+  tbody.innerHTML = users.map(u => renderUserRow(u)).join('');
+}
+
+function renderUserRow(u) {
+  const isMe = u.id === myId;
+  return `
+  <tr id="row-${u.id}">
+    <td>
+      <div class="user-cell">
+        <div class="user-avatar">${(u.name || '?')[0].toUpperCase()}</div>
+        <div>
+          <div class="user-name">${escHtml(u.name || '')} ${isMe ? '<span style="font-size:10px;color:var(--text3)">(나)</span>' : ''}</div>
+          <div class="user-email">${escHtml(u.email || '')}</div>
+        </div>
+      </div>
+    </td>
+    <td>
+      <select class="role-select" onchange="setPending(${u.id}, 'role', this.value)" ${isMe ? 'disabled' : ''}>
+        <option value="user"  ${u.role !== 'admin' ? 'selected' : ''}>user</option>
+        <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
+      </select>
+    </td>
+    <td>
+      <label class="toggle toggle-danger">
+        <input type="checkbox" ${u.is_blocked ? 'checked' : ''} onchange="setPending(${u.id}, 'is_blocked', this.checked)" ${isMe ? 'disabled' : ''}>
+        <span class="toggle-slider"></span>
+      </label>
+    </td>
+    ${permToggle(u, 'can_search')}
+    ${permToggle(u, 'can_wordbook')}
+    ${permToggle(u, 'can_quiz')}
+    ${permToggle(u, 'can_tts')}
+    ${permToggle(u, 'can_podcast')}
+    <td style="text-align:right;font-weight:600">${fmt(u.search_count)}</td>
+    <td style="text-align:right;font-weight:600">${fmt(u.tts_count)}</td>
+    <td style="text-align:right">${fmt(u.wordbook_count)}</td>
+    <td>
+      <button class="btn-save" id="save-${u.id}" onclick="saveUser(${u.id})" disabled>저장</button>
+    </td>
+  </tr>`;
+}
+
+function permToggle(u, field) {
+  return `<td>
+    <label class="toggle">
+      <input type="checkbox" ${u[field] !== false ? 'checked' : ''} onchange="setPending(${u.id}, '${field}', this.checked)">
+      <span class="toggle-slider"></span>
+    </label>
+  </td>`;
+}
+
+function setPending(userId, field, value) {
+  if (!pendingChanges[userId]) pendingChanges[userId] = {};
+  pendingChanges[userId][field] = value;
+  const btn = document.getElementById(`save-${userId}`);
+  if (btn) btn.disabled = false;
+}
+
+async function saveUser(userId) {
+  const changes = pendingChanges[userId];
+  if (!changes || !Object.keys(changes).length) return;
+  const btn = document.getElementById(`save-${userId}`);
+  if (btn) { btn.disabled = true; btn.textContent = '저장중...'; }
+
+  try {
+    const r = await fetch(`/api/admin/users/${userId}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(changes),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showToast('오류: ' + (data.error || '저장 실패'));
+      if (btn) { btn.disabled = false; btn.textContent = '저장'; }
+      return;
+    }
+    delete pendingChanges[userId];
+    // Update local data
+    const idx = usersData.findIndex(u => u.id === userId);
+    if (idx >= 0) Object.assign(usersData[idx], data);
+    showToast('저장되었습니다.');
+    if (btn) btn.textContent = '저장';
+  } catch (e) {
+    showToast('네트워크 오류');
+    if (btn) { btn.disabled = false; btn.textContent = '저장'; }
+  }
+}
+
+function escHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Load data ─────────────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const [usersRes, statsRes] = await Promise.all([
+      fetch('/api/admin/users', { headers: authHeaders() }),
+      fetch('/api/admin/stats', { headers: authHeaders() }),
+    ]);
+    if (!usersRes.ok || !statsRes.ok) throw new Error('API error');
+    const [users, stats] = await Promise.all([usersRes.json(), statsRes.json()]);
+    pendingChanges = {};
+    renderStats(stats);
+    renderCost(stats);
+    renderUsers(users);
+  } catch (e) {
+    showToast('데이터 로드 실패: ' + e.message);
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async () => {
+  const ok = await checkAuth();
+  document.getElementById('loading').style.display = 'none';
+
+  if (!ok) {
+    document.getElementById('denied').style.display = 'flex';
+    return;
+  }
+
+  // Get own user id
+  try {
+    const r = await fetch('/api/me', { headers: authHeaders() });
+    if (r.ok) { const d = await r.json(); myId = d.id; }
+  } catch {}
+
+  document.getElementById('content').style.display = 'block';
+  await loadData();
+})();
+</script>
+</body>
+</html>

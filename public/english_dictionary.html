@@ -889,6 +889,14 @@
     display: flex; align-items: center; justify-content: center;
     cursor: default; user-select: none;
   }
+  .nav-admin-btn {
+    margin-left: 8px; font-size: 11px; font-weight: 700;
+    padding: 3px 9px; border-radius: 20px;
+    background: #ede9fe; color: #6d28d9;
+    text-decoration: none; white-space: nowrap;
+    letter-spacing: 0.3px;
+  }
+  .nav-admin-btn:hover { background: #ddd6fe; }
 
   /* ─── SEARCH WELCOME ─────────────────────────────────────────── */
   .user-welcome-bar {
@@ -1033,6 +1041,7 @@
   </div>
   <div class="nav-user" id="nav-user-info" style="display:none">
     <div class="nav-avatar" id="nav-user-avatar" title=""></div>
+    <a href="/admin" class="nav-admin-btn" id="nav-admin-link" style="display:none">관리자</a>
   </div>
 </nav>
 
@@ -1167,6 +1176,8 @@ function authHeaders() {
   return t ? { 'Authorization': 'Bearer ' + t } : {};
 }
 
+let userPerms = null;
+
 async function initAuth() {
   const params = new URLSearchParams(window.location.search);
   const urlToken = params.get('token');
@@ -1193,6 +1204,22 @@ async function initAuth() {
   if (welcomeName) welcomeName.textContent = (payload.name || '') + ' 님';
   const searchWelcome = document.getElementById('search-welcome');
   if (searchWelcome) searchWelcome.style.display = 'block';
+
+  // Fetch fresh permissions from server
+  try {
+    const r = await fetch('/api/me', { headers: authHeaders() });
+    if (r.ok) {
+      userPerms = await r.json();
+      if (userPerms.is_blocked) {
+        clearToken(); showLoginScreen();
+        showToast('계정이 차단되었습니다. 관리자에게 문의하세요.');
+        return;
+      }
+      if (userPerms.role === 'admin') {
+        document.getElementById('nav-admin-link').style.display = 'inline-block';
+      }
+    }
+  } catch {}
 
   await loadWordbookFromDB();
   updateBadges();
