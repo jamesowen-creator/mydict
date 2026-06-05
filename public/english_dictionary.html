@@ -1286,6 +1286,7 @@ async function initAuth() {
   await loadWordbookFromDB();
   updateBadges();
   backfillShortMeanings();
+  setupBackButtonBlock();
 }
 
 function showLoginScreen() {
@@ -2694,6 +2695,21 @@ function setPodcastSpeed(speed) {
   if (podcastAudio) podcastAudio.playbackRate = speed;
   document.querySelectorAll('.podcast-speed-btn').forEach(b => {
     b.classList.toggle('active', parseFloat(b.dataset.speed) === speed);
+  });
+}
+
+// ─── BACK BUTTON BLOCK ───────────────────────────────────────────────────────
+let _backBlockInstalled = false;
+
+function setupBackButtonBlock() {
+  // 로그인 상태에서 뒤로가기 누르면 앱 종료 대신 현재 화면 유지
+  history.pushState({ app: 'gotcha' }, '');
+  if (_backBlockInstalled) return;
+  _backBlockInstalled = true;
+  window.addEventListener('popstate', function () {
+    if (getToken()) {
+      history.pushState({ app: 'gotcha' }, '');
+    }
   });
 }
 
