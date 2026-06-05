@@ -327,7 +327,7 @@ app.post('/api/search', async (req, res) => {
   try {
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
+      max_tokens: 4000,
       messages: [{ role: 'user', content: query.trim() }],
       system: SYSTEM_PROMPT,
     });
@@ -363,7 +363,7 @@ app.post('/api/ai', async (req, res) => {
   try {
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
+      max_tokens: 4000,
       messages: [{ role: 'user', content: prompt.trim() }],
     });
     if (!message.content?.length) {

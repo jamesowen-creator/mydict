@@ -1344,6 +1344,22 @@ async function deleteWordFromDB(id) {
 }
 
 // ─── API CALL ─────────────────────────────────────────────────────────────────
+function safeParseJSON(text) {
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    // 응답이 잘린 경우: 마지막 완전한 '}'까지 잘라서 재시도
+    const start = text.indexOf('{');
+    if (start === -1) throw new Error('응답이 잘렸습니다. 다시 시도해주세요.');
+    let end = text.lastIndexOf('}');
+    while (end > start) {
+      try { return JSON.parse(text.slice(start, end + 1)); } catch (_) {}
+      end = text.lastIndexOf('}', end - 1);
+    }
+    throw new Error('응답이 잘렸습니다. 다시 시도해주세요.');
+  }
+}
+
 async function callAI(prompt) {
   const response = await fetch('/api/ai', {
     method: 'POST',
@@ -1509,7 +1525,7 @@ Respond ONLY in valid JSON with this exact structure:
 Return 2-4 meaning sets (different senses/parts of speech) and 3-4 similar words. For domain use one of: 일반, 비즈니스, 의학, 법률, 기술, 구어체, 문학, 격식체, 비격식. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
 
   const text = await callAI(prompt);
-  const result = JSON.parse(text);
+  const result = safeParseJSON(text);
   result.lang = 'en';
   // backward compat for quiz/podcast
   result.short_meaning = result.meanings?.[0]?.core_meaning || '';
@@ -1636,7 +1652,7 @@ Respond ONLY in valid JSON:
 Return 2-4 English entries representing different nuances or usages. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
 
   const text = await callAI(prompt);
-  const result = JSON.parse(text);
+  const result = safeParseJSON(text);
   result.lang = 'ko';
   currentResult = result;
 
@@ -1741,7 +1757,7 @@ Respond ONLY in valid JSON:
 Return 2-3 entries. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
 
   const text = await callAI(prompt);
-  const result = JSON.parse(text);
+  const result = safeParseJSON(text);
   result.lang = 'ja';
 
   const alreadySaved = wordbook.some(w => w.word === result.word && w.lang === 'ja');
@@ -1822,7 +1838,7 @@ Respond ONLY in valid JSON:
 Return 2-3 entries. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
 
   const text = await callAI(prompt);
-  const result = JSON.parse(text);
+  const result = safeParseJSON(text);
   result.lang = 'zh';
 
   const alreadySaved = wordbook.some(w => w.word === result.word && w.lang === 'zh');
@@ -1896,7 +1912,7 @@ async function loadExtraTrans(word, lang, btn) {
     }
 
     var text = await callAI(prompt);
-    var r = JSON.parse(text);
+    var r = safeParseJSON(text);
 
     if (lang === 'ja') {
       resultDiv.innerHTML = '<div class="ko-entry ja" style="margin-top:0">' +
@@ -1941,7 +1957,7 @@ async function loadExtraTransKO(word, lang, btn) {
     }
 
     var text = await callAI(prompt);
-    var r = JSON.parse(text);
+    var r = safeParseJSON(text);
 
     if (lang === 'ja') {
       resultDiv.innerHTML = '<div class="ko-entry ja" style="margin-top:0">' +
