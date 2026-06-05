@@ -936,6 +936,67 @@
   .tts-btn:hover { border-color: var(--accent); background: rgba(74,110,245,0.06); }
   .tts-btn.playing { border-color: var(--accent); background: rgba(74,110,245,0.12); }
 
+  /* MEANING SET (new EN structure) */
+  .meaning-set {
+    margin-bottom: 12px;
+    padding: 14px;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--accent);
+  }
+  .meaning-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .meaning-num {
+    font-family: 'Sora', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: white;
+    background: var(--accent);
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .meaning-core {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .meaning-domain {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: rgba(74,110,245,0.1);
+    color: var(--accent);
+    letter-spacing: 0.03em;
+    border: 1px solid rgba(74,110,245,0.2);
+  }
+  .meaning-nuance {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.6;
+    margin-bottom: 8px;
+  }
+  .base-form-hint {
+    font-size: 12px;
+    color: var(--text3);
+    margin-bottom: 8px;
+    font-family: 'Sora', sans-serif;
+    letter-spacing: 0.02em;
+  }
+  .similar-core {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 2px;
+    font-weight: 500;
+  }
+
   /* PODCAST PLAYER */
   .podcast-player {
     position: fixed;
@@ -1040,7 +1101,6 @@
     <button class="nav-tab" onclick="showPage('wrong')">오답노트 <span class="badge" id="wrong-count">0</span></button>
   </div>
   <div class="nav-user" id="nav-user-info" style="display:none">
-    <div class="nav-avatar" id="nav-user-avatar" title=""></div>
     <a href="/admin" class="nav-admin-btn" id="nav-admin-link" style="display:none">관리자</a>
   </div>
 </nav>
@@ -1082,7 +1142,10 @@
           <div class="user-welcome-name" id="user-welcome-name"></div>
           <div class="user-welcome-sub">단어를 검색해보세요</div>
         </div>
-        <button class="logout-text-btn" onclick="logout()">로그아웃</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <a href="/admin" class="btn" id="welcome-admin-btn" style="display:none;font-size:12px;padding:6px 12px;background:#ede9fe;color:#6d28d9;border:none;text-decoration:none;border-radius:8px">관리자</a>
+          <button class="logout-text-btn" onclick="logout()">로그아웃</button>
+        </div>
       </div>
     </div>
     <div id="search-result"></div>
@@ -1194,9 +1257,6 @@ async function initAuth() {
     clearToken(); showLoginScreen(); return;
   }
 
-  const avatar = document.getElementById('nav-user-avatar');
-  avatar.textContent = (payload.name || '?')[0].toUpperCase();
-  avatar.title = payload.name;
   document.getElementById('nav-user-info').style.display = 'flex';
   document.getElementById('login-overlay').style.display = 'none';
 
@@ -1217,6 +1277,8 @@ async function initAuth() {
       }
       if (userPerms.role === 'admin') {
         document.getElementById('nav-admin-link').style.display = 'inline-block';
+        const welcomeAdminBtn = document.getElementById('welcome-admin-btn');
+        if (welcomeAdminBtn) welcomeAdminBtn.style.display = 'inline-flex';
       }
     }
   } catch {}
@@ -1360,11 +1422,15 @@ function clearSearchInput() {
   input.value = '';
   document.getElementById('search-clear-btn').style.display = 'none';
   updateLangIndicator('en');
+  input.focus();
 }
 
 async function doSearch() {
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
+
+  // 모바일 키보드 내리기
+  document.getElementById('search-input').blur();
 
   const searchWelcome = document.getElementById('search-welcome');
   if (searchWelcome) searchWelcome.style.display = 'none';
@@ -1413,17 +1479,19 @@ async function searchEnglish(query, resultDiv) {
   const prompt = `You are an English dictionary assistant for a Korean learner.
 For the English word or phrase: "${query}"
 
+First identify the base/dictionary form (e.g., running→run, better→good, mice→mouse, meandering→meander). If it's already the base form, set word equal to search_query.
+
 Respond ONLY in valid JSON with this exact structure:
 {
-  "word": "the word/phrase",
+  "word": "base form dictionary entry",
+  "search_query": "${query}",
   "pronunciation": "/prəˌnʌnsiˈeɪʃən/",
-  "pos": ["noun", "verb"],
-  "short_meaning": "핵심 뜻만 한국어로 5단어 이내",
-  "nuance": "한국어로 통상적인 의미와 뉘앙스 설명 (2-4문장)",
-  "usages": [
+  "meanings": [
     {
-      "context": "맥락 라벨",
-      "description": "한국어로 이 맥락에서의 쓰임새 설명",
+      "core_meaning": "핵심 의미 5단어 이내 한국어",
+      "pos": "noun",
+      "domain": "일반",
+      "nuance": "이 의미가 언제/어떻게 쓰이는지 1~2문장 한국어로",
       "example": "English example sentence.",
       "translation": "예문의 한국어 해석"
     }
@@ -1431,16 +1499,20 @@ Respond ONLY in valid JSON with this exact structure:
   "similar": [
     {
       "word": "similar English word",
-      "diff": "한국어로 뉘앙스 차이 설명"
+      "core_meaning": "이 유사어의 핵심 의미 5단어 이내 한국어",
+      "diff": "검색 단어와의 뉘앙스 차이 1~2문장 한국어로"
     }
   ]
 }
 
-Return 2-3 usages and 3-4 similar words. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
+Return 2-4 meaning sets (different senses/parts of speech) and 3-4 similar words. For domain use one of: 일반, 비즈니스, 의학, 법률, 기술, 구어체, 문학, 격식체, 비격식. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
 
   const text = await callAI(prompt);
   const result = JSON.parse(text);
   result.lang = 'en';
+  // backward compat for quiz/podcast
+  result.short_meaning = result.meanings?.[0]?.core_meaning || '';
+  result.nuance = result.meanings?.map(m => m.nuance).join(' ') || '';
   currentResult = result;
 
   const alreadySaved = wordbook.some(w => w.word.toLowerCase() === result.word.toLowerCase() && w.lang === 'en');
@@ -1459,25 +1531,53 @@ function renderResultEN(result, alreadySaved) {
     'interjection': '감탄사', 'phrase': '구', 'idiom': '관용어'
   };
 
-  const posHtml = (result.pos || []).map(p =>
-    `<span class="result-pos-tag">${posMap[p.toLowerCase()] || p}</span>`
-  ).join('');
-
-  const usagesHtml = (result.usages || []).map(u => `
-    <div class="usage-item">
-      <div class="usage-context">${u.context}</div>
-      <div class="usage-desc">${u.description}</div>
-      <div class="usage-example">${u.example}</div>
-      ${u.translation ? `<div class="usage-translation">→ ${u.translation}</div>` : ''}
-    </div>
-  `).join('');
+  // New structure: meanings[]
+  let meaningsHtml = '';
+  if (result.meanings && result.meanings.length > 0) {
+    meaningsHtml = result.meanings.map((m, i) => `
+      <div class="meaning-set">
+        <div class="meaning-header">
+          <span class="meaning-num">${i + 1}</span>
+          <span class="meaning-core">${m.core_meaning}</span>
+          <span class="result-pos-tag">${posMap[(m.pos || '').toLowerCase()] || m.pos || ''}</span>
+          ${m.domain ? `<span class="meaning-domain">${m.domain}</span>` : ''}
+        </div>
+        <div class="meaning-nuance">${m.nuance}</div>
+        <div class="usage-example">${m.example}</div>
+        ${m.translation ? `<div class="usage-translation">→ ${m.translation}</div>` : ''}
+      </div>
+    `).join('');
+  } else {
+    // fallback for old saved words (usages[] + nuance)
+    const posHtml = (result.pos || []).map(p =>
+      `<span class="result-pos-tag">${posMap[p.toLowerCase()] || p}</span>`
+    ).join('');
+    meaningsHtml = (posHtml ? `<div class="result-pos-list">${posHtml}</div>` : '') +
+      `<div class="result-section-body" style="margin-bottom:12px">${result.nuance || ''}</div>` +
+      (result.usages || []).map(u => `
+        <div class="usage-item">
+          <div class="usage-context">${u.context}</div>
+          <div class="usage-desc">${u.description}</div>
+          <div class="usage-example">${u.example}</div>
+          ${u.translation ? `<div class="usage-translation">→ ${u.translation}</div>` : ''}
+        </div>
+      `).join('');
+  }
 
   const similarHtml = (result.similar || []).map(s => `
     <div class="similar-item">
-      <div class="similar-word" onclick="searchWord('${s.word}', 'en')">${s.word}</div>
+      <div style="min-width:100px">
+        <div class="similar-word" onclick="searchWord('${s.word.replace(/'/g, "\\'")}', 'en')">${s.word}</div>
+        ${s.core_meaning ? `<div class="similar-core">${s.core_meaning}</div>` : ''}
+      </div>
       <div class="similar-diff">${s.diff}</div>
     </div>
   `).join('');
+
+  const searchQuery = result.search_query || '';
+  const baseFormHint = searchQuery && searchQuery.toLowerCase() !== result.word.toLowerCase()
+    ? `<div class="base-form-hint">${searchQuery} → ${result.word}</div>`
+    : '';
 
   document.getElementById('search-result').innerHTML = `
     <div class="result-card">
@@ -1485,17 +1585,12 @@ function renderResultEN(result, alreadySaved) {
         <div class="result-word">${result.word}</div>
         <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="en" onclick="playTTSFromBtn(this)" title="발음 듣기">🔊</button>
       </div>
+      ${baseFormHint}
       ${result.pronunciation ? `<div class="result-pronunciation">${result.pronunciation}</div>` : ''}
-      ${posHtml ? `<div class="result-pos-list">${posHtml}</div>` : ''}
 
       <div class="result-section">
         <div class="result-section-title">의미 & 뉘앙스</div>
-        <div class="result-section-body">${result.nuance}</div>
-      </div>
-
-      <div class="result-section">
-        <div class="result-section-title">쓰임새</div>
-        ${usagesHtml}
+        ${meaningsHtml}
       </div>
 
       <div class="result-section">
