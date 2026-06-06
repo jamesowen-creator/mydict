@@ -1061,6 +1061,364 @@
     background: rgba(74,110,245,0.08);
   }
 
+
+  /* DASHBOARD */
+  @keyframes skel-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  .skel-block {
+    background: linear-gradient(90deg, var(--surface2) 25%, #d8ddf0 50%, var(--surface2) 75%);
+    background-size: 200% 100%;
+    animation: skel-shimmer 1.4s infinite;
+    border-radius: var(--radius-sm);
+  }
+
+  .dash-level-card {
+    background: linear-gradient(135deg, #1e1b6b 0%, #4a6ef5 100%);
+    border-radius: var(--radius);
+    padding: 20px 20px 18px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .dash-level-main { display: flex; align-items: center; gap: 14px; }
+  .dash-level-badge {
+    font-size: 12px;
+    font-weight: 800;
+    font-family: 'Sora', sans-serif;
+    background: rgba(255,255,255,0.18);
+    padding: 5px 11px;
+    border-radius: 20px;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  .dash-level-title {
+    font-size: 20px;
+    font-weight: 800;
+    font-family: 'Sora', sans-serif;
+    letter-spacing: -0.02em;
+  }
+  .dash-level-sub { font-size: 12px; opacity: 0.72; margin-top: 2px; }
+  .dash-streak-badge {
+    background: rgba(245,158,11,0.9);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .dash-lv-bar-wrap {
+    height: 5px;
+    background: var(--surface2);
+    border-radius: 3px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .dash-lv-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #818cf8, #4a6ef5);
+    border-radius: 3px;
+    transition: width 0.9s cubic-bezier(0.25,0.46,0.45,0.94);
+  }
+
+  .dash-review-banner {
+    background: linear-gradient(135deg, #4a6ef5, #7c3aed);
+    border-radius: var(--radius-sm);
+    padding: 16px 18px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: opacity 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .dash-review-banner:hover { opacity: 0.9; }
+  .dash-banner-title { font-size: 15px; font-weight: 700; }
+  .dash-banner-sub   { font-size: 12px; opacity: 0.78; margin-top: 3px; }
+  .dash-banner-arrow { font-size: 22px; opacity: 0.8; }
+  .dash-review-done {
+    background: rgba(22,163,74,0.09);
+    border: 1px solid rgba(22,163,74,0.22);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    color: var(--correct);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  .dash-stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .dash-stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 10px;
+    text-align: center;
+  }
+  .dash-stat-num {
+    font-size: 26px;
+    font-weight: 800;
+    font-family: 'Sora', sans-serif;
+    line-height: 1.1;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+  .dash-stat-green  { color: var(--correct); }
+  .dash-stat-orange { color: #d97706; }
+  .dash-stat-label  { font-size: 11px; color: var(--text3); font-weight: 500; }
+
+  .dash-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px 16px 14px;
+    margin-bottom: 12px;
+  }
+  .dash-card-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text3);
+    margin-bottom: 14px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .dash-lang-bars { display: flex; flex-direction: column; gap: 11px; }
+  .dash-lang-row  { display: flex; align-items: center; gap: 10px; }
+  .dash-lang-empty { opacity: 0.38; }
+  .dash-lang-label {
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Sora', sans-serif;
+    letter-spacing: 0.05em;
+    color: var(--text2);
+    width: 24px;
+    flex-shrink: 0;
+  }
+  .dash-lang-bar-wrap {
+    flex: 1;
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .dash-lang-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.9s cubic-bezier(0.25,0.46,0.45,0.94);
+  }
+  .dash-lang-stat {
+    font-size: 11px;
+    color: var(--text3);
+    min-width: 40px;
+    text-align: right;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+  }
+
+  .dash-acc-bars { display: flex; flex-direction: column; gap: 11px; }
+  .dash-acc-row  { display: flex; align-items: center; gap: 10px; }
+  .dash-acc-label {
+    font-size: 12px;
+    color: var(--text2);
+    width: 56px;
+    flex-shrink: 0;
+  }
+  .dash-acc-bar-wrap {
+    flex: 1;
+    height: 10px;
+    background: var(--surface2);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .dash-acc-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.9s cubic-bezier(0.25,0.46,0.45,0.94);
+    min-width: 2px;
+  }
+  .dash-acc-sure  { background: var(--correct); }
+  .dash-acc-vague { background: #f59e0b; }
+  .dash-acc-miss  { background: var(--wrong); }
+  .dash-acc-num {
+    font-size: 12px;
+    color: var(--text3);
+    min-width: 32px;
+    text-align: right;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+  }
+
+  .dash-motivation {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text3);
+    font-style: italic;
+    padding: 8px 8px 24px;
+    line-height: 1.7;
+  }
+
+  /* METACOG QUIZ */
+  .metacog-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .metacog-word-info {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text3);
+    margin-bottom: 8px;
+  }
+  .metacog-question {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 14px 0;
+    line-height: 1.5;
+  }
+  .metacog-ox-btns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .metacog-ox-btn {
+    font-size: 34px;
+    padding: 20px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--text);
+  }
+  .metacog-ox-btn:hover { transform: scale(1.04); }
+  .metacog-ox-btn.correct { background: rgba(22,163,74,0.12); border-color: var(--correct); }
+  .metacog-ox-btn.wrong   { background: rgba(220,38,38,0.12); border-color: var(--wrong); }
+  .metacog-options { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+  .metacog-option {
+    padding: 12px 16px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    font-size: 14px;
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .metacog-option:hover { border-color: var(--accent); }
+  .metacog-option.correct { background: rgba(22,163,74,0.12); border-color: var(--correct); }
+  .metacog-option.wrong   { background: rgba(220,38,38,0.12); border-color: var(--wrong); }
+  .metacog-fill-wrap { margin: 14px 0; }
+  .metacog-fill-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 15px;
+    font-family: 'Sora', sans-serif;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+  }
+  .metacog-fill-input:focus  { outline: none; border-color: var(--accent); }
+  .metacog-subj-textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'Noto Sans KR', sans-serif;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+    resize: none;
+    height: 80px;
+  }
+  .metacog-subj-textarea:focus { outline: none; border-color: var(--accent); }
+  .metacog-feedback {
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    margin: 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    display: none;
+  }
+  .metacog-feedback.correct { background: rgba(22,163,74,0.12); color: var(--correct); display: block; }
+  .metacog-feedback.wrong   { background: rgba(220,38,38,0.12); color: var(--wrong);   display: block; }
+  .metacog-feedback.partial { background: rgba(251,191,36,0.12); color: #b45309;        display: block; }
+  .metacog-self-eval {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 14px 0 0;
+  }
+  .metacog-eval-btn {
+    padding: 10px 4px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--text);
+    text-align: center;
+    line-height: 1.5;
+    transition: all 0.15s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .metacog-eval-btn:hover { border-color: var(--accent); }
+  .metacog-ai-check-btn {
+    width: 100%;
+    padding: 10px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 13px;
+    margin-top: 8px;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .metacog-summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    text-align: center;
+  }
+  .metacog-summary-stats {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+  }
+  .metacog-stat {
+    font-size: 14px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-weight: 700;
+  }
+
 </style>
 </head>
 <body>
@@ -1088,9 +1446,11 @@
     <img src="/Gotcha_1.0.PNG" alt="Gotcha" style="height:40px;width:auto;object-fit:contain;"/>
   </div>
   <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showPage('search')">검색</button>
+    <button class="nav-tab active" onclick="showPage('home')">🏠 홈</button>
+    <button class="nav-tab" onclick="showPage('search')">검색</button>
     <button class="nav-tab" onclick="showPage('wordbook')">단어장 <span class="badge" id="wordbook-count">0</span></button>
     <button class="nav-tab" onclick="showPage('quiz')">퀴즈</button>
+    <button class="nav-tab" onclick="showPage('metacog')">🧠 복습</button>
     <button class="nav-tab" onclick="showPage('wrong')">오답노트 <span class="badge" id="wrong-count">0</span></button>
   </div>
   <div class="nav-user" id="nav-user-info" style="display:none">
@@ -1112,8 +1472,26 @@
 
 <main>
 
+  <!-- HOME DASHBOARD -->
+  <div class="page active" id="page-home">
+    <div id="home-container">
+      <div style="padding:16px">
+        <div class="skel-block" style="height:96px;margin-bottom:6px"></div>
+        <div class="skel-block" style="height:5px;margin-bottom:14px"></div>
+        <div class="skel-block" style="height:62px;margin-bottom:12px"></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+          <div class="skel-block" style="height:72px"></div>
+          <div class="skel-block" style="height:72px"></div>
+          <div class="skel-block" style="height:72px"></div>
+        </div>
+        <div class="skel-block" style="height:130px;margin-bottom:12px"></div>
+        <div class="skel-block" style="height:110px"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- SEARCH PAGE -->
-  <div class="page active" id="page-search">
+  <div class="page" id="page-search">
     <div class="search-page-wrap">
       <div class="search-wrap" style="margin-bottom:8px">
         <div class="search-input-wrap">
@@ -1170,6 +1548,11 @@
   <!-- QUIZ PAGE -->
   <div class="page" id="page-quiz">
     <div id="quiz-container"></div>
+  </div>
+
+  <!-- METACOG PAGE -->
+  <div class="page" id="page-metacog">
+    <div id="metacog-container"></div>
   </div>
 
   <!-- WRONG NOTE PAGE -->
@@ -1280,6 +1663,7 @@ async function initAuth() {
   updateBadges();
   backfillShortMeanings();
   setupBackButtonBlock();
+  showPage('home');
 }
 
 function showLoginScreen() {
@@ -1387,14 +1771,17 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
-  document.querySelectorAll('.nav-tab')[['search','wordbook','quiz','wrong'].indexOf(name)].classList.add('active');
+  const tabIdx = ['home','search','wordbook','quiz','metacog','wrong'].indexOf(name);
+  if (tabIdx >= 0) document.querySelectorAll('.nav-tab')[tabIdx].classList.add('active');
 
   const stickyBar = document.getElementById('search-bar-wrap');
-  stickyBar.style.display = name === 'search' ? 'none' : 'none'; // 검색탭에서는 숨김
+  stickyBar.style.display = 'none';
 
+  if (name === 'home')     initDashboard();
   if (name === 'wordbook') renderWordbook();
-  if (name === 'quiz') renderQuizStart(false);
-  if (name === 'wrong') renderWrongNote();
+  if (name === 'quiz')     renderQuizStart(false);
+  if (name === 'wrong')    renderWrongNote();
+  if (name === 'metacog')  initMetacogPage();
 }
 
 // ─── LANGUAGE DETECTION ───────────────────────────────────────────────────────
@@ -2348,6 +2735,519 @@ function renderQuizResult() {
         ${wrongWords.length > 0 ? `<button class="btn" style="background:var(--accent2)" onclick="renderQuizStart(true)">오답 퀴즈 바로 시작</button>` : ''}
       </div>
     </div>`;
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+
+const LANG_COLORS = { EN: '#4a6ef5', KO: '#e67e22', JA: '#e74c3c', ZH: '#c0392b' };
+
+function getMotivationMsg({ streak, today_due, mastered }) {
+  if (streak >= 7)    return `${streak}일 연속 학습! 습관이 실력이 됩니다 🔥`;
+  if (today_due > 10) return '복습할 단어가 쌓였어요. 지금이 딱 좋은 타이밍이에요 🎯';
+  if (mastered >= 50) return `${mastered}개 마스터! 당신의 두뇌는 이미 업그레이드 중 🧠`;
+  return '오늘도 한 단어씩. 작은 인출이 큰 기억을 만들어요 💡';
+}
+
+async function initDashboard() {
+  const container = document.getElementById('home-container');
+  if (!getToken()) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:64px 24px">
+        <div style="font-size:48px;margin-bottom:16px">🔐</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px">로그인 후 이용 가능</div>
+        <div style="font-size:14px;color:var(--text3)">학습 현황을 보려면 로그인해주세요.</div>
+      </div>`;
+    return;
+  }
+  // skeleton
+  container.innerHTML = `<div style="padding:16px">
+    <div class="skel-block" style="height:96px;margin-bottom:6px"></div>
+    <div class="skel-block" style="height:5px;margin-bottom:14px"></div>
+    <div class="skel-block" style="height:62px;margin-bottom:12px"></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+      <div class="skel-block" style="height:72px"></div>
+      <div class="skel-block" style="height:72px"></div>
+      <div class="skel-block" style="height:72px"></div>
+    </div>
+    <div class="skel-block" style="height:130px;margin-bottom:12px"></div>
+    <div class="skel-block" style="height:110px"></div>
+  </div>`;
+  try {
+    const res = await fetch('/api/dashboard', { headers: authHeaders() });
+    if (!res.ok) throw new Error('API ' + res.status);
+    renderDashboard(container, await res.json());
+  } catch (e) {
+    console.error('[dashboard]', e);
+    container.innerHTML = `<div style="text-align:center;padding:48px;color:var(--text3)">
+      <div style="font-size:13px;margin-bottom:12px">데이터를 불러올 수 없어요.</div>
+      <button class="btn secondary" style="font-size:12px;padding:8px 16px" onclick="initDashboard()">다시 시도</button>
+    </div>`;
+  }
+}
+
+function renderDashboard(container, d) {
+  const { today_due, total_words, mastered, streak, accuracy, by_language, level } = d;
+  const accTotal = accuracy.sure + accuracy.vague + accuracy.missed;
+  const pctOf = (n) => accTotal > 0 ? Math.round(n / accTotal * 100) : 0;
+  const lvPct = level.next_at ? Math.min(100, Math.round(mastered / level.next_at * 100)) : 100;
+
+  const langBarsHtml = by_language.map(({ lang, total, mastered: m }) => {
+    const pct   = total > 0 ? Math.round(m / total * 100) : 0;
+    const empty = total === 0;
+    const color = LANG_COLORS[lang] || 'var(--accent)';
+    return `
+      <div class="dash-lang-row${empty ? ' dash-lang-empty' : ''}">
+        <div class="dash-lang-label">${lang}</div>
+        <div class="dash-lang-bar-wrap">
+          <div class="dash-lang-bar-fill" data-pct="${empty ? 0 : pct}"
+               style="width:0%;background:${color}"></div>
+        </div>
+        <div class="dash-lang-stat">${empty ? '—' : `${m}/${total}`}</div>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div style="padding:16px">
+      <div class="dash-level-card">
+        <div class="dash-level-main">
+          <div class="dash-level-badge">Lv.${level.current}</div>
+          <div>
+            <div class="dash-level-title">${level.title}</div>
+            <div class="dash-level-sub">${level.next_at
+              ? `${mastered} / ${level.next_at}개 → Lv.${level.current + 1}`
+              : '최고 레벨 달성! 🎓'}</div>
+          </div>
+        </div>
+        <div class="dash-streak-badge">🔥 ${streak}일</div>
+      </div>
+      ${level.next_at ? `<div class="dash-lv-bar-wrap">
+        <div class="dash-lv-bar-fill" data-pct="${lvPct}" style="width:0%"></div>
+      </div>` : ''}
+
+      ${today_due > 0
+        ? `<div class="dash-review-banner" onclick="showPage('metacog')">
+             <div>
+               <div class="dash-banner-title">🧠 오늘 복습할 단어 <strong>${today_due}개</strong></div>
+               <div class="dash-banner-sub">지금 바로 시작해볼까요?</div>
+             </div>
+             <div class="dash-banner-arrow">→</div>
+           </div>`
+        : `<div class="dash-review-done">✨ <strong>오늘 복습 완료!</strong> 내일 또 만나요</div>`
+      }
+
+      <div class="dash-stats-row">
+        <div class="dash-stat-card">
+          <div class="dash-stat-num">${total_words}</div>
+          <div class="dash-stat-label">전체</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-num dash-stat-green">${mastered}</div>
+          <div class="dash-stat-label">마스터</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-num dash-stat-orange">${today_due}</div>
+          <div class="dash-stat-label">복습 대기</div>
+        </div>
+      </div>
+
+      <div class="dash-card">
+        <div class="dash-card-title">언어별 숙련도</div>
+        <div class="dash-lang-bars">${langBarsHtml}</div>
+      </div>
+
+      <div class="dash-card">
+        <div class="dash-card-title">자기평가 분포
+          <span style="font-weight:400;color:var(--text3);margin-left:4px">${accTotal}회 응답</span>
+        </div>
+        <div class="dash-acc-bars">
+          <div class="dash-acc-row">
+            <div class="dash-acc-label">💪 확실</div>
+            <div class="dash-acc-bar-wrap">
+              <div class="dash-acc-bar-fill dash-acc-sure" data-pct="${pctOf(accuracy.sure)}" style="width:0%"></div>
+            </div>
+            <div class="dash-acc-num">${accuracy.sure}</div>
+          </div>
+          <div class="dash-acc-row">
+            <div class="dash-acc-label">🤔 애매</div>
+            <div class="dash-acc-bar-wrap">
+              <div class="dash-acc-bar-fill dash-acc-vague" data-pct="${pctOf(accuracy.vague)}" style="width:0%"></div>
+            </div>
+            <div class="dash-acc-num">${accuracy.vague}</div>
+          </div>
+          <div class="dash-acc-row">
+            <div class="dash-acc-label">🎲 몰랐어</div>
+            <div class="dash-acc-bar-wrap">
+              <div class="dash-acc-bar-fill dash-acc-miss" data-pct="${pctOf(accuracy.missed)}" style="width:0%"></div>
+            </div>
+            <div class="dash-acc-num">${accuracy.missed}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dash-motivation">"${getMotivationMsg(d)}"</div>
+    </div>`;
+
+  // Trigger bar animations
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.querySelectorAll('#home-container [data-pct]').forEach(el => {
+      el.style.width = el.dataset.pct + '%';
+    });
+  }));
+}
+
+// ─── METACOG QUIZ ─────────────────────────────────────────────────────────────
+
+let mcState = null;
+
+// Extracts display meaning from either review-due (data.short_meaning) or wordbook client format
+function getMcMeaning(w) {
+  const d = w.data || {};
+  const sm = d.short_meaning || w.short_meaning;
+  const nu = d.nuance       || w.nuance;
+  return sm || (nu ? nu.slice(0, 50) + (nu.length > 50 ? '...' : '') : '(뜻 없음)');
+}
+
+function pickMcType(word) {
+  const rep  = word.repetitions || 0;
+  const rand = Math.random();
+  const hasEx = !!word.example_sentence;
+  if (rep <= 1) {
+    return rand < 0.5 ? 'ox' : 'mc4';
+  } else if (rep <= 3) {
+    if (rand < 0.4) return 'mc4';
+    if (rand < 0.8) return hasEx ? 'fill' : 'mc4';
+    return 'subjective';
+  } else {
+    if (rand < 0.3) return hasEx ? 'fill' : 'subjective';
+    return 'subjective';
+  }
+}
+
+async function initMetacogPage() {
+  const container = document.getElementById('metacog-container');
+  container.innerHTML = '<div style="text-align:center;padding:48px;color:var(--text3)">불러오는 중...</div>';
+  try {
+    const res = await fetch('/api/review-due', { headers: authHeaders() });
+    if (!res.ok) throw new Error('API error');
+    const { due_count, words } = await res.json();
+
+    if (due_count === 0) {
+      container.innerHTML = `
+        <div class="quiz-start-card">
+          <div style="font-size:48px;margin-bottom:12px">🎉</div>
+          <div style="font-size:18px;font-weight:700;margin-bottom:8px">오늘 복습 완료!</div>
+          <div style="font-size:14px;color:var(--text2)">오늘 복습할 단어가 없어요.<br>잘 하고 있어요!</div>
+          <button class="btn secondary" style="width:100%;margin-top:20px" onclick="showPage('wordbook')">단어장으로</button>
+        </div>`;
+      return;
+    }
+
+    mcState = { words, current: 0, answered: false, currentType: null, subjAnswer: '',
+                summary: { s3: 0, s1: 0, s0: 0 }, generatedExamples: new Set() };
+    renderMcQuestion();
+  } catch (e) {
+    console.error('[metacog] init error:', e);
+    container.innerHTML = `<div class="quiz-start-card"><div style="color:var(--wrong);font-size:14px">불러오기 실패. 다시 시도해주세요.</div>
+      <button class="btn secondary" style="margin-top:16px;width:100%" onclick="initMetacogPage()">재시도</button></div>`;
+  }
+}
+
+function renderMcQuestion() {
+  const { words, current } = mcState;
+  const word  = words[current];
+  const total = words.length;
+  const type  = pickMcType(word);
+  mcState.currentType = type;
+  mcState.answered    = false;
+  mcState.subjAnswer  = '';
+
+  const pct = (current / total * 100).toFixed(0);
+  const isConc = (word.entry_type || 'word') === 'concept';
+
+  // Background example generation for fill type when no sentence exists
+  if (type === 'fill' && !word.example_sentence && !mcState.generatedExamples.has(word.id)) {
+    mcState.generatedExamples.add(word.id);
+    generateMcExample(word);
+  }
+
+  const progressHtml = `
+    <div class="quiz-progress">
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-text">${current + 1} / ${total}</div>
+    </div>`;
+
+  const infoHtml = `<div class="metacog-word-info">
+    <span>반복 ${word.repetitions || 0}회</span>
+    <span>간격 ${word.interval_days || 1}일</span>
+    <span>${isConc ? '개념' : '단어'}</span>
+  </div>`;
+
+  let body = '';
+  if      (type === 'ox')        body = buildMcOX(word, isConc);
+  else if (type === 'mc4')       body = buildMcMC4(word);
+  else if (type === 'fill')      body = buildMcFill(word);
+  else                           body = buildMcSubjective(word, isConc);
+
+  document.getElementById('metacog-container').innerHTML = progressHtml + `
+    <div class="metacog-card">
+      ${infoHtml}
+      ${body}
+      <div class="metacog-feedback" id="mc-feedback"></div>
+      <div id="mc-self-eval" style="display:none">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;text-align:center">실제로 얼마나 알고 있었나요?</div>
+        <div class="metacog-self-eval">
+          <button class="metacog-eval-btn" onclick="submitMcScore(3)">💪<br>확실히 알았어</button>
+          <button class="metacog-eval-btn" onclick="submitMcScore(1)">🤔<br>애매하게 맞혔어</button>
+          <button class="metacog-eval-btn" onclick="submitMcScore(0)">🎲<br>찍었어·몰랐어</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── OX ──
+function buildMcOX(word, isConc) {
+  const isCorrectShown = Math.random() < 0.5;
+  const correctMeaning = getMcMeaning(word);
+  let shownMeaning = correctMeaning;
+  if (!isCorrectShown) {
+    const others = mcState.words.filter(w => w.id !== word.id);
+    if (others.length) shownMeaning = getMcMeaning(others[Math.floor(Math.random() * others.length)]);
+  }
+  mcState.oxCorrect = isCorrectShown;
+  const label = isConc ? '이 용어의 설명은' : '이 단어의 뜻은';
+  return `
+    <div style="font-size:22px;font-weight:700;font-family:'Sora',sans-serif;margin:4px 0">${word.word}</div>
+    <div class="metacog-question">${label}<br>"${shownMeaning}"이다</div>
+    <div class="metacog-ox-btns">
+      <button class="metacog-ox-btn" id="mc-o-btn" onclick="checkMcOX(true)">O</button>
+      <button class="metacog-ox-btn" id="mc-x-btn" onclick="checkMcOX(false)">X</button>
+    </div>`;
+}
+
+function checkMcOX(selected) {
+  if (mcState.answered) return;
+  mcState.answered = true;
+  const isCorrect = selected === mcState.oxCorrect;
+  document.getElementById('mc-o-btn').disabled = true;
+  document.getElementById('mc-x-btn').disabled = true;
+  document.getElementById(selected ? 'mc-o-btn' : 'mc-x-btn').classList.add(isCorrect ? 'correct' : 'wrong');
+  document.getElementById(mcState.oxCorrect ? 'mc-o-btn' : 'mc-x-btn').classList.add('correct');
+  showMcFeedback(isCorrect);
+  showMcSelfEval();
+}
+
+// ── 4지선다 ──
+function buildMcMC4(word) {
+  const meaning = getMcMeaning(word);
+  // Pool: other words in review session + client wordbook
+  const others = [
+    ...mcState.words.filter(w => w.id !== word.id),
+    ...wordbook.filter(w => w.id !== word.id)
+  ];
+  const wrongs = others.sort(() => Math.random() - 0.5)
+    .slice(0, 3).map(w => getMcMeaning(w));
+  const fillers = ['해당 없음', '알 수 없음', '정의 없음'];
+  while (wrongs.length < 3) wrongs.push(fillers[wrongs.length]);
+  const ci = Math.floor(Math.random() * 4);
+  const opts = [...wrongs]; opts.splice(ci, 0, meaning);
+  mcState.mc4CorrectIdx = ci;
+  return `
+    <div style="font-size:22px;font-weight:700;font-family:'Sora',sans-serif;margin:4px 0">${word.word}</div>
+    <div class="metacog-question">이 단어의 뜻은?</div>
+    <div class="metacog-options">
+      ${opts.map((o, i) => `<button class="metacog-option" id="mc-opt-${i}" onclick="checkMcMC4(${i})">${o}</button>`).join('')}
+    </div>`;
+}
+
+function checkMcMC4(selected) {
+  if (mcState.answered) return;
+  mcState.answered = true;
+  const ci = mcState.mc4CorrectIdx;
+  const isCorrect = selected === ci;
+  document.querySelectorAll('.metacog-option').forEach(b => b.disabled = true);
+  document.getElementById(`mc-opt-${selected}`).classList.add(isCorrect ? 'correct' : 'wrong');
+  document.getElementById(`mc-opt-${ci}`).classList.add('correct');
+  showMcFeedback(isCorrect);
+  showMcSelfEval();
+}
+
+// ── 빈칸 채우기 ──
+function buildMcFill(word) {
+  const sentence = word.example_sentence;
+  if (!sentence) { mcState.currentType = 'subjective'; return buildMcSubjective(word, false); }
+  const escaped = word.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const blank = sentence.replace(new RegExp(escaped, 'gi'), '____');
+  return `
+    <div class="metacog-question">빈칸에 알맞은 단어를 쓰세요</div>
+    <div style="font-size:15px;line-height:1.8;margin:12px 0;padding:14px;background:var(--surface2);border-radius:var(--radius-sm)">${blank}</div>
+    <div class="metacog-fill-wrap">
+      <input class="metacog-fill-input" id="mc-fill-input" type="text" placeholder="단어 입력..."
+        autocomplete="off" autocorrect="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter')checkMcFill()">
+      <button class="btn" style="width:100%" onclick="checkMcFill()">제출</button>
+    </div>`;
+}
+
+function checkMcFill() {
+  if (mcState.answered) return;
+  const input = document.getElementById('mc-fill-input');
+  const ans = (input.value || '').trim();
+  if (!ans) return;
+  mcState.answered = true;
+  const word = mcState.words[mcState.current];
+  const isCorrect = ans.toLowerCase() === word.word.toLowerCase();
+  input.disabled = true;
+  showMcFeedback(isCorrect, isCorrect ? null : `정답: ${word.word}`);
+  showMcSelfEval();
+}
+
+// ── 주관식 ──
+function buildMcSubjective(word, isConc) {
+  const label = isConc ? '이 용어의 설명을 적어보세요' : '이 단어의 뜻을 적어보세요';
+  return `
+    <div style="font-size:22px;font-weight:700;font-family:'Sora',sans-serif;margin:4px 0">${word.word}</div>
+    <div class="metacog-question">${label}</div>
+    <div class="metacog-fill-wrap">
+      <textarea class="metacog-subj-textarea" id="mc-subj-input" placeholder="뜻을 자유롭게 적어보세요..."></textarea>
+      <button class="btn" style="width:100%" onclick="checkMcSubjective()">제출</button>
+    </div>`;
+}
+
+function checkMcSubjective() {
+  if (mcState.answered) return;
+  const input = document.getElementById('mc-subj-input');
+  const userAns = (input.value || '').trim();
+  if (!userAns) return;
+  mcState.answered  = true;
+  mcState.subjAnswer = userAns.toLowerCase();
+  input.disabled = true;
+
+  const word    = mcState.words[mcState.current];
+  const meaning = getMcMeaning(word);
+  const keywords = meaning.toLowerCase().split(/[\s,·\-]+/).filter(k => k.length > 1);
+  const matchCount = keywords.filter(k => mcState.subjAnswer.includes(k)).length;
+  const ratio = keywords.length > 0 ? matchCount / keywords.length : 0;
+
+  if (ratio >= 0.5) {
+    showMcFeedback(true, `정답 키워드: ${meaning}`);
+    showMcSelfEval();
+  } else if (ratio >= 0.3) {
+    const fb = document.getElementById('mc-feedback');
+    fb.className = 'metacog-feedback partial';
+    fb.innerHTML = `<div>🤔 핵심 단어가 일부 맞아요!</div>
+      <div style="font-size:12px;margin-top:4px;font-weight:400">정답: ${meaning}</div>
+      <button class="metacog-ai-check-btn" id="mc-ai-btn" onclick="checkMcWithAI()">🤖 AI로 확인하기</button>
+      <div id="mc-ai-result"></div>`;
+  } else {
+    showMcFeedback(false, `정답: ${meaning}`);
+    showMcSelfEval();
+  }
+}
+
+async function checkMcWithAI() {
+  const btn = document.getElementById('mc-ai-btn');
+  btn.disabled = true;
+  btn.textContent = '판단 중...';
+  const word    = mcState.words[mcState.current];
+  const meaning = getMcMeaning(word);
+  const prompt  = `단어 "${word.word}"의 뜻은 "${meaning}"입니다. 학습자가 "${mcState.subjAnswer}"라고 답했습니다. 이 답이 뜻을 올바르게 표현하고 있나요? "정답" 또는 "오답"으로만 답하세요.`;
+  try {
+    const res  = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) });
+    const data = await res.json();
+    const aiVerdict = (data.result || '').trim();
+    document.getElementById('mc-ai-result').innerHTML = `
+      <div style="margin-top:8px;font-size:13px">AI 판단: <strong>${aiVerdict}</strong></div>
+      <div style="font-size:12px;color:var(--text2);margin-top:6px">최종 선택:</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+        <button class="btn" style="background:var(--correct);font-size:12px;padding:8px" onclick="finalizeAI(true)">O 정답</button>
+        <button class="btn" style="background:var(--wrong);font-size:12px;padding:8px"   onclick="finalizeAI(false)">X 오답</button>
+      </div>`;
+  } catch (e) {
+    document.getElementById('mc-ai-result').innerHTML = '<div style="color:var(--wrong);font-size:12px;margin-top:6px">AI 확인 실패</div>';
+    showMcSelfEval();
+  }
+}
+
+function finalizeAI(isCorrect) {
+  document.getElementById('mc-ai-result').innerHTML =
+    isCorrect ? '<div style="color:var(--correct);margin-top:6px;font-size:13px">✓ 정답으로 처리</div>'
+              : '<div style="color:var(--wrong);margin-top:6px;font-size:13px">✗ 오답으로 처리</div>';
+  showMcSelfEval();
+}
+
+// ── 공통 UI ──
+function showMcFeedback(isCorrect, extra) {
+  const fb = document.getElementById('mc-feedback');
+  fb.className = 'metacog-feedback ' + (isCorrect ? 'correct' : 'wrong');
+  fb.innerHTML = (isCorrect ? '✓ 정답!' : '✗ 오답') +
+    (extra ? `<div style="font-size:12px;font-weight:400;margin-top:4px">${extra}</div>` : '');
+}
+
+function showMcSelfEval() {
+  document.getElementById('mc-self-eval').style.display = 'block';
+}
+
+async function submitMcScore(score) {
+  const word = mcState.words[mcState.current];
+  mcState.summary[`s${score}`]++;
+  try {
+    await fetch('/api/review-result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ word_id: word.id, score })
+    });
+  } catch (e) {
+    console.error('[metacog] review-result error:', e);
+  }
+  mcState.current++;
+  if (mcState.current >= mcState.words.length) renderMcSummary();
+  else renderMcQuestion();
+}
+
+function renderMcSummary() {
+  const { summary, words } = mcState;
+  const total = words.length;
+  const minNextDays = words.reduce((min, w) => {
+    if (!w.next_review) return min;
+    return Math.min(min, Math.ceil((new Date(w.next_review) - Date.now()) / 86400000));
+  }, Infinity);
+
+  document.getElementById('metacog-container').innerHTML = `
+    <div class="metacog-summary-card">
+      <div style="font-size:42px;margin-bottom:12px">🧠</div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:4px">복습 완료!</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:4px">총 ${total}개 단어</div>
+      <div class="metacog-summary-stats">
+        <span class="metacog-stat" style="background:rgba(22,163,74,0.12);color:var(--correct)">💪 ${summary.s3}개</span>
+        <span class="metacog-stat" style="background:rgba(251,191,36,0.12);color:#b45309">🤔 ${summary.s1}개</span>
+        <span class="metacog-stat" style="background:rgba(220,38,38,0.12);color:var(--wrong)">🎲 ${summary.s0}개</span>
+      </div>
+      ${minNextDays < Infinity ? `<div style="font-size:13px;color:var(--text2);margin:8px 0">다음 복습 예정: <strong>${minNextDays}일 후</strong></div>` : ''}
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:18px">
+        <button class="btn" onclick="initMetacogPage()">다시 복습하기</button>
+        <button class="btn secondary" onclick="showPage('wordbook')">단어장으로</button>
+      </div>
+    </div>`;
+}
+
+async function generateMcExample(word) {
+  try {
+    const prompt = `Generate one natural example sentence using the word '${word.word}'. Return only the sentence, nothing else.`;
+    const res  = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) });
+    const data = await res.json();
+    const sentence = (data.result || '').trim();
+    if (sentence) {
+      await fetch(`/api/wordbook/${word.id}/example`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ example_sentence: sentence })
+      });
+      // Update in-memory so next session can use it immediately
+      word.example_sentence = sentence;
+    }
+  } catch (e) {
+    console.error('[metacog] example gen error:', e);
+  }
 }
 
 // ─── WRONG NOTE ───────────────────────────────────────────────────────────────
