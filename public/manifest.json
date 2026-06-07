@@ -1,7 +1,7 @@
 {
-  "name": "Gotcha",
-  "short_name": "Gotcha",
-  "description": "AI 기반 영어 사전 & 단어장",
+  "name": "METIS",
+  "short_name": "METIS",
+  "description": "A Lens for the Wisdom",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
