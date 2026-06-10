@@ -1112,9 +1112,9 @@
     padding: 20px 20px 18px;
     color: #fff;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 6px;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 14px;
   }
   .dash-level-main { display: flex; align-items: center; gap: 14px; }
   .dash-level-badge {
@@ -1484,9 +1484,6 @@
     <button class="nav-tab" onclick="showPage('metacog')">🧠 복습</button>
     <button class="nav-tab" onclick="showPage('wrong')">오답노트 <span class="badge" id="wrong-count">0</span></button>
   </div>
-  <div class="nav-user" id="nav-user-info" style="display:none">
-    <a href="/admin" class="nav-admin-btn" id="nav-admin-link" style="display:none">관리자</a>
-  </div>
 </nav>
 
 <!-- STICKY SEARCH BAR -->
@@ -1536,17 +1533,6 @@
         <span class="lang-tag" id="lang-tag-ko2">🇰🇷 한국어</span>
         <span class="lang-tag" id="lang-tag-ja2">🇯🇵 일본어</span>
         <span class="lang-tag" id="lang-tag-zh2">🇨🇳 중국어</span>
-      </div>
-    </div>
-    <div id="search-welcome" style="display:none">
-      <div class="user-welcome-bar">
-        <div>
-          <div class="user-welcome-name" id="user-welcome-name"></div>
-          <div class="user-welcome-sub">단어를 검색해보세요</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <a href="/admin" class="btn" id="welcome-admin-btn" style="display:none;font-size:12px;padding:6px 12px;background:#ede9fe;color:#6d28d9;border:none;text-decoration:none;border-radius:8px">관리자</a>
-        </div>
       </div>
     </div>
     <div id="search-result"></div>
@@ -1689,14 +1675,9 @@ async function initAuth() {
     clearToken(); showLoginScreen(); return;
   }
 
-  document.getElementById('nav-user-info').style.display = 'flex';
   document.getElementById('login-overlay').style.display = 'none';
 
   currentUserName = payload.name || '';
-  const welcomeName = document.getElementById('user-welcome-name');
-  if (welcomeName) welcomeName.textContent = currentUserName + ' 님';
-  const searchWelcome = document.getElementById('search-welcome');
-  if (searchWelcome) searchWelcome.style.display = 'block';
 
   // Fetch fresh permissions from server
   try {
@@ -1707,11 +1688,6 @@ async function initAuth() {
         clearToken(); showLoginScreen();
         showToast('계정이 차단되었습니다. 관리자에게 문의하세요.');
         return;
-      }
-      if (userPerms.role === 'admin') {
-        document.getElementById('nav-admin-link').style.display = 'inline-block';
-        const welcomeAdminBtn = document.getElementById('welcome-admin-btn');
-        if (welcomeAdminBtn) welcomeAdminBtn.style.display = 'inline-flex';
       }
     }
   } catch {}
@@ -1731,9 +1707,6 @@ function logout() {
   clearToken();
   wordbook = [];
   updateBadges();
-  document.getElementById('nav-user-info').style.display = 'none';
-  const searchWelcome = document.getElementById('search-welcome');
-  if (searchWelcome) searchWelcome.style.display = 'none';
   showLoginScreen();
 }
 
@@ -1743,8 +1716,6 @@ function goHome() {
   document.getElementById('search-result').innerHTML = '';
   const clearBtn = document.getElementById('search-clear-btn');
   if (clearBtn) clearBtn.style.display = 'none';
-  const searchWelcome = document.getElementById('search-welcome');
-  if (searchWelcome && getToken()) searchWelcome.style.display = 'block';
   const searchBarWrap = document.getElementById('search-bar-wrap');
   if (searchBarWrap) searchBarWrap.style.display = 'none';
 }
@@ -1886,8 +1857,6 @@ async function doSearch() {
   // 모바일 키보드 내리기
   document.getElementById('search-input').blur();
 
-  const searchWelcome = document.getElementById('search-welcome');
-  if (searchWelcome) searchWelcome.style.display = 'none';
 
   const lang = detectLang(query);
   updateLangIndicator(lang);
@@ -2949,7 +2918,10 @@ function renderDashboard(container, d) {
     <div style="padding:16px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div style="font-size:15px;font-weight:700;color:var(--text)">${currentUserName} 님</div>
-        <button class="logout-text-btn" onclick="logout()">로그아웃</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          ${userPerms?.role === 'admin' ? `<a href="/admin" style="font-size:12px;padding:6px 12px;background:#ede9fe;color:#6d28d9;border:none;text-decoration:none;border-radius:8px;font-weight:700">관리자</a>` : ''}
+          <button class="logout-text-btn" onclick="logout()">로그아웃</button>
+        </div>
       </div>
 
       <div class="dash-level-card">
@@ -2962,13 +2934,11 @@ function renderDashboard(container, d) {
               : '최고 레벨 달성! 🎓'}</div>
           </div>
         </div>
-        <div class="dash-streak-badge">🔥 ${streak}일</div>
+        <div style="height:6px;background:rgba(255,255,255,0.2);border-radius:3px;overflow:hidden">
+          <div data-pct="${level.next_at ? lvPct : 100}"
+               style="width:0%;height:100%;border-radius:3px;background:${getLevelBarColor(level.current)};transition:width 1.1s cubic-bezier(0.25,0.46,0.45,0.94)"></div>
+        </div>
       </div>
-      ${level.next_at ? `<div class="dash-lv-bar-wrap">
-        <div class="dash-lv-bar-fill" data-pct="${lvPct}"
-             style="width:0%;background:${getLevelBarColor(level.current)}"></div>
-      </div>` : ''}
-
 
       ${today_due > 0
         ? `<div class="dash-review-banner" onclick="showPage('metacog')">
@@ -2978,7 +2948,7 @@ function renderDashboard(container, d) {
              </div>
              <div class="dash-banner-arrow">→</div>
            </div>`
-        : `<div class="dash-review-done">✨ <strong>오늘 복습 완료!</strong> 내일 또 만나요</div>`
+        : ''
       }
 
       <div class="dash-stats-row">
