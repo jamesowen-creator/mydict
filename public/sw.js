@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gotcha-v10';
+const CACHE_NAME = 'gotcha-v11';
 const STATIC_ASSETS = [
   '/',
   '/english_dictionary.html',
