@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>문학 나침반</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #7F77DD;
+    --primary-light: #EEEDFE;
+    --primary-dark: #3C3489;
+    --bg: #FAFAF9;
+    --card: #FFFFFF;
+    --text1: #1a1a1a;
+    --text2: #6b7280;
+    --border: rgba(0,0,0,0.08);
+    --success: #1D9E75;
+    --success-light: #E1F5EE;
+    --error: #E24B4A;
+    --error-light: #FCEBEB;
+    --tab-height: 64px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Noto Sans KR', 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text1);
+    min-height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* ── Loading ── */
+  #loading {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: var(--bg); z-index: 999; gap: 16px;
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--primary-light);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { color: var(--text2); font-size: 14px; }
+
+  /* ── Views ── */
+  .view { display: none; min-height: 100dvh; padding-bottom: var(--tab-height); }
+  .view.active { display: block; }
+
+  /* ── Top Bar ── */
+  .top-bar {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .top-bar h1 { font-size: 18px; font-weight: 700; color: var(--text1); flex: 1; }
+  .top-bar .subtitle { font-size: 12px; color: var(--text2); font-weight: 400; }
+  .back-btn {
+    background: none; border: none; cursor: pointer;
+    padding: 6px; border-radius: 8px;
+    color: var(--text2); display: flex; align-items: center;
+    transition: background 0.15s;
+  }
+  .back-btn:hover { background: var(--primary-light); color: var(--primary); }
+  .back-btn svg { width: 20px; height: 20px; }
+  .progress-text { font-size: 13px; font-weight: 600; color: var(--primary); font-family: 'Inter', sans-serif; }
+
+  /* ── Tab Bar ── */
+  .tab-bar {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    height: var(--tab-height);
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    display: flex; z-index: 200;
+  }
+  .tab-btn {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 4px; background: none; border: none; cursor: pointer;
+    color: var(--text2); font-size: 11px; font-weight: 500;
+    transition: color 0.15s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .tab-btn.active { color: var(--primary); }
+  .tab-btn svg { width: 22px; height: 22px; }
+  .tab-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Home View ── */
+  #view-home .content { padding: 20px 16px; }
+  .home-header { margin-bottom: 24px; }
+  .home-header h2 { font-size: 22px; font-weight: 700; color: var(--text1); margin-bottom: 4px; }
+  .home-header p { font-size: 14px; color: var(--text2); line-height: 1.5; }
+
+  .era-card {
+    background: var(--card);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .era-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .era-name { font-size: 17px; font-weight: 700; color: var(--text1); }
+  .era-range { font-size: 12px; color: var(--text2); font-family: 'Inter', sans-serif; }
+  .era-divider { height: 1px; background: var(--border); margin: 14px 0; }
+  .movement-label { font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 10px; letter-spacing: 0.03em; }
+  .movement-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .movement-pill {
+    background: var(--primary-light);
+    color: var(--primary-dark);
+    border: 1px solid rgba(127,119,221,0.2);
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .movement-pill:hover { background: var(--primary); color: #fff; }
+  .movement-pill .pill-period { font-size: 11px; opacity: 0.7; font-family: 'Inter', sans-serif; }
+
+  /* ── Briefing View ── */
+  #view-briefing .content { padding: 20px 16px; }
+  .briefing-section { margin-bottom: 20px; }
+  .section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--primary); text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .section-box {
+    background: var(--card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    font-size: 14px; line-height: 1.7; color: var(--text1);
+  }
+  .keyword-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .keyword-tag {
+    background: var(--primary-light);
+    color: var(--primary-dark);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 13px; font-weight: 500;
+  }
+  .author-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .author-chip {
+    background: #F3F4F6;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px; font-weight: 600;
+    color: var(--text1);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .author-chip::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--primary);
+    border-radius: 50%;
+  }
+  .briefing-cta {
+    margin-top: 28px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 16px;
+    width: 100%;
+    font-size: 15px; font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: background 0.15s; font-family: 'Noto Sans KR', sans-serif;
+  }
+  .briefing-cta:hover { background: var(--primary-dark); }
+  .briefing-cta svg { width: 18px; height: 18px; }
+
+  /* ── Cards View ── */
+  #view-cards { display: none; flex-direction: column; }
+  #view-cards.active { display: flex; }
+
+  .cards-area {
+    flex: 1;
+    padding: 20px 16px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Flip Card */
+  .flip-card-wrapper {
+    width: 100%;
+    perspective: 1200px;
+    margin-bottom: 20px;
+  }
+  .flip-card {
+    width: 100%; min-height: 420px;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1);
+    cursor: pointer;
+  }
+  .flip-card.flipped { transform: rotateY(180deg); }
+  .flip-card-front, .flip-card-back {
+    position: absolute; inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    background: var(--card);
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+    padding: 24px;
+    overflow-y: auto;
+  }
+  .flip-card-back { transform: rotateY(180deg); }
+
+  /* Front face */
+  .card-badges { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .badge {
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .badge-movement { background: var(--primary-light); color: var(--primary-dark); }
+  .badge-level { background: #FEF3C7; color: #92400E; }
+  .badge-level.고등 { background: #FCE7F3; color: #831843; }
+
+  .card-title { font-size: 26px; font-weight: 700; color: var(--text1); margin-bottom: 6px; line-height: 1.3; }
+  .card-meta { font-size: 14px; color: var(--text2); margin-bottom: 4px; font-family: 'Inter', sans-serif; }
+  .card-genre { font-size: 13px; color: var(--text2); margin-bottom: 16px; }
+  .card-keywords { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+  .card-keyword {
+    background: #F3F4F6;
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 12px; color: var(--text2); font-weight: 500;
+  }
+  .card-hint {
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px dashed var(--border);
+    text-align: center;
+    font-size: 12px; color: var(--text2);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .card-hint svg { width: 14px; height: 14px; color: var(--primary); }
+
+  /* Back face */
+  .back-section { margin-bottom: 18px; }
+  .back-section-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--primary); margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .back-section-title svg { width: 13px; height: 13px; }
+  .back-section-body { font-size: 13px; line-height: 1.75; color: var(--text1); }
+  .back-divider { height: 1px; background: var(--border); margin: 14px 0; }
+  .related-list { display: flex; flex-direction: column; gap: 8px; }
+  .related-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: 10px;
+  }
+  .related-item svg { width: 14px; height: 14px; color: var(--primary); flex-shrink: 0; margin-top: 2px; }
+  .related-item-info { flex: 1; }
+  .related-title { font-size: 13px; font-weight: 600; color: var(--text1); }
+  .related-author { font-size: 12px; color: var(--text2); }
+  .related-relation { font-size: 11px; color: var(--primary); font-weight: 500; margin-top: 2px; }
+
+  /* Card navigation */
+  .card-nav {
+    display: flex; align-items: center; justify-content: center;
+    gap: 16px; padding: 0 16px 16px;
+  }
+  .nav-btn {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: var(--card);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text1);
+    transition: all 0.15s;
+  }
+  .nav-btn:hover:not(:disabled) { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .nav-btn svg { width: 18px; height: 18px; }
+  .dot-indicators { display: flex; gap: 6px; align-items: center; flex: 1; justify-content: center; }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--border); transition: all 0.2s;
+  }
+  .dot.active { background: var(--primary); width: 20px; border-radius: 4px; }
+
+  .quiz-start-btn {
+    margin: 0 16px 16px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 16px;
+    width: calc(100% - 32px);
+    font-size: 15px; font-weight: 700;
+    cursor: pointer;
+    display: none; align-items: center; justify-content: center; gap: 8px;
+    transition: background 0.15s; font-family: 'Noto Sans KR', sans-serif;
+  }
+  .quiz-start-btn.visible { display: flex; }
+  .quiz-start-btn:hover { background: var(--primary-dark); }
+  .quiz-start-btn svg { width: 18px; height: 18px; }
+
+  /* ── Quiz View ── */
+  #view-quiz .content { padding: 20px 16px; }
+
+  .quiz-progress-bar-wrap {
+    height: 6px; background: var(--primary-light);
+    border-radius: 3px; margin-bottom: 20px; overflow: hidden;
+  }
+  .quiz-progress-bar {
+    height: 100%; background: var(--primary);
+    border-radius: 3px; transition: width 0.3s ease;
+  }
+  .quiz-round-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--primary); margin-bottom: 6px;
+  }
+  .quiz-question-counter { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
+  .quiz-card {
+    background: var(--card);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  /* Round 1 — Matching */
+  .match-instruction { font-size: 14px; color: var(--text2); margin-bottom: 16px; line-height: 1.5; }
+  .match-columns { display: flex; gap: 12px; }
+  .match-col { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .match-col-label { font-size: 11px; font-weight: 700; color: var(--text2); letter-spacing: 0.05em; margin-bottom: 4px; text-align: center; }
+  .match-item {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px; font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--text1);
+    min-height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    word-break: keep-all;
+  }
+  .match-item.selected { background: var(--primary-light); border-color: var(--primary); color: var(--primary-dark); }
+  .match-item.correct { background: var(--success-light); border-color: var(--success); color: var(--success); cursor: default; }
+  .match-item.wrong { background: var(--error-light); border-color: var(--error); color: var(--error); }
+  .match-item.disabled { cursor: default; opacity: 0.5; }
+
+  /* Round 2 — OX */
+  .ox-question { font-size: 16px; font-weight: 600; line-height: 1.6; margin-bottom: 24px; color: var(--text1); }
+  .ox-buttons { display: flex; gap: 12px; }
+  .ox-btn {
+    flex: 1; height: 80px;
+    border-radius: 14px; border: 2px solid var(--border);
+    background: var(--bg); cursor: pointer;
+    font-size: 32px; font-weight: 700;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ox-btn:hover:not(:disabled) { border-color: var(--primary); background: var(--primary-light); }
+  .ox-btn.correct { background: var(--success-light); border-color: var(--success); }
+  .ox-btn.wrong { background: var(--error-light); border-color: var(--error); }
+  .ox-btn:disabled { cursor: default; }
+  .ox-feedback {
+    margin-top: 12px; padding: 10px 14px;
+    border-radius: 10px; font-size: 13px; font-weight: 500;
+    display: none;
+  }
+  .ox-feedback.show { display: block; }
+  .ox-feedback.correct-fb { background: var(--success-light); color: var(--success); }
+  .ox-feedback.wrong-fb { background: var(--error-light); color: var(--error); }
+
+  /* Round 3 — MCQ */
+  .mcq-question { font-size: 16px; font-weight: 600; line-height: 1.6; margin-bottom: 20px; color: var(--text1); }
+  .mcq-options { display: flex; flex-direction: column; gap: 10px; }
+  .mcq-option {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .mcq-option:hover:not(.answered) { border-color: var(--primary); background: var(--primary-light); }
+  .mcq-option.correct { background: var(--success-light); border-color: var(--success); }
+  .mcq-option.wrong { background: var(--error-light); border-color: var(--error); }
+  .mcq-num {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    flex-shrink: 0; color: var(--text2);
+    transition: all 0.15s;
+  }
+  .mcq-option.correct .mcq-num { background: var(--success); color: #fff; }
+  .mcq-option.wrong .mcq-num { background: var(--error); color: #fff; }
+  .mcq-option.correct-hint .mcq-num { background: var(--success); color: #fff; }
+  .mcq-option.correct-hint { background: var(--success-light); border-color: var(--success); }
+  .mcq-text { font-size: 14px; color: var(--text1); }
+
+  .quiz-next-btn {
+    margin-top: 20px;
+    background: var(--primary); color: #fff;
+    border: none; border-radius: 12px;
+    padding: 14px; width: 100%;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    display: none; font-family: 'Noto Sans KR', sans-serif;
+    transition: background 0.15s;
+  }
+  .quiz-next-btn.visible { display: block; }
+  .quiz-next-btn:hover { background: var(--primary-dark); }
+
+  /* ── Result View ── */
+  #view-result .content { padding: 24px 16px; }
+  .result-score-wrap {
+    text-align: center; margin-bottom: 28px;
+    padding: 28px;
+    background: var(--card);
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .result-emoji { font-size: 48px; margin-bottom: 12px; }
+  .result-score { font-size: 42px; font-weight: 700; color: var(--primary); font-family: 'Inter', sans-serif; }
+  .result-score span { font-size: 20px; color: var(--text2); }
+  .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
+  .result-submsg { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  .result-section-label { font-size: 13px; font-weight: 700; color: var(--text2); margin-bottom: 12px; letter-spacing: 0.03em; }
+  .result-wrong-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .result-wrong-item {
+    background: var(--card); border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+  }
+  .result-wrong-q { font-size: 13px; color: var(--text2); margin-bottom: 4px; }
+  .result-wrong-a { font-size: 14px; font-weight: 600; color: var(--success); }
+  .result-wrong-a::before { content: '정답: '; color: var(--text2); font-weight: 400; }
+
+  .result-actions { display: flex; flex-direction: column; gap: 10px; }
+  .result-btn {
+    border-radius: 14px; padding: 15px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    border: none; transition: all 0.15s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .result-btn-primary { background: var(--primary); color: #fff; }
+  .result-btn-primary:hover { background: var(--primary-dark); }
+  .result-btn-secondary { background: var(--card); color: var(--text1); border: 1.5px solid var(--border); }
+  .result-btn-secondary:hover { background: var(--bg); }
+
+  /* ── Misc ── */
+  .error-msg {
+    text-align: center; padding: 40px 24px;
+    color: var(--error); font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p>작품 데이터 로딩 중…</p>
+</div>
+
+<!-- View 1: Home -->
+<div id="view-home" class="view">
+  <div class="top-bar">
+    <div style="flex:1">
+      <h1>문학 나침반</h1>
+      <div class="subtitle">배경지식으로 문학을 읽는 눈을 키워요</div>
+    </div>
+  </div>
+  <div class="content" id="home-content"></div>
+</div>
+
+<!-- View 2: Briefing -->
+<div id="view-briefing" class="view">
+  <div class="top-bar">
+    <button class="back-btn" onclick="goHome()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <h1 id="briefing-title"></h1>
+  </div>
+  <div class="content" id="briefing-content"></div>
+</div>
+
+<!-- View 3: Cards -->
+<div id="view-cards" class="view">
+  <div class="top-bar">
+    <button class="back-btn" onclick="showBriefing(currentMovement)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <h1 id="cards-title" style="font-size:16px"></h1>
+    <span class="progress-text" id="cards-progress"></span>
+  </div>
+  <div class="cards-area">
+    <div class="flip-card-wrapper">
+      <div class="flip-card" id="flip-card" onclick="flipCard()">
+        <div class="flip-card-front" id="card-front"></div>
+        <div class="flip-card-back" id="card-back"></div>
+      </div>
+    </div>
+    <div class="dot-indicators" id="dot-indicators"></div>
+  </div>
+  <div class="card-nav">
+    <button class="nav-btn" id="prev-btn" onclick="prevCard()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <div style="flex:1"></div>
+    <button class="nav-btn" id="next-btn" onclick="nextCard()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+    </button>
+  </div>
+  <button class="quiz-start-btn" id="quiz-start-btn" onclick="startQuiz()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+    </svg>
+    퀴즈 시작
+  </button>
+</div>
+
+<!-- View 4: Quiz -->
+<div id="view-quiz" class="view">
+  <div class="top-bar">
+    <button class="back-btn" onclick="showCards()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <h1 id="quiz-title" style="font-size:16px"></h1>
+  </div>
+  <div class="content" id="quiz-content"></div>
+</div>
+
+<!-- View 5: Result -->
+<div id="view-result" class="view">
+  <div class="top-bar">
+    <h1>퀴즈 결과</h1>
+  </div>
+  <div class="content" id="result-content"></div>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-home" onclick="goHome()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+      <polyline points="9 22 9 12 15 12 15 22"></polyline>
+    </svg>
+    홈
+  </button>
+  <button class="tab-btn disabled" id="tab-quiz" title="학습 후 퀴즈 이용 가능">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>
+    퀴즈
+  </button>
+</div>
+
+<script>
+// ── State ──
+let DB = null;
+let currentMovement = null;
+let currentCardIndex = 0;
+let isFlipped = false;
+let quizData = { rounds: [], currentRound: 0, currentQ: 0, score: 0, wrong: [] };
+
+// ── Utility ──
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const tabHome = document.getElementById('tab-home');
+  tabHome.classList.toggle('active', id === 'view-home');
+}
+
+// ── Data Load ──
+async function loadDB() {
+  try {
+    const res = await fetch('literature_db.json');
+    if (!res.ok) throw new Error('네트워크 오류');
+    DB = await res.json();
+    document.getElementById('loading').style.display = 'none';
+    renderHome();
+    showView('view-home');
+  } catch (e) {
+    document.getElementById('loading').innerHTML =
+      `<div class="error-msg">데이터를 불러오지 못했습니다.<br>${e.message}</div>`;
+  }
+}
+
+// ── View 1: Home ──
+function renderHome() {
+  const container = document.getElementById('home-content');
+  let html = `<div class="home-header">
+    <h2>한국 문학 탐구</h2>
+    <p>시대별 문학 사조와 작품을 배경지식과 함께 깊이 있게 알아보세요.</p>
+  </div>`;
+
+  DB.eras.forEach(era => {
+    html += `<div class="era-card">
+      <div class="era-header">
+        <span class="era-name">${era.name}</span>
+        <span class="era-range">${era.range}</span>
+      </div>
+      <div class="era-divider"></div>
+      <div class="movement-label">문학 사조</div>
+      <div class="movement-pills">`;
+    era.movements.forEach(m => {
+      html += `<button class="movement-pill" onclick="showBriefing('${m.id}')">
+        ${m.name}
+        <span class="pill-period">${m.period}</span>
+      </button>`;
+    });
+    html += `</div></div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function goHome() {
+  renderHome();
+  showView('view-home');
+}
+
+// ── View 2: Briefing ──
+function showBriefing(movementId) {
+  const movement = findMovement(movementId);
+  if (!movement) return;
+  currentMovement = movementId;
+
+  document.getElementById('briefing-title').textContent = movement.name;
+  const b = movement.briefing;
+
+  let html = `
+    <div class="briefing-section">
+      <div class="section-label">시대 배경</div>
+      <div class="section-box">${b.era_background}</div>
+    </div>
+    <div class="briefing-section">
+      <div class="section-label">사조 특징</div>
+      <div class="section-box">${b.characteristics}</div>
+    </div>
+    <div class="briefing-section">
+      <div class="section-label">핵심 키워드</div>
+      <div class="keyword-tags">
+        ${b.keywords.map(k => `<span class="keyword-tag">${k}</span>`).join('')}
+      </div>
+    </div>
+    <div class="briefing-section">
+      <div class="section-label">대표 작가</div>
+      <div class="author-chips">
+        ${b.representative_authors.map(a => `<span class="author-chip">${a}</span>`).join('')}
+      </div>
+    </div>
+    <button class="briefing-cta" onclick="showCards()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+        <line x1="8" y1="21" x2="16" y2="21"></line>
+        <line x1="12" y1="17" x2="12" y2="21"></line>
+      </svg>
+      작품 카드 보기 (${movement.works.length}개)
+    </button>`;
+
+  document.getElementById('briefing-content').innerHTML = html;
+  showView('view-briefing');
+  window.scrollTo(0, 0);
+}
+
+// ── View 3: Cards ──
+function showCards() {
+  const movement = findMovement(currentMovement);
+  if (!movement) return;
+  currentCardIndex = 0;
+  isFlipped = false;
+
+  document.getElementById('cards-title').textContent = movement.name;
+  renderCard();
+  showView('view-cards');
+  window.scrollTo(0, 0);
+}
+
+function renderCard() {
+  const movement = findMovement(currentMovement);
+  const works = movement.works;
+  const work = works[currentCardIndex];
+  const total = works.length;
+
+  // progress
+  document.getElementById('cards-progress').textContent = `${currentCardIndex + 1}/${total}`;
+
+  // reset flip
+  const fc = document.getElementById('flip-card');
+  fc.classList.remove('flipped');
+  isFlipped = false;
+
+  // dots
+  let dots = '';
+  for (let i = 0; i < total; i++) {
+    dots += `<div class="dot ${i === currentCardIndex ? 'active' : ''}"></div>`;
+  }
+  document.getElementById('dot-indicators').innerHTML = dots;
+
+  // front
+  document.getElementById('card-front').innerHTML = `
+    <div class="card-badges">
+      <span class="badge badge-movement">${work.literary_movement}</span>
+      <span class="badge badge-level ${work.level}">${work.level}</span>
+    </div>
+    <div class="card-title">「${work.title}」</div>
+    <div class="card-meta">${work.author} · ${work.year}</div>
+    <div class="card-genre">${work.genre}</div>
+    <div class="card-keywords">
+      ${work.keywords.map(k => `<span class="card-keyword">${k}</span>`).join('')}
+    </div>
+    <div class="card-hint">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+      탭하여 배경지식 보기
+    </div>`;
+
+  // back
+  let relatedHtml = '';
+  if (work.related_works && work.related_works.length > 0) {
+    relatedHtml = `
+      <div class="back-divider"></div>
+      <div class="back-section">
+        <div class="back-section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+          연결 작품
+        </div>
+        <div class="related-list">
+          ${work.related_works.map(r => `
+            <div class="related-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+              <div class="related-item-info">
+                <div class="related-title">「${r.title}」</div>
+                <div class="related-author">${r.author}</div>
+                <div class="related-relation">${r.relation}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  document.getElementById('card-back').innerHTML = `
+    <div class="back-section">
+      <div class="back-section-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+        </svg>
+        장르
+      </div>
+      <div class="back-section-body">${work.genre_desc}</div>
+    </div>
+    <div class="back-divider"></div>
+    <div class="back-section">
+      <div class="back-section-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        작가
+      </div>
+      <div class="back-section-body">${work.author_desc}</div>
+    </div>
+    <div class="back-divider"></div>
+    <div class="back-section">
+      <div class="back-section-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+        시대적 배경
+      </div>
+      <div class="back-section-body">${work.era_desc}</div>
+    </div>
+    ${relatedHtml}`;
+
+  // nav buttons
+  document.getElementById('prev-btn').disabled = currentCardIndex === 0;
+  document.getElementById('next-btn').disabled = currentCardIndex === total - 1;
+
+  // quiz button
+  const quizBtn = document.getElementById('quiz-start-btn');
+  const allUnlocked = works.every(w => w.quiz_unlocked);
+  if (currentCardIndex === total - 1) {
+    quizBtn.classList.add('visible');
+    if (!allUnlocked) {
+      quizBtn.textContent = '학습 완료 후 해제';
+      quizBtn.style.background = '#9CA3AF';
+      quizBtn.onclick = () => alert('모든 작품의 quiz_unlocked가 true여야 퀴즈를 시작할 수 있습니다.');
+    } else {
+      quizBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg> 퀴즈 시작`;
+      quizBtn.style.background = '';
+      quizBtn.onclick = startQuiz;
+    }
+  } else {
+    quizBtn.classList.remove('visible');
+  }
+}
+
+function flipCard() {
+  const fc = document.getElementById('flip-card');
+  isFlipped = !isFlipped;
+  fc.classList.toggle('flipped', isFlipped);
+}
+
+function prevCard() {
+  if (currentCardIndex > 0) { currentCardIndex--; renderCard(); }
+}
+
+function nextCard() {
+  const movement = findMovement(currentMovement);
+  if (currentCardIndex < movement.works.length - 1) { currentCardIndex++; renderCard(); }
+}
+
+// ── Quiz Generation ──
+function buildQuizData() {
+  const movement = findMovement(currentMovement);
+  const works = movement.works;
+  const allMovements = getAllMovements();
+
+  const rounds = [];
+
+  // Round 1: Matching (작품 ↔ 작가)
+  const pairs = works.map(w => ({ work: w.title, author: w.author, id: w.id }));
+  rounds.push({ type: 'matching', pairs });
+
+  // Round 2: OX (3문항)
+  const oxQuestions = [];
+
+  // True statements — work belongs to this movement
+  works.slice(0, 2).forEach(w => {
+    oxQuestions.push({
+      statement: `「${w.title}」은(는) ${w.author}의 작품이다.`,
+      answer: true,
+      explanation: `맞습니다. 「${w.title}」은 ${w.author}의 ${w.year}년 작품입니다.`
+    });
+  });
+
+  // False statement — mix authors/movements
+  const otherWorks = getAllWorks().filter(w => w.literary_movement !== movement.name);
+  if (otherWorks.length > 0) {
+    const ow = otherWorks[0];
+    const wrongAuthor = works[0].author;
+    oxQuestions.push({
+      statement: `「${ow.title}」은(는) ${wrongAuthor}의 작품이다.`,
+      answer: false,
+      explanation: `아닙니다. 「${ow.title}」은 ${ow.author}의 작품입니다.`
+    });
+  } else {
+    // fallback: movement mismatch
+    const w = works[0];
+    const otherM = allMovements.find(m => m.id !== movement.id);
+    if (otherM) {
+      oxQuestions.push({
+        statement: `「${w.title}」의 문학 사조는 ${otherM.name}이다.`,
+        answer: false,
+        explanation: `아닙니다. 「${w.title}」의 문학 사조는 ${movement.name}입니다.`
+      });
+    }
+  }
+
+  rounds.push({ type: 'ox', questions: oxQuestions.slice(0, 3) });
+
+  // Round 3: MCQ (3문항 — "이 작품의 문학 사조는?")
+  const mcqQuestions = [];
+  const otherMovementNames = allMovements
+    .filter(m => m.id !== movement.id)
+    .map(m => m.name);
+
+  works.slice(0, 3).forEach(w => {
+    const wrongOptions = shuffle(otherMovementNames).slice(0, 3);
+    const options = shuffle([movement.name, ...wrongOptions]);
+    mcqQuestions.push({
+      question: `「${w.title}」(${w.author})의 문학 사조는 무엇인가요?`,
+      options,
+      answer: movement.name
+    });
+  });
+
+  // If fewer than 3 works, pad with author questions
+  if (mcqQuestions.length < 3 && works.length > 0) {
+    const w = works[0];
+    const otherAuthors = getAllWorks()
+      .filter(ow => ow.author !== w.author)
+      .map(ow => ow.author)
+      .filter((a, i, arr) => arr.indexOf(a) === i);
+    const wrongAuthors = shuffle(otherAuthors).slice(0, 3);
+    const authorOptions = shuffle([w.author, ...wrongAuthors]);
+    mcqQuestions.push({
+      question: `「${w.title}」를 쓴 시인은 누구인가요?`,
+      options: authorOptions,
+      answer: w.author
+    });
+  }
+
+  rounds.push({ type: 'mcq', questions: mcqQuestions.slice(0, 3) });
+
+  return rounds;
+}
+
+// ── View 4: Quiz ──
+function startQuiz() {
+  const rounds = buildQuizData();
+  quizData = { rounds, currentRound: 0, currentQ: 0, score: 0, wrong: [], totalQ: countTotalQ(rounds) };
+  document.getElementById('quiz-title').textContent = findMovement(currentMovement).name + ' 퀴즈';
+  showView('view-quiz');
+  renderQuizRound();
+  window.scrollTo(0, 0);
+}
+
+function countTotalQ(rounds) {
+  return rounds.reduce((acc, r) => {
+    if (r.type === 'matching') return acc + r.pairs.length;
+    return acc + r.questions.length;
+  }, 0);
+}
+
+function getAnsweredSoFar() {
+  let count = 0;
+  for (let i = 0; i < quizData.currentRound; i++) {
+    const r = quizData.rounds[i];
+    if (r.type === 'matching') count += r.pairs.length;
+    else count += r.questions.length;
+  }
+  count += quizData.currentQ;
+  return count;
+}
+
+function updateProgressBar() {
+  const answered = getAnsweredSoFar();
+  const pct = quizData.totalQ > 0 ? (answered / quizData.totalQ) * 100 : 0;
+  const bar = document.getElementById('quiz-progress-bar');
+  if (bar) bar.style.width = pct + '%';
+}
+
+function renderQuizRound() {
+  const round = quizData.rounds[quizData.currentRound];
+  if (!round) { showResult(); return; }
+
+  const roundNames = { matching: '연결 퀴즈', ox: 'OX 퀴즈', mcq: '4지선다' };
+  const roundNums = { matching: 1, ox: 2, mcq: 3 };
+
+  if (round.type === 'matching') renderMatching(round, roundNames, roundNums);
+  else if (round.type === 'ox') renderOX(round, roundNames, roundNums);
+  else if (round.type === 'mcq') renderMCQ(round, roundNames, roundNums);
+}
+
+// Round 1 — Matching
+function renderMatching(round, roundNames, roundNums) {
+  const shuffledWorks = shuffle(round.pairs.map(p => ({ text: `「${p.work}」`, id: p.id, type: 'work' })));
+  const shuffledAuthors = shuffle(round.pairs.map(p => ({ text: p.author, id: p.id, type: 'author' })));
+
+  let selectedWork = null;
+  let selectedAuthor = null;
+  let matched = new Set();
+
+  const container = document.getElementById('quiz-content');
+  container.innerHTML = `
+    <div class="quiz-progress-bar-wrap"><div class="quiz-progress-bar" id="quiz-progress-bar" style="width:0%"></div></div>
+    <div class="quiz-round-label">라운드 ${roundNums['matching']} · ${roundNames['matching']}</div>
+    <div class="quiz-question-counter">작품과 작가를 연결하세요</div>
+    <div class="quiz-card">
+      <div class="match-instruction">작품명과 해당 작가를 각각 클릭하여 연결하세요. 모두 연결하면 다음 라운드로 넘어갑니다.</div>
+      <div class="match-columns">
+        <div class="match-col">
+          <div class="match-col-label">작품</div>
+          ${shuffledWorks.map(w => `<div class="match-item" id="mw-${w.id}" data-id="${w.id}" data-type="work">${w.text}</div>`).join('')}
+        </div>
+        <div class="match-col">
+          <div class="match-col-label">작가</div>
+          ${shuffledAuthors.map(a => `<div class="match-item" id="ma-${a.id}" data-id="${a.id}" data-type="author">${a.text}</div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  updateProgressBar();
+
+  container.querySelectorAll('.match-item').forEach(el => {
+    el.addEventListener('click', () => {
+      if (el.classList.contains('correct') || el.classList.contains('disabled')) return;
+
+      const type = el.dataset.type;
+      const id = el.dataset.id;
+
+      if (type === 'work') {
+        if (selectedWork) selectedWork.classList.remove('selected');
+        selectedWork = el;
+        el.classList.add('selected');
+      } else {
+        if (selectedAuthor) selectedAuthor.classList.remove('selected');
+        selectedAuthor = el;
+        el.classList.add('selected');
+      }
+
+      if (selectedWork && selectedAuthor) {
+        const wId = selectedWork.dataset.id;
+        const aId = selectedAuthor.dataset.id;
+        const pair = round.pairs.find(p => p.id === wId);
+        const isCorrect = pair && wId === aId;
+
+        if (isCorrect) {
+          selectedWork.classList.remove('selected'); selectedWork.classList.add('correct');
+          selectedAuthor.classList.remove('selected'); selectedAuthor.classList.add('correct');
+          matched.add(wId);
+          quizData.score++;
+        } else {
+          selectedWork.classList.add('wrong');
+          selectedAuthor.classList.add('wrong');
+          setTimeout(() => {
+            if (selectedWork) { selectedWork.classList.remove('wrong', 'selected'); selectedWork = null; }
+            if (selectedAuthor) { selectedAuthor.classList.remove('wrong', 'selected'); selectedAuthor = null; }
+          }, 800);
+        }
+
+        if (isCorrect) { selectedWork = null; selectedAuthor = null; }
+
+        if (matched.size === round.pairs.length) {
+          setTimeout(() => {
+            quizData.currentRound++;
+            quizData.currentQ = 0;
+            renderQuizRound();
+          }, 600);
+        }
+      }
+    });
+  });
+}
+
+// Round 2 — OX
+function renderOX(round, roundNames, roundNums) {
+  quizData.currentQ = 0;
+  renderOXQuestion(round, roundNames, roundNums);
+}
+
+function renderOXQuestion(round, roundNames, roundNums) {
+  const q = round.questions[quizData.currentQ];
+  if (!q) { quizData.currentRound++; quizData.currentQ = 0; renderQuizRound(); return; }
+
+  const container = document.getElementById('quiz-content');
+  container.innerHTML = `
+    <div class="quiz-progress-bar-wrap"><div class="quiz-progress-bar" id="quiz-progress-bar"></div></div>
+    <div class="quiz-round-label">라운드 ${roundNums['ox']} · ${roundNames['ox']}</div>
+    <div class="quiz-question-counter">${quizData.currentQ + 1} / ${round.questions.length}</div>
+    <div class="quiz-card">
+      <div class="ox-question">${q.statement}</div>
+      <div class="ox-buttons">
+        <button class="ox-btn" id="ox-o" onclick="answerOX(true)">O</button>
+        <button class="ox-btn" id="ox-x" onclick="answerOX(false)">X</button>
+      </div>
+      <div class="ox-feedback" id="ox-feedback"></div>
+    </div>
+    <button class="quiz-next-btn" id="quiz-next-btn" onclick="nextOX()">다음</button>`;
+
+  updateProgressBar();
+}
+
+function answerOX(answer) {
+  const round = quizData.rounds[quizData.currentRound];
+  const q = round.questions[quizData.currentQ];
+  const oBtn = document.getElementById('ox-o');
+  const xBtn = document.getElementById('ox-x');
+  const fb = document.getElementById('ox-feedback');
+
+  oBtn.disabled = true; xBtn.disabled = true;
+
+  const isCorrect = answer === q.answer;
+  if (isCorrect) {
+    quizData.score++;
+    (answer ? oBtn : xBtn).classList.add('correct');
+    fb.textContent = '정답! ' + q.explanation;
+    fb.className = 'ox-feedback show correct-fb';
+  } else {
+    (answer ? oBtn : xBtn).classList.add('wrong');
+    (!answer ? oBtn : xBtn).classList.add('correct');
+    fb.textContent = '오답. ' + q.explanation;
+    fb.className = 'ox-feedback show wrong-fb';
+    quizData.wrong.push({ q: q.statement, a: q.answer ? 'O (참)' : 'X (거짓)' });
+  }
+
+  quizData.currentQ++;
+  document.getElementById('quiz-next-btn').classList.add('visible');
+}
+
+function nextOX() {
+  const round = quizData.rounds[quizData.currentRound];
+  if (quizData.currentQ >= round.questions.length) {
+    quizData.currentRound++;
+    quizData.currentQ = 0;
+    renderQuizRound();
+  } else {
+    renderOXQuestion(round, { ox: 'OX 퀴즈' }, { ox: 2 });
+  }
+}
+
+// Round 3 — MCQ
+function renderMCQ(round, roundNames, roundNums) {
+  quizData.currentQ = 0;
+  renderMCQQuestion(round, roundNames, roundNums);
+}
+
+function renderMCQQuestion(round, roundNames, roundNums) {
+  const q = round.questions[quizData.currentQ];
+  if (!q) { quizData.currentRound++; quizData.currentQ = 0; renderQuizRound(); return; }
+
+  const container = document.getElementById('quiz-content');
+  container.innerHTML = `
+    <div class="quiz-progress-bar-wrap"><div class="quiz-progress-bar" id="quiz-progress-bar"></div></div>
+    <div class="quiz-round-label">라운드 ${roundNums['mcq']} · ${roundNames['mcq']}</div>
+    <div class="quiz-question-counter">${quizData.currentQ + 1} / ${round.questions.length}</div>
+    <div class="quiz-card">
+      <div class="mcq-question">${q.question}</div>
+      <div class="mcq-options">
+        ${q.options.map((opt, i) => `
+          <button class="mcq-option" data-opt="${opt}" onclick="answerMCQ(this, '${opt.replace(/'/g, "\\'")}')">
+            <span class="mcq-num">${i + 1}</span>
+            <span class="mcq-text">${opt}</span>
+          </button>`).join('')}
+      </div>
+    </div>
+    <button class="quiz-next-btn" id="quiz-next-btn" onclick="nextMCQ()">다음</button>`;
+
+  updateProgressBar();
+}
+
+function answerMCQ(el, chosen) {
+  const round = quizData.rounds[quizData.currentRound];
+  const q = round.questions[quizData.currentQ];
+
+  document.querySelectorAll('.mcq-option').forEach(opt => {
+    opt.classList.add('answered');
+    opt.onclick = null;
+  });
+
+  const isCorrect = chosen === q.answer;
+  if (isCorrect) {
+    el.classList.add('correct');
+    quizData.score++;
+  } else {
+    el.classList.add('wrong');
+    document.querySelectorAll('.mcq-option').forEach(opt => {
+      if (opt.dataset.opt === q.answer) opt.classList.add('correct-hint');
+    });
+    quizData.wrong.push({ q: q.question, a: q.answer });
+  }
+
+  quizData.currentQ++;
+  document.getElementById('quiz-next-btn').classList.add('visible');
+}
+
+function nextMCQ() {
+  const round = quizData.rounds[quizData.currentRound];
+  if (quizData.currentQ >= round.questions.length) {
+    quizData.currentRound++;
+    quizData.currentQ = 0;
+    renderQuizRound();
+  } else {
+    renderMCQQuestion(round, { mcq: '4지선다' }, { mcq: 3 });
+  }
+}
+
+// ── View 5: Result ──
+function showResult() {
+  const total = quizData.totalQ;
+  const score = quizData.score;
+  const pct = total > 0 ? Math.round((score / total) * 100) : 0;
+
+  let emoji = '🎉', msg = '완벽해요!', sub = '모든 문항을 맞혔습니다.';
+  if (pct < 100) { emoji = '👍'; msg = '잘했어요!'; sub = '조금만 더 연습하면 완벽합니다.'; }
+  if (pct < 60) { emoji = '📚'; msg = '다시 도전해봐요!'; sub = '작품 카드를 다시 보고 퀴즈에 도전하세요.'; }
+
+  let wrongHtml = '';
+  if (quizData.wrong.length > 0) {
+    wrongHtml = `
+      <div class="result-section-label">틀린 문항</div>
+      <div class="result-wrong-list">
+        ${quizData.wrong.map(w => `
+          <div class="result-wrong-item">
+            <div class="result-wrong-q">${w.q}</div>
+            <div class="result-wrong-a">${w.a}</div>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  document.getElementById('result-content').innerHTML = `
+    <div class="result-score-wrap">
+      <div class="result-emoji">${emoji}</div>
+      <div class="result-score">${score}<span> / ${total}</span></div>
+      <div class="result-msg">${msg}</div>
+      <div class="result-submsg">${sub}</div>
+    </div>
+    ${wrongHtml}
+    <div class="result-actions">
+      <button class="result-btn result-btn-primary" onclick="retryQuiz()">다시 풀기</button>
+      <button class="result-btn result-btn-secondary" onclick="goHome()">홈으로</button>
+    </div>`;
+
+  showView('view-result');
+  window.scrollTo(0, 0);
+}
+
+function retryQuiz() {
+  startQuiz();
+}
+
+// ── Helpers ──
+function findMovement(id) {
+  for (const era of DB.eras) {
+    for (const m of era.movements) {
+      if (m.id === id) return m;
+    }
+  }
+  return null;
+}
+
+function getAllMovements() {
+  const all = [];
+  for (const era of DB.eras) {
+    for (const m of era.movements) all.push(m);
+  }
+  return all;
+}
+
+function getAllWorks() {
+  const all = [];
+  for (const era of DB.eras) {
+    for (const m of era.movements) {
+      for (const w of m.works) all.push(w);
+    }
+  }
+  return all;
+}
+
+// ── Boot ──
+loadDB();
+</script>
+</body>
+</html>
