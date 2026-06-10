@@ -1064,6 +1064,18 @@
     border-color: var(--accent); color: var(--accent);
     background: rgba(74,110,245,0.08);
   }
+  .podcast-mode-row, .podcast-repeat-row { display: flex; justify-content: center; gap: 8px; margin-top: 6px; }
+  .podcast-mode-btn, .podcast-repeat-btn {
+    padding: 5px 13px; border-radius: 20px;
+    font-size: 12px; font-weight: 700;
+    border: 1.5px solid var(--border); background: none;
+    color: var(--text2); cursor: pointer;
+    transition: all 0.15s; font-family: 'Sora', sans-serif;
+  }
+  .podcast-mode-btn.active, .podcast-repeat-btn.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(74,110,245,0.08);
+  }
 
 
   /* DASHBOARD */
@@ -1543,7 +1555,7 @@
       <button class="wordbook-tab" id="wb-tab-zh" onclick="switchWordbookTab('zh')">🇨🇳 중국어</button>
     </div>
     <button class="btn" onclick="podcastStart()" style="width:100%;margin-bottom:14px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);font-size:14px;padding:12px 16px">
-      🎧 오늘의 단어 듣기
+      🎧 단어 연속 듣기
     </button>
     <div id="wordbook-list"></div>
   </div>
@@ -1591,6 +1603,16 @@
     <button class="podcast-speed-btn" data-speed="0.75" onclick="setPodcastSpeed(0.75)">0.75×</button>
     <button class="podcast-speed-btn active" data-speed="1" onclick="setPodcastSpeed(1)">1×</button>
     <button class="podcast-speed-btn" data-speed="1.25" onclick="setPodcastSpeed(1.25)">1.25×</button>
+  </div>
+  <div class="podcast-mode-row">
+    <button class="podcast-mode-btn" data-mode="word" onclick="setPodcastMode('word')">단어만</button>
+    <button class="podcast-mode-btn active" data-mode="word+meaning" onclick="setPodcastMode('word+meaning')">단어+의미</button>
+    <button class="podcast-mode-btn" data-mode="full" onclick="setPodcastMode('full')">전체</button>
+  </div>
+  <div class="podcast-repeat-row">
+    <button class="podcast-repeat-btn active" data-repeat="1" onclick="setPodcastRepeat(1)">1회</button>
+    <button class="podcast-repeat-btn" data-repeat="2" onclick="setPodcastRepeat(2)">2회</button>
+    <button class="podcast-repeat-btn" data-repeat="3" onclick="setPodcastRepeat(3)">3회</button>
   </div>
 </div>
 
@@ -3414,16 +3436,18 @@ let podcastSpeed = 1.0;
 let podcastAudio = null;
 let podcastSegments = [];
 let podcastSegIdx = 0;
+let podcastMode = 'word+meaning'; // 'word' | 'word+meaning' | 'full'
+let podcastRepeat = 1;
+let podcastRepeatIdx = 0;
 
 function buildPodcastSegments(entry) {
   const lang = entry.lang || 'en';
   const segs = [];
-  // 1. 단어
   if (entry.word) segs.push({ text: entry.word, lang });
-  // 2. 뜻 (한국어)
+  if (podcastMode === 'word') return segs;
   const meaning = entry.short_meaning || (entry.nuance || '').slice(0, 80);
   if (meaning) segs.push({ text: meaning, lang: 'ko' });
-  // 3. 예문 (원어)
+  if (podcastMode === 'word+meaning') return segs;
   const example = lang === 'en'
     ? (entry.usages?.[0]?.example || '')
     : (entry.entries?.[0]?.example || '');
@@ -3454,7 +3478,7 @@ function podcastStart() {
 
 function _showPodcastPlayer() {
   document.getElementById('podcast-player').classList.add('show');
-  document.body.style.paddingBottom = '185px';
+  document.body.style.paddingBottom = '260px';
   if ('mediaSession' in navigator) {
     navigator.mediaSession.setActionHandler('play', () => {
       if (!podcastPlaying) {
@@ -3511,6 +3535,7 @@ async function _podcastPlayFromCurrentWord() {
   if (!podcastPlaying || !podcastPlaylist.length) return;
   const entry = podcastPlaylist[podcastIndex];
   if (!entry) { _podcastFinished(); return; }
+  podcastRepeatIdx = 0;
   podcastSegments = buildPodcastSegments(entry);
   podcastSegIdx = 0;
   _updatePodcastDisplay();
@@ -3520,6 +3545,14 @@ async function _podcastPlayFromCurrentWord() {
 async function _podcastPlayNextSeg() {
   if (!podcastPlaying) return;
   if (podcastSegIdx >= podcastSegments.length) {
+    podcastRepeatIdx++;
+    if (podcastRepeatIdx < podcastRepeat) {
+      podcastSegments = buildPodcastSegments(podcastPlaylist[podcastIndex]);
+      podcastSegIdx = 0;
+      setTimeout(() => _podcastPlayNextSeg(), 600);
+      return;
+    }
+    podcastRepeatIdx = 0;
     setTimeout(() => {
       if (!podcastPlaying) return;
       podcastIndex++;
@@ -3607,6 +3640,21 @@ function setPodcastSpeed(speed) {
   if (podcastAudio) podcastAudio.playbackRate = speed;
   document.querySelectorAll('.podcast-speed-btn').forEach(b => {
     b.classList.toggle('active', parseFloat(b.dataset.speed) === speed);
+  });
+}
+
+function setPodcastMode(mode) {
+  podcastMode = mode;
+  document.querySelectorAll('.podcast-mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+}
+
+function setPodcastRepeat(count) {
+  podcastRepeat = count;
+  podcastRepeatIdx = 0;
+  document.querySelectorAll('.podcast-repeat-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.repeat) === count);
   });
 }
 
