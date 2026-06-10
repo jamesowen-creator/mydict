@@ -1,8 +1,8 @@
-const CACHE_NAME = 'gotcha-v3';
+const CACHE_NAME = 'gotcha-v4';
 const STATIC_ASSETS = [
   '/',
   '/english_dictionary.html',
-  '/Gotcha_1.0.PNG',
+  '/metis-logo-2.png',
   '/manifest.json',
   'https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap'
 ];
