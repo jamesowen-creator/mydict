@@ -287,6 +287,34 @@
   }
   .word-tone { margin-bottom: 14px; }
 
+  .derivatives-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .derivative-item {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .derivative-word {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .derivative-pos {
+    font-size: 11px;
+    color: var(--text3);
+    background: var(--bg2);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  .derivative-meaning {
+    font-size: 13px;
+    color: var(--text2);
+  }
+
   .result-pos-list {
     display: flex;
     flex-wrap: wrap;
@@ -1967,6 +1995,13 @@ Respond ONLY in valid JSON with this exact structure:
       "translation": "예문의 한국어 해석"
     }
   ],
+  "derivatives": [
+    {
+      "word": "derived word",
+      "pos": "명사",
+      "meaning": "의미 한국어"
+    }
+  ],
   "similar": [
     {
       "word": "similar English word",
@@ -1976,7 +2011,7 @@ Respond ONLY in valid JSON with this exact structure:
   ]
 }
 
-Return 2-4 meaning sets (different senses/parts of speech) and 3-4 similar words. For domain use one of: 일반, 비즈니스, 의학, 법률, 기술, 구어체, 문학, 격식체, 비격식. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
+Return 2-4 meaning sets (different senses/parts of speech), up to 5 derivatives, and 3-4 similar words. For domain use one of: 일반, 비즈니스, 의학, 법률, 기술, 구어체, 문학, 격식체, 비격식. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
 
   const text = await callAI(prompt);
   const result = safeParseJSON(text);
@@ -2065,6 +2100,20 @@ function renderResultEN(result, alreadySaved) {
         <div class="result-section-title">의미 & 뉘앙스</div>
         ${meaningsHtml}
       </div>
+
+      ${result.derivatives && result.derivatives.length > 0 ? `
+      <div class="result-section">
+        <div class="result-section-title">파생어</div>
+        <div class="derivatives-list">
+          ${result.derivatives.map(d => `
+            <div class="derivative-item">
+              <span class="derivative-word">${d.word}</span>
+              ${d.pos ? `<span class="derivative-pos">${d.pos}</span>` : ''}
+              <span class="derivative-meaning">${d.meaning}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
 
       <div class="result-section">
         <div class="result-section-title">유사한 단어</div>
