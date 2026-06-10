@@ -58,6 +58,7 @@ async function initDB() {
   await pool.query(`ALTER TABLE wordbook ADD COLUMN IF NOT EXISTS last_reviewed     TIMESTAMP`);
   await pool.query(`ALTER TABLE wordbook ADD COLUMN IF NOT EXISTS example_sentence  TEXT`);
   await pool.query(`ALTER TABLE wordbook ADD COLUMN IF NOT EXISTS entry_type        VARCHAR(10) DEFAULT 'word'`);
+  await pool.query(`ALTER TABLE wordbook ADD COLUMN IF NOT EXISTS correct_count     INTEGER   DEFAULT 0`);
   console.log('[DB] wordbook migration complete (metacognitive + concept columns)');
 
   await pool.query(`
@@ -452,11 +453,16 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
   const uid = req.user.id;
 
   function levelOf(m) {
-    if (m >= 100) return { current: 5, title: 'Master',   next_at: null };
-    if (m >= 60)  return { current: 4, title: 'Scholar',  next_at: 100 };
-    if (m >= 30)  return { current: 3, title: 'Thinker',  next_at: 60 };
-    if (m >= 10)  return { current: 2, title: 'Explorer', next_at: 30 };
-    return              { current: 1, title: 'Beginner', next_at: 10 };
+    if (m >= 900) return { current: 10, next_at: null };
+    if (m >= 800) return { current: 9,  next_at: 900 };
+    if (m >= 700) return { current: 8,  next_at: 800 };
+    if (m >= 600) return { current: 7,  next_at: 700 };
+    if (m >= 500) return { current: 6,  next_at: 600 };
+    if (m >= 400) return { current: 5,  next_at: 500 };
+    if (m >= 300) return { current: 4,  next_at: 400 };
+    if (m >= 200) return { current: 3,  next_at: 300 };
+    if (m >= 100) return { current: 2,  next_at: 200 };
+    return              { current: 1,   next_at: 100 };
   }
 
   try {
@@ -464,7 +470,7 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
       pool.query(`
         SELECT
           COUNT(*)::int                                                    AS total_words,
-          COUNT(*) FILTER (WHERE repetitions >= 4)::int                   AS mastered,
+          COUNT(*) FILTER (WHERE correct_count >= 3)::int                  AS mastered,
           COUNT(*) FILTER (WHERE next_review <= NOW()
                            AND last_reviewed IS NOT NULL)::int             AS today_due
         FROM wordbook WHERE user_id = $1`, [uid]),
@@ -472,7 +478,7 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
       pool.query(`
         SELECT UPPER(lang) AS lang,
                COUNT(*)::int                                    AS total,
-               COUNT(*) FILTER (WHERE repetitions >= 4)::int   AS mastered
+               COUNT(*) FILTER (WHERE correct_count >= 3)::int  AS mastered
         FROM wordbook WHERE user_id = $1 GROUP BY lang`, [uid]),
 
       pool.query(`
@@ -599,6 +605,21 @@ app.post('/api/review-result', requireAuth, async (req, res) => {
     res.json(updated.rows[0]);
   } catch (err) {
     console.error('[review-result] DB error:', err.message);
+    res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+  }
+});
+
+app.post('/api/quiz-correct', requireAuth, async (req, res) => {
+  const { word_id } = req.body;
+  if (!word_id) return res.status(400).json({ error: 'word_id가 필요합니다.' });
+  try {
+    await pool.query(
+      'UPDATE wordbook SET correct_count = COALESCE(correct_count, 0) + 1 WHERE id = $1 AND user_id = $2',
+      [word_id, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[quiz-correct] DB error:', err.message);
     res.status(500).json({ error: '서버 오류가 발생했습니다.' });
   }
 });
