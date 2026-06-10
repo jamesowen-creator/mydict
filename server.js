@@ -59,6 +59,8 @@ async function initDB() {
   await pool.query(`ALTER TABLE wordbook ADD COLUMN IF NOT EXISTS example_sentence  TEXT`);
   await pool.query(`ALTER TABLE wordbook ADD COLUMN IF NOT EXISTS entry_type        VARCHAR(10) DEFAULT 'word'`);
   await pool.query(`ALTER TABLE wordbook ADD COLUMN IF NOT EXISTS correct_count     INTEGER   DEFAULT 0`);
+  await pool.query(`ALTER TABLE wordbook ADD COLUMN IF NOT EXISTS next_review_date  DATE`);
+  await pool.query(`ALTER TABLE wordbook ADD COLUMN IF NOT EXISTS review_count      INTEGER   DEFAULT 0`);
   console.log('[DB] wordbook migration complete (metacognitive + concept columns)');
 
   await pool.query(`
@@ -422,9 +424,12 @@ app.post('/api/wordbook', requireAuth, async (req, res) => {
   const { word, lang = 'en', data } = req.body;
   if (!word) return res.status(400).json({ error: '단어를 입력해주세요.' });
   try {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowDate = tomorrow.toISOString().split('T')[0];
     const { rows } = await pool.query(
-      'INSERT INTO wordbook (user_id, word, lang, data) VALUES ($1, $2, $3, $4) RETURNING *',
-      [req.user.id, word, lang, data ? JSON.stringify(data) : null]
+      'INSERT INTO wordbook (user_id, word, lang, data, next_review_date) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [req.user.id, word, lang, data ? JSON.stringify(data) : null, tomorrowDate]
     );
     res.json(rows[0]);
   } catch (err) {
@@ -605,6 +610,73 @@ app.post('/api/review-result', requireAuth, async (req, res) => {
     res.json(updated.rows[0]);
   } catch (err) {
     console.error('[review-result] DB error:', err.message);
+    res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// ─── Daily Quest (Spaced Repetition) ─────────────────────────────────────────
+
+const REVIEW_INTERVALS = [1, 3, 7, 14, 30]; // days, indexed by review_count before increment
+
+app.get('/api/review/today', requireAuth, async (req, res) => {
+  const uid = req.user.id;
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const { rows } = await pool.query(`
+      SELECT id, word, lang, data, review_count, correct_count, next_review_date
+      FROM wordbook
+      WHERE user_id = $1
+        AND next_review_date IS NOT NULL
+        AND next_review_date <= $2
+        AND correct_count < 3
+      ORDER BY next_review_date ASC, review_count ASC
+    `, [uid, today]);
+
+    const byRound = {};
+    rows.forEach(r => {
+      const round = (r.review_count || 0) + 1;
+      byRound[round] = (byRound[round] || 0) + 1;
+    });
+
+    res.json({ total: rows.length, words: rows, by_round: byRound });
+  } catch (err) {
+    console.error('[review/today]', err.message);
+    res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+  }
+});
+
+app.post('/api/review/complete', requireAuth, async (req, res) => {
+  const { word_id, correct } = req.body;
+  if (word_id == null) return res.status(400).json({ error: 'word_id가 필요합니다.' });
+  try {
+    const { rows } = await pool.query(
+      'SELECT review_count, correct_count FROM wordbook WHERE id = $1 AND user_id = $2',
+      [word_id, req.user.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: '항목을 찾을 수 없습니다.' });
+
+    const { review_count, correct_count } = rows[0];
+    const intervalDays = REVIEW_INTERVALS[Math.min(review_count, REVIEW_INTERVALS.length - 1)];
+    const nextDate = new Date();
+    nextDate.setDate(nextDate.getDate() + intervalDays);
+    const nextDateStr = nextDate.toISOString().split('T')[0];
+    const newCorrect = correct ? correct_count + 1 : correct_count;
+
+    await pool.query(
+      `UPDATE wordbook
+         SET review_count = review_count + 1,
+             correct_count = $1,
+             next_review_date = $2
+       WHERE id = $3 AND user_id = $4`,
+      [newCorrect, nextDateStr, word_id, req.user.id]
+    );
+    await pool.query(
+      'INSERT INTO review_log (user_id, word_id, score) VALUES ($1, $2, $3)',
+      [req.user.id, word_id, correct ? 3 : 0]
+    );
+    res.json({ ok: true, next_review_date: nextDateStr });
+  } catch (err) {
+    console.error('[review/complete]', err.message);
     res.status(500).json({ error: '서버 오류가 발생했습니다.' });
   }
 });

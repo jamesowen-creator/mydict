@@ -1187,6 +1187,45 @@
     margin-bottom: 12px;
   }
 
+  .quest-card {
+    background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    color: #fff;
+    margin-bottom: 14px;
+  }
+  .quest-title { font-size: 12px; font-weight: 700; opacity: 0.75; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .quest-count { font-size: 28px; font-weight: 800; font-family: 'Sora', sans-serif; line-height: 1.1; }
+  .quest-sub   { font-size: 12px; opacity: 0.65; margin-bottom: 10px; }
+  .quest-rounds { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; }
+  .quest-round-pill {
+    font-size: 11px; font-weight: 700;
+    background: rgba(255,255,255,0.16);
+    padding: 3px 9px; border-radius: 20px;
+  }
+  .quest-bar-wrap {
+    height: 5px; background: rgba(255,255,255,0.18);
+    border-radius: 3px; overflow: hidden; margin-bottom: 14px;
+  }
+  .quest-bar-fill {
+    height: 100%; background: #4ade80; border-radius: 3px;
+    transition: width 0.7s cubic-bezier(0.25,0.46,0.45,0.94);
+  }
+  .quest-start-btn {
+    width: 100%; padding: 12px;
+    background: rgba(255,255,255,0.13);
+    border: 1.5px solid rgba(255,255,255,0.28);
+    border-radius: 10px; color: #fff;
+    font-size: 15px; font-weight: 700;
+    cursor: pointer; font-family: 'Sora', sans-serif;
+    transition: background 0.15s;
+  }
+  .quest-start-btn:hover { background: rgba(255,255,255,0.24); }
+  .quest-back-btn {
+    background: none; border: none; font-size: 20px;
+    cursor: pointer; color: var(--text3); padding: 0 4px 0 0; line-height: 1;
+  }
+
   .dash-stats-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1546,7 +1585,6 @@
         <button class="btn secondary" onclick="downloadCSV()" style="font-size:12px;padding:8px 12px;">📊 CSV</button>
         <button class="btn secondary" onclick="downloadJSON()" style="font-size:12px;padding:8px 12px;">💾 JSON</button>
         <button class="btn secondary" onclick="importJSON()" style="font-size:12px;padding:8px 12px;">📥 가져오기</button>
-        <button class="btn danger" onclick="clearWordbook()" style="font-size:12px;padding:8px 12px;">삭제</button>
       </div>
     </div>
     <div class="wordbook-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
@@ -2875,9 +2913,13 @@ async function initDashboard() {
     <div class="skel-block" style="height:110px"></div>
   </div>`;
   try {
-    const res = await fetch('/api/dashboard', { headers: authHeaders() });
-    if (!res.ok) throw new Error('API ' + res.status);
-    renderDashboard(container, await res.json());
+    const [dashRes, questRes] = await Promise.all([
+      fetch('/api/dashboard',    { headers: authHeaders() }),
+      fetch('/api/review/today', { headers: authHeaders() })
+    ]);
+    if (!dashRes.ok) throw new Error('API ' + dashRes.status);
+    const quest = questRes.ok ? await questRes.json() : { total: 0, words: [], by_round: {} };
+    renderDashboard(container, await dashRes.json(), quest);
   } catch (e) {
     console.error('[dashboard]', e);
     container.innerHTML = `<div style="text-align:center;padding:48px;color:var(--text3)">
@@ -2887,13 +2929,122 @@ async function initDashboard() {
   }
 }
 
+// ─── DAILY QUEST ─────────────────────────────────────────────────────────────
+
+let questSession = null;
+
+async function startQuest() {
+  const container = document.getElementById('home-container');
+  try {
+    const res = await fetch('/api/review/today', { headers: authHeaders() });
+    if (!res.ok) { showToast('복습 단어를 불러올 수 없습니다.'); return; }
+    const { words } = await res.json();
+    if (!words.length) { showToast('오늘 복습할 단어가 없습니다.'); return; }
+    questSession = { words: words.sort(() => Math.random() - 0.5), current: 0, correct: 0 };
+    renderQuestQuestion(container);
+  } catch (e) { showToast('오류가 발생했습니다.'); }
+}
+
+function _questMeaning(w) {
+  const d = w.data || {};
+  const sm = d.short_meaning || w.short_meaning;
+  const nu = d.nuance || w.nuance;
+  return sm || (nu ? nu.slice(0, 40) + (nu.length > 40 ? '…' : '') : '(뜻 없음)');
+}
+
+function renderQuestQuestion(container) {
+  if (!questSession) return;
+  const { words, current } = questSession;
+  if (current >= words.length) { renderQuestComplete(container); return; }
+
+  const w = words[current];
+  const total = words.length;
+  const pct = Math.round(current / total * 100);
+  const round = (w.review_count || 0) + 1;
+
+  const correctMeaning = _questMeaning(w);
+  const langPool = wordbook.filter(wb => (wb.lang || 'en') === (w.lang || 'en') && wb.word !== w.word)
+    .sort(() => Math.random() - 0.5).slice(0, 3);
+  const wrongs = langPool.map(wb => wb.short_meaning || (wb.nuance || '').slice(0, 40) || '—');
+  while (wrongs.length < 3) wrongs.push(['—', '없음', '모름'][wrongs.length] || '—');
+
+  const correctIdx = Math.floor(Math.random() * 4);
+  const options = [...wrongs];
+  options.splice(correctIdx, 0, correctMeaning);
+
+  container.innerHTML = `
+    <div style="padding:16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <button class="quest-back-btn" onclick="initDashboard()">←</button>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text3);margin-bottom:4px">
+            <span>오늘의 퀘스트</span><span>${current + 1} / ${total}</span>
+          </div>
+          <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:#4ade80;border-radius:2px;transition:width 0.4s ease"></div>
+          </div>
+        </div>
+      </div>
+      <div class="quiz-card">
+        <div class="quiz-type-tag">${round}차 복습</div>
+        <div class="quiz-question">${w.word}</div>
+        <div class="quiz-options">
+          ${options.map((opt, i) => `
+            <button class="quiz-option" onclick="questAnswer(this,${i},${correctIdx},${w.id})">${opt}</button>
+          `).join('')}
+        </div>
+        <div class="quiz-feedback" id="quest-feedback"></div>
+        <button class="btn quiz-next-btn" id="quest-next" onclick="questNext()" style="display:none">
+          ${current + 1 === total ? '결과 보기' : '다음 →'}
+        </button>
+      </div>
+    </div>`;
+}
+
+function questAnswer(btn, selected, correct, wordId) {
+  document.querySelectorAll('.quiz-option').forEach(o => o.disabled = true);
+  const isCorrect = selected === correct;
+  btn.classList.add(isCorrect ? 'correct' : 'wrong');
+  document.querySelectorAll('.quiz-option')[correct].classList.add('correct');
+  const fb = document.getElementById('quest-feedback');
+  fb.className = 'quiz-feedback ' + (isCorrect ? 'correct' : 'wrong');
+  fb.textContent = isCorrect ? '✓ 정답입니다!' : '✗ 틀렸습니다.';
+  if (isCorrect) questSession.correct++;
+  fetch('/api/review/complete', {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ word_id: wordId, correct: isCorrect })
+  }).catch(() => {});
+  document.getElementById('quest-next').style.display = 'block';
+}
+
+function questNext() {
+  questSession.current++;
+  renderQuestQuestion(document.getElementById('home-container'));
+}
+
+function renderQuestComplete(container) {
+  const { words, correct } = questSession;
+  const total = words.length;
+  const pct = Math.round(correct / total * 100);
+  const emoji = pct >= 80 ? '🎉' : pct >= 50 ? '👍' : '💪';
+  questSession = null;
+  container.innerHTML = `
+    <div style="padding:32px 16px;text-align:center">
+      <div style="font-size:52px;margin-bottom:14px">${emoji}</div>
+      <div style="font-size:22px;font-weight:800;color:var(--text);margin-bottom:6px">오늘의 퀘스트 완료!</div>
+      <div style="font-size:14px;color:var(--text2);margin-bottom:28px">${correct}/${total} 정답 (${pct}%)</div>
+      <button class="btn" onclick="initDashboard()" style="width:100%;padding:14px;font-size:15px">홈으로 돌아가기</button>
+    </div>`;
+}
+
 function getLevelBarColor(lv) {
   const c = ['','#8B6914','#B8860B','#CD9B1D','#9E9E9E','#C0C0C0','#D8D8D8','#FFD700','#FFE135','#FFF0A0'];
   if (lv >= 10) return 'linear-gradient(90deg,#8B6914,#B8860B,#CD9B1D,#9E9E9E,#C0C0C0,#D8D8D8,#FFD700,#FFE135,#FFF0A0)';
   return `linear-gradient(90deg,${c[lv]}99,${c[lv]})`;
 }
 
-function renderDashboard(container, d) {
+function renderDashboard(container, d, quest = { total: 0, words: [], by_round: {} }) {
   const { today_due, total_words, mastered, streak, accuracy, by_language, level } = d;
   const accTotal = accuracy.sure + accuracy.vague + accuracy.missed;
   const pctOf = (n) => accTotal > 0 ? Math.round(n / accTotal * 100) : 0;
@@ -2940,16 +3091,21 @@ function renderDashboard(container, d) {
         </div>
       </div>
 
-      ${today_due > 0
-        ? `<div class="dash-review-banner" onclick="showPage('metacog')">
-             <div>
-               <div class="dash-banner-title">🧠 오늘 복습할 단어 <strong>${today_due}개</strong></div>
-               <div class="dash-banner-sub">지금 바로 시작해볼까요?</div>
-             </div>
-             <div class="dash-banner-arrow">→</div>
-           </div>`
-        : ''
-      }
+      ${quest.total > 0 ? `
+      <div class="quest-card">
+        <div class="quest-title">📅 오늘의 퀘스트</div>
+        <div class="quest-count">${quest.total}개</div>
+        <div class="quest-sub">복습할 단어</div>
+        <div class="quest-rounds">
+          ${Object.entries(quest.by_round).map(([r, n]) =>
+            `<span class="quest-round-pill">${r}차 ${n}개</span>`
+          ).join('')}
+        </div>
+        <div class="quest-bar-wrap">
+          <div class="quest-bar-fill" style="width:0%"></div>
+        </div>
+        <button class="quest-start-btn" onclick="startQuest()">퀘스트 시작 🚀</button>
+      </div>` : ''}
 
       <div class="dash-stats-row">
         <div class="dash-stat-card">
