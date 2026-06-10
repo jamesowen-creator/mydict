@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gotcha-v2';
+const CACHE_NAME = 'gotcha-v3';
 const STATIC_ASSETS = [
   '/',
   '/english_dictionary.html',
@@ -41,12 +41,25 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // HTML 문서는 네트워크 우선 (항상 최신 버전 로드)
+  if (request.destination === 'document') {
+    event.respondWith(
+      fetch(request).then(response => {
+        if (response && response.status === 200) {
+          const toCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, toCache));
+        }
+        return response;
+      }).catch(() => caches.match(request))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then(cached => {
       if (cached) return cached;
 
       return fetch(request).then(response => {
-        // 유효한 응답만 캐시
         if (!response || response.status !== 200 || response.type === 'opaque') {
           return response;
         }
@@ -54,7 +67,6 @@ self.addEventListener('fetch', event => {
         caches.open(CACHE_NAME).then(cache => cache.put(request, toCache));
         return response;
       }).catch(() => {
-        // 오프라인 fallback: HTML 페이지 요청이면 캐시된 메인 페이지 반환
         if (request.destination === 'document') {
           return caches.match('/english_dictionary.html');
         }
