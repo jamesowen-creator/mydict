@@ -572,6 +572,22 @@
     border-radius: 4px;
   }
   .word-chip-del:hover { color: var(--wrong); }
+  .word-chip.selected { border-color: var(--accent); background: rgba(74,110,245,0.06); }
+  .word-chip-check {
+    width: 16px; height: 16px; flex-shrink: 0;
+    border: 1.5px solid var(--border); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: transparent; transition: all 0.15s;
+  }
+  .word-chip.selected .word-chip-check { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .wb-sort-btn {
+    padding: 5px 14px; border-radius: 20px;
+    font-size: 12px; font-weight: 700;
+    border: 1.5px solid var(--border); background: none;
+    color: var(--text2); cursor: pointer;
+    transition: all 0.15s; font-family: 'Sora', sans-serif;
+  }
+  .wb-sort-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(74,110,245,0.08); }
 
   .empty-state {
     text-align: center;
@@ -1064,15 +1080,15 @@
     border-color: var(--accent); color: var(--accent);
     background: rgba(74,110,245,0.08);
   }
-  .podcast-mode-row, .podcast-repeat-row { display: flex; justify-content: center; gap: 8px; margin-top: 6px; }
-  .podcast-mode-btn, .podcast-repeat-btn {
+  .podcast-mode-row, .podcast-repeat-row, .podcast-gap-row { display: flex; justify-content: center; gap: 8px; margin-top: 6px; }
+  .podcast-mode-btn, .podcast-repeat-btn, .podcast-gap-btn {
     padding: 5px 13px; border-radius: 20px;
     font-size: 12px; font-weight: 700;
     border: 1.5px solid var(--border); background: none;
     color: var(--text2); cursor: pointer;
     transition: all 0.15s; font-family: 'Sora', sans-serif;
   }
-  .podcast-mode-btn.active, .podcast-repeat-btn.active {
+  .podcast-mode-btn.active, .podcast-repeat-btn.active, .podcast-gap-btn.active {
     border-color: var(--accent); color: var(--accent);
     background: rgba(74,110,245,0.08);
   }
@@ -1554,9 +1570,19 @@
       <button class="wordbook-tab" id="wb-tab-ja" onclick="switchWordbookTab('ja')">🇯🇵 일본어</button>
       <button class="wordbook-tab" id="wb-tab-zh" onclick="switchWordbookTab('zh')">🇨🇳 중국어</button>
     </div>
-    <button class="btn" onclick="podcastStart()" style="width:100%;margin-bottom:14px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);font-size:14px;padding:12px 16px">
+    <div style="display:flex;gap:6px;margin:10px 0 10px">
+      <button class="wb-sort-btn active" data-sort="abc" onclick="setWordbookSort('abc')">ABC 순</button>
+      <button class="wb-sort-btn" data-sort="recent" onclick="setWordbookSort('recent')">최근 순</button>
+    </div>
+    <button class="btn" onclick="podcastStart()" style="width:100%;margin-bottom:8px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);font-size:14px;padding:12px 16px">
       🎧 단어 연속 듣기
     </button>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn secondary" onclick="toggleSelectAll()" id="wb-select-all-btn" style="white-space:nowrap;font-size:12px;padding:8px 12px">전체선택</button>
+      <button class="btn" onclick="podcastStartSelected()" id="wb-selected-play-btn" style="flex:1;font-size:13px;padding:10px 12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);opacity:0.4" disabled>
+        🎧 선택한 단어 듣기 (0개)
+      </button>
+    </div>
     <div id="wordbook-list"></div>
   </div>
 
@@ -1613,6 +1639,12 @@
     <button class="podcast-repeat-btn active" data-repeat="1" onclick="setPodcastRepeat(1)">1회</button>
     <button class="podcast-repeat-btn" data-repeat="2" onclick="setPodcastRepeat(2)">2회</button>
     <button class="podcast-repeat-btn" data-repeat="3" onclick="setPodcastRepeat(3)">3회</button>
+  </div>
+  <div class="podcast-gap-row">
+    <button class="podcast-gap-btn active" data-gap="1" onclick="setPodcastGap(1)">1s</button>
+    <button class="podcast-gap-btn" data-gap="1.5" onclick="setPodcastGap(1.5)">1.5s</button>
+    <button class="podcast-gap-btn" data-gap="2" onclick="setPodcastGap(2)">2s</button>
+    <button class="podcast-gap-btn" data-gap="3" onclick="setPodcastGap(3)">3s</button>
   </div>
 </div>
 
@@ -2392,9 +2424,12 @@ async function loadExtraTransKO(word, lang, btn) {
 
 // ─── WORDBOOK ─────────────────────────────────────────────────────────────────
 let currentWordbookTab = 'en';
+let wordbookSortOrder = 'abc';
+let selectedWords = new Set();
 
 function switchWordbookTab(tab) {
   currentWordbookTab = tab;
+  selectedWords.clear();
   ['en','ko','ja','zh'].forEach(function(l) {
     var el = document.getElementById('wb-tab-' + l);
     if (el) el.className = 'wordbook-tab' + (tab === l ? ' active-' + l : '');
@@ -2422,53 +2457,117 @@ function renderWordbook() {
 
   if (filtered.length === 0) {
     el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">아직 저장된 단어가 없어요.<br>검색하면 자동으로 저장됩니다.</div></div>';
+    updateSelectedBtn();
     return;
   }
 
   var locale = {en:'en', ko:'ko', ja:'ja', zh:'zh'}[tab] || 'en';
-  var sorted = filtered.slice().sort(function(a, b) {
-    return a.word.localeCompare(b.word, locale);
-  });
-
-  var groups = {};
-  sorted.forEach(function(w) {
-    var letter = tab === 'ko' ? getChosung(w.word[0]) : w.word[0].toUpperCase();
-    if (!groups[letter]) groups[letter] = [];
-    groups[letter].push(w);
-  });
-
-  var sortedKeys;
-  if (tab === 'ko') {
-    sortedKeys = Object.keys(groups).sort(function(a, b) {
-      var ai = KO_ORDER.indexOf(a), bi = KO_ORDER.indexOf(b);
-      if (ai === -1 && bi === -1) return a.localeCompare(b, 'ko');
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
-      return ai - bi;
-    });
-  } else {
-    sortedKeys = Object.keys(groups).sort();
-  }
-
   var chipClass = tab !== 'en' ? tab : '';
   var headerClass = tab !== 'en' ? tab : '';
 
-  var html = sortedKeys.map(function(letter) {
-    var chips = groups[letter].map(function(w) {
-      var safeWord = w.word.split("'").join("\\'");
-      return '<div class="word-chip ' + chipClass + '" onclick="searchFromWordbook(\'' + safeWord + '\', \'' + tab + '\')">' +
+  function makeChip(w) {
+    var key = w.word + '|' + tab;
+    var isSelected = selectedWords.has(key);
+    var safeWord = w.word.split("'").join("\\'");
+    return '<div class="word-chip ' + chipClass + (isSelected ? ' selected' : '') + '" onclick="searchFromWordbook(\'' + safeWord + '\', \'' + tab + '\')">' +
+      '<span style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">' +
+        '<span class="word-chip-check" onclick="event.stopPropagation();toggleWordSelect(\'' + safeWord + '\',\'' + tab + '\')">' + (isSelected ? '✓' : '') + '</span>' +
         '<span class="word-chip-text">' + w.word + '</span>' +
-        '<span class="word-chip-del" onclick="event.stopPropagation();deleteWord(\'' + safeWord + '\', \'' + tab + '\')">×</span>' +
+      '</span>' +
+      '<span class="word-chip-del" onclick="event.stopPropagation();deleteWord(\'' + safeWord + '\', \'' + tab + '\')">×</span>' +
+      '</div>';
+  }
+
+  var html;
+  if (wordbookSortOrder === 'recent') {
+    var recentSorted = filtered.slice().sort(function(a, b) { return (b.savedAt || 0) - (a.savedAt || 0); });
+    html = '<div class="alpha-section"><div class="alpha-words">' + recentSorted.map(makeChip).join('') + '</div></div>';
+  } else {
+    var sorted = filtered.slice().sort(function(a, b) { return a.word.localeCompare(b.word, locale); });
+    var groups = {};
+    sorted.forEach(function(w) {
+      var letter = tab === 'ko' ? getChosung(w.word[0]) : w.word[0].toUpperCase();
+      if (!groups[letter]) groups[letter] = [];
+      groups[letter].push(w);
+    });
+    var sortedKeys;
+    if (tab === 'ko') {
+      sortedKeys = Object.keys(groups).sort(function(a, b) {
+        var ai = KO_ORDER.indexOf(a), bi = KO_ORDER.indexOf(b);
+        if (ai === -1 && bi === -1) return a.localeCompare(b, 'ko');
+        if (ai === -1) return 1; if (bi === -1) return -1;
+        return ai - bi;
+      });
+    } else {
+      sortedKeys = Object.keys(groups).sort();
+    }
+    html = sortedKeys.map(function(letter) {
+      return '<div class="alpha-section">' +
+        '<div class="alpha-header ' + headerClass + '">' + letter + '</div>' +
+        '<div class="alpha-words">' + groups[letter].map(makeChip).join('') + '</div>' +
         '</div>';
     }).join('');
-    return '<div class="alpha-section">' +
-      '<div class="alpha-header ' + headerClass + '">' + letter + '</div>' +
-      '<div class="alpha-words">' + chips + '</div>' +
-      '</div>';
-  }).join('');
+  }
 
   el.innerHTML = '<div class="word-grid">' + html + '</div>';
+  updateSelectedBtn();
 }
+function setWordbookSort(sort) {
+  wordbookSortOrder = sort;
+  document.querySelectorAll('.wb-sort-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.sort === sort);
+  });
+  renderWordbook();
+}
+
+function toggleWordSelect(word, lang) {
+  const key = word + '|' + lang;
+  if (selectedWords.has(key)) selectedWords.delete(key);
+  else selectedWords.add(key);
+  renderWordbook();
+}
+
+function toggleSelectAll() {
+  const tab = currentWordbookTab;
+  const tabWords = wordbook.filter(w => (w.lang || 'en') === tab);
+  const allSelected = tabWords.length > 0 && tabWords.every(w => selectedWords.has(w.word + '|' + tab));
+  if (allSelected) tabWords.forEach(w => selectedWords.delete(w.word + '|' + tab));
+  else tabWords.forEach(w => selectedWords.add(w.word + '|' + tab));
+  renderWordbook();
+}
+
+function updateSelectedBtn() {
+  const tab = currentWordbookTab;
+  const tabWords = wordbook.filter(w => (w.lang || 'en') === tab);
+  const count = tabWords.filter(w => selectedWords.has(w.word + '|' + tab)).length;
+  const btn = document.getElementById('wb-selected-play-btn');
+  if (btn) {
+    btn.textContent = `🎧 선택한 단어 듣기 (${count}개)`;
+    btn.disabled = count === 0;
+    btn.style.opacity = count === 0 ? '0.4' : '1';
+  }
+  const selectAllBtn = document.getElementById('wb-select-all-btn');
+  if (selectAllBtn) {
+    const allSelected = tabWords.length > 0 && tabWords.every(w => selectedWords.has(w.word + '|' + tab));
+    selectAllBtn.textContent = allSelected ? '전체해제' : '전체선택';
+  }
+}
+
+function podcastStartSelected() {
+  const tab = currentWordbookTab;
+  const words = wordbook.filter(w => (w.lang || 'en') === tab && selectedWords.has(w.word + '|' + tab));
+  if (words.length === 0) { showToast('선택된 단어가 없습니다.'); return; }
+  if (ttsCurrentAudio) {
+    ttsCurrentAudio.pause(); ttsCurrentAudio = null;
+    document.querySelectorAll('.tts-btn').forEach(b => { b.textContent = '🔊'; b.classList.remove('playing'); });
+  }
+  const locale = { en: 'en', ko: 'ko', ja: 'ja', zh: 'zh' }[tab] || 'en';
+  podcastPlaylist = words.slice().sort((a, b) => a.word.localeCompare(b.word, locale));
+  podcastIndex = 0; podcastAudio = null; podcastSegments = []; podcastSegIdx = 0;
+  podcastPlaying = true;
+  _updatePodcastBtn(); _showPodcastPlayer(); _podcastPlayFromCurrentWord();
+}
+
 function searchFromWordbook(word, lang) {
   document.getElementById('search-input').value = word;
   updateLangIndicator(lang);
@@ -3439,6 +3538,7 @@ let podcastSegIdx = 0;
 let podcastMode = 'word+meaning'; // 'word' | 'word+meaning' | 'full'
 let podcastRepeat = 1;
 let podcastRepeatIdx = 0;
+let podcastGap = 1.0;
 
 function buildPodcastSegments(entry) {
   const lang = entry.lang || 'en';
@@ -3478,7 +3578,7 @@ function podcastStart() {
 
 function _showPodcastPlayer() {
   document.getElementById('podcast-player').classList.add('show');
-  document.body.style.paddingBottom = '260px';
+  document.body.style.paddingBottom = '300px';
   if ('mediaSession' in navigator) {
     navigator.mediaSession.setActionHandler('play', () => {
       if (!podcastPlaying) {
@@ -3558,7 +3658,7 @@ async function _podcastPlayNextSeg() {
       podcastIndex++;
       if (podcastIndex >= podcastPlaylist.length) _podcastFinished();
       else _podcastPlayFromCurrentWord();
-    }, 900);
+    }, podcastGap * 1000);
     return;
   }
   const { text, lang } = podcastSegments[podcastSegIdx++];
@@ -3655,6 +3755,13 @@ function setPodcastRepeat(count) {
   podcastRepeatIdx = 0;
   document.querySelectorAll('.podcast-repeat-btn').forEach(b => {
     b.classList.toggle('active', parseInt(b.dataset.repeat) === count);
+  });
+}
+
+function setPodcastGap(gap) {
+  podcastGap = gap;
+  document.querySelectorAll('.podcast-gap-btn').forEach(b => {
+    b.classList.toggle('active', parseFloat(b.dataset.gap) === gap);
   });
 }
 
