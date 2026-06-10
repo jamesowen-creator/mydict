@@ -279,6 +279,14 @@
     letter-spacing: 0.03em;
   }
 
+  .word-etymology, .word-tone {
+    font-size: 12px;
+    color: var(--text3);
+    line-height: 1.5;
+    margin-bottom: 4px;
+  }
+  .word-tone { margin-bottom: 14px; }
+
   .result-pos-list {
     display: flex;
     flex-wrap: wrap;
@@ -1947,6 +1955,8 @@ Respond ONLY in valid JSON with this exact structure:
   "word": "base form dictionary entry",
   "search_query": "${query}",
   "pronunciation": "/prəˌnʌnsiˈeɪʃən/",
+  "etymology": "어원 분석 한 줄 (예: trans(넘어서) + figure(형태) → 형태를 완전히 넘어선 변화)",
+  "tone": "이 단어의 감정/톤 포지셔닝 한 줄 (예: 신비롭고 거대한 변화의 느낌. change보다 훨씬 극적이고 문학적)",
   "meanings": [
     {
       "core_meaning": "핵심 의미 5단어 이내 한국어",
@@ -2048,6 +2058,8 @@ function renderResultEN(result, alreadySaved) {
       </div>
       ${baseFormHint}
       ${result.pronunciation ? `<div class="result-pronunciation">${result.pronunciation}</div>` : ''}
+      ${result.etymology ? `<div class="word-etymology">어원: ${result.etymology}</div>` : ''}
+      ${result.tone ? `<div class="word-tone">느낌: ${result.tone}</div>` : ''}
 
       <div class="result-section">
         <div class="result-section-title">의미 & 뉘앙스</div>
