@@ -279,6 +279,12 @@
     letter-spacing: 0.03em;
   }
 
+  .word-headline {
+    font-size: 15px;
+    color: var(--text);
+    line-height: 1.5;
+    margin-bottom: 8px;
+  }
   .word-etymology, .word-tone {
     font-size: 12px;
     color: var(--text2);
@@ -2141,6 +2147,12 @@ For the Korean word or phrase: "${query}"
 Respond ONLY in valid JSON:
 {
   "word": "${query}",
+  "headline": "이 단어의 직관적 핵심 의미 한 줄 (예: 논리적인 → 이성과 근거에 기반한 사고방식을 뜻함)",
+  "etymology": "어원 분석 한 줄 — 한자어근(예: 理(이치)+性(성질)→이성) 또는 고유어 어근 설명",
+  "tone": "이 단어의 감정/톤 포지셔닝 한 줄",
+  "derivatives": [
+    { "word": "파생어", "pos": "명사", "meaning": "의미" }
+  ],
   "nuance": "이 한국어 단어/표현의 의미와 뉘앙스를 한국어로 설명 (2-3문장)",
   "entries": [
     {
@@ -2154,7 +2166,7 @@ Respond ONLY in valid JSON:
   ]
 }
 
-Return 2-4 English entries representing different nuances or usages. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
+Return up to 5 derivatives and 2-4 English entries representing different nuances or usages. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
 
   const text = await callAI(prompt);
   const result = safeParseJSON(text);
@@ -2200,10 +2212,26 @@ function renderResultKO(result, alreadySaved) {
         <div class="result-word" style="color:var(--accent-ko)">${result.word}</div>
         <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="ko" onclick="playTTSFromBtn(this)" title="발음 듣기">🔊</button>
       </div>
+      ${result.headline ? `<div class="word-headline">${result.headline}</div>` : ''}
+      ${result.etymology ? `<div class="word-etymology">어원: ${result.etymology}</div>` : ''}
+      ${result.tone ? `<div class="word-tone">느낌: ${result.tone}</div>` : ''}
       <div style="margin-bottom:16px">
         <div class="result-section-title" style="margin-bottom:6px">의미 & 뉘앙스</div>
         <div class="result-section-body">${result.nuance}</div>
       </div>
+      ${result.derivatives && result.derivatives.length > 0 ? `
+      <div class="result-section">
+        <div class="result-section-title">파생어</div>
+        <div class="derivatives-list">
+          ${result.derivatives.map(d => `
+            <div class="derivative-item">
+              <span class="derivative-word">${d.word}</span>
+              ${d.pos ? `<span class="derivative-pos">${d.pos}</span>` : ''}
+              <span class="derivative-meaning">${d.meaning}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
       <div class="result-section-title" style="margin-bottom:10px">영어 표현</div>
       ${entriesHtml}
 
@@ -2245,6 +2273,12 @@ Respond ONLY in valid JSON:
 {
   "word": "${query}",
   "reading": "히라가나 읽기 (후리가나)",
+  "headline": "이 단어의 직관적 핵심 의미 한 줄",
+  "etymology": "한자 구성 분석 한 줄 (예: 食(먹다)+事(일) → 먹는 일)",
+  "tone": "이 단어의 감정/톤 포지셔닝 한 줄",
+  "derivatives": [
+    { "word": "파생어", "pos": "명사", "meaning": "의미" }
+  ],
   "nuance": "이 일본어 단어/표현의 의미와 뉘앙스를 한국어로 설명 (2-3문장)",
   "pos": ["noun"],
   "entries": [
@@ -2259,7 +2293,7 @@ Respond ONLY in valid JSON:
   ]
 }
 
-Return 2-3 entries. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
+Return up to 5 derivatives and 2-3 entries. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
 
   const text = await callAI(prompt);
   const result = safeParseJSON(text);
@@ -2305,11 +2339,27 @@ function renderResultJA(result, alreadySaved) {
         <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="ja" onclick="playTTSFromBtn(this)" title="발음 듣기">🔊</button>
       </div>
       ${result.reading ? `<div class="result-pronunciation">${result.reading}</div>` : ''}
+      ${result.headline ? `<div class="word-headline">${result.headline}</div>` : ''}
+      ${result.etymology ? `<div class="word-etymology">어원: ${result.etymology}</div>` : ''}
+      ${result.tone ? `<div class="word-tone">느낌: ${result.tone}</div>` : ''}
       ${posHtml ? `<div class="result-pos-list">${posHtml}</div>` : ''}
       <div style="margin-bottom:16px">
         <div class="result-section-title" style="margin-bottom:6px">의미 & 뉘앙스</div>
         <div class="result-section-body">${result.nuance}</div>
       </div>
+      ${result.derivatives && result.derivatives.length > 0 ? `
+      <div class="result-section">
+        <div class="result-section-title">파생어</div>
+        <div class="derivatives-list">
+          ${result.derivatives.map(d => `
+            <div class="derivative-item">
+              <span class="derivative-word">${d.word}</span>
+              ${d.pos ? `<span class="derivative-pos">${d.pos}</span>` : ''}
+              <span class="derivative-meaning">${d.meaning}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
       <div class="result-section-title" style="margin-bottom:10px">번역</div>
       ${entriesHtml}
     </div>
@@ -2326,6 +2376,12 @@ Respond ONLY in valid JSON:
 {
   "word": "${query}",
   "pinyin": "pīnyīn with tone marks",
+  "headline": "이 단어의 직관적 핵심 의미 한 줄",
+  "etymology": "한자 분해 + 의미 조합 한 줄 (예: 食(먹다)+堂(집) → 먹는 집)",
+  "tone": "이 단어의 감정/톤 포지셔닝 한 줄",
+  "derivatives": [
+    { "word": "파생어", "pos": "명사", "meaning": "의미" }
+  ],
   "nuance": "이 중국어 단어/표현의 의미와 뉘앙스를 한국어로 설명 (2-3문장)",
   "pos": ["noun"],
   "entries": [
@@ -2340,7 +2396,7 @@ Respond ONLY in valid JSON:
   ]
 }
 
-Return 2-3 entries. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
+Return up to 5 derivatives and 2-3 entries. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
 
   const text = await callAI(prompt);
   const result = safeParseJSON(text);
@@ -2386,11 +2442,27 @@ function renderResultZH(result, alreadySaved) {
         <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="zh" onclick="playTTSFromBtn(this)" title="발음 듣기">🔊</button>
       </div>
       ${result.pinyin ? `<div class="result-pronunciation">${result.pinyin}</div>` : ''}
+      ${result.headline ? `<div class="word-headline">${result.headline}</div>` : ''}
+      ${result.etymology ? `<div class="word-etymology">어원: ${result.etymology}</div>` : ''}
+      ${result.tone ? `<div class="word-tone">느낌: ${result.tone}</div>` : ''}
       ${posHtml ? `<div class="result-pos-list">${posHtml}</div>` : ''}
       <div style="margin-bottom:16px">
         <div class="result-section-title" style="margin-bottom:6px">의미 & 뉘앙스</div>
         <div class="result-section-body">${result.nuance}</div>
       </div>
+      ${result.derivatives && result.derivatives.length > 0 ? `
+      <div class="result-section">
+        <div class="result-section-title">파생어</div>
+        <div class="derivatives-list">
+          ${result.derivatives.map(d => `
+            <div class="derivative-item">
+              <span class="derivative-word">${d.word}</span>
+              ${d.pos ? `<span class="derivative-pos">${d.pos}</span>` : ''}
+              <span class="derivative-meaning">${d.meaning}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
       <div class="result-section-title" style="margin-bottom:10px">번역</div>
       ${entriesHtml}
     </div>
