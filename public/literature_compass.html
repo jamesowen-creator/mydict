@@ -133,6 +133,41 @@
   .movement-pill:hover { background: var(--primary); color: #fff; }
   .movement-pill .pill-period { font-size: 11px; opacity: 0.7; font-family: 'Inter', sans-serif; }
 
+  /* ── Genre Filter Tabs ── */
+  .genre-filter-tabs {
+    display: flex;
+    overflow-x: auto;
+    border-bottom: 0.5px solid var(--border);
+    margin: 0 0 14px;
+    scrollbar-width: none;
+  }
+  .genre-filter-tabs::-webkit-scrollbar { display: none; }
+  .genre-tab {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 14px 9px;
+    margin-bottom: -1px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+  .genre-tab.active {
+    color: var(--text1);
+    font-weight: 700;
+    border-bottom-color: #7F77DD;
+  }
+  .genre-empty {
+    font-size: 13px;
+    color: var(--text2);
+    padding: 4px 0 8px;
+  }
+
   /* ── Briefing View ── */
   #view-briefing .content { padding: 20px 16px; }
   .briefing-section { margin-bottom: 20px; }
@@ -601,6 +636,7 @@ let currentMovement = null;
 let currentCardIndex = 0;
 let isFlipped = false;
 let quizData = { rounds: [], currentRound: 0, currentQ: 0, score: 0, wrong: [] };
+let currentGenreFilters = {}; // eraId -> selected genre, defaults to '전체'
 
 // ── Utility ──
 function shuffle(arr) {
@@ -635,7 +671,42 @@ async function loadDB() {
 }
 
 // ── View 1: Home ──
+const GENRE_TABS = ['전체', '시', '소설', '수필', '희곡'];
+
+function getFilteredMovements(era, genre) {
+  if (genre === '전체') return era.movements;
+  return era.movements.filter(m => m.works.some(w => w.genre === genre));
+}
+
+function renderPills(era, genre) {
+  const container = document.getElementById(`pills-${era.id}`);
+  if (!container) return;
+  const filtered = getFilteredMovements(era, genre);
+  if (filtered.length === 0) {
+    container.innerHTML = `<p class="genre-empty">아직 콘텐츠가 없어요</p>`;
+    return;
+  }
+  container.innerHTML = `<div class="movement-pills">
+    ${filtered.map(m => `<button class="movement-pill" onclick="showBriefing('${m.id}')">
+      ${m.name}<span class="pill-period">${m.period}</span>
+    </button>`).join('')}
+  </div>`;
+}
+
+function setGenreFilter(eraId, genre) {
+  currentGenreFilters[eraId] = genre;
+  const tabsEl = document.getElementById(`genre-tabs-${eraId}`);
+  if (tabsEl) {
+    tabsEl.querySelectorAll('.genre-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.genre === genre);
+    });
+  }
+  const era = DB.eras.find(e => e.id === eraId);
+  if (era) renderPills(era, genre);
+}
+
 function renderHome() {
+  currentGenreFilters = {};
   const container = document.getElementById('home-content');
   let html = `<div class="home-header">
     <h2>한국 문학 탐구</h2>
@@ -643,21 +714,26 @@ function renderHome() {
   </div>`;
 
   DB.eras.forEach(era => {
+    const tabsHtml = GENRE_TABS.map(g =>
+      `<button class="genre-tab${g === '전체' ? ' active' : ''}" data-genre="${g}" onclick="setGenreFilter('${era.id}','${g}')">${g}</button>`
+    ).join('');
+
+    const pillsHtml = era.movements.map(m =>
+      `<button class="movement-pill" onclick="showBriefing('${m.id}')">
+        ${m.name}<span class="pill-period">${m.period}</span>
+      </button>`
+    ).join('');
+
     html += `<div class="era-card">
       <div class="era-header">
         <span class="era-name">${era.name}</span>
         <span class="era-range">${era.range}</span>
       </div>
       <div class="era-divider"></div>
+      <div class="genre-filter-tabs" id="genre-tabs-${era.id}">${tabsHtml}</div>
       <div class="movement-label">문학 사조</div>
-      <div class="movement-pills">`;
-    era.movements.forEach(m => {
-      html += `<button class="movement-pill" onclick="showBriefing('${m.id}')">
-        ${m.name}
-        <span class="pill-period">${m.period}</span>
-      </button>`;
-    });
-    html += `</div></div>`;
+      <div id="pills-${era.id}"><div class="movement-pills">${pillsHtml}</div></div>
+    </div>`;
   });
 
   container.innerHTML = html;
