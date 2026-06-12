@@ -99,6 +99,19 @@
   .tab-btn svg { width: 22px; height: 22px; }
   .tab-btn.disabled { opacity: 0.4; cursor: not-allowed; }
 
+  /* ── App Link Pill ── */
+  .app-link {
+    display: flex; align-items: center; gap: 4px;
+    padding: 5px 10px; border-radius: 20px;
+    font-size: 12px; font-weight: 600;
+    text-decoration: none; white-space: nowrap; flex-shrink: 0;
+    transition: opacity 0.15s;
+    background: #E1F5EE; color: #085041;
+    border: 1px solid rgba(29,158,117,0.25);
+  }
+  .app-link:hover { opacity: 0.8; }
+  .app-link svg { width: 13px; height: 13px; }
+
   /* ── Home View ── */
   #view-home .content { padding: 20px 16px; }
   .home-header { margin-bottom: 24px; }
@@ -531,6 +544,13 @@
       <h1>문학 나침반</h1>
       <div class="subtitle">배경지식으로 문학을 읽는 눈을 키워요</div>
     </div>
+    <a class="app-link" href="digest_reading.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      </svg>
+      한입 독서
+    </a>
   </div>
   <div class="content" id="home-content"></div>
 </div>
