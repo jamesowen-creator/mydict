@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>한입 독서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #1D9E75;
+    --primary-light: #E1F5EE;
+    --primary-dark: #085041;
+    --bg: #FAFAF9;
+    --card: #FFFFFF;
+    --text1: #1a1a1a;
+    --text2: #6b7280;
+    --border: rgba(0,0,0,0.08);
+    --error: #E24B4A;
+    --error-light: #FCEBEB;
+    --tab-height: 64px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Noto Sans KR', 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text1);
+    min-height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* ── Loading ── */
+  #loading {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: var(--bg); z-index: 999; gap: 16px;
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--primary-light);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { color: var(--text2); font-size: 14px; }
+
+  /* ── Views ── */
+  .view { display: none; min-height: 100dvh; padding-bottom: var(--tab-height); }
+  .view.active { display: block; }
+
+  /* ── Top Bar ── */
+  .top-bar {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .top-bar h1 { font-size: 18px; font-weight: 700; color: var(--text1); flex: 1; }
+  .top-bar .subtitle { font-size: 12px; color: var(--text2); font-weight: 400; }
+  .back-btn {
+    background: none; border: none; cursor: pointer;
+    padding: 6px; border-radius: 8px;
+    color: var(--text2); display: flex; align-items: center;
+    transition: background 0.15s;
+  }
+  .back-btn:hover { background: var(--primary-light); color: var(--primary); }
+  .back-btn svg { width: 20px; height: 20px; }
+
+  /* ── Tab Bar ── */
+  .tab-bar {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    height: var(--tab-height);
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    display: flex; z-index: 200;
+  }
+  .tab-btn {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 4px; background: none; border: none; cursor: pointer;
+    color: var(--text2); font-size: 11px; font-weight: 500;
+    transition: color 0.15s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .tab-btn.active { color: var(--primary); }
+  .tab-btn svg { width: 22px; height: 22px; }
+  .tab-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── View 1: List ── */
+  #view-list .content { padding: 20px 16px; }
+
+  .list-header { margin-bottom: 20px; }
+  .list-header h2 { font-size: 22px; font-weight: 700; color: var(--text1); margin-bottom: 4px; }
+  .list-header p { font-size: 14px; color: var(--text2); line-height: 1.5; }
+
+  /* Progress section */
+  .progress-section {
+    background: var(--card);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 16px 18px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .progress-title {
+    font-size: 13px; font-weight: 700; color: var(--text2);
+    letter-spacing: 0.03em; margin-bottom: 12px;
+  }
+  .progress-row { margin-bottom: 12px; }
+  .progress-row:last-child { margin-bottom: 0; }
+  .progress-label-row {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px;
+  }
+  .progress-level-label { font-size: 13px; font-weight: 600; color: var(--text1); }
+  .progress-count { font-size: 13px; color: var(--primary); font-weight: 700; font-family: 'Inter', sans-serif; }
+  .progress-count.empty { color: var(--text2); font-weight: 500; }
+  .progress-bar-track {
+    height: 6px; background: var(--primary-light);
+    border-radius: 3px; overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%; background: var(--primary);
+    border-radius: 3px; transition: width 0.4s ease;
+  }
+  .progress-coming-soon {
+    font-size: 12px; color: var(--text2);
+    font-style: italic; margin-top: 4px;
+  }
+
+  /* Work cards */
+  .work-card {
+    background: var(--card);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 16px 18px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .work-card:hover { box-shadow: 0 4px 16px rgba(29,158,117,0.12); border-color: rgba(29,158,117,0.25); }
+  .work-card.conquered { border-color: rgba(29,158,117,0.3); }
+  .work-card-main { flex: 1; min-width: 0; }
+  .work-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .work-title { font-size: 16px; font-weight: 700; color: var(--text1); }
+  .work-author-year { font-size: 13px; color: var(--text2); margin-bottom: 6px; }
+  .work-one-line {
+    font-size: 13px; color: var(--text2); line-height: 1.5;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .level-badge {
+    border-radius: 20px; padding: 3px 9px;
+    font-size: 11px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .level-badge.중학 { background: #FEF3C7; color: #92400E; }
+  .level-badge.고등 { background: #FCE7F3; color: #831843; }
+  .conquest-icon {
+    width: 32px; height: 32px; flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    background: var(--bg);
+  }
+  .conquest-icon.done {
+    background: var(--primary); border-color: var(--primary);
+  }
+  .conquest-icon svg { width: 16px; height: 16px; color: var(--text2); }
+  .conquest-icon.done svg { color: #fff; }
+
+  /* ── View 2: Digest ── */
+  #view-digest .content { padding: 20px 16px 100px; }
+
+  .digest-work-header {
+    background: var(--card);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 20px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .digest-work-title { font-size: 24px; font-weight: 700; color: var(--text1); margin-bottom: 6px; line-height: 1.3; }
+  .digest-work-meta { font-size: 14px; color: var(--text2); font-family: 'Inter', sans-serif; }
+
+  .digest-section {
+    background: var(--card);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 18px 20px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .digest-section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--primary); text-transform: uppercase; margin-bottom: 10px;
+  }
+  .digest-one-line {
+    border-left: 4px solid var(--primary);
+    padding: 10px 14px;
+    background: var(--primary-light);
+    border-radius: 0 10px 10px 0;
+    font-size: 14px; font-weight: 600; line-height: 1.6; color: var(--primary-dark);
+  }
+  .digest-summary {
+    font-size: 14px; line-height: 1.8; color: var(--text1);
+  }
+  .key-scene-list { display: flex; flex-direction: column; gap: 12px; }
+  .key-scene-item { display: flex; gap: 12px; align-items: flex-start; }
+  .scene-num {
+    width: 24px; height: 24px; flex-shrink: 0;
+    background: var(--primary); color: #fff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; font-family: 'Inter', sans-serif;
+    margin-top: 1px;
+  }
+  .scene-text { font-size: 14px; line-height: 1.7; color: var(--text1); flex: 1; }
+
+  .tag-group { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag {
+    background: var(--primary-light); color: var(--primary-dark);
+    border-radius: 20px; padding: 5px 12px;
+    font-size: 13px; font-weight: 500;
+  }
+
+  .related-list { display: flex; flex-direction: column; gap: 10px; }
+  .related-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 12px 14px;
+    background: var(--bg); border-radius: 12px;
+    cursor: pointer; transition: background 0.15s;
+    border: 1px solid transparent;
+  }
+  .related-item:hover { background: var(--primary-light); border-color: rgba(29,158,117,0.2); }
+  .related-item svg { width: 14px; height: 14px; color: var(--primary); flex-shrink: 0; margin-top: 3px; }
+  .related-info { flex: 1; }
+  .related-title { font-size: 13px; font-weight: 600; color: var(--text1); }
+  .related-author { font-size: 12px; color: var(--text2); }
+  .related-relation { font-size: 11px; color: var(--primary); font-weight: 500; margin-top: 2px; }
+
+  /* Conquest toggle */
+  .conquest-bar {
+    position: fixed; bottom: var(--tab-height); left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    padding: 10px 16px;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    z-index: 150;
+  }
+  .conquest-btn {
+    width: 100%; padding: 14px;
+    border-radius: 14px; border: 2px solid var(--border);
+    background: var(--bg); cursor: pointer;
+    font-size: 15px; font-weight: 700;
+    font-family: 'Noto Sans KR', sans-serif;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    color: var(--text2); transition: all 0.2s;
+  }
+  .conquest-btn.conquered {
+    background: var(--primary-light); border-color: var(--primary);
+    color: var(--primary-dark);
+  }
+  .conquest-btn svg { width: 18px; height: 18px; }
+
+  /* ── View 3: Quiz ── */
+  #view-quiz .content { padding: 20px 16px; }
+
+  .quiz-progress-bar-wrap {
+    height: 6px; background: var(--primary-light);
+    border-radius: 3px; margin-bottom: 20px; overflow: hidden;
+  }
+  .quiz-progress-bar {
+    height: 100%; background: var(--primary);
+    border-radius: 3px; transition: width 0.3s ease;
+  }
+  .quiz-round-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--primary); margin-bottom: 6px;
+  }
+  .quiz-question-counter { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
+  .quiz-card {
+    background: var(--card); border-radius: 16px;
+    border: 1px solid var(--border); padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .quiz-question {
+    font-size: 16px; font-weight: 600; line-height: 1.6;
+    margin-bottom: 20px; color: var(--text1);
+  }
+  .mcq-options { display: flex; flex-direction: column; gap: 10px; }
+  .mcq-option {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    background: var(--bg); border: 1.5px solid var(--border);
+    border-radius: 12px; cursor: pointer; transition: all 0.15s;
+  }
+  .mcq-option:hover:not(.answered) { border-color: var(--primary); background: var(--primary-light); }
+  .mcq-option.correct { background: var(--primary-light); border-color: var(--primary); }
+  .mcq-option.wrong { background: var(--error-light); border-color: var(--error); }
+  .mcq-option.correct-hint { background: var(--primary-light); border-color: var(--primary); }
+  .mcq-num {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; flex-shrink: 0; color: var(--text2);
+    transition: all 0.15s;
+  }
+  .mcq-option.correct .mcq-num { background: var(--primary); color: #fff; }
+  .mcq-option.wrong .mcq-num { background: var(--error); color: #fff; }
+  .mcq-option.correct-hint .mcq-num { background: var(--primary); color: #fff; }
+  .mcq-text { font-size: 14px; color: var(--text1); }
+
+  .ox-buttons { display: flex; gap: 12px; margin-top: 4px; }
+  .ox-btn {
+    flex: 1; height: 80px;
+    border-radius: 14px; border: 2px solid var(--border);
+    background: var(--bg); cursor: pointer;
+    font-size: 32px; font-weight: 700;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ox-btn:hover:not(:disabled) { border-color: var(--primary); background: var(--primary-light); }
+  .ox-btn.correct { background: var(--primary-light); border-color: var(--primary); }
+  .ox-btn.wrong { background: var(--error-light); border-color: var(--error); }
+  .ox-btn:disabled { cursor: default; }
+  .ox-feedback {
+    margin-top: 12px; padding: 10px 14px;
+    border-radius: 10px; font-size: 13px; font-weight: 500; display: none;
+  }
+  .ox-feedback.show { display: block; }
+  .ox-feedback.correct-fb { background: var(--primary-light); color: var(--primary-dark); }
+  .ox-feedback.wrong-fb { background: var(--error-light); color: var(--error); }
+
+  .quiz-next-btn {
+    margin-top: 20px;
+    background: var(--primary); color: #fff;
+    border: none; border-radius: 12px;
+    padding: 14px; width: 100%;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    display: none; font-family: 'Noto Sans KR', sans-serif;
+    transition: background 0.15s;
+  }
+  .quiz-next-btn.visible { display: block; }
+  .quiz-next-btn:hover { background: var(--primary-dark); }
+
+  /* ── View 4: Result ── */
+  #view-result .content { padding: 24px 16px; }
+  .result-score-wrap {
+    text-align: center; margin-bottom: 28px;
+    padding: 28px; background: var(--card);
+    border-radius: 20px; border: 1px solid var(--border);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .result-emoji { font-size: 48px; margin-bottom: 12px; }
+  .result-score { font-size: 42px; font-weight: 700; color: var(--primary); font-family: 'Inter', sans-serif; }
+  .result-score span { font-size: 20px; color: var(--text2); }
+  .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
+  .result-submsg { font-size: 13px; color: var(--text2); margin-top: 4px; }
+  .result-section-label { font-size: 13px; font-weight: 700; color: var(--text2); margin-bottom: 12px; letter-spacing: 0.03em; }
+  .result-wrong-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .result-wrong-item {
+    background: var(--card); border-radius: 12px;
+    border: 1px solid var(--border); padding: 12px 14px;
+  }
+  .result-wrong-q { font-size: 13px; color: var(--text2); margin-bottom: 4px; }
+  .result-wrong-a { font-size: 14px; font-weight: 600; color: var(--primary); }
+  .result-wrong-a::before { content: '정답: '; color: var(--text2); font-weight: 400; }
+  .result-actions { display: flex; flex-direction: column; gap: 10px; }
+  .result-btn {
+    border-radius: 14px; padding: 15px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    border: none; transition: all 0.15s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .result-btn-primary { background: var(--primary); color: #fff; }
+  .result-btn-primary:hover { background: var(--primary-dark); }
+  .result-btn-secondary { background: var(--card); color: var(--text1); border: 1.5px solid var(--border); }
+  .result-btn-secondary:hover { background: var(--bg); }
+
+  /* ── Misc ── */
+  .error-msg { text-align: center; padding: 40px 24px; color: var(--error); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p>작품 데이터 로딩 중…</p>
+</div>
+
+<!-- View 1: List -->
+<div id="view-list" class="view">
+  <div class="top-bar">
+    <div style="flex:1">
+      <h1>한입 독서</h1>
+      <div class="subtitle">핵심만 읽고 작품을 정복해요</div>
+    </div>
+  </div>
+  <div class="content" id="list-content"></div>
+</div>
+
+<!-- View 2: Digest -->
+<div id="view-digest" class="view">
+  <div class="top-bar">
+    <button class="back-btn" onclick="goList()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <h1 id="digest-top-title" style="font-size:16px"></h1>
+  </div>
+  <div class="content" id="digest-content"></div>
+  <div class="conquest-bar">
+    <button class="conquest-btn" id="conquest-btn" onclick="toggleConquest()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      이 작품 정복 완료
+    </button>
+  </div>
+</div>
+
+<!-- View 3: Quiz -->
+<div id="view-quiz" class="view">
+  <div class="top-bar">
+    <button class="back-btn" onclick="goList()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <h1>독서 퀴즈</h1>
+  </div>
+  <div class="content" id="quiz-content"></div>
+</div>
+
+<!-- View 4: Result -->
+<div id="view-result" class="view">
+  <div class="top-bar"><h1>퀴즈 결과</h1></div>
+  <div class="content" id="result-content"></div>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-list" onclick="goList()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+      <polyline points="9 22 9 12 15 12 15 22"></polyline>
+    </svg>
+    홈
+  </button>
+  <button class="tab-btn disabled" id="tab-quiz" onclick="startQuizFlow()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>
+    퀴즈
+  </button>
+</div>
+
+<script>
+// ── State ──
+let DB = null;
+let currentWorkId = null;
+let quizState = { questions: [], currentIdx: 0, score: 0, wrong: [] };
+
+// ── Utility ──
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function isConquered(id) {
+  return localStorage.getItem(`digest_conquest_${id}`) === 'true';
+}
+
+function setConquered(id, val) {
+  localStorage.setItem(`digest_conquest_${id}`, val ? 'true' : 'false');
+}
+
+function getConqueredWorks() {
+  if (!DB) return [];
+  return DB.works.filter(w => isConquered(w.id));
+}
+
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('tab-list').classList.toggle('active', id === 'view-list');
+  document.getElementById('tab-quiz').classList.toggle('active', id === 'view-quiz' || id === 'view-result');
+}
+
+// ── Data Load ──
+async function loadDB() {
+  try {
+    const res = await fetch('digest_db.json');
+    if (!res.ok) throw new Error('네트워크 오류');
+    DB = await res.json();
+    document.getElementById('loading').style.display = 'none';
+    renderList();
+    showView('view-list');
+  } catch (e) {
+    document.getElementById('loading').innerHTML =
+      `<div class="error-msg">데이터를 불러오지 못했습니다.<br>${e.message}</div>`;
+  }
+}
+
+// ── View 1: List ──
+function renderList() {
+  updateTabQuizState();
+  const container = document.getElementById('list-content');
+
+  const allWorks = DB.works;
+  const middleWorks = allWorks.filter(w => w.level === '중학');
+  const highWorks = allWorks.filter(w => w.level === '고등');
+  const conqueredMiddle = middleWorks.filter(w => isConquered(w.id)).length;
+  const conqueredHigh = highWorks.filter(w => isConquered(w.id)).length;
+  const totalConquered = conqueredMiddle + conqueredHigh;
+
+  const middlePct = middleWorks.length > 0 ? (conqueredMiddle / middleWorks.length) * 100 : 0;
+
+  const highSection = highWorks.length === 0
+    ? `<div class="progress-row">
+        <div class="progress-label-row">
+          <span class="progress-level-label">고등</span>
+          <span class="progress-count empty">준비 중</span>
+        </div>
+        <p class="progress-coming-soon">고등 콘텐츠를 준비하고 있어요</p>
+      </div>`
+    : `<div class="progress-row">
+        <div class="progress-label-row">
+          <span class="progress-level-label">고등</span>
+          <span class="progress-count">${conqueredHigh} / ${highWorks.length}</span>
+        </div>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" style="width:${highWorks.length > 0 ? (conqueredHigh/highWorks.length)*100 : 0}%"></div>
+        </div>
+      </div>`;
+
+  const worksHtml = allWorks.map(w => {
+    const conquered = isConquered(w.id);
+    return `<div class="work-card${conquered ? ' conquered' : ''}" onclick="showDigest('${w.id}')">
+      <div class="work-card-main">
+        <div class="work-card-top">
+          <span class="work-title">「${w.title}」</span>
+          <span class="level-badge ${w.level}">${w.level}</span>
+        </div>
+        <div class="work-author-year">${w.author} · ${w.year}</div>
+        <div class="work-one-line">${w.one_line}</div>
+      </div>
+      <div class="conquest-icon${conquered ? ' done' : ''}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="list-header">
+      <h2>한국 문학 작품</h2>
+      <p>핵심 내용을 읽고 작품을 정복해보세요.</p>
+    </div>
+    <div class="progress-section">
+      <div class="progress-title">정복 현황 · ${totalConquered} / ${allWorks.length} 작품</div>
+      <div class="progress-row">
+        <div class="progress-label-row">
+          <span class="progress-level-label">중학</span>
+          <span class="progress-count">${conqueredMiddle} / ${middleWorks.length}</span>
+        </div>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" style="width:${middlePct}%"></div>
+        </div>
+      </div>
+      ${highSection}
+    </div>
+    ${worksHtml}`;
+}
+
+function updateTabQuizState() {
+  const conquered = getConqueredWorks();
+  const btn = document.getElementById('tab-quiz');
+  if (conquered.length >= 1) {
+    btn.classList.remove('disabled');
+  } else {
+    btn.classList.add('disabled');
+  }
+}
+
+function goList() {
+  renderList();
+  showView('view-list');
+  window.scrollTo(0, 0);
+}
+
+// ── View 2: Digest ──
+function showDigest(workId) {
+  const work = DB.works.find(w => w.id === workId);
+  if (!work) return;
+  currentWorkId = workId;
+
+  document.getElementById('digest-top-title').textContent = `「${work.title}」`;
+
+  const relatedHtml = work.related_works.length > 0
+    ? `<div class="digest-section">
+        <div class="digest-section-label">연결 작품</div>
+        <div class="related-list">
+          ${work.related_works.map(r => `
+            <div class="related-item" onclick="showDigest('${r.id}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+              <div class="related-info">
+                <div class="related-title">「${r.title}」</div>
+                <div class="related-author">${r.author}</div>
+                <div class="related-relation">${r.relation}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`
+    : '';
+
+  document.getElementById('digest-content').innerHTML = `
+    <div class="digest-work-header">
+      <div class="digest-work-title">「${work.title}」</div>
+      <div class="digest-work-meta">${work.author} · ${work.year} · ${work.genre}</div>
+    </div>
+    <div class="digest-section">
+      <div class="digest-section-label">핵심 한 줄</div>
+      <div class="digest-one-line">${work.one_line}</div>
+    </div>
+    <div class="digest-section">
+      <div class="digest-section-label">줄거리</div>
+      <div class="digest-summary">${work.summary}</div>
+    </div>
+    <div class="digest-section">
+      <div class="digest-section-label">핵심 장면</div>
+      <div class="key-scene-list">
+        ${work.key_scenes.map((s, i) => `
+          <div class="key-scene-item">
+            <div class="scene-num">${i + 1}</div>
+            <div class="scene-text">${s}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="digest-section">
+      <div class="digest-section-label">주제 · 정서</div>
+      <div class="tag-group" style="margin-bottom:10px">
+        <span class="tag">${work.theme}</span>
+      </div>
+      <div class="tag-group">
+        ${work.emotion.split(',').map(e => `<span class="tag">${e.trim()}</span>`).join('')}
+      </div>
+    </div>
+    ${relatedHtml}`;
+
+  updateConquestBtn();
+  showView('view-digest');
+  window.scrollTo(0, 0);
+}
+
+function updateConquestBtn() {
+  const btn = document.getElementById('conquest-btn');
+  if (isConquered(currentWorkId)) {
+    btn.classList.add('conquered');
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"></polyline></svg> 정복 완료!`;
+  } else {
+    btn.classList.remove('conquered');
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"></polyline></svg> 이 작품 정복 완료`;
+  }
+}
+
+function toggleConquest() {
+  const current = isConquered(currentWorkId);
+  setConquered(currentWorkId, !current);
+  updateConquestBtn();
+  updateTabQuizState();
+}
+
+// ── View 3: Quiz ──
+function startQuizFlow() {
+  const conquered = getConqueredWorks();
+  if (conquered.length === 0) {
+    alert('먼저 작품을 읽어보세요! 정복한 작품이 있어야 퀴즈를 시작할 수 있어요.');
+    return;
+  }
+  const questions = buildQuestions(conquered);
+  if (questions.length === 0) {
+    alert('퀴즈를 생성할 수 없습니다. 더 많은 작품을 정복해보세요!');
+    return;
+  }
+  quizState = { questions, currentIdx: 0, score: 0, wrong: [] };
+  showView('view-quiz');
+  renderQuestion();
+  window.scrollTo(0, 0);
+}
+
+function buildQuestions(conquered) {
+  const questions = [];
+  const allWorks = DB.works;
+
+  // Type 1: MCQ — 핵심 정서 (정복 4개 이상일 때)
+  if (conquered.length >= 4) {
+    const pool = shuffle(conquered).slice(0, 3);
+    pool.forEach(w => {
+      const wrong = shuffle(allWorks.filter(ow => ow.id !== w.id)).slice(0, 3).map(ow => ow.emotion);
+      const options = shuffle([w.emotion, ...wrong]);
+      questions.push({
+        type: 'mcq',
+        roundLabel: '핵심 정서 퀴즈',
+        question: `「${w.title}」(${w.author})의 핵심 정서는 무엇인가요?`,
+        options,
+        answer: w.emotion
+      });
+    });
+  }
+
+  // Type 2: MCQ — 작품 맞추기 (정복 4개 이상일 때)
+  if (conquered.length >= 4) {
+    const pool = shuffle(conquered).slice(0, 3);
+    pool.forEach(w => {
+      const wrongTitles = shuffle(conquered.filter(ow => ow.id !== w.id)).slice(0, 3).map(ow => `「${ow.title}」`);
+      const options = shuffle([`「${w.title}」`, ...wrongTitles]);
+      questions.push({
+        type: 'mcq',
+        roundLabel: '작품 맞추기 퀴즈',
+        question: `다음 설명에 해당하는 작품은?\n\n"${w.one_line}"`,
+        options,
+        answer: `「${w.title}」`
+      });
+    });
+  }
+
+  // Type 3: OX — 주제 퀴즈 (항상 가능)
+  const oxPool = shuffle(conquered).slice(0, 3);
+  oxPool.forEach(w => {
+    const isTrue = Math.random() > 0.5;
+    let statement, answer, explanation;
+    if (isTrue) {
+      statement = `「${w.title}」의 주제는 "${w.theme}"이다.`;
+      answer = true;
+      explanation = `맞습니다. 「${w.title}」의 주제는 "${w.theme}"입니다.`;
+    } else {
+      const other = allWorks.find(ow => ow.id !== w.id);
+      if (other) {
+        statement = `「${w.title}」의 주제는 "${other.theme}"이다.`;
+        answer = false;
+        explanation = `아닙니다. 「${w.title}」의 주제는 "${w.theme}"입니다.`;
+      } else {
+        statement = `「${w.title}」의 주제는 "${w.theme}"이다.`;
+        answer = true;
+        explanation = `맞습니다. 「${w.title}」의 주제는 "${w.theme}"입니다.`;
+      }
+    }
+    questions.push({ type: 'ox', roundLabel: 'OX 퀴즈', statement, answer, explanation });
+  });
+
+  return shuffle(questions);
+}
+
+function renderQuestion() {
+  const q = quizState.questions[quizState.currentIdx];
+  if (!q) { showResult(); return; }
+
+  const pct = (quizState.currentIdx / quizState.questions.length) * 100;
+  const counter = `${quizState.currentIdx + 1} / ${quizState.questions.length}`;
+
+  const container = document.getElementById('quiz-content');
+
+  if (q.type === 'mcq') {
+    container.innerHTML = `
+      <div class="quiz-progress-bar-wrap"><div class="quiz-progress-bar" id="qpb" style="width:${pct}%"></div></div>
+      <div class="quiz-round-label">${q.roundLabel}</div>
+      <div class="quiz-question-counter">${counter}</div>
+      <div class="quiz-card">
+        <div class="quiz-question" style="white-space:pre-line">${q.question}</div>
+        <div class="mcq-options">
+          ${q.options.map((opt, i) => `
+            <button class="mcq-option" data-opt="${escAttr(opt)}" onclick="answerMCQ(this,'${escJs(opt)}')">
+              <span class="mcq-num">${i + 1}</span>
+              <span class="mcq-text">${opt}</span>
+            </button>`).join('')}
+        </div>
+      </div>
+      <button class="quiz-next-btn" id="quiz-next" onclick="nextQuestion()">다음</button>`;
+  } else {
+    container.innerHTML = `
+      <div class="quiz-progress-bar-wrap"><div class="quiz-progress-bar" id="qpb" style="width:${pct}%"></div></div>
+      <div class="quiz-round-label">${q.roundLabel}</div>
+      <div class="quiz-question-counter">${counter}</div>
+      <div class="quiz-card">
+        <div class="quiz-question">${q.statement}</div>
+        <div class="ox-buttons">
+          <button class="ox-btn" id="ox-o" onclick="answerOX(true)">O</button>
+          <button class="ox-btn" id="ox-x" onclick="answerOX(false)">X</button>
+        </div>
+        <div class="ox-feedback" id="ox-fb"></div>
+      </div>
+      <button class="quiz-next-btn" id="quiz-next" onclick="nextQuestion()">다음</button>`;
+  }
+}
+
+function escAttr(s) { return s.replace(/"/g, '&quot;'); }
+function escJs(s) { return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+
+function answerMCQ(el, chosen) {
+  const q = quizState.questions[quizState.currentIdx];
+  document.querySelectorAll('.mcq-option').forEach(opt => {
+    opt.classList.add('answered'); opt.onclick = null;
+  });
+  const isCorrect = chosen === q.answer;
+  if (isCorrect) {
+    el.classList.add('correct'); quizState.score++;
+  } else {
+    el.classList.add('wrong');
+    document.querySelectorAll('.mcq-option').forEach(opt => {
+      if (opt.dataset.opt === q.answer) opt.classList.add('correct-hint');
+    });
+    quizState.wrong.push({ q: q.question || q.statement, a: q.answer });
+  }
+  document.getElementById('quiz-next').classList.add('visible');
+}
+
+function answerOX(answer) {
+  const q = quizState.questions[quizState.currentIdx];
+  const oBtn = document.getElementById('ox-o');
+  const xBtn = document.getElementById('ox-x');
+  const fb = document.getElementById('ox-fb');
+  oBtn.disabled = true; xBtn.disabled = true;
+  const isCorrect = answer === q.answer;
+  if (isCorrect) {
+    (answer ? oBtn : xBtn).classList.add('correct');
+    quizState.score++;
+    fb.textContent = '정답! ' + q.explanation;
+    fb.className = 'ox-feedback show correct-fb';
+  } else {
+    (answer ? oBtn : xBtn).classList.add('wrong');
+    (!answer ? oBtn : xBtn).classList.add('correct');
+    fb.textContent = '오답. ' + q.explanation;
+    fb.className = 'ox-feedback show wrong-fb';
+    quizState.wrong.push({ q: q.statement, a: q.answer ? 'O (참)' : 'X (거짓)' });
+  }
+  document.getElementById('quiz-next').classList.add('visible');
+}
+
+function nextQuestion() {
+  quizState.currentIdx++;
+  renderQuestion();
+  window.scrollTo(0, 0);
+}
+
+// ── View 4: Result ──
+function showResult() {
+  const total = quizState.questions.length;
+  const score = quizState.score;
+  const pct = total > 0 ? Math.round((score / total) * 100) : 0;
+
+  let emoji = '🎉', msg = '완벽해요!', sub = '모든 문항을 맞혔습니다.';
+  if (pct < 100) { emoji = '👍'; msg = '잘했어요!'; sub = '조금만 더 연습하면 완벽합니다.'; }
+  if (pct < 60) { emoji = '📚'; msg = '다시 도전해봐요!'; sub = '작품을 다시 읽고 퀴즈에 도전하세요.'; }
+
+  let wrongHtml = '';
+  if (quizState.wrong.length > 0) {
+    wrongHtml = `
+      <div class="result-section-label">틀린 문항</div>
+      <div class="result-wrong-list">
+        ${quizState.wrong.map(w => `
+          <div class="result-wrong-item">
+            <div class="result-wrong-q" style="white-space:pre-line">${w.q}</div>
+            <div class="result-wrong-a">${w.a}</div>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  document.getElementById('result-content').innerHTML = `
+    <div class="result-score-wrap">
+      <div class="result-emoji">${emoji}</div>
+      <div class="result-score">${score}<span> / ${total}</span></div>
+      <div class="result-msg">${msg}</div>
+      <div class="result-submsg">${sub}</div>
+    </div>
+    ${wrongHtml}
+    <div class="result-actions">
+      <button class="result-btn result-btn-primary" onclick="startQuizFlow()">다시 풀기</button>
+      <button class="result-btn result-btn-secondary" onclick="goList()">목록으로</button>
+    </div>`;
+
+  showView('view-result');
+  window.scrollTo(0, 0);
+}
+
+// ── Boot ──
+loadDB();
+</script>
+</body>
+</html>
