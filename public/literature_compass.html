@@ -147,6 +147,17 @@
   .movement-pill .pill-name { font-size: 13px; font-weight: 600; line-height: 1.3; }
   .movement-pill .pill-period { font-size: 11px; font-weight: 400; opacity: 0.65; font-family: 'Inter', sans-serif; line-height: 1.2; }
 
+  /* ── Timeline ── */
+  .timeline-wrap { display: flex; }
+  .tl-axis { width: 40px; flex-shrink: 0; position: relative; border-right: 1.5px solid var(--border); }
+  .tl-axis-label { position: absolute; right: 6px; transform: translateY(-50%); font-size: 10px; color: var(--text3); font-family: 'Inter', sans-serif; line-height: 1; pointer-events: none; white-space: nowrap; }
+  .tl-bars { flex: 1; position: relative; padding-left: 6px; box-sizing: border-box; }
+  .tl-grid-line { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed rgba(127,119,221,0.15); pointer-events: none; }
+  .tl-bar { position: absolute; left: 0; height: 26px; border-radius: 13px; background: var(--primary-light); border: 1px solid rgba(127,119,221,0.25); color: var(--primary-dark); cursor: pointer; display: flex; align-items: center; padding: 0 10px; min-width: 62px; overflow: hidden; white-space: nowrap; transition: background 0.15s, color 0.15s; box-sizing: border-box; }
+  .tl-bar:hover { background: var(--primary); color: #fff; }
+  .tl-bar-dim { opacity: 0.22; pointer-events: none; cursor: default; }
+  .tl-bar-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+
   /* ── Genre Filter Tabs ── */
   .genre-filter-tabs {
     display: flex;
@@ -725,6 +736,80 @@ function getFilteredMovements(era, genre) {
   return era.movements.filter(m => m.works.some(w => w.genre === genre));
 }
 
+function renderTimeline(era, genre) {
+  const container = document.getElementById(`pills-${era.id}`);
+  if (!container) return;
+
+  const all = era.movements.filter(m => m.start_year && m.end_year);
+  if (!all.length) { renderPills(era, genre); return; }
+
+  const activeIds = new Set(getFilteredMovements(era, genre).map(m => m.id));
+
+  const MIN_Y = Math.min(...all.map(m => m.start_year)) - 2;
+  const MAX_Y = Math.max(...all.map(m => m.end_year))   + 5;
+  const RANGE = MAX_Y - MIN_Y;
+  const PX_YR = 4.5;   // vertical pixels per year
+  const LANE_H = 32;   // extra vertical offset per stagger lane
+
+  // Greedy lane assignment (sorted by start_year)
+  const byStart = [...all].sort((a, b) => a.start_year - b.start_year);
+  const laneEnd = [];
+  const laneOf  = {};
+  byStart.forEach(m => {
+    let l = laneEnd.findIndex(e => e <= m.start_year);
+    if (l < 0) l = laneEnd.length;
+    laneOf[m.id] = l;
+    laneEnd[l] = m.end_year;
+  });
+
+  // Pixel top per bar; apply min-gap correction within each lane
+  const topPx = {};
+  all.forEach(m => {
+    topPx[m.id] = Math.round((m.start_year - MIN_Y) * PX_YR + laneOf[m.id] * LANE_H);
+  });
+  const BY_LANE_H = 26, MIN_GAP = 4;
+  const byLane = {};
+  all.forEach(m => { (byLane[laneOf[m.id]] = byLane[laneOf[m.id]] || []).push(m); });
+  Object.values(byLane).forEach(items => {
+    items.sort((a, b) => topPx[a.id] - topPx[b.id]);
+    let prevBottom = -Infinity;
+    items.forEach(m => {
+      if (topPx[m.id] < prevBottom + MIN_GAP) topPx[m.id] = prevBottom + MIN_GAP;
+      prevBottom = topPx[m.id] + BY_LANE_H;
+    });
+  });
+
+  const totalH = Math.max(...Object.values(topPx)) + BY_LANE_H + 16;
+
+  // Year axis labels + grid lines (every 10 years)
+  const startDec = Math.ceil(MIN_Y / 10) * 10;
+  let axisHtml = '', gridHtml = '';
+  for (let y = startDec; y <= MAX_Y; y += 10) {
+    const t = Math.round((y - MIN_Y) * PX_YR);
+    axisHtml += `<span class="tl-axis-label" style="top:${t}px">${y}</span>`;
+    gridHtml += `<div class="tl-grid-line"   style="top:${t}px"></div>`;
+  }
+
+  // Bars
+  let barsHtml = '';
+  all.forEach(m => {
+    const wpct = ((m.end_year - m.start_year) / RANGE * 100).toFixed(1);
+    const dim  = !activeIds.has(m.id);
+    const oc   = dim ? '' : `onclick="showBriefing('${m.id}')"`;
+    barsHtml +=
+      `<button class="tl-bar${dim ? ' tl-bar-dim' : ''}" ${oc}` +
+      ` style="top:${topPx[m.id]}px;width:max(${wpct}%,62px)"` +
+      ` title="${m.name} (${m.start_year}~${m.end_year})">` +
+      `<span class="tl-bar-name">${m.name}</span></button>`;
+  });
+
+  container.innerHTML =
+    `<div class="timeline-wrap">` +
+    `<div class="tl-axis" style="height:${totalH}px">${axisHtml}</div>` +
+    `<div class="tl-bars" style="height:${totalH}px">${gridHtml}${barsHtml}</div>` +
+    `</div>`;
+}
+
 function renderPills(era, genre) {
   const container = document.getElementById(`pills-${era.id}`);
   if (!container) return;
@@ -749,7 +834,7 @@ function setGenreFilter(eraId, genre) {
     });
   }
   const era = DB.eras.find(e => e.id === eraId);
-  if (era) renderPills(era, genre);
+  if (era) renderTimeline(era, genre);
 }
 
 function renderHome() {
@@ -775,12 +860,6 @@ function renderHome() {
       `<button class="genre-tab${g === '전체' ? ' active' : ''}" data-genre="${g}" onclick="setGenreFilter('${era.id}','${g}')">${g}</button>`
     ).join('');
 
-    const pillsHtml = era.movements.map(m =>
-      `<button class="movement-pill" onclick="showBriefing('${m.id}')">
-        <span class="pill-name">${m.name}</span><span class="pill-period">${m.period}</span>
-      </button>`
-    ).join('');
-
     html += `<div class="era-card">
       <div class="era-header">
         <span class="era-name">${era.name}</span>
@@ -789,11 +868,12 @@ function renderHome() {
       <div class="era-divider"></div>
       <div class="genre-filter-tabs" id="genre-tabs-${era.id}">${tabsHtml}</div>
       <div class="movement-label">문학 사조</div>
-      <div id="pills-${era.id}"><div class="movement-pills">${pillsHtml}</div></div>
+      <div id="pills-${era.id}"></div>
     </div>`;
   });
 
   container.innerHTML = html;
+  DB.eras.forEach(era => renderTimeline(era, '전체'));
 }
 
 function goHome() {
