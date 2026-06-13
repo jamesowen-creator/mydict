@@ -198,7 +198,13 @@ app.get('/', (req, res) => {
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.json')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  },
+}));
 
 // ─── Google OAuth ─────────────────────────────────────────────────────────────
 
