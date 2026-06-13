@@ -55,6 +55,17 @@ async function initDB() {
   } catch (e) {
     console.warn('[DB] name mojibake repair skipped:', e.message);
   }
+  // One-time repair: NFD → NFC normalization (PostgreSQL has no built-in NFC function)
+  try {
+    const { rows: nfdRows } = await pool.query('SELECT id, name FROM users WHERE name IS NOT NULL');
+    const toFix = nfdRows.filter(r => r.name.normalize('NFC') !== r.name);
+    for (const row of toFix) {
+      await pool.query('UPDATE users SET name = $1 WHERE id = $2', [row.name.normalize('NFC'), row.id]);
+    }
+    if (toFix.length > 0) console.log(`[DB] NFC normalization fixed ${toFix.length} name(s)`);
+  } catch (e) {
+    console.warn('[DB] name NFC normalization skipped:', e.message);
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS wordbook (
@@ -152,6 +163,7 @@ if (googleOAuthEnabled) {
     try {
       const email = profile.emails?.[0]?.value;
       const role = ADMIN_EMAILS.includes(email) ? 'admin' : null;
+      const displayName = (profile.displayName || '').normalize('NFC');
       const { rows } = await pool.query(
         `INSERT INTO users (google_id, email, name, role)
          VALUES ($1, $2, $3, COALESCE($4, 'user'))
@@ -160,7 +172,7 @@ if (googleOAuthEnabled) {
                name  = EXCLUDED.name,
                role  = CASE WHEN $4 IS NOT NULL THEN $4 ELSE users.role END
          RETURNING *`,
-        [profile.id, email, profile.displayName, role]
+        [profile.id, email, displayName, role]
       );
       done(null, rows[0]);
     } catch (err) {
