@@ -44,27 +44,59 @@ async function initDB() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS can_podcast BOOLEAN      DEFAULT true`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS perm_literature_compass BOOLEAN DEFAULT true`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS perm_digest_reading     BOOLEAN DEFAULT true`);
-  // One-time repair: names mis-encoded as Latin-1 instead of UTF-8
+  // Unified name repair: Latin-1 mojibake (U+0080-U+00FF) + NFC normalization
   try {
-    await pool.query(`
-      UPDATE users
-      SET name = convert_from(convert_to(name, 'LATIN1'), 'UTF8')
-      WHERE name ~ '[À-ÿ]'
-        AND name NOT SIMILAR TO '%[가-힣ぁ-んァ-ン一-龥]%'
-    `);
-  } catch (e) {
-    console.warn('[DB] name mojibake repair skipped:', e.message);
-  }
-  // One-time repair: NFD → NFC normalization (PostgreSQL has no built-in NFC function)
-  try {
-    const { rows: nfdRows } = await pool.query('SELECT id, name FROM users WHERE name IS NOT NULL');
-    const toFix = nfdRows.filter(r => r.name.normalize('NFC') !== r.name);
-    for (const row of toFix) {
-      await pool.query('UPDATE users SET name = $1 WHERE id = $2', [row.name.normalize('NFC'), row.id]);
+    const { rows: allUsers } = await pool.query('SELECT id, name FROM users WHERE name IS NOT NULL');
+
+    // Detects C1 control chars (U+0080-U+009F) and Latin supplement (U+00A0-U+00FF)
+    // that indicate UTF-8 bytes were mis-stored as Latin-1 characters.
+    const MOJIBAKE_RE = /[-ÿ]/;
+    const KOREAN_RE   = /[가-힣]/;
+    const FFFD        = '�';
+
+    // Treat each char's code-point as a raw Latin-1 byte, re-decode as UTF-8.
+    // Returns the repaired string, or null if conversion is not an improvement.
+    function tryLatinRepair(str) {
+      if (!MOJIBAKE_RE.test(str)) return null;
+      try {
+        const candidate = Buffer.from(str, 'latin1').toString('utf8');
+        if (candidate.includes(FFFD)) return null;          // invalid UTF-8 bytes
+        const stillBroken = MOJIBAKE_RE.test(candidate);
+        const hasKorean   = KOREAN_RE.test(candidate);
+        if (hasKorean || !stillBroken) return candidate;   // improvement confirmed
+        return null;
+      } catch { return null; }
     }
-    if (toFix.length > 0) console.log(`[DB] NFC normalization fixed ${toFix.length} name(s)`);
+
+    const candidates = allUsers.filter(r =>
+      MOJIBAKE_RE.test(r.name) || r.name.normalize('NFC') !== r.name
+    );
+    let repairCount = 0;
+
+    for (const row of candidates) {
+      let name = row.name;
+
+      // Up to 2 Latin-1 repair passes (handles double-encoded names)
+      const pass1 = tryLatinRepair(name);
+      if (pass1 !== null) {
+        name = pass1;
+        const pass2 = tryLatinRepair(name);
+        if (pass2 !== null) name = pass2;
+      }
+
+      // NFC normalization after byte repair
+      name = name.normalize('NFC');
+
+      if (name !== row.name) {
+        console.log('[DB] name repair: "' + row.name + '" → "' + name + '"');
+        await pool.query('UPDATE users SET name = $1 WHERE id = $2', [name, row.id]);
+        repairCount++;
+      }
+    }
+
+    console.log('[DB] name repair: 복구 대상 ' + candidates.length + '명, 복구 완료 ' + repairCount + '명');
   } catch (e) {
-    console.warn('[DB] name NFC normalization skipped:', e.message);
+    console.warn('[DB] name repair skipped:', e.message);
   }
 
   await pool.query(`
