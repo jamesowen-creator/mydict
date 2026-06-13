@@ -537,6 +537,14 @@
   <p>작품 데이터 로딩 중…</p>
 </div>
 
+<!-- Access Denied -->
+<div id="access-denied" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center">
+  <div style="font-size:48px">🔒</div>
+  <h2 style="font-size:20px;font-weight:700;color:var(--text1)">이용 권한이 없습니다</h2>
+  <p style="font-size:14px;color:var(--text2);line-height:1.6">문학 나침반 이용 권한이 없습니다.<br>관리자에게 문의해주세요.</p>
+  <a href="/" style="display:inline-flex;align-items:center;gap:8px;background:var(--primary);color:#fff;padding:14px 24px;border-radius:14px;font-size:15px;font-weight:700;text-decoration:none">METIS 홈으로</a>
+</div>
+
 <!-- View 1: Home -->
 <div id="view-home" class="view">
   <div class="top-bar">
@@ -675,8 +683,26 @@ function showView(id) {
   tabHome.classList.toggle('active', id === 'view-home');
 }
 
+// ── Permission Check ──
+async function checkPermission() {
+  const token = localStorage.getItem('mydict_token');
+  if (!token) return true;
+  try {
+    const r = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) return true;
+    const me = await r.json();
+    return me.perm_literature_compass !== false;
+  } catch { return true; }
+}
+
 // ── Data Load ──
 async function loadDB() {
+  const allowed = await checkPermission();
+  if (!allowed) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('access-denied').style.display = 'flex';
+    return;
+  }
   try {
     const res = await fetch('literature_db.json');
     if (!res.ok) throw new Error('네트워크 오류');

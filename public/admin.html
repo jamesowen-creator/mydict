@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gotcha Admin</title>
+<title>METIS Admin</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -157,7 +157,7 @@
 
 <header>
   <div class="header-left">
-    <span class="header-logo">Gotcha</span>
+    <span class="header-logo">METIS</span>
     <span class="header-badge">ADMIN</span>
   </div>
   <a href="/" class="btn-back">← 앱으로 돌아가기</a>
@@ -213,6 +213,8 @@
               <th>퀴즈</th>
               <th>TTS</th>
               <th>팟캐스트</th>
+              <th>문학나침반</th>
+              <th>한입독서</th>
               <th style="text-align:right">검색 횟수</th>
               <th style="text-align:right">TTS 횟수</th>
               <th style="text-align:right">단어장</th>
@@ -361,6 +363,8 @@ function renderUserRow(u) {
     ${permToggle(u, 'can_quiz')}
     ${permToggle(u, 'can_tts')}
     ${permToggle(u, 'can_podcast')}
+    ${permToggle(u, 'perm_literature_compass')}
+    ${permToggle(u, 'perm_digest_reading')}
     <td style="text-align:right;font-weight:600">${fmt(u.search_count)}</td>
     <td style="text-align:right;font-weight:600">${fmt(u.tts_count)}</td>
     <td style="text-align:right">${fmt(u.wordbook_count)}</td>

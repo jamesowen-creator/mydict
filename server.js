@@ -39,6 +39,8 @@ async function initDB() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS can_quiz    BOOLEAN      DEFAULT true`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS can_tts     BOOLEAN      DEFAULT true`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS can_podcast BOOLEAN      DEFAULT true`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS perm_literature_compass BOOLEAN DEFAULT true`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS perm_digest_reading     BOOLEAN DEFAULT true`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS wordbook (
@@ -287,12 +289,14 @@ app.get('/api/me', requireAuth, async (req, res) => {
       id: req.user.id, email: req.user.email, name: req.user.name,
       role: emailIsAdmin ? 'admin' : (req.user.role || 'user'), is_blocked: false,
       can_search: true, can_wordbook: true, can_quiz: true, can_tts: true, can_podcast: true,
+      perm_literature_compass: true, perm_digest_reading: true,
     });
   }
   try {
     const { rows } = await pool.query(
       `SELECT id, email, name, role, is_blocked,
-              can_search, can_wordbook, can_quiz, can_tts, can_podcast
+              can_search, can_wordbook, can_quiz, can_tts, can_podcast,
+              perm_literature_compass, perm_digest_reading
        FROM users WHERE id = $1`,
       [req.user.id]
     );
@@ -809,6 +813,7 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
       SELECT
         u.id, u.email, u.name, u.role, u.is_blocked,
         u.can_search, u.can_wordbook, u.can_quiz, u.can_tts, u.can_podcast,
+        u.perm_literature_compass, u.perm_digest_reading,
         u.created_at,
         COUNT(DISTINCT w.id)::int AS wordbook_count,
         COALESCE(SUM(CASE WHEN a.event_type IN ('search','ai') THEN 1 END)::int, 0) AS search_count,
@@ -830,7 +835,7 @@ app.patch('/api/admin/users/:id', requireAdmin, async (req, res) => {
   const targetId = parseInt(req.params.id);
   if (isNaN(targetId)) return res.status(400).json({ error: '잘못된 ID입니다.' });
 
-  const allowed = ['role', 'is_blocked', 'can_search', 'can_wordbook', 'can_quiz', 'can_tts', 'can_podcast'];
+  const allowed = ['role', 'is_blocked', 'can_search', 'can_wordbook', 'can_quiz', 'can_tts', 'can_podcast', 'perm_literature_compass', 'perm_digest_reading'];
   const updates = Object.entries(req.body).filter(([k]) => allowed.includes(k));
   if (!updates.length) return res.status(400).json({ error: '변경할 항목이 없습니다.' });
 
@@ -846,7 +851,7 @@ app.patch('/api/admin/users/:id', requireAdmin, async (req, res) => {
     const setClauses = updates.map(([k], i) => `${k} = $${i + 2}`).join(', ');
     const values = [targetId, ...updates.map(([, v]) => v)];
     const { rows } = await pool.query(
-      `UPDATE users SET ${setClauses} WHERE id = $1 RETURNING id, email, name, role, is_blocked, can_search, can_wordbook, can_quiz, can_tts, can_podcast`,
+      `UPDATE users SET ${setClauses} WHERE id = $1 RETURNING id, email, name, role, is_blocked, can_search, can_wordbook, can_quiz, can_tts, can_podcast, perm_literature_compass, perm_digest_reading`,
       values
     );
     if (!rows.length) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
