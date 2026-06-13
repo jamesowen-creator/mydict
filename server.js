@@ -20,6 +20,9 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
 });
+pool.on('connect', client => {
+  client.query("SET client_encoding = 'UTF8'").catch(() => {});
+});
 
 async function initDB() {
   await pool.query(`
@@ -41,6 +44,17 @@ async function initDB() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS can_podcast BOOLEAN      DEFAULT true`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS perm_literature_compass BOOLEAN DEFAULT true`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS perm_digest_reading     BOOLEAN DEFAULT true`);
+  // One-time repair: names mis-encoded as Latin-1 instead of UTF-8
+  try {
+    await pool.query(`
+      UPDATE users
+      SET name = convert_from(convert_to(name, 'LATIN1'), 'UTF8')
+      WHERE name ~ '[À-ÿ]'
+        AND name NOT SIMILAR TO '%[가-힣ぁ-んァ-ン一-龥]%'
+    `);
+  } catch (e) {
+    console.warn('[DB] name mojibake repair skipped:', e.message);
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS wordbook (

@@ -606,6 +606,7 @@
   }
 
   .word-chip-del {
+    display: none;
     color: var(--text3);
     font-size: 16px;
     line-height: 1;
@@ -614,6 +615,7 @@
     border-radius: 4px;
   }
   .word-chip-del:hover { color: var(--wrong); }
+  .wb-delete-mode .word-chip-del { display: flex; }
   .word-chip.selected { border-color: var(--accent); background: rgba(74,110,245,0.06); }
   .word-chip-check {
     width: 16px; height: 16px; flex-shrink: 0;
@@ -1635,18 +1637,17 @@
       <button class="wordbook-tab" id="wb-tab-ja" onclick="switchWordbookTab('ja')">🇯🇵 일본어</button>
       <button class="wordbook-tab" id="wb-tab-zh" onclick="switchWordbookTab('zh')">🇨🇳 중국어</button>
     </div>
-    <div style="display:flex;gap:6px;margin:10px 0 10px">
+    <div style="display:flex;gap:6px;align-items:center;margin:10px 0 10px">
       <button class="wb-sort-btn active" data-sort="abc" onclick="setWordbookSort('abc')">ABC 순</button>
       <button class="wb-sort-btn" data-sort="recent" onclick="setWordbookSort('recent')">최근 순</button>
+      <span style="flex:1"></span>
+      <button class="wb-sort-btn" id="wb-delete-mode-btn" onclick="toggleDeleteMode()">삭제 모드</button>
     </div>
     <button class="btn" onclick="podcastStart()" style="width:100%;margin-bottom:8px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);font-size:14px;padding:12px 16px">
       🎧 단어 연속 듣기
     </button>
-    <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button class="btn secondary" onclick="toggleSelectAll()" id="wb-select-all-btn" style="white-space:nowrap;font-size:12px;padding:8px 12px">전체선택</button>
-      <button class="btn" onclick="podcastStartSelected()" id="wb-selected-play-btn" style="flex:1;font-size:13px;padding:10px 12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);opacity:0.4" disabled>
-        🎧 선택한 단어 듣기 (0개)
-      </button>
+    <div id="wb-select-row" style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn secondary" onclick="enterSelectMode()" style="flex:1;font-size:13px;padding:10px 12px">🎙 선택 듣기</button>
     </div>
     <div id="wordbook-list"></div>
   </div>
@@ -1875,7 +1876,7 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-function showPage(name) {
+function showPage(name, push = true) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
@@ -1890,6 +1891,9 @@ function showPage(name) {
   if (name === 'quiz')     renderQuizStart(false);
   if (name === 'wrong')    renderWrongNote();
   if (name === 'metacog')  initMetacogPage();
+
+  _currentPage = name;
+  if (push && _backBlockInstalled) history.pushState({ page: name }, '');
 }
 
 // ─── LANGUAGE DETECTION ───────────────────────────────────────────────────────
@@ -2567,14 +2571,22 @@ let currentWordbookTab = 'en';
 let wordbookSortOrder = 'abc';
 let selectedWords = new Set();
 let currentUserName = '';
+let wordbookDeleteMode = false;
+let wordbookSelectMode = false;
+let _currentPage = 'home';
 
 function switchWordbookTab(tab) {
   currentWordbookTab = tab;
   selectedWords.clear();
+  wordbookDeleteMode = false;
+  wordbookSelectMode = false;
+  const wbList = document.getElementById('wordbook-list');
+  if (wbList) wbList.classList.remove('wb-delete-mode');
   ['en','ko','ja','zh'].forEach(function(l) {
     var el = document.getElementById('wb-tab-' + l);
     if (el) el.className = 'wordbook-tab' + (tab === l ? ' active-' + l : '');
   });
+  updateSelectRow();
   renderWordbook();
 }
 
@@ -2610,11 +2622,11 @@ function renderWordbook() {
     var key = w.word + '|' + tab;
     var isSelected = selectedWords.has(key);
     var safeWord = w.word.split("'").join("\\'");
-    return '<div class="word-chip ' + chipClass + (isSelected ? ' selected' : '') + '" onclick="searchFromWordbook(\'' + safeWord + '\', \'' + tab + '\')">' +
-      '<span style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">' +
-        '<span class="word-chip-check" onclick="event.stopPropagation();toggleWordSelect(\'' + safeWord + '\',\'' + tab + '\')">' + (isSelected ? '✓' : '') + '</span>' +
-        '<span class="word-chip-text">' + w.word + '</span>' +
-      '</span>' +
+    var clickAction = wordbookSelectMode
+      ? 'toggleWordSelect(\'' + safeWord + '\',\'' + tab + '\')'
+      : 'searchFromWordbook(\'' + safeWord + '\', \'' + tab + '\')';
+    return '<div class="word-chip ' + chipClass + (isSelected ? ' selected' : '') + '" onclick="' + clickAction + '">' +
+      '<span class="word-chip-text">' + w.word + '</span>' +
       '<span class="word-chip-del" onclick="event.stopPropagation();deleteWord(\'' + safeWord + '\', \'' + tab + '\')">×</span>' +
       '</div>';
   }
@@ -2683,7 +2695,7 @@ function updateSelectedBtn() {
   const count = tabWords.filter(w => selectedWords.has(w.word + '|' + tab)).length;
   const btn = document.getElementById('wb-selected-play-btn');
   if (btn) {
-    btn.textContent = `🎧 선택한 단어 듣기 (${count}개)`;
+    btn.textContent = `🎧 재생 (${count}개)`;
     btn.disabled = count === 0;
     btn.style.opacity = count === 0 ? '0.4' : '1';
   }
@@ -2698,6 +2710,11 @@ function podcastStartSelected() {
   const tab = currentWordbookTab;
   const words = wordbook.filter(w => (w.lang || 'en') === tab && selectedWords.has(w.word + '|' + tab));
   if (words.length === 0) { showToast('선택된 단어가 없습니다.'); return; }
+  // Exit select mode before starting playback
+  wordbookSelectMode = false;
+  selectedWords.clear();
+  updateSelectRow();
+  renderWordbook();
   if (ttsCurrentAudio) {
     ttsCurrentAudio.pause(); ttsCurrentAudio = null;
     document.querySelectorAll('.tts-btn').forEach(b => { b.textContent = '🔊'; b.classList.remove('playing'); });
@@ -2707,6 +2724,44 @@ function podcastStartSelected() {
   podcastIndex = 0; podcastAudio = null; podcastSegments = []; podcastSegIdx = 0;
   podcastPlaying = true;
   _updatePodcastBtn(); _showPodcastPlayer(); _podcastPlayFromCurrentWord();
+}
+
+function toggleDeleteMode() {
+  wordbookDeleteMode = !wordbookDeleteMode;
+  const list = document.getElementById('wordbook-list');
+  if (list) list.classList.toggle('wb-delete-mode', wordbookDeleteMode);
+  const btn = document.getElementById('wb-delete-mode-btn');
+  if (btn) {
+    btn.classList.toggle('active', wordbookDeleteMode);
+    btn.textContent = wordbookDeleteMode ? '삭제 완료' : '삭제 모드';
+  }
+}
+
+function enterSelectMode() {
+  wordbookSelectMode = true;
+  selectedWords.clear();
+  updateSelectRow();
+  renderWordbook();
+}
+
+function exitSelectMode() {
+  wordbookSelectMode = false;
+  selectedWords.clear();
+  updateSelectRow();
+  renderWordbook();
+}
+
+function updateSelectRow() {
+  const row = document.getElementById('wb-select-row');
+  if (!row) return;
+  if (wordbookSelectMode) {
+    row.innerHTML =
+      '<button class="btn secondary" onclick="toggleSelectAll()" id="wb-select-all-btn" style="white-space:nowrap;font-size:12px;padding:8px 12px">전체선택</button>' +
+      '<button class="btn" onclick="podcastStartSelected()" id="wb-selected-play-btn" style="flex:1;font-size:13px;padding:10px 12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);opacity:0.4" disabled>🎧 재생 (0개)</button>' +
+      '<button class="btn secondary" onclick="exitSelectMode()" style="font-size:12px;padding:8px 12px;white-space:nowrap">취소</button>';
+  } else {
+    row.innerHTML = '<button class="btn secondary" onclick="enterSelectMode()" style="flex:1;font-size:13px;padding:10px 12px">🎙 선택 듣기</button>';
+  }
 }
 
 function searchFromWordbook(word, lang) {
@@ -3831,6 +3886,7 @@ let podcastMode = 'word+meaning'; // 'word' | 'word+meaning' | 'full'
 let podcastRepeat = 1;
 let podcastRepeatIdx = 0;
 let podcastGap = 1.0;
+let _podcastCallId = 0;
 
 function buildPodcastSegments(entry) {
   const lang = entry.lang || 'en';
@@ -3955,12 +4011,13 @@ async function _podcastPlayNextSeg() {
   }
   const { text, lang } = podcastSegments[podcastSegIdx++];
   const key = text + ':' + lang;
+  const callId = ++_podcastCallId;
   try {
     let url = ttsMemCache[key];
     if (!url) {
       const res = await fetch('/api/tts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, lang })
       });
       if (!res.ok) throw new Error('TTS 실패');
@@ -3968,15 +4025,23 @@ async function _podcastPlayNextSeg() {
       url = URL.createObjectURL(blob);
       ttsMemCache[key] = url;
     }
-    if (!podcastPlaying) return;
+    if (!podcastPlaying || callId !== _podcastCallId) return;
     podcastAudio = new Audio(url);
     podcastAudio.playbackRate = podcastSpeed;
-    podcastAudio.onended = () => setTimeout(() => _podcastPlayNextSeg(), 450);
-    podcastAudio.onerror = () => setTimeout(() => _podcastPlayNextSeg(), 300);
+    podcastAudio.onended = () => {
+      if (callId !== _podcastCallId) return;
+      setTimeout(() => _podcastPlayNextSeg(), 450);
+    };
+    podcastAudio.onerror = () => {
+      if (callId !== _podcastCallId) return;
+      podcastAudio.onended = null;
+      setTimeout(() => _podcastPlayNextSeg(), 300);
+    };
     await podcastAudio.play();
   } catch (e) {
     console.warn('Podcast TTS error:', e);
-    if (!podcastPlaying) return;
+    if (!podcastPlaying || callId !== _podcastCallId) return;
+    if (podcastAudio) { podcastAudio.onended = null; podcastAudio.onerror = null; }
     setTimeout(() => _podcastPlayNextSeg(), 300);
   }
 }
@@ -4057,17 +4122,19 @@ function setPodcastGap(gap) {
   });
 }
 
-// ─── BACK BUTTON BLOCK ───────────────────────────────────────────────────────
+// ─── BACK BUTTON NAVIGATION ──────────────────────────────────────────────────
 let _backBlockInstalled = false;
 
 function setupBackButtonBlock() {
-  // 로그인 상태에서 뒤로가기 누르면 앱 종료 대신 현재 화면 유지
-  history.pushState({ app: 'gotcha' }, '');
+  history.replaceState({ page: 'home' }, '');
   if (_backBlockInstalled) return;
   _backBlockInstalled = true;
-  window.addEventListener('popstate', function () {
-    if (getToken()) {
-      history.pushState({ app: 'gotcha' }, '');
+  window.addEventListener('popstate', function(e) {
+    if (!getToken()) return;
+    if (e.state && e.state.page) {
+      showPage(e.state.page, false);
+    } else {
+      history.pushState({ page: _currentPage || 'home' }, '');
     }
   });
 }
