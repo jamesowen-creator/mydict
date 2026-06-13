@@ -1,4 +1,4 @@
-const CACHE_NAME = 'metis-v2';
+const CACHE_NAME = 'metis-v3';
 const STATIC_ASSETS = [
   '/',
   '/english_dictionary.html',
@@ -7,7 +7,7 @@ const STATIC_ASSETS = [
   'https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap'
 ];
 
-// Install: 정적 파일 캐싱
+// Install: 정적 파일 사전 캐싱
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
@@ -19,7 +19,7 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// Activate: 오래된 캐시 삭제
+// Activate: 이전 버전 캐시 전체 삭제
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -31,45 +31,54 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch: 캐시 우선, 없으면 네트워크
+// Fetch: HTML·JSON → network-first / 정적 자산 → cache-first
 self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // API 요청은 캐시하지 않고 바로 네트워크로
+  // API / 인증 요청은 캐시 없이 네트워크로 직접 전달
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) {
     return;
   }
 
-  // HTML 문서는 네트워크 우선 (항상 최신 버전 로드)
-  if (request.destination === 'document') {
+  const isDocument =
+    request.destination === 'document' ||
+    request.mode === 'navigate' ||
+    url.pathname.endsWith('.html');
+  const isJson = url.pathname.endsWith('.json');
+
+  // HTML 문서 + JSON 데이터: network-first → 캐시 갱신 → 오프라인 시 캐시 fallback
+  if (isDocument || isJson) {
     event.respondWith(
-      fetch(request).then(response => {
-        if (response && response.status === 200) {
-          const toCache = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, toCache));
-        }
-        return response;
-      }).catch(() => caches.match(request))
+      fetch(request)
+        .then(response => {
+          if (response && response.status === 200) {
+            caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match(request).then(cached => {
+            if (cached) return cached;
+            // HTML 요청이고 캐시도 없으면 홈 화면으로 fallback
+            if (isDocument) return caches.match('/english_dictionary.html');
+            return null;
+          })
+        )
     );
     return;
   }
 
+  // 이미지·폰트·아이콘 등 정적 자산: cache-first (성능 최적화)
   event.respondWith(
     caches.match(request).then(cached => {
       if (cached) return cached;
-
       return fetch(request).then(response => {
         if (!response || response.status !== 200 || response.type === 'opaque') {
           return response;
         }
-        const toCache = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, toCache));
+        caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
         return response;
-      }).catch(() => {
-        if (request.destination === 'document') {
-          return caches.match('/english_dictionary.html');
-        }
       });
     })
   );
