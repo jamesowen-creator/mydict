@@ -193,14 +193,16 @@ app.use(passport.session());
 // ─── Static files ─────────────────────────────────────────────────────────────
 
 app.get('/', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', 'english_dictionary.html'));
 });
 app.get('/admin', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.json')) {
+    if (filePath.endsWith('.json') || filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache');
     }
   },

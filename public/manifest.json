@@ -4,7 +4,7 @@
   "description": "A Lens for the Wisdom",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#f5f7ff",
   "theme_color": "#4a6ef5",
   "icons": [

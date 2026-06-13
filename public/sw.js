@@ -1,9 +1,9 @@
-const CACHE_NAME = 'gotcha-v14';
+const CACHE_NAME = 'metis-v2';
 const STATIC_ASSETS = [
   '/',
   '/english_dictionary.html',
   '/metis-logo-2.png',
-  '/manifest.json',
+  // manifest.json은 서버에서 no-cache로 제공 — SW 캐시 제외하여 항상 최신 상태 유지
   'https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap'
 ];
 
