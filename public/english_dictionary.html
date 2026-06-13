@@ -1760,11 +1760,12 @@ async function initAuth() {
 
   currentUserName = payload.name || '';
 
-  // Fetch fresh permissions from server
+  // Fetch fresh permissions and name from server (overrides stale JWT payload)
   try {
     const r = await fetch('/api/me', { headers: authHeaders() });
     if (r.ok) {
       userPerms = await r.json();
+      if (userPerms.name) currentUserName = userPerms.name;
       if (userPerms.is_blocked) {
         clearToken(); showLoginScreen();
         showToast('계정이 차단되었습니다. 관리자에게 문의하세요.');
