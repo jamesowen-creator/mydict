@@ -1011,6 +1011,10 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+app.use('/api/metacong', require('./routes/metacong'));
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 app.listen(PORT, () => {
   console.log(`사전 서버 실행 중: http://localhost:${PORT}`);
 });

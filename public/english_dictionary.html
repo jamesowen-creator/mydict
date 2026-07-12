@@ -102,6 +102,22 @@
   }
   .nav-tab:hover:not(.active) { color: var(--text); }
 
+  .nav-tab-metacong {
+    padding: 14px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all 0.2s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+  }
+  .nav-tab-metacong:hover { border-bottom-color: var(--accent3); }
+
   .badge {
     display: inline-block;
     background: var(--accent2);
@@ -1566,6 +1582,7 @@
     <button class="nav-tab" onclick="showPage('quiz')">퀴즈</button>
     <button class="nav-tab" onclick="showPage('metacog')">복습</button>
     <button class="nav-tab" onclick="showPage('wrong')">오답노트 <span class="badge" id="wrong-count">0</span></button>
+    <button class="nav-tab-metacong" onclick="openMetaCong()">🧠 MetaCong 학습</button>
   </div>
 </nav>
 
@@ -1736,6 +1753,12 @@ function parseJwt(token) {
 function authHeaders() {
   const t = getToken();
   return t ? { 'Authorization': 'Bearer ' + t } : {};
+}
+
+// ─── METACONG ─────────────────────────────────────────────────────────────────
+function openMetaCong() {
+  const token = getToken();
+  window.location.href = token ? '/metacong/?token=' + encodeURIComponent(token) : '/metacong/';
 }
 
 let userPerms = null;
