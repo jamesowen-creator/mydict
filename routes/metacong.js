@@ -55,9 +55,12 @@ function toDateString(value) {
 const PROMPTS_DIR = path.join(__dirname, '..', 'prompts');
 const PROMPT_FILES = {
   question: 'question.md',
+  question_level1: 'question_level1.md',
+  question_level3: 'question_level3.md',
   feedback: 'feedback.md',
   summary: 'summary.md',
   overview: 'overview.md',
+  subtopics: 'subtopics.md',
 };
 
 function loadPrompt(type) {
@@ -65,13 +68,43 @@ function loadPrompt(type) {
   return fs.readFileSync(filePath, 'utf-8');
 }
 
+function buildLevel3UserMessage(body) {
+  const standardsBlock = (body.standards || [])
+    .map((s, idx) =>
+      [
+        `${idx + 1}. 성취기준 코드: ${s.code}`,
+        `   성취기준 내용: ${s.achievement_standard}`,
+        ...(s.explanation ? [`   해설: ${s.explanation}`] : []),
+        ...(s.sub_topics && s.sub_topics.length > 0 ? [`   세부 주제: ${s.sub_topics.join(', ')}`] : []),
+      ].join('\n')
+    )
+    .join('\n\n');
+
+  return [
+    '[영역 정보]',
+    `과목: ${body.subject}`,
+    `영역: ${body.domain}`,
+    '',
+    '[영역에 속한 성취기준 목록]',
+    standardsBlock,
+  ].join('\n');
+}
+
 function buildUserMessage(body) {
+  if (body.type === 'question_level3') {
+    return buildLevel3UserMessage(body);
+  }
+
   const header = [
     '[성취기준 정보]',
     `과목: ${body.subject}`,
     `영역: ${body.domain}`,
     `성취기준 코드: ${body.standard_code}`,
     `성취기준 내용: ${body.achievement_standard}`,
+    ...(body.explanation ? [`성취기준 해설: ${body.explanation}`] : []),
+    ...(body.sub_topics && body.sub_topics.length > 0
+      ? [`세부 주제 목록: ${body.sub_topics.join(', ')}`]
+      : []),
   ].join('\n');
 
   switch (body.type) {
@@ -85,14 +118,28 @@ function buildUserMessage(body) {
         '(제공되지 않음 - 성취기준을 바탕으로 개요를 생성해주세요)'
       }`;
     case 'question':
+    case 'question_level1':
     default:
       return header;
   }
 }
 
 function isValidChatBody(body) {
-  const validTypes = ['question', 'feedback', 'summary', 'overview'];
+  const validTypes = [
+    'question',
+    'question_level1',
+    'question_level3',
+    'feedback',
+    'summary',
+    'overview',
+    'subtopics',
+  ];
   if (!body.type || !validTypes.includes(body.type)) return false;
+
+  if (body.type === 'question_level3') {
+    return Boolean(body.domain && body.subject && body.standards && body.standards.length > 0);
+  }
+
   if (!body.standard_code || !body.achievement_standard || !body.domain || !body.subject) {
     return false;
   }
@@ -160,7 +207,12 @@ router.post('/chat', async (req, res) => {
     return res.status(500).json({ error: '알 수 없는 오류가 발생했습니다.' });
   }
 
-  if (body.type === 'question' || body.type === 'overview') {
+  if (
+    body.type === 'question' ||
+    body.type === 'question_level1' ||
+    body.type === 'question_level3' ||
+    body.type === 'overview'
+  ) {
     return res.status(200).json({ result: rawText.trim() });
   }
 
@@ -181,7 +233,7 @@ router.post('/chat', async (req, res) => {
     });
   }
 
-  // summary — 프롬프트가 최종 JSON 스키마를 강제하므로 검증만 하고 그대로 result에 담아 돌려준다.
+  // summary / subtopics — 프롬프트가 최종 JSON 스키마를 강제하므로 검증만 하고 그대로 result에 담아 돌려준다.
   const jsonText = extractJson(rawText);
   try {
     JSON.parse(jsonText);
@@ -207,7 +259,9 @@ router.get('/standards', async (req, res) => {
          a.achievement_standard,
          COALESCE(p.progress_percent, 0) AS progress_percent,
          COALESCE(p.interval_stage, 0) AS interval_stage,
-         p.next_review_date
+         p.next_review_date,
+         a.sub_topics,
+         a.explanation
        FROM achievement_standards a
        LEFT JOIN user_progress p
          ON p.standard_code = a.code AND p.user_id = $1
@@ -225,6 +279,8 @@ router.get('/standards', async (req, res) => {
       progress_percent: row.progress_percent,
       interval_stage: row.interval_stage,
       next_review_date: toDateString(row.next_review_date),
+      sub_topics: row.sub_topics,
+      explanation: row.explanation,
     }));
 
     res.status(200).json({ standards });
