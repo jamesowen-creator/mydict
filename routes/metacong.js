@@ -20,6 +20,9 @@ const pool = new Pool({
 
 const LOCAL_USER_ID = 'local'; // Phase 2에서 JWT 사용자 ID로 교체 예정
 
+// 저장된 질문을 재사용할 확률 — 나머지는 새로 생성해 다양성을 유지한다.
+const QUESTION_REUSE_PROBABILITY = 0.7;
+
 // ─── 간격 반복 계산 (spaced-rep.ts 이식) ──────────────────────────────────────
 
 const INTERVAL_DAYS = [1, 3, 7, 21, 60];
@@ -157,6 +160,101 @@ function extractJson(text) {
   return trimmed.slice(start, end + 1);
 }
 
+// ─── 질문 은행 (questions 테이블 캐시 로직 이식 — src/lib/db.ts, api/chat.ts) ──────
+
+/** question/question_level1/question_level3만 질문 은행 캐시 대상이다. 그 외는 null. */
+function questionLevelOf(type) {
+  if (type === 'question_level1') return 1;
+  if (type === 'question') return 2;
+  if (type === 'question_level3') return 3;
+  return null;
+}
+
+/** Level 3 캐시 키(표준화된 성취기준 코드 조합) — 정렬해서 항상 같은 순서로 비교·저장한다. */
+function sortedLevel3Codes(body) {
+  return (body.standards || []).map((s) => s.code).sort();
+}
+
+/** 해당 성취기준·레벨로 저장된 질문 중 하나를 무작위로 반환한다. 없으면 null. */
+async function getReusableQuestion(standardCode, level) {
+  const { rows } = await pool.query(
+    `SELECT id, question_text FROM questions
+     WHERE standard_code = $1 AND level = $2
+     ORDER BY RANDOM()
+     LIMIT 1`,
+    [standardCode, level]
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Level 3(종합) 질문은 성취기준 하나가 아니라 domain 안의 여러 성취기준 조합이 캐시 키다.
+ * related_codes를 정렬한 배열로 저장하므로, 조회할 때도 정렬한 배열을 그대로 비교한다.
+ */
+async function getReusableLevel3Question(sortedRelatedCodes) {
+  const { rows } = await pool.query(
+    `SELECT id, question_text FROM questions
+     WHERE level = 3 AND related_codes = $1::text[]
+     ORDER BY RANDOM()
+     LIMIT 1`,
+    [sortedRelatedCodes]
+  );
+  return rows[0] || null;
+}
+
+/** 생성된 질문을 질문 은행에 저장하고 생성된 id를 반환한다. */
+async function saveQuestion(standardCode, level, questionText, relatedCodes) {
+  const { rows } = await pool.query(
+    `INSERT INTO questions (standard_code, level, question_text, related_codes)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id`,
+    [standardCode, level, questionText, relatedCodes || null]
+  );
+  return rows[0].id;
+}
+
+/** 질문 은행에서 재사용된 질문의 used_count를 1 증가시킨다. */
+async function incrementQuestionUsage(questionId) {
+  await pool.query('UPDATE questions SET used_count = used_count + 1 WHERE id = $1', [questionId]);
+}
+
+/**
+ * 저장된 질문이 있으면 확률적으로 재사용한다. 재사용하면 Anthropic 호출 없이 바로 반환하고,
+ * 재사용하지 않기로 하거나(다양성 유지) 저장된 질문이 없으면 null을 반환해 새로 생성하게 한다.
+ * DB 조회 자체가 실패해도 캐시는 최적화일 뿐이므로 새로 생성하는 쪽으로 넘어간다(fail open).
+ */
+async function tryReuseCachedQuestion(body, level) {
+  try {
+    const cached =
+      level === 3
+        ? await getReusableLevel3Question(sortedLevel3Codes(body))
+        : await getReusableQuestion(body.standard_code, level);
+
+    if (!cached) return null;
+    if (Math.random() >= QUESTION_REUSE_PROBABILITY) return null;
+
+    await incrementQuestionUsage(cached.id);
+    return cached.question_text;
+  } catch (err) {
+    console.error('질문 캐시 조회 실패, 새로 생성합니다:', err);
+    return null;
+  }
+}
+
+/** 새로 생성된 질문을 질문 은행에 저장한다. 저장 실패는 응답 자체를 막지 않는다. */
+async function saveGeneratedQuestion(body, level, questionText) {
+  try {
+    if (level === 3) {
+      const sortedCodes = sortedLevel3Codes(body);
+      await saveQuestion(sortedCodes[0], level, questionText, sortedCodes);
+    } else {
+      await saveQuestion(body.standard_code, level, questionText);
+    }
+  } catch (err) {
+    console.error('질문 저장 실패 (응답 자체는 정상 반환):', err);
+  }
+}
+
 // ─── POST /api/metacong/chat ──────────────────────────────────────────────────
 
 router.post('/chat', async (req, res) => {
@@ -168,6 +266,15 @@ router.post('/chat', async (req, res) => {
   const body = req.body || {};
   if (!isValidChatBody(body)) {
     return res.status(400).json({ error: '요청 형식이 올바르지 않습니다.' });
+  }
+
+  const level = questionLevelOf(body.type);
+
+  if (level !== null) {
+    const reused = await tryReuseCachedQuestion(body, level);
+    if (reused !== null) {
+      return res.status(200).json({ result: reused });
+    }
   }
 
   let systemPrompt;
@@ -213,7 +320,13 @@ router.post('/chat', async (req, res) => {
     body.type === 'question_level3' ||
     body.type === 'overview'
   ) {
-    return res.status(200).json({ result: rawText.trim() });
+    const trimmed = rawText.trim();
+
+    if (level !== null) {
+      await saveGeneratedQuestion(body, level, trimmed);
+    }
+
+    return res.status(200).json({ result: trimmed });
   }
 
   if (body.type === 'feedback') {
