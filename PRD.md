@@ -5,7 +5,7 @@
 Claude AI를 기반으로 한 영어 단어 / 상용구 검색 웹 서비스.  
 기존 사전 앱과 달리 AI가 문맥에 맞는 한국어 뜻·예문·어원을 즉시 생성하여 제공한다.
 
-- **서비스 URL:** https://mydict-production.up.railway.app
+- **서비스 URL:** https://mydict-production-68cb.up.railway.app
 - **현재 버전:** 1.0.0
 - **배포 환경:** Railway (Node.js)
 
