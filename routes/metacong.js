@@ -21,7 +21,7 @@ const pool = new Pool({
 const LOCAL_USER_ID = 'local'; // Phase 2에서 JWT 사용자 ID로 교체 예정
 
 // 저장된 질문을 재사용할 확률 — 나머지는 새로 생성해 다양성을 유지한다.
-const QUESTION_REUSE_PROBABILITY = 0.7;
+const QUESTION_REUSE_PROBABILITY = 0.95;
 
 // ─── 간격 반복 계산 (spaced-rep.ts 이식) ──────────────────────────────────────
 
@@ -175,11 +175,11 @@ function sortedLevel3Codes(body) {
   return (body.standards || []).map((s) => s.code).sort();
 }
 
-/** 해당 성취기준·레벨로 저장된 질문 중 하나를 무작위로 반환한다. 없으면 null. */
+/** 해당 성취기준·레벨로 저장된 승인(approved) 질문 중 하나를 무작위로 반환한다. 없으면 null. */
 async function getReusableQuestion(standardCode, level) {
   const { rows } = await pool.query(
     `SELECT id, question_text FROM questions
-     WHERE standard_code = $1 AND level = $2
+     WHERE standard_code = $1 AND level = $2 AND status = 'approved'
      ORDER BY RANDOM()
      LIMIT 1`,
     [standardCode, level]
@@ -194,7 +194,7 @@ async function getReusableQuestion(standardCode, level) {
 async function getReusableLevel3Question(sortedRelatedCodes) {
   const { rows } = await pool.query(
     `SELECT id, question_text FROM questions
-     WHERE level = 3 AND related_codes = $1::text[]
+     WHERE level = 3 AND related_codes = $1::text[] AND status = 'approved'
      ORDER BY RANDOM()
      LIMIT 1`,
     [sortedRelatedCodes]
@@ -216,6 +216,24 @@ async function saveQuestion(standardCode, level, questionText, relatedCodes) {
 /** 질문 은행에서 재사용된 질문의 used_count를 1 증가시킨다. */
 async function incrementQuestionUsage(questionId) {
   await pool.query('UPDATE questions SET used_count = used_count + 1 WHERE id = $1', [questionId]);
+}
+
+/** 질문을 승인(approved) 처리해 캐시 재사용 대상에 포함시킨다. */
+async function approveQuestion(questionId, note) {
+  await pool.query(
+    `UPDATE questions SET status = 'approved', verified_at = NOW(), verification_note = $1
+     WHERE id = $2`,
+    [note || null, questionId]
+  );
+}
+
+/** 질문을 반려(rejected) 처리해 캐시 재사용 대상에서 제외한다. */
+async function rejectQuestion(questionId, note) {
+  await pool.query(
+    `UPDATE questions SET status = 'rejected', verified_at = NOW(), verification_note = $1
+     WHERE id = $2`,
+    [note || null, questionId]
+  );
 }
 
 /**
