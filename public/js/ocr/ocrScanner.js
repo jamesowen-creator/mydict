@@ -1,0 +1,16 @@
+import { captureLiveFrame } from './liveFrameCapture.js';
+import { createLiveEnglishOcrSession } from './liveEnglishOcrSession.js';
+import { extractLiveEnglishCandidates } from './extractEnglishCandidates.js';
+import { projectOverlayRect } from './liveOverlayGeometry.js';
+
+export function createOcrScanner(root) {
+  const video = root.querySelector('[data-ocr-video]'), canvas = root.querySelector('[data-ocr-canvas]'), overlay = root.querySelector('[data-ocr-overlay]'), list = root.querySelector('[data-ocr-candidates]');
+  const state = { stream: null, session: null, timer: null, busy: false, paused: false, history: [], cursor: -1 };
+  const guide = { left: .12, top: .32, width: .76, height: .28 };
+  function render(words = []) { list.innerHTML = words.map(w => `<button type="button" class="ocr-candidate">${w.text}</button>`).join(''); list.querySelectorAll('button').forEach(b => b.onclick = () => { list.querySelectorAll('button').forEach(x => x.classList.remove('selected')); b.classList.add('selected'); }); overlay.innerHTML = words.map(w => { const r = projectOverlayRect(w.bbox, video, overlay, guide); return r ? `<span class="ocr-box" style="left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px">${w.text}</span>` : ''; }).join(''); }
+  function renderHistory() { render(state.history[state.cursor] || []); }
+  async function scan() { if (state.busy || state.paused || !state.session) return; state.busy = true; try { const blob = await captureLiveFrame(video, canvas, guide); const data = await state.session.recognize(blob); const words = extractLiveEnglishCandidates(data); if (words.length) { state.history = [...state.history, words].slice(-10); state.cursor = state.history.length - 1; render(words); } } catch (e) { root.querySelector('[data-ocr-error]').textContent = e.message; } finally { state.busy = false; } }
+  async function start() { try { state.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }); video.srcObject = state.stream; await video.play(); const track = state.stream.getVideoTracks()[0], caps = track.getCapabilities?.() || {}; const torch = root.querySelector('[data-ocr-torch]'); if (caps.torch) { torch.hidden = false; torch.onclick = () => { const on = torch.dataset.on === '1'; track.applyConstraints({ advanced: [{ torch: !on }] }); torch.dataset.on = on ? '0' : '1'; }; } state.session = await createLiveEnglishOcrSession(); state.timer = setInterval(scan, 2000); scan(); } catch (e) { root.querySelector('[data-ocr-error]').textContent = e.message; } }
+  function stop() { clearInterval(state.timer); state.timer = null; state.stream?.getTracks().forEach(t => t.stop()); state.stream = null; video.srcObject = null; state.session?.terminate(); state.session = null; }
+  root.querySelector('[data-ocr-close]').onclick = stop; root.querySelector('[data-ocr-pause]').onclick = e => { state.paused = !state.paused; e.currentTarget.textContent = state.paused ? '재생' : '일시정지'; }; root.querySelector('[data-ocr-prev]').onclick = () => { if (state.cursor > 0) { state.cursor--; renderHistory(); } }; root.querySelector('[data-ocr-next]').onclick = () => { if (state.cursor < state.history.length - 1) { state.cursor++; renderHistory(); } }; start(); return { stop };
+}

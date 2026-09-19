@@ -1550,6 +1550,7 @@
     font-weight: 700;
   }
 
+  .ocr-scanner{position:fixed;inset:0;z-index:500;background:#111;color:#fff;padding:16px;overflow:auto}.ocr-preview{position:relative;max-width:720px;margin:40px auto 16px;aspect-ratio:16/10;background:#000;overflow:hidden}.ocr-preview video{width:100%;height:100%;object-fit:cover}.ocr-guide{position:absolute;left:12%;top:32%;width:76%;height:28%;border:2px solid #4a6ef5;border-radius:12px}.ocr-overlay{position:absolute;inset:0}.ocr-box{position:absolute;border:2px solid #16a34a;color:#fff;background:#16a34a66;font-size:12px}.ocr-actions,.ocr-candidates{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.ocr-actions button,.ocr-candidate{padding:8px 12px;border:1px solid #667;border-radius:8px;background:#fff;color:#111}.ocr-candidate.selected{background:#4a6ef5;color:#fff}.ocr-error{text-align:center;color:#ff9b9b}
 </style>
 </head>
 <body>
@@ -4175,6 +4176,21 @@ if ('serviceWorker' in navigator) {
       .catch(err => console.warn('[SW] 등록 실패:', err));
   });
 }
+</script>
+<section id="ocr-scanner" class="ocr-scanner" hidden aria-label="Live OCR scanner">
+  <div class="ocr-preview"><video data-ocr-video playsinline muted></video><div class="ocr-guide"></div><div data-ocr-overlay class="ocr-overlay"></div><canvas data-ocr-canvas hidden></canvas></div>
+  <div class="ocr-actions"><button data-ocr-close type="button">종료</button><button data-ocr-torch type="button" hidden>조명</button><button data-ocr-prev type="button">이전</button><button data-ocr-pause type="button">일시정지</button><button data-ocr-next type="button">다음</button></div>
+  <div data-ocr-candidates class="ocr-candidates"></div><p data-ocr-error class="ocr-error" role="status"></p>
+</section>
+<button id="ocr-open" type="button" style="position:fixed;right:16px;bottom:72px;z-index:120;padding:10px 14px;border:0;border-radius:999px;background:var(--accent);color:#fff">OCR 스캔</button>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="/js/ocr/ocrScanner.js" type="module"></script>
+<script type="module">
+  import { createOcrScanner } from '/js/ocr/ocrScanner.js';
+  const panel = document.getElementById('ocr-scanner');
+  let scanner;
+  document.getElementById('ocr-open').onclick = () => { panel.hidden = false; scanner = createOcrScanner(panel); };
+  panel.querySelector('[data-ocr-close]').onclick = () => { scanner?.stop(); panel.hidden = true; };
 </script>
 </body>
 </html>
