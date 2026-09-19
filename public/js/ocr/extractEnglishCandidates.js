@@ -22,12 +22,19 @@ function normalizeToken(raw) {
   return normalizeWord(raw.replace(/[‐‑‒–—―]/g, '-').replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, ''));
 }
 
-function isCandidateWord(word) {
+// `wordSet` is our own addition on top of the metis2-app port: metis2-app has no real
+// dictionary-membership check anywhere (confirmed by reading lib/wordValidation.ts and
+// lib/aiWordSearchResolution.ts - both are pattern/plausibility heuristics only, and the
+// project has no bundled word list or dictionary API). It's an optional trailing arg so
+// metis2-app's own test fixtures (which call these functions without it) still pass
+// unchanged when it's omitted.
+function isCandidateWord(word, wordSet) {
   if (word.length < 2 || word.length > 30) return false;
   if (!/^[a-z]+(?:-[a-z]+)?$/.test(word)) return false;
   if (word.includes('-') && word.split('-').some((part) => part.length < 2)) return false;
   if (/(.)\1{2,}/.test(word)) return false;
   if (!isSupportedWordInput(word) || stopwords.has(word)) return false;
+  if (wordSet && !wordSet.has(word)) return false;
   return /[aeiou]/.test(word) || (word.length >= 3 && word.slice(1).includes('y'));
 }
 
@@ -62,7 +69,7 @@ function calculateProximityScore(bbox, imageSize) {
   return Math.round((1 - normalizedDistance) * 12);
 }
 
-export function rankEnglishCandidates(text, structuredTokens, imageSize) {
+export function rankEnglishCandidates(text, structuredTokens, imageSize, wordSet) {
   const tokens = structuredTokens?.length
     ? structuredTokens
     : (text || '').split(/\s+/).filter(Boolean).map((token) => ({ text: token }));
@@ -70,7 +77,7 @@ export function rankEnglishCandidates(text, structuredTokens, imageSize) {
 
   tokens.forEach((token, index) => {
     const word = normalizeToken(token.text);
-    if (!isCandidateWord(word)) return;
+    if (!isCandidateWord(word, wordSet)) return;
     const current = grouped.get(word) ?? { firstIndex: index, occurrences: 0, confidences: [], proximityScores: [], phrase: false };
     current.occurrences += 1;
     if (typeof token.confidence === 'number' && Number.isFinite(token.confidence)) current.confidences.push(Math.max(0, Math.min(100, token.confidence)));
@@ -82,7 +89,7 @@ export function rankEnglishCandidates(text, structuredTokens, imageSize) {
   for (let index = 0; index < tokens.length - 1; index += 1) {
     const first = normalizeToken(tokens[index].text);
     const second = normalizeToken(tokens[index + 1].text);
-    if (!isCandidateWord(first) || !isCandidateWord(second)) continue;
+    if (!isCandidateWord(first, wordSet) || !isCandidateWord(second, wordSet)) continue;
     const phrase = `${first} ${second}`;
     const current = grouped.get(phrase) ?? { firstIndex: index, occurrences: 0, confidences: [], proximityScores: [], phrase: true };
     current.occurrences += 1;
@@ -128,8 +135,8 @@ export function rankEnglishCandidates(text, structuredTokens, imageSize) {
     .map(({ word, score, confidence, occurrences, proximityScore }) => ({ word, score, confidence, occurrences, proximityScore }));
 }
 
-export function extractEnglishCandidates(text, structuredTokens, imageSize) {
-  return rankEnglishCandidates(text, structuredTokens, imageSize).slice(0, 12).map(({ word }) => word);
+export function extractEnglishCandidates(text, structuredTokens, imageSize, wordSet) {
+  return rankEnglishCandidates(text, structuredTokens, imageSize, wordSet).slice(0, 12).map(({ word }) => word);
 }
 
 function filterLiveCandidates(ranked) {
@@ -140,20 +147,39 @@ function filterLiveCandidates(ranked) {
 }
 
 // Matches metis2-app's extractLiveEnglishCandidates(text, structuredTokens, imageSize)
-// signature exactly (word strings only) so its test fixtures can be reused verbatim.
-export function extractLiveEnglishCandidates(text, structuredTokens, imageSize) {
-  return filterLiveCandidates(rankEnglishCandidates(text, structuredTokens, imageSize)).map(({ word }) => word);
+// signature exactly (word strings only, wordSet omitted) so its test fixtures can be
+// reused verbatim.
+export function extractLiveEnglishCandidates(text, structuredTokens, imageSize, wordSet) {
+  return filterLiveCandidates(rankEnglishCandidates(text, structuredTokens, imageSize, wordSet)).map(({ word }) => word);
+}
+
+// Real-dictionary-membership check (metis3-app addition, not present in metis2-app).
+// Loaded lazily and only once per page load; 274k-word MIT-licensed list from the
+// "word-list" npm package (public/data/ocr-word-list.txt + companion LICENSE file).
+// Falls back to `null` (no filtering) if the fetch fails, e.g. offline, so a network
+// hiccup degrades to the old alphabetic-pattern-only behavior instead of breaking OCR.
+let wordSetPromise = null;
+export function preloadEnglishWordSet() {
+  wordSetPromise ??= fetch('/data/ocr-word-list.txt')
+    .then((response) => (response.ok ? response.text() : Promise.reject(new Error(`HTTP ${response.status}`))))
+    .then((text) => new Set(text.split('\n').map((word) => word.trim()).filter(Boolean)))
+    .catch((error) => {
+      console.warn(`[OCR] English word list failed to load, falling back to pattern-only filtering: ${error.message}`);
+      return null;
+    });
+  return wordSetPromise;
 }
 
 // ocrScanner.js-facing adapter: takes the raw Tesseract.js `recognize()` result
 // (`data.words`, each with text/confidence/bbox) plus the captured frame's pixel size
 // for the center-proximity weighting, and returns {text, confidence, bbox} entries so
 // the caller can still render overlay boxes and candidate buttons unchanged.
-export function deriveLiveOcrCandidates(data, imageSize) {
+export async function deriveLiveOcrCandidates(data, imageSize) {
+  const wordSet = await preloadEnglishWordSet();
   const rawWords = data?.words || [];
   const tokens = rawWords.map((w) => ({ text: String(w.text ?? ''), confidence: Number(w.confidence), bbox: w.bbox }));
   const text = typeof data?.text === 'string' ? data.text : '';
-  const ranked = filterLiveCandidates(rankEnglishCandidates(text, tokens, imageSize));
+  const ranked = filterLiveCandidates(rankEnglishCandidates(text, tokens, imageSize, wordSet));
   return ranked.map(({ word, confidence }) => {
     const source = rawWords.find((w) => normalizeToken(String(w.text ?? '')) === word);
     return { text: word, confidence: confidence ?? 0, bbox: source?.bbox };

@@ -1,6 +1,6 @@
 import { captureLiveFrame } from './liveFrameCapture.js';
 import { createLiveEnglishOcrSession } from './liveEnglishOcrSession.js';
-import { deriveLiveOcrCandidates } from './extractEnglishCandidates.js';
+import { deriveLiveOcrCandidates, preloadEnglishWordSet } from './extractEnglishCandidates.js';
 import { projectOverlayRect } from './liveOverlayGeometry.js';
 
 const PLAY_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5.14v13.72c0 .79.87 1.27 1.54.84L20.3 12.84a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14Z"/></svg>';
@@ -79,7 +79,7 @@ export function createOcrScanner(root, { onSelect } = {}) {
       const blob = await captureLiveFrame(video, canvas, guide);
       const imageSize = { width: canvas.width, height: canvas.height };
       const data = await state.session.recognize(blob);
-      const words = deriveLiveOcrCandidates(data, imageSize);
+      const words = await deriveLiveOcrCandidates(data, imageSize);
       if (words.length) {
         recordHistory(words);
         render(words);
@@ -95,6 +95,7 @@ export function createOcrScanner(root, { onSelect } = {}) {
 
   async function start() {
     showError('');
+    void preloadEnglishWordSet(); // kick off in parallel with the camera prompt below
     try {
       state.stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
