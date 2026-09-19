@@ -1550,7 +1550,44 @@
     font-weight: 700;
   }
 
-  .ocr-scanner{position:fixed;inset:0;z-index:500;background:#111;color:#fff;padding:16px;overflow:auto}.ocr-preview{position:relative;max-width:720px;margin:40px auto 16px;aspect-ratio:16/10;background:#000;overflow:hidden}.ocr-preview video{width:100%;height:100%;object-fit:cover}.ocr-guide{position:absolute;left:12%;top:32%;width:76%;height:28%;border:2px solid #4a6ef5;border-radius:12px}.ocr-overlay{position:absolute;inset:0}.ocr-box{position:absolute;border:2px solid #16a34a;color:#fff;background:#16a34a66;font-size:12px}.ocr-actions,.ocr-candidates{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.ocr-actions button,.ocr-candidate{padding:8px 12px;border:1px solid #667;border-radius:8px;background:#fff;color:#111}.ocr-candidate.selected{background:#4a6ef5;color:#fff}.ocr-error{text-align:center;color:#ff9b9b}
+  /* Colors/layout matched against C:\dev\metis2-app components/english/LiveOcrScanner.tsx
+     (metis3-app has no earlier commit with this design; metis2-app is the verified source). */
+  .ocr-scanner{--ocr-void:#0d0d10;--ocr-ember:#e2583b;--ocr-ember-deep:#b8442e;--ocr-text1:#f5f2ed;--ocr-text2:#9a968e;position:fixed;inset:0;z-index:500;background:var(--ocr-void);color:var(--ocr-text1);display:flex;flex-direction:column}
+  .ocr-scanner[hidden]{display:none}
+  .ocr-topbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:16px 20px;flex:none}
+  .ocr-topbar-left{display:flex;align-items:center;gap:4px}
+  .ocr-close-btn{padding:8px 14px;border:none;border-radius:999px;background:transparent;color:var(--ocr-text1);font-size:14px;font-weight:700}
+  .ocr-torch-btn{padding:8px 10px;border:none;background:transparent;color:rgba(245,242,237,.9);font-size:13px;font-weight:700}
+  .ocr-torch-btn.active{color:#ff9b87}
+  .ocr-live-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;border:1px solid rgba(226,88,59,.5);background:rgba(226,88,59,.1);color:#f17c63;font-size:12px;font-weight:800;letter-spacing:.08em}
+  .ocr-live-dot{width:6px;height:6px;border-radius:50%;background:var(--ocr-ember);box-shadow:0 0 0 3px rgba(226,88,59,.25);animation:ocr-live-pulse 1.8s ease-in-out infinite}
+  @keyframes ocr-live-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.85)}}
+  .ocr-preview{position:relative;flex:1;min-height:0;overflow:hidden;background:var(--ocr-void)}
+  .ocr-preview video{width:100%;height:100%;object-fit:cover;display:block}
+  .ocr-guide{position:absolute;left:50%;top:50%;width:min(78vw,280px);height:224px;transform:translate(-50%,-50%);pointer-events:none;opacity:1;transition:opacity .3s;z-index:20}
+  .ocr-guide.camera-open{opacity:.75}
+  .ocr-corner{position:absolute;width:28px;height:28px;border:2.5px solid var(--ocr-ember)}
+  .ocr-corner-tl{left:0;top:0;border-right:0;border-bottom:0;border-radius:8px 0 0 0}
+  .ocr-corner-tr{right:0;top:0;border-left:0;border-bottom:0;border-radius:0 8px 0 0}
+  .ocr-corner-bl{left:0;bottom:0;border-right:0;border-top:0;border-radius:0 0 0 8px}
+  .ocr-corner-br{right:0;bottom:0;border-left:0;border-top:0;border-radius:0 0 8px 0}
+  .ocr-laser{position:absolute;left:7%;right:7%;height:2px;background:linear-gradient(90deg,transparent,#ff8a70,transparent);box-shadow:0 0 14px 2px var(--ocr-ember);animation:ocr-scanner-laser 2.1s cubic-bezier(.45,0,.55,1) infinite}
+  .ocr-laser.is-paused{animation-play-state:paused;opacity:.4}
+  @keyframes ocr-scanner-laser{0%,100%{top:8%;opacity:.72}50%{top:92%;opacity:1}}
+  .ocr-overlay{position:absolute;inset:0;z-index:15}
+  .ocr-box{position:absolute;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.05);border-radius:4px}
+  .ocr-candidates{position:absolute;right:12px;top:30%;z-index:20;display:flex;flex-direction:column;gap:4px;width:142px;max-height:calc(100% - 12rem);overflow-y:auto}
+  .ocr-candidate{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 10px;border:1px solid rgba(255,255,255,.2);border-radius:8px;background:rgba(0,0,0,.15);backdrop-filter:blur(4px);color:rgba(255,255,255,.8);font-size:11px;font-weight:500;text-align:left}
+  .ocr-candidate span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ocr-candidate::after{content:'\203a';color:rgba(255,255,255,.45);font-weight:500;flex:none}
+  .ocr-candidate.selected{box-shadow:0 0 0 1px rgba(255,255,255,.65) inset}
+  .ocr-controls{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:25;display:flex;align-items:center;gap:16px}
+  .ocr-circle-btn{width:56px;height:56px;border-radius:50%;border:1px solid rgba(255,155,135,.7);background:rgba(9,10,12,.75);color:var(--ocr-text1);box-shadow:0 0 18px -4px rgba(226,88,59,.8);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center}
+  .ocr-circle-btn:disabled{opacity:.4}
+  .ocr-circle-btn[hidden]{display:none}
+  .ocr-error{position:absolute;left:50%;top:calc(50% + 4.5rem);transform:translateX(-50%);width:16rem;text-align:center;font-size:12px;line-height:1.4;color:#ffb7ad;z-index:25}
+  .ocr-error:empty{display:none}
+  .ocr-open-btn{position:fixed;right:16px;bottom:72px;z-index:120;padding:10px 14px;border:0;border-radius:999px;background:var(--accent);color:#fff}
 </style>
 </head>
 <body>
@@ -4178,19 +4215,52 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <section id="ocr-scanner" class="ocr-scanner" hidden aria-label="Live OCR scanner">
-  <div class="ocr-preview"><video data-ocr-video playsinline muted></video><div class="ocr-guide"></div><div data-ocr-overlay class="ocr-overlay"></div><canvas data-ocr-canvas hidden></canvas></div>
-  <div class="ocr-actions"><button data-ocr-close type="button">종료</button><button data-ocr-torch type="button" hidden>조명</button><button data-ocr-prev type="button">이전</button><button data-ocr-pause type="button">일시정지</button><button data-ocr-next type="button">다음</button></div>
-  <div data-ocr-candidates class="ocr-candidates"></div><p data-ocr-error class="ocr-error" role="status"></p>
+  <div class="ocr-topbar">
+    <div class="ocr-topbar-left">
+      <button data-ocr-close type="button" class="ocr-close-btn">종료</button>
+      <button data-ocr-torch type="button" class="ocr-torch-btn" hidden>조명</button>
+    </div>
+    <span class="ocr-live-badge"><span class="ocr-live-dot"></span>LIVE OCR</span>
+  </div>
+  <div class="ocr-preview">
+    <video data-ocr-video playsinline muted></video>
+    <div data-ocr-overlay class="ocr-overlay"></div>
+    <canvas data-ocr-canvas hidden></canvas>
+    <div data-ocr-candidates class="ocr-candidates"></div>
+  </div>
+  <div data-ocr-guide class="ocr-guide">
+    <span class="ocr-corner ocr-corner-tl"></span>
+    <span class="ocr-corner ocr-corner-tr"></span>
+    <span class="ocr-corner ocr-corner-bl"></span>
+    <span class="ocr-corner ocr-corner-br"></span>
+    <span data-ocr-laser class="ocr-laser"></span>
+  </div>
+  <div class="ocr-controls">
+    <button data-ocr-prev type="button" class="ocr-circle-btn" aria-label="이전 후보" hidden>&#8249;</button>
+    <button data-ocr-capture type="button" class="ocr-circle-btn" aria-label="시작"></button>
+    <button data-ocr-next type="button" class="ocr-circle-btn" aria-label="다음 후보" hidden>&#8250;</button>
+  </div>
+  <p data-ocr-error class="ocr-error" role="status"></p>
 </section>
-<button id="ocr-open" type="button" style="position:fixed;right:16px;bottom:72px;z-index:120;padding:10px 14px;border:0;border-radius:999px;background:var(--accent);color:#fff">OCR 스캔</button>
+<button id="ocr-open" type="button" class="ocr-open-btn">OCR 스캔</button>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="/js/ocr/ocrScanner.js" type="module"></script>
 <script type="module">
   import { createOcrScanner } from '/js/ocr/ocrScanner.js';
   const panel = document.getElementById('ocr-scanner');
   let scanner;
-  document.getElementById('ocr-open').onclick = () => { panel.hidden = false; scanner = createOcrScanner(panel); };
-  panel.querySelector('[data-ocr-close]').onclick = () => { scanner?.stop(); panel.hidden = true; };
+  function closePanel() { scanner?.stop(); panel.hidden = true; }
+  document.getElementById('ocr-open').onclick = () => {
+    panel.hidden = false;
+    scanner = createOcrScanner(panel, {
+      onSelect: (word) => {
+        closePanel();
+        if (typeof searchWord === 'function') searchWord(word, 'en');
+      }
+    });
+    // createOcrScanner binds its own close-button handler (camera stop only);
+    // rebind after creation so closing also hides the panel.
+    panel.querySelector('[data-ocr-close]').onclick = closePanel;
+  };
 </script>
 </body>
 </html>
