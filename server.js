@@ -10,6 +10,11 @@ const session = require('express-session');
 const jwt = require('jsonwebtoken');
 
 const app = express();
+// Railway (and most PaaS) terminate TLS at an edge proxy and forward plain HTTP
+// internally. Without this, req.protocol always reports 'http', so passport's
+// auto-built OAuth callback URL becomes http://... and mismatches the https://...
+// redirect URI registered in Google Cloud Console (redirect_uri_mismatch).
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'mydict-jwt-secret';
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
