@@ -1,6 +1,6 @@
 import { captureLiveFrame } from './liveFrameCapture.js';
 import { createLiveEnglishOcrSession } from './liveEnglishOcrSession.js';
-import { extractLiveEnglishCandidates } from './extractEnglishCandidates.js';
+import { deriveLiveOcrCandidates } from './extractEnglishCandidates.js';
 import { projectOverlayRect } from './liveOverlayGeometry.js';
 
 const PLAY_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5.14v13.72c0 .79.87 1.27 1.54.84L20.3 12.84a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14Z"/></svg>';
@@ -77,8 +77,9 @@ export function createOcrScanner(root, { onSelect } = {}) {
     state.busy = true;
     try {
       const blob = await captureLiveFrame(video, canvas, guide);
+      const imageSize = { width: canvas.width, height: canvas.height };
       const data = await state.session.recognize(blob);
-      const words = extractLiveEnglishCandidates(data);
+      const words = deriveLiveOcrCandidates(data, imageSize);
       if (words.length) {
         recordHistory(words);
         render(words);
