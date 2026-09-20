@@ -7,8 +7,18 @@
     <title>vite-tmp</title>
     <script type="module" crossorigin src="/metacong/assets/index-De0zm6hL.js"></script>
     <link rel="stylesheet" crossorigin href="/metacong/assets/index-DB1ZUr2K.css">
+    <!-- 작업13-a: MetaCong은 이 저장소에 소스가 없는 외부 빌드 산출물
+         (public/js/common 등 참고). 공용 헤더(appHeader.js/css)는 프레임워크
+         의존성 없는 순수 DOM 스크립트라 React 소스 없이도 빌드된 정적
+         index.html에 바로 얹을 수 있어서 이 방식을 사용함.
+         주의: 이 파일이 외부 MetaCong 프로젝트에서 다시 빌드되어
+         재복사되면 이 두 줄은 덮어써져 사라짐 - 다음 동기화 시 다시
+         추가해야 함. -->
+    <link rel="stylesheet" href="/css/common/appHeader.css">
   </head>
   <body>
+    <script src="/js/common/appHeader.js"></script>
+    <script>MetisAppHeader.inject();</script>
     <div id="root"></div>
   </body>
 </html>
