@@ -623,6 +623,20 @@
   .wb-side-btn.danger.active { border-color: var(--wrong); color: var(--wrong); background: rgba(239,68,68,0.08); }
   .wb-main { flex: 1; min-width: 0; }
 
+  /* Selection action bar (전체선택/재생 or 전체선택/선택 삭제/취소) - sticks
+     just below the sticky top nav (nav's own height is 52px) while the word
+     list scrolls, in both 선택 듣기 and 삭제 모드. Solid background so list
+     chips scrolling underneath don't show through. */
+  #wb-select-row {
+    position: sticky;
+    top: 52px;
+    z-index: 20;
+    background: var(--bg);
+    padding: 8px 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  }
+  #wb-select-row:empty { padding: 0; box-shadow: none; }
+
   /* WORD GRID */
   .word-grid {
     display: flex;
