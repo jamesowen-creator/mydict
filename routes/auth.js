@@ -19,7 +19,7 @@ if (googleOAuthEnabled) {
   }, async (accessToken, refreshToken, profile, done) => {
     try {
       const email = profile.emails?.[0]?.value;
-      const role = ADMIN_EMAILS.includes(email) ? 'admin' : null;
+      const role = ADMIN_EMAILS.includes((email || '').toLowerCase()) ? 'admin' : null;
       const displayName = (profile.displayName || '').normalize('NFC');
       const { rows } = await pool.query(
         `INSERT INTO users (google_id, email, name, role)
@@ -79,7 +79,7 @@ router.get('/auth/logout', (req, res) => {
 // ─── /api/me ─────────────────────────────────────────────────────────────────
 
 router.get('/api/me', requireAuth, async (req, res) => {
-  const emailIsAdmin = ADMIN_EMAILS.includes(req.user.email);
+  const emailIsAdmin = ADMIN_EMAILS.includes((req.user.email || '').toLowerCase());
   if (!process.env.DATABASE_URL) {
     return res.json({
       id: req.user.id, email: req.user.email, name: req.user.name,

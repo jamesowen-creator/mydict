@@ -2,7 +2,9 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('../lib/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'mydict-jwt-secret';
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
+// Lowercased so admin checks aren't sensitive to how Google happens to case the
+// email in its OAuth profile, or how ADMIN_EMAILS was typed in Railway Variables.
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 
 function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
