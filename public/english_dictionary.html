@@ -567,6 +567,62 @@
     background: rgba(192,57,43,0.06);
   }
 
+  /* WORDBOOK 2-COLUMN LAYOUT (left rail = controls, right = word list) */
+  .wb-layout {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .wb-side {
+    width: 74px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .wb-side-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .wb-side-group:last-child { border-bottom: none; margin-bottom: 0; }
+  .wb-side-group.wb-side-gap-before { margin-top: 10px; }
+  .wb-side-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0 2px 1px;
+  }
+  .wb-side-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 2px;
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text2);
+    cursor: pointer;
+    line-height: 1.2;
+    text-align: center;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .wb-side-icon { font-size: 17px; line-height: 1; }
+  .wb-side-btn.active-en, .wb-side-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(74,110,245,0.06); }
+  .wb-side-btn.active-ko { border-color: var(--accent-ko); color: var(--accent-ko); background: rgba(230,126,34,0.06); }
+  .wb-side-btn.active-ja { border-color: var(--accent-ja); color: var(--accent-ja); background: rgba(231,76,60,0.06); }
+  .wb-side-btn.active-zh { border-color: var(--accent-zh); color: var(--accent-zh); background: rgba(192,57,43,0.06); }
+  .wb-side-btn.danger.active { border-color: var(--wrong); color: var(--wrong); background: rgba(239,68,68,0.08); }
+  .wb-main { flex: 1; min-width: 0; }
+
   /* WORD GRID */
   .word-grid {
     display: flex;
@@ -1679,31 +1735,43 @@
   <div class="page" id="page-wordbook">
     <div class="section-header">
       <div class="section-title">단어장</div>
-      <div style="display:flex;gap:6px">
-        <button class="btn secondary" onclick="downloadCSV()" style="font-size:12px;padding:8px 12px;">📊 CSV</button>
-        <button class="btn secondary" onclick="downloadJSON()" style="font-size:12px;padding:8px 12px;">💾 JSON</button>
-        <button class="btn secondary" onclick="importJSON()" style="font-size:12px;padding:8px 12px;">📥 가져오기</button>
+    </div>
+    <div class="wb-layout">
+      <div class="wb-side">
+        <div class="wb-side-group">
+          <div class="wb-side-label">언어</div>
+          <button class="wb-side-btn active-en" id="wb-tab-en" onclick="switchWordbookTab('en')"><span class="wb-side-icon">🇺🇸</span><span>영어</span></button>
+          <button class="wb-side-btn" id="wb-tab-ko" onclick="switchWordbookTab('ko')"><span class="wb-side-icon">🇰🇷</span><span>한국어</span></button>
+          <button class="wb-side-btn" id="wb-tab-ja" onclick="switchWordbookTab('ja')"><span class="wb-side-icon">🇯🇵</span><span>일본어</span></button>
+          <button class="wb-side-btn" id="wb-tab-zh" onclick="switchWordbookTab('zh')"><span class="wb-side-icon">🇨🇳</span><span>중국어</span></button>
+        </div>
+
+        <div class="wb-side-group">
+          <div class="wb-side-label">정렬</div>
+          <button class="wb-side-btn wb-sort-btn active" data-sort="abc" onclick="setWordbookSort('abc')"><span class="wb-side-icon">🔤</span><span>ABC순</span></button>
+          <button class="wb-side-btn wb-sort-btn" data-sort="recent" onclick="setWordbookSort('recent')"><span class="wb-side-icon">🕐</span><span>최근순</span></button>
+        </div>
+
+        <div class="wb-side-group">
+          <button class="wb-side-btn" id="wb-mode-listen-btn" onclick="setWordbookMode('listen')"><span class="wb-side-icon">🎙</span><span>선택 듣기</span></button>
+        </div>
+
+        <div class="wb-side-group wb-side-gap-before">
+          <button class="wb-side-btn danger" id="wb-mode-delete-btn" onclick="setWordbookMode('delete')"><span class="wb-side-icon">🗑</span><span>삭제 모드</span></button>
+        </div>
+
+        <div class="wb-side-group">
+          <button class="wb-side-btn" onclick="downloadCSV()"><span class="wb-side-icon">📊</span><span>CSV</span></button>
+          <button class="wb-side-btn" onclick="downloadJSON()"><span class="wb-side-icon">💾</span><span>JSON</span></button>
+          <button class="wb-side-btn" onclick="importJSON()"><span class="wb-side-icon">📥</span><span>가져오기</span></button>
+        </div>
+      </div>
+
+      <div class="wb-main">
+        <div id="wb-select-row" style="display:flex;gap:8px;margin-bottom:10px"></div>
+        <div id="wordbook-list"></div>
       </div>
     </div>
-    <div class="wordbook-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-      <button class="wordbook-tab active-en" id="wb-tab-en" onclick="switchWordbookTab('en')">🇺🇸 영어</button>
-      <button class="wordbook-tab" id="wb-tab-ko" onclick="switchWordbookTab('ko')">🇰🇷 한국어</button>
-      <button class="wordbook-tab" id="wb-tab-ja" onclick="switchWordbookTab('ja')">🇯🇵 일본어</button>
-      <button class="wordbook-tab" id="wb-tab-zh" onclick="switchWordbookTab('zh')">🇨🇳 중국어</button>
-    </div>
-    <div style="display:flex;gap:6px;align-items:center;margin:10px 0 10px">
-      <button class="wb-sort-btn active" data-sort="abc" onclick="setWordbookSort('abc')">ABC 순</button>
-      <button class="wb-sort-btn" data-sort="recent" onclick="setWordbookSort('recent')">최근 순</button>
-      <span style="flex:1"></span>
-      <button class="wb-sort-btn" id="wb-delete-mode-btn" onclick="toggleDeleteMode()">삭제 모드</button>
-    </div>
-    <button class="btn" onclick="podcastStart()" style="width:100%;margin-bottom:8px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);font-size:14px;padding:12px 16px">
-      🎧 단어 연속 듣기
-    </button>
-    <div id="wb-select-row" style="display:flex;gap:8px;margin-bottom:14px">
-      <button class="btn secondary" onclick="enterSelectMode()" style="flex:1;font-size:13px;padding:10px 12px">🎙 선택 듣기</button>
-    </div>
-    <div id="wordbook-list"></div>
   </div>
 
   <!-- QUIZ PAGE -->
@@ -2683,21 +2751,20 @@ let currentWordbookTab = 'en';
 let wordbookSortOrder = 'abc';
 let selectedWords = new Set();
 let currentUserName = '';
-let wordbookDeleteMode = false;
-let wordbookSelectMode = false;
+// 'none' | 'listen' | 'delete' - mutually exclusive by construction (a single
+// variable, not two flags), matching 작업5's "동시에 둘 다 켜질 수 없음" requirement.
+let wordbookMode = 'none';
 let _currentPage = 'search';
 
 function switchWordbookTab(tab) {
   currentWordbookTab = tab;
   selectedWords.clear();
-  wordbookDeleteMode = false;
-  wordbookSelectMode = false;
-  const wbList = document.getElementById('wordbook-list');
-  if (wbList) wbList.classList.remove('wb-delete-mode');
+  wordbookMode = 'none';
   ['en','ko','ja','zh'].forEach(function(l) {
     var el = document.getElementById('wb-tab-' + l);
-    if (el) el.className = 'wordbook-tab' + (tab === l ? ' active-' + l : '');
+    if (el) el.className = 'wb-side-btn' + (tab === l ? ' active-' + l : '');
   });
+  updateModeButtons();
   updateSelectRow();
   renderWordbook();
 }
@@ -2734,11 +2801,15 @@ function renderWordbook() {
     var key = w.word + '|' + tab;
     var isSelected = selectedWords.has(key);
     var safeWord = w.word.split("'").join("\\'");
-    var clickAction = wordbookSelectMode
+    var inSelectMode = wordbookMode !== 'none';
+    var clickAction = inSelectMode
       ? 'toggleWordSelect(\'' + safeWord + '\',\'' + tab + '\')'
       : 'searchFromWordbook(\'' + safeWord + '\', \'' + tab + '\')';
     return '<div class="word-chip ' + chipClass + (isSelected ? ' selected' : '') + '" onclick="' + clickAction + '">' +
+      '<span style="display:flex;align-items:center;gap:8px">' +
+      (inSelectMode ? '<span class="word-chip-check">✓</span>' : '') +
       '<span class="word-chip-text">' + w.word + '</span>' +
+      '</span>' +
       '<span class="word-chip-del" onclick="event.stopPropagation();deleteWord(\'' + safeWord + '\', \'' + tab + '\')">×</span>' +
       '</div>';
   }
@@ -2805,9 +2876,9 @@ function updateSelectedBtn() {
   const tab = currentWordbookTab;
   const tabWords = wordbook.filter(w => (w.lang || 'en') === tab);
   const count = tabWords.filter(w => selectedWords.has(w.word + '|' + tab)).length;
-  const btn = document.getElementById('wb-selected-play-btn');
+  const btn = document.getElementById('wb-selected-action-btn');
   if (btn) {
-    btn.textContent = `🎧 재생 (${count}개)`;
+    btn.textContent = wordbookMode === 'delete' ? `🗑 선택 삭제 (${count}개)` : `🎧 재생 (${count}개)`;
     btn.disabled = count === 0;
     btn.style.opacity = count === 0 ? '0.4' : '1';
   }
@@ -2823,10 +2894,7 @@ function podcastStartSelected() {
   const words = wordbook.filter(w => (w.lang || 'en') === tab && selectedWords.has(w.word + '|' + tab));
   if (words.length === 0) { showToast('선택된 단어가 없습니다.'); return; }
   // Exit select mode before starting playback
-  wordbookSelectMode = false;
-  selectedWords.clear();
-  updateSelectRow();
-  renderWordbook();
+  setWordbookMode('none');
   if (ttsCurrentAudio) {
     ttsCurrentAudio.pause(); ttsCurrentAudio = null;
     document.querySelectorAll('.tts-btn').forEach(b => { b.textContent = '🔊'; b.classList.remove('playing'); });
@@ -2838,41 +2906,52 @@ function podcastStartSelected() {
   _updatePodcastBtn(); _showPodcastPlayer(); _podcastPlayFromCurrentWord();
 }
 
-function toggleDeleteMode() {
-  wordbookDeleteMode = !wordbookDeleteMode;
-  const list = document.getElementById('wordbook-list');
-  if (list) list.classList.toggle('wb-delete-mode', wordbookDeleteMode);
-  const btn = document.getElementById('wb-delete-mode-btn');
-  if (btn) {
-    btn.classList.toggle('active', wordbookDeleteMode);
-    btn.textContent = wordbookDeleteMode ? '삭제 완료' : '삭제 모드';
-  }
+async function confirmDeleteSelectedWords() {
+  const tab = currentWordbookTab;
+  const words = wordbook.filter(w => (w.lang || 'en') === tab && selectedWords.has(w.word + '|' + tab));
+  if (words.length === 0) { showToast('선택된 단어가 없습니다.'); return; }
+  if (!confirm(`선택한 ${words.length}개 단어를 삭제하시겠습니까?`)) return;
+  await Promise.all(words.filter(w => w.id).map(w => deleteWordFromDB(w.id)));
+  const keys = new Set(words.map(w => w.word + '|' + tab));
+  wordbook = wordbook.filter(w => !keys.has(w.word + '|' + (w.lang || 'en')));
+  setWordbookMode('none');
+  updateBadges();
+  showToast(`${words.length}개 단어를 삭제했습니다.`);
 }
 
-function enterSelectMode() {
-  wordbookSelectMode = true;
+// 선택 듣기/삭제 모드는 상호 배타적: 같은 모드를 다시 누르면 해제(취소),
+// 다른 모드를 누르면 자동으로 이전 모드가 꺼지고 새 모드로 전환됨
+// (wordbookMode가 단일 값이라 둘이 동시에 켜지는 상태 자체가 존재하지 않음).
+function setWordbookMode(mode) {
+  wordbookMode = (wordbookMode === mode) ? 'none' : mode;
   selectedWords.clear();
+  updateModeButtons();
   updateSelectRow();
   renderWordbook();
 }
 
-function exitSelectMode() {
-  wordbookSelectMode = false;
-  selectedWords.clear();
-  updateSelectRow();
-  renderWordbook();
+function updateModeButtons() {
+  const listenBtn = document.getElementById('wb-mode-listen-btn');
+  const deleteBtn = document.getElementById('wb-mode-delete-btn');
+  if (listenBtn) listenBtn.classList.toggle('active', wordbookMode === 'listen');
+  if (deleteBtn) deleteBtn.classList.toggle('active', wordbookMode === 'delete');
 }
 
 function updateSelectRow() {
   const row = document.getElementById('wb-select-row');
   if (!row) return;
-  if (wordbookSelectMode) {
+  if (wordbookMode === 'listen') {
     row.innerHTML =
       '<button class="btn secondary" onclick="toggleSelectAll()" id="wb-select-all-btn" style="white-space:nowrap;font-size:12px;padding:8px 12px">전체선택</button>' +
-      '<button class="btn" onclick="podcastStartSelected()" id="wb-selected-play-btn" style="flex:1;font-size:13px;padding:10px 12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);opacity:0.4" disabled>🎧 재생 (0개)</button>' +
-      '<button class="btn secondary" onclick="exitSelectMode()" style="font-size:12px;padding:8px 12px;white-space:nowrap">취소</button>';
+      '<button class="btn" onclick="podcastStartSelected()" id="wb-selected-action-btn" style="flex:1;font-size:13px;padding:10px 12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);opacity:0.4" disabled>🎧 재생 (0개)</button>' +
+      '<button class="btn secondary" onclick="setWordbookMode(\'listen\')" style="font-size:12px;padding:8px 12px;white-space:nowrap">취소</button>';
+  } else if (wordbookMode === 'delete') {
+    row.innerHTML =
+      '<button class="btn secondary" onclick="toggleSelectAll()" id="wb-select-all-btn" style="white-space:nowrap;font-size:12px;padding:8px 12px">전체선택</button>' +
+      '<button class="btn" onclick="confirmDeleteSelectedWords()" id="wb-selected-action-btn" style="flex:1;font-size:13px;padding:10px 12px;background:var(--wrong);opacity:0.4" disabled>🗑 선택 삭제 (0개)</button>' +
+      '<button class="btn secondary" onclick="setWordbookMode(\'delete\')" style="font-size:12px;padding:8px 12px;white-space:nowrap">취소</button>';
   } else {
-    row.innerHTML = '<button class="btn secondary" onclick="enterSelectMode()" style="flex:1;font-size:13px;padding:10px 12px">🎙 선택 듣기</button>';
+    row.innerHTML = '';
   }
 }
 
