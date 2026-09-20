@@ -2048,14 +2048,12 @@ Respond ONLY in valid JSON with this exact structure:
   "word": "base form dictionary entry",
   "search_query": "${query}",
   "pronunciation": "/prəˌnʌnsiˈeɪʃən/",
-  "etymology": "어원 분석 한 줄 (예: trans(넘어서) + figure(형태) → 형태를 완전히 넘어선 변화)",
-  "tone": "이 단어의 감정/톤 포지셔닝 한 줄 (예: 신비롭고 거대한 변화의 느낌. change보다 훨씬 극적이고 문학적)",
   "meanings": [
     {
-      "core_meaning": "핵심 의미 5단어 이내 한국어",
       "pos": "noun",
       "domain": "일반",
-      "nuance": "이 의미가 언제/어떻게 쓰이는지 1~2문장 한국어로",
+      "definition": "순수 사전적 정의만 한국어로 (뉘앙스·사용 상황 설명 없이 핵심 뜻만)",
+      "usage_note": "이 의미가 실제로 자주 쓰이는 상황·장소·톤을 1~2문장 한국어로 (뉘앙스 보조 설명)",
       "example": "English example sentence.",
       "translation": "예문의 한국어 해석"
     }
@@ -2073,17 +2071,31 @@ Respond ONLY in valid JSON with this exact structure:
       "core_meaning": "이 유사어의 핵심 의미 5단어 이내 한국어",
       "diff": "검색 단어와의 뉘앙스 차이 1~2문장 한국어로"
     }
+  ],
+  "collocations": [
+    {
+      "phrase": "실제 자주 쓰이는 단어 조합 (예: severe pain)",
+      "meaning": "그 조합 표현의 한국어 뜻 (예: 심한 통증)"
+    }
   ]
 }
 
-Return 2-4 meaning sets (different senses/parts of speech), up to 5 derivatives, and 3-4 similar words. For domain use one of: 일반, 비즈니스, 의학, 법률, 기술, 구어체, 문학, 격식체, 비격식. YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
+Rules:
+- meanings: 2-4 entries, ordered by REAL-WORLD USAGE FREQUENCY (most common sense first). If the word has senses across different parts of speech, include them all in this SAME array (still frequency-ordered overall) - each entry's "pos" marks which part of speech it belongs to. "definition" must be a plain dictionary definition only; never put usage context, situation, or tone commentary there - that belongs in "usage_note".
+- derivatives: up to 5 related word forms.
+- similar: 3-4 near-synonyms with a one-line nuance difference from the searched word.
+- collocations: 2-3 real, commonly-used word combinations (adjective+noun, verb+noun, etc.) built around "${query}" or its base form, each with its Korean meaning.
+- domain: one of 일반, 비즈니스, 의학, 법률, 기술, 구어체, 문학, 격식체, 비격식.
+- Do NOT include etymology or word-origin information anywhere in the response.
+YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
 
   const text = await callAI(prompt);
   const result = safeParseJSON(text);
   result.lang = 'en';
-  // backward compat for quiz/podcast
-  result.short_meaning = result.meanings?.[0]?.core_meaning || '';
-  result.nuance = result.meanings?.map(m => m.nuance).join(' ') || '';
+  // backward compat for quiz/podcast, which read these two top-level fields
+  // regardless of how the per-meaning schema changes underneath them
+  result.short_meaning = result.meanings?.[0]?.definition || '';
+  result.nuance = result.meanings?.map(m => m.usage_note).filter(Boolean).join(' ') || '';
   currentResult = result;
 
   const alreadySaved = wordbook.some(w => w.word.toLowerCase() === result.word.toLowerCase() && w.lang === 'en');
@@ -2102,30 +2114,52 @@ function renderResultEN(result, alreadySaved) {
     'interjection': '감탄사', 'phrase': '구', 'idiom': '관용어'
   };
 
-  // New structure: meanings[]
-  let meaningsHtml = '';
+  // New structure: meanings[] (pos + definition + usage_note + example/translation)
+  let definitionsHtml = '';
+  let usageNotesHtml = '';
+  let examplesHtml = '';
   if (result.meanings && result.meanings.length > 0) {
-    meaningsHtml = result.meanings.map((m, i) => `
+    definitionsHtml = result.meanings.map((m, i) => `
       <div class="meaning-set">
         <div class="meaning-header">
           <span class="meaning-num">${i + 1}</span>
-          <span class="meaning-core">${m.core_meaning}</span>
           <span class="result-pos-tag">${posMap[(m.pos || '').toLowerCase()] || m.pos || ''}</span>
           ${m.domain ? `<span class="meaning-domain">${m.domain}</span>` : ''}
         </div>
-        <div class="meaning-nuance">${m.nuance}</div>
-        <div class="usage-example">${m.example}</div>
-        ${m.translation ? `<div class="usage-translation">→ ${m.translation}</div>` : ''}
+        <div class="meaning-core">${m.definition || m.core_meaning || ''}</div>
       </div>
     `).join('');
+
+    usageNotesHtml = result.meanings.map((m, i) => {
+      const note = m.usage_note || m.nuance;
+      if (!note) return '';
+      return `
+      <div class="meaning-set">
+        <div class="meaning-header">
+          <span class="meaning-num">${i + 1}</span>
+          <span class="result-pos-tag">${posMap[(m.pos || '').toLowerCase()] || m.pos || ''}</span>
+        </div>
+        <div class="meaning-nuance">${note}</div>
+      </div>`;
+    }).join('');
+
+    examplesHtml = result.meanings.map((m, i) => {
+      if (!m.example) return '';
+      return `
+      <div class="meaning-set">
+        <div class="meaning-header"><span class="meaning-num">${i + 1}</span></div>
+        <div class="usage-example">${m.example}</div>
+        ${m.translation ? `<div class="usage-translation">→ ${m.translation}</div>` : ''}
+      </div>`;
+    }).join('');
   } else {
-    // fallback for old saved words (usages[] + nuance)
+    // fallback for old saved words (usages[] + nuance) - predates the meanings[] schema
     const posHtml = (result.pos || []).map(p =>
       `<span class="result-pos-tag">${posMap[p.toLowerCase()] || p}</span>`
     ).join('');
-    meaningsHtml = (posHtml ? `<div class="result-pos-list">${posHtml}</div>` : '') +
-      `<div class="result-section-body" style="margin-bottom:12px">${result.nuance || ''}</div>` +
-      (result.usages || []).map(u => `
+    definitionsHtml = (posHtml ? `<div class="result-pos-list">${posHtml}</div>` : '') +
+      `<div class="result-section-body" style="margin-bottom:12px">${result.nuance || ''}</div>`;
+    examplesHtml = (result.usages || []).map(u => `
         <div class="usage-item">
           <div class="usage-context">${u.context}</div>
           <div class="usage-desc">${u.description}</div>
@@ -2145,6 +2179,13 @@ function renderResultEN(result, alreadySaved) {
     </div>
   `).join('');
 
+  const collocationsHtml = (result.collocations || []).map(c => `
+    <div class="derivative-item">
+      <span class="derivative-word">${c.phrase}</span>
+      <span class="derivative-meaning">${c.meaning}</span>
+    </div>
+  `).join('');
+
   const searchQuery = result.search_query || '';
   const baseFormHint = searchQuery && searchQuery.toLowerCase() !== result.word.toLowerCase()
     ? `<div class="base-form-hint">${searchQuery} → ${result.word}</div>`
@@ -2158,12 +2199,10 @@ function renderResultEN(result, alreadySaved) {
       </div>
       ${baseFormHint}
       ${result.pronunciation ? `<div class="result-pronunciation">${result.pronunciation}</div>` : ''}
-      ${result.etymology ? `<div class="word-etymology">어원: ${result.etymology}</div>` : ''}
-      ${result.tone ? `<div class="word-tone">느낌: ${result.tone}</div>` : ''}
 
       <div class="result-section">
-        <div class="result-section-title">의미 & 뉘앙스</div>
-        ${meaningsHtml}
+        <div class="result-section-title">사전적 의미</div>
+        ${definitionsHtml}
       </div>
 
       ${result.derivatives && result.derivatives.length > 0 ? `
@@ -2180,10 +2219,28 @@ function renderResultEN(result, alreadySaved) {
         </div>
       </div>` : ''}
 
+      ${usageNotesHtml ? `
       <div class="result-section">
-        <div class="result-section-title">유사한 단어</div>
+        <div class="result-section-title">활용 · 뉘앙스</div>
+        ${usageNotesHtml}
+      </div>` : ''}
+
+      ${examplesHtml ? `
+      <div class="result-section">
+        <div class="result-section-title">예문</div>
+        ${examplesHtml}
+      </div>` : ''}
+
+      <div class="result-section">
+        <div class="result-section-title">유의어</div>
         <div class="similar-list">${similarHtml}</div>
       </div>
+
+      ${collocationsHtml ? `
+      <div class="result-section">
+        <div class="result-section-title">Collocation</div>
+        <div class="derivatives-list">${collocationsHtml}</div>
+      </div>` : ''}
 
       <div class="extra-trans-wrap">
         <div class="extra-trans-label">추가 번역</div>

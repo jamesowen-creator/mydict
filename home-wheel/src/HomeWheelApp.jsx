@@ -19,7 +19,7 @@ export default function HomeWheelApp() {
 
   return (
     <div
-      className="h-dvh w-full flex flex-col items-center justify-center overflow-hidden px-5"
+      className="h-dvh w-full flex flex-col overflow-hidden px-5 py-8"
       style={{
         '--accent-rgb': '226, 88, 59',
         '--accent': 'rgb(var(--accent-rgb))',
@@ -28,14 +28,23 @@ export default function HomeWheelApp() {
         fontFamily: "'Sora', 'Noto Sans KR', ui-sans-serif, system-ui, -apple-system, sans-serif",
       }}
     >
-      <header className="mb-6 text-center">
+      {/* Fixed header/footer anchors + a flexible middle zone that centers the
+          wheel within whatever space is left, instead of centering the whole
+          block in the viewport (which left large, equal, purposeless gaps
+          above and below on tall phones - ThreeDWheelPicker's own viewport
+          height is a fixed per-breakpoint value we're leaving untouched). */}
+      <header className="text-center">
         <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">무엇을 시작할까요?</h1>
         <p className="mt-2 text-sm text-white/40">돌려서 고르고, 한 번 더 탭하면 이동해요</p>
       </header>
 
-      <div className="w-full max-w-xl">
-        <ThreeDWheelPicker options={OPTIONS} value={selected} onChange={setSelected} onCenterTap={goTo} />
+      <div className="flex flex-1 items-start justify-center pt-6 sm:items-center sm:pt-0">
+        <div className="w-full max-w-xl">
+          <ThreeDWheelPicker options={OPTIONS} value={selected} onChange={setSelected} onCenterTap={goTo} />
+        </div>
       </div>
+
+      <p className="text-center text-[11px] tracking-[0.25em] text-white/20">METIS · A LENS FOR THE WISDOM</p>
     </div>
   );
 }
