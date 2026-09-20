@@ -569,49 +569,6 @@
     font-weight: 700;
   }
 
-  /* WORDBOOK TABS */
-  .wordbook-tabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-
-  .wordbook-tab {
-    flex: 1;
-    padding: 8px;
-    border-radius: var(--radius-sm);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    border: 2px solid var(--border);
-    background: var(--surface);
-    color: var(--text2);
-    transition: all 0.2s;
-    font-family: 'Noto Sans KR', sans-serif;
-  }
-
-  .wordbook-tab.active-en {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: rgba(74,110,245,0.06);
-  }
-
-  .wordbook-tab.active-ko {
-    border-color: var(--accent-ko);
-    color: var(--accent-ko);
-    background: rgba(230,126,34,0.06);
-  }
-  .wordbook-tab.active-ja {
-    border-color: var(--accent-ja);
-    color: var(--accent-ja);
-    background: rgba(231,76,60,0.06);
-  }
-  .wordbook-tab.active-zh {
-    border-color: var(--accent-zh);
-    color: var(--accent-zh);
-    background: rgba(192,57,43,0.06);
-  }
-
   /* WORDBOOK 2-COLUMN LAYOUT (left rail = controls, right = word list) */
   .wb-layout {
     display: flex;
@@ -1981,11 +1938,6 @@ function authHeaders() {
 }
 
 // ─── METACONG ─────────────────────────────────────────────────────────────────
-function openMetaCong() {
-  const token = getToken();
-  window.location.href = token ? '/metacong/?token=' + encodeURIComponent(token) : '/metacong/';
-}
-
 let userPerms = null;
 
 async function initAuth() {
@@ -4359,27 +4311,6 @@ function buildPodcastSegments(entry) {
     : (entry.entries?.[0]?.example || '');
   if (example) segs.push({ text: example.slice(0, 200), lang });
   return segs;
-}
-
-function podcastStart() {
-  const tab = currentWordbookTab;
-  const words = wordbook.filter(w => (w.lang || 'en') === tab);
-  if (words.length === 0) { showToast('단어장이 비어있습니다.'); return; }
-  // 개별 TTS 정지
-  if (ttsCurrentAudio) {
-    ttsCurrentAudio.pause(); ttsCurrentAudio = null;
-    document.querySelectorAll('.tts-btn').forEach(b => { b.textContent = '🔊'; b.classList.remove('playing'); });
-  }
-  const locale = { en: 'en', ko: 'ko', ja: 'ja', zh: 'zh' }[tab] || 'en';
-  podcastPlaylist = words.slice().sort((a, b) => a.word.localeCompare(b.word, locale));
-  podcastIndex = 0;
-  podcastAudio = null;
-  podcastSegments = [];
-  podcastSegIdx = 0;
-  podcastPlaying = true;
-  _updatePodcastBtn();
-  _showPodcastPlayer();
-  _podcastPlayFromCurrentWord();
 }
 
 function _showPodcastPlayer() {
