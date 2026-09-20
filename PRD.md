@@ -14,7 +14,8 @@
 
 | 경로 | 앱 | 설명 |
 |------|----|------|
-| `/` | 영어 사전 (english_dictionary.html) | 단어/상용구 검색, Claude가 뜻·예문·어원 생성. 단어장·복습(SRS)·퀴즈 포함 |
+| `/` | 홈 화면 | 3D 휠 피커로 하위 앱에 진입 (React+Vite 서브앱 `home-wheel/`을 빌드한 정적 결과물, `public/home/`에서 서빙) |
+| `/english_dictionary.html` | 영어 사전 | 단어/상용구 검색, Claude가 뜻·예문·어원 생성. 단어장·복습(SRS)·퀴즈 포함 |
 | `/literature_compass.html` | 문학 나침반 | 한국 문학 사조를 연표(타임라인)로 표시 |
 | `/digest_reading.html` | 한입 독서 | 독서 요약 콘텐츠 제공 |
 | `/metacong/` | MetaCong | 한국사·세계사 성취기준 기반 음성 학습 퀴즈 (Vite+React SPA, `routes/metacong.js` API) |
@@ -25,7 +26,8 @@
 ## 3. 인증
 
 - **비밀번호 인증(레거시):** `APP_PASSWORD` 설정 시 첫 방문 모달 → 통과 시 `localStorage`에 저장. 미설정 시 인증 없이 통과.
-- **Google OAuth (passport-google-oauth20):** `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` 설정 시에만 활성화(`googleOAuthEnabled`). 로그인 성공 시 JWT 발급(`/?token=`), Postgres `users` 테이블에 사용자 저장.
+- **Google OAuth (passport-google-oauth20):** `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` 설정 시에만 활성화(`googleOAuthEnabled`). 로그인 성공 시 JWT 발급, 로그인을 시작한 페이지로 리다이렉트(기본값은 `/?token=`이며 상태 파라미터로 시작 페이지를 기억함). Postgres `users` 테이블에 사용자 저장.
+- **신규 가입자 승인제:** 새로 가입하는 계정은 `users.is_approved = false`로 생성되며, 관리자가 관리자 패널에서 승인하기 전까지 로그인 콜백이 JWT를 아예 발급하지 않고 승인 대기 안내로 리다이렉트한다. `ADMIN_EMAILS`에 포함된 이메일은 가입 즉시 자동 승인됨. 기존 가입자는 컬럼 추가 시점에 자동으로 승인 상태로 소급 적용됨. 승인 취소는 로그인 시점에만 체크하며, 이미 발급된 JWT는 재검증하지 않음(`HANDOVER.md` §4 참고).
 - **관리자 판별:** `ADMIN_EMAILS` 목록에 포함된 이메일은 로그인 시 `role='admin'`으로 설정.
 - **세션:** `express-session` (`SESSION_SECRET`), JWT (`JWT_SECRET`).
 
@@ -39,7 +41,7 @@
 | 구분 | 기술 |
 |------|------|
 | Backend | Node.js + Express |
-| Frontend | Vanilla HTML/CSS/JS (사전·문학·독서·관리자) + Vite/React (MetaCong) |
+| Frontend | Vanilla HTML/CSS/JS (사전·문학·독서·관리자) + Vite/React (홈 화면 `home-wheel/`, 이 저장소 소스 있음 / MetaCong, 이 저장소에 소스 없이 빌드 결과물만 존재) |
 | DB | PostgreSQL (`pg`) — 사용자, 단어장, 복습 기록, TTS 캐시 |
 | AI | Claude Haiku (`@anthropic-ai/sdk`) — 사전 검색, MetaCong 문답 |
 | TTS | OpenAI API (`OPENAI_API_KEY`), Postgres 캐시 |
@@ -52,16 +54,20 @@
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| POST | `/api/search` | 단어 검색 (Claude) |
-| POST | `/api/auth` | 비밀번호 인증 |
+| POST | `/api/ai` | 단어 검색 실제 사용 엔드포인트 (Claude 호출 패스스루 — 프롬프트는 프론트엔드 `english_dictionary.html`의 `searchEnglish()` 등에서 구성) |
+| POST | ~~`/api/search`~~ | **죽은 코드** — `server.js`에 구버전 검색 로직이 남아있지만 프론트엔드 어디에서도 호출하지 않음. 위 `/api/ai`로 대체됨 |
+| POST | `/api/auth` | 비밀번호 인증 (레거시, `APP_PASSWORD` 미설정 시 사실상 무의미) |
 | GET | `/auth/google`, `/auth/google/callback`, `/auth/logout` | Google OAuth 플로우 |
 | GET | `/api/me` | 로그인 사용자 정보 |
 | GET/POST/DELETE | `/api/wordbook` | 단어장 CRUD |
-| GET | `/api/dashboard` | 학습 대시보드 |
+| PATCH | `/api/wordbook/:id/example` | 단어장 항목 예문 수정 |
+| GET | `/api/dashboard` | 학습 대시보드 데이터 조회 (백엔드 로직 자체는 살아있으나, 이를 호출하는 프론트엔드 화면 `#page-home`이 현재 도달 불가능한 상태 — `HANDOVER.md` §5 참고) |
 | POST | `/api/review-result`, `/api/review/complete`, `/api/quiz-correct` | 복습(SRS) 기록 |
 | GET | `/api/review/today`, `/api/review-due` | 복습 대상 조회 |
 | POST | `/api/tts` | TTS 생성/캐시 조회 |
-| GET | `/api/admin/users`, `/api/admin/stats` | 관리자 전용 |
+| DELETE | `/api/tts/cache` | TTS 캐시 삭제 |
+| GET | `/api/admin/users`, `/api/admin/stats` | 관리자 전용 조회 |
+| PATCH | `/api/admin/users/:id` | 관리자 전용 — 사용자 권한/역할/차단/승인 상태 수정 |
 | POST | `/metacong/chat` | MetaCong 문답 (질문 생성/채점) |
 | GET | `/metacong/standards`, POST `/metacong/progress`, `/metacong/sessions` | MetaCong 진도/세션 |
 | GET | `/api/debug` | 환경변수 진단 (보안상 운영 제거 권장) |
