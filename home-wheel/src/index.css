@@ -1,1 +1,21 @@
 @import "tailwindcss";
+
+/* ThreeDWheelPicker's nav controls (prev/next buttons + the "Scroll · Drag ·
+   Swipe" hint) were hardcoded to white-based Tailwind utilities (text-white/*,
+   border-white/*, bg-white/*) for the original dark demo. Same --wheel-fg-rgb
+   variable as the card text in ThreeDWheelPicker.jsx (falls back to
+   255,255,255 - the original white - when a consumer doesn't set it), so
+   HomeWheelApp's light theme can flip these to dark without touching the
+   component's structure/logic. */
+.wheel-nav-btn {
+  border-color: rgba(var(--wheel-fg-rgb, 255, 255, 255), 0.12);
+  background-color: rgba(var(--wheel-fg-rgb, 255, 255, 255), 0.05);
+  color: rgba(var(--wheel-fg-rgb, 255, 255, 255), 0.5);
+}
+.wheel-nav-btn:hover {
+  color: rgba(var(--wheel-fg-rgb, 255, 255, 255), 1);
+  border-color: rgba(var(--wheel-fg-rgb, 255, 255, 255), 0.3);
+}
+.wheel-nav-hint {
+  color: rgba(var(--wheel-fg-rgb, 255, 255, 255), 0.35);
+}

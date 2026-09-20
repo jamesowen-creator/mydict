@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ThreeDWheelPicker } from './ThreeDWheelPicker.jsx';
+import { getToken, clearToken, fetchMe } from './auth.js';
 
 // Array-based so adding a future menu item is just adding an entry here.
 const OPTIONS = [
@@ -11,10 +12,26 @@ const OPTIONS = [
 
 export default function HomeWheelApp() {
   const [selected, setSelected] = useState(OPTIONS[0].id);
+  const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token) { setAuthChecked(true); return; }
+    fetchMe(token)
+      .then((me) => setUser(me))
+      .catch(() => {})
+      .finally(() => setAuthChecked(true));
+  }, []);
 
   const goTo = (id) => {
     const target = OPTIONS.find((o) => o.id === id);
     if (target) window.location.href = target.url;
+  };
+
+  const handleLogout = () => {
+    clearToken();
+    setUser(null);
   };
 
   return (
@@ -23,28 +40,69 @@ export default function HomeWheelApp() {
       style={{
         '--accent-rgb': '226, 88, 59',
         '--accent': 'rgb(var(--accent-rgb))',
+        // 8-c: light theme, matching the rest of the app's --bg/--surface2
+        // tones instead of the reference demo's dark background. Card
+        // fill/border/text inside ThreeDWheelPicker now read --wheel-card-rgb
+        // / --wheel-fg-rgb (see that file's comments) instead of hardcoded
+        // white, so the component's own structure never needed touching for
+        // this - only these two variables + the outer background.
+        '--wheel-card-rgb': '100, 116, 139',
+        '--wheel-fg-rgb': '30, 41, 59',
         background:
-          'radial-gradient(900px 520px at 50% 8%, rgba(226, 88, 59, .14), transparent 65%), linear-gradient(180deg, #0d0d10 0%, #07080a 100%)',
+          'radial-gradient(900px 520px at 50% 8%, rgba(226, 88, 59, .10), transparent 65%), linear-gradient(180deg, #f5f7ff 0%, #eef1fb 100%)',
         fontFamily: "'Sora', 'Noto Sans KR', ui-sans-serif, system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* Fixed header/footer anchors + a flexible middle zone that centers the
-          wheel within whatever space is left, instead of centering the whole
-          block in the viewport (which left large, equal, purposeless gaps
-          above and below on tall phones - ThreeDWheelPicker's own viewport
-          height is a fixed per-breakpoint value we're leaving untouched). */}
-      <header className="text-center">
-        <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">무엇을 시작할까요?</h1>
-        <p className="mt-2 text-sm text-white/40">돌려서 고르고, 한 번 더 탭하면 이동해요</p>
-      </header>
-
-      <div className="flex flex-1 items-start justify-center pt-6 sm:items-center sm:pt-0">
+      {/* 8-a: header copy removed. The wheel now sits near the top of the
+          flexible middle zone (pt-2, was pt-6) so removing ~80px of header
+          text doesn't leave a big dead gap above it - a small layout nudge,
+          not a structural change. */}
+      <div className="flex flex-1 items-start justify-center pt-2 sm:items-center sm:pt-0">
         <div className="w-full max-w-xl">
           <ThreeDWheelPicker options={OPTIONS} value={selected} onChange={setSelected} onCenterTap={goTo} />
         </div>
       </div>
 
-      <p className="text-center text-[11px] tracking-[0.25em] text-white/20">METIS · A LENS FOR THE WISDOM</p>
+      {/* 8-b: login/logout + admin, in the space below the wheel. Reads the
+          same localStorage token + /api/me role check the vanilla pages use
+          (see auth.js) - no separate shared module exists yet to import
+          instead, since the vanilla pages are plain inline <script>, not
+          built with anything a Vite bundle could import from. */}
+      <div className="flex flex-col items-center gap-3 pb-2">
+        {authChecked && (
+          user ? (
+            <div className="flex items-center gap-3">
+              {user.role === 'admin' && (
+                <a
+                  href="/admin"
+                  className="rounded-full border px-4 py-2 text-xs font-bold transition"
+                  style={{ borderColor: 'rgba(226,88,59,.4)', color: 'var(--accent)', background: 'rgba(226,88,59,.08)' }}
+                >
+                  관리자
+                </a>
+              )}
+              <button
+                onClick={handleLogout}
+                className="rounded-full border px-4 py-2 text-xs font-bold transition"
+                style={{ borderColor: 'rgba(30,41,59,.15)', color: 'rgba(30,41,59,.6)', background: 'rgba(30,41,59,.04)' }}
+              >
+                로그아웃
+              </button>
+            </div>
+          ) : (
+            <a
+              href="/auth/google"
+              className="rounded-full px-5 py-2.5 text-sm font-bold text-white transition"
+              style={{ background: 'var(--accent)', boxShadow: '0 8px 20px -8px rgba(226,88,59,.6)' }}
+            >
+              Google로 로그인
+            </a>
+          )
+        )}
+        <p className="text-center text-[11px] tracking-[0.25em]" style={{ color: 'rgba(30,41,59,.3)' }}>
+          METIS · A LENS FOR THE WISDOM
+        </p>
+      </div>
     </div>
   );
 }

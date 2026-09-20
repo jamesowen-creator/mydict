@@ -111,10 +111,10 @@ function WheelItem({ option, rel, metrics, reduced, onSelect, isSelected }) {
           padding: "0 22px",
           borderRadius: 20,
           filter: blur ? `blur(${blur}px)` : "none",
-          background: `linear-gradient(145deg, rgba(255,255,255,${0.035 + focus * 0.045}), rgba(255,255,255,0.012))`,
+          background: `linear-gradient(145deg, rgba(var(--wheel-card-rgb, 255,255,255),${0.035 + focus * 0.045}), rgba(var(--wheel-card-rgb, 255,255,255),0.012))`,
           backdropFilter: "blur(14px)",
           WebkitBackdropFilter: "blur(14px)",
-          border: `1px solid rgba(${focus > 0.5 ? "var(--accent-rgb)" : "255,255,255"}, ${0.08 + focus * 0.42})`,
+          border: `1px solid rgba(${focus > 0.5 ? "var(--accent-rgb)" : "var(--wheel-card-rgb, 255,255,255)"}, ${0.08 + focus * 0.42})`,
           boxShadow:
             focus > 0.35
               ? `0 18px 45px -18px rgba(0,0,0,.85), 0 0 ${18 + focus * 22}px -6px rgba(var(--accent-rgb), ${focus * 0.35})`
@@ -139,7 +139,7 @@ function WheelItem({ option, rel, metrics, reduced, onSelect, isSelected }) {
               fontSize: focus > 0.5 ? 20 : 17,
               fontWeight: 600,
               letterSpacing: "-0.01em",
-              color: `rgba(255,255,255,${0.55 + focus * 0.45})`,
+              color: `rgba(var(--wheel-fg-rgb, 255,255,255),${0.55 + focus * 0.45})`,
               transition: "font-size 160ms ease-out, color 160ms linear",
               whiteSpace: "nowrap",
             }}
@@ -152,7 +152,7 @@ function WheelItem({ option, rel, metrics, reduced, onSelect, isSelected }) {
                 display: "block",
                 marginTop: 2,
                 fontSize: 12.5,
-                color: `rgba(255,255,255,${0.18 + focus * 0.32})`,
+                color: `rgba(var(--wheel-fg-rgb, 255,255,255),${0.18 + focus * 0.32})`,
                 whiteSpace: "nowrap",
               }}
             >
@@ -418,17 +418,17 @@ export function ThreeDWheelPicker({ options, value, onChange, onCenterTap }) {
         <button
           onClick={() => goBy(-1)}
           aria-label="이전 항목"
-          className="h-9 w-9 rounded-full border border-white/10 bg-white/5 text-white/50 hover:text-white hover:border-white/25 transition"
+          className="h-9 w-9 rounded-full border transition wheel-nav-btn"
         >
           ↑
         </button>
-        <span className="text-[11px] tracking-[0.18em] uppercase text-white/25">
+        <span className="text-[11px] tracking-[0.18em] uppercase wheel-nav-hint">
           Scroll · Drag · Swipe
         </span>
         <button
           onClick={() => goBy(1)}
           aria-label="다음 항목"
-          className="h-9 w-9 rounded-full border border-white/10 bg-white/5 text-white/50 hover:text-white hover:border-white/25 transition"
+          className="h-9 w-9 rounded-full border transition wheel-nav-btn"
         >
           ↓
         </button>
