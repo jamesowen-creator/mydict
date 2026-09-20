@@ -246,7 +246,18 @@
 const TOKEN_KEY = 'mydict_token';
 
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
-function parseJwt(t) { try { return JSON.parse(atob(t.split('.')[1])); } catch { return null; } }
+// atob() decodes Base64 as Latin-1, not UTF-8 - mangles/can break JSON.parse
+// on a payload with a Korean name. Rebuild real UTF-8 before parsing (같은
+// 수정을 english_dictionary.html의 parseJwt에도 적용함 - 작업9-c).
+function parseJwt(t) {
+  try {
+    const base64 = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(
+      atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+    );
+    return JSON.parse(json);
+  } catch { return null; }
+}
 function authHeaders() { return { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' }; }
 
 function showToast(msg, ms = 2500) {

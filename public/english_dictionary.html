@@ -1869,7 +1869,18 @@ function setToken(t) { localStorage.setItem('mydict_token', t); }
 function clearToken() { localStorage.removeItem('mydict_token'); }
 
 function parseJwt(token) {
-  try { return JSON.parse(atob(token.split('.')[1])); } catch { return null; }
+  try {
+    // atob() decodes Base64 into a Latin-1 string, not UTF-8 - a JWT payload
+    // holding a Korean name (or any multi-byte character) comes out mangled,
+    // and depending on the exact bytes can even break JSON.parse outright.
+    // Re-expand each decoded byte through decodeURIComponent to rebuild the
+    // real UTF-8 string before parsing.
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(
+      atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+    );
+    return JSON.parse(json);
+  } catch { return null; }
 }
 
 function authHeaders() {
@@ -1930,12 +1941,21 @@ async function initAuth() {
         return;
       }
     }
-  } catch {}
+  } catch (e) { console.error('[initAuth] /api/me fetch/처리 실패:', e); }
 
-  await loadWordbookFromDB();
-  updateBadges();
-  backfillShortMeanings();
-  setupBackButtonBlock();
+  // 작업9-c: 위에서 로그인 오버레이는 이미 숨겼는데(1928행), 아래 중 하나가
+  // 예외를 던지면 initAuth()가 여기서 조용히 멈춰버려서 showPage('search')까지
+  // 못 가고 검색 화면도 못 뜨는 채로 방치됨 - 서버 로그로는 절대 안 보이는
+  // 클라이언트 예외라 감지 자체가 안 됐을 수 있음. 방어적으로 감싸서 무슨
+  // 일이 있어도 최소한 검색 화면까지는 가고, 콘솔에 원인을 남기게 함.
+  try {
+    await loadWordbookFromDB();
+    updateBadges();
+    backfillShortMeanings();
+    setupBackButtonBlock();
+  } catch (e) {
+    console.error('[initAuth] 로그인 후 초기화 중 예외 발생 (검색 화면은 계속 진행함):', e);
+  }
   showPage('search');
 }
 

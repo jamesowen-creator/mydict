@@ -136,8 +136,12 @@ router.get('/api/me', requireAuth, async (req, res) => {
       await pool.query('UPDATE users SET role = $1 WHERE id = $2', ['admin', req.user.id]);
       user.role = 'admin';
     }
-    // 작업9-c 임시 디버그 로그 - 원인 확인 끝나면 제거할 것
-    console.log('[me-debug]', maskEmail(req.user.email), '| jwt id:', req.user.id, '| db id:', user.id, '| is_blocked:', user.is_blocked, '| role:', user.role);
+    // 작업9-c 임시 디버그 로그 - 원인 확인 끝나면 제거할 것. 클라이언트에
+    // 실제로 내려가는 JSON 전체 + name 필드의 코드포인트(인코딩 깨짐 확인용)
+    const nameCodepoints = user.name
+      ? [...user.name].map(c => 'U+' + c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')).join(' ')
+      : '(no name)';
+    console.log('[me-debug]', maskEmail(req.user.email), '| full response:', JSON.stringify(user), '| name codepoints:', nameCodepoints);
     res.json(user);
   } catch (err) {
     console.log('[me-debug]', maskEmail(req.user.email), '| jwt id:', req.user.id, '| QUERY THREW:', err.message);
