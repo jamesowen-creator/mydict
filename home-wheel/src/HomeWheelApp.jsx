@@ -3,11 +3,13 @@ import { ThreeDWheelPicker } from './ThreeDWheelPicker.jsx';
 import { getToken, clearToken, fetchMe } from './auth.js';
 
 // Array-based so adding a future menu item is just adding an entry here.
+// No `icon` field (작업10-a removed the per-item icons - text-only cards now;
+// ThreeDWheelPicker's WheelItem no longer renders an icon span at all).
 const OPTIONS = [
-  { id: 'dictionary', name: '언어 사전', description: 'AI가 풀어주는 뜻과 예문', icon: '📖', url: '/english_dictionary.html' },
-  { id: 'literature', name: '문학 나침반', description: '시대별 문학 사조 타임라인', icon: '🧭', url: '/literature_compass.html' },
-  { id: 'digest', name: '한입 독서', description: '한 입 크기로 읽는 작품 요약', icon: '📚', url: '/digest_reading.html' },
-  { id: 'metacong', name: 'MetaCong', description: '한국사·세계사 음성 학습 퀴즈', icon: '🧠', url: '/metacong/' },
+  { id: 'dictionary', name: '언어 사전', description: 'AI가 풀어주는 뜻과 예문', url: '/english_dictionary.html' },
+  { id: 'literature', name: '문학 나침반', description: '시대별 문학 사조 타임라인', url: '/literature_compass.html' },
+  { id: 'digest', name: '한입 독서', description: '한 입 크기로 읽는 작품 요약', url: '/digest_reading.html' },
+  { id: 'metacong', name: 'MetaCong', description: '한국사·세계사 음성 학습 퀴즈', url: '/metacong/' },
 ];
 
 export default function HomeWheelApp() {
@@ -36,7 +38,7 @@ export default function HomeWheelApp() {
 
   return (
     <div
-      className="h-dvh w-full flex flex-col overflow-hidden px-5 py-8"
+      className="h-dvh w-full flex flex-col overflow-hidden px-5 py-6"
       style={{
         '--accent-rgb': '226, 88, 59',
         '--accent': 'rgb(var(--accent-rgb))',
@@ -53,11 +55,14 @@ export default function HomeWheelApp() {
         fontFamily: "'Sora', 'Noto Sans KR', ui-sans-serif, system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* 8-a: header copy removed. The wheel now sits near the top of the
-          flexible middle zone (pt-2, was pt-6) so removing ~80px of header
-          text doesn't leave a big dead gap above it - a small layout nudge,
-          not a structural change. */}
-      <div className="flex flex-1 items-start justify-center pt-2 sm:items-center sm:pt-0">
+      {/* 작업10-a: wheel re-centered vertically (was pinned near the top with
+          pt-2/items-start to compensate for the now-removed 작업8-a header -
+          that compensation is gone too, since there's nothing left above it
+          to balance against). flex-1 + items-center lets this zone grow to
+          fill whatever space is left between the top edge and the fixed-size
+          login row below, and centers the wheel within that space - the
+          "위/중간/아래 자연스럽게 분배" 작업10-b asked for. */}
+      <div className="flex flex-1 items-center justify-center">
         <div className="w-full max-w-xl">
           <ThreeDWheelPicker options={OPTIONS} value={selected} onChange={setSelected} onCenterTap={goTo} />
         </div>
@@ -99,9 +104,6 @@ export default function HomeWheelApp() {
             </a>
           )
         )}
-        <p className="text-center text-[11px] tracking-[0.25em]" style={{ color: 'rgba(30,41,59,.3)' }}>
-          METIS · A LENS FOR THE WISDOM
-        </p>
       </div>
     </div>
   );

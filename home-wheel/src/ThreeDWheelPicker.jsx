@@ -107,7 +107,7 @@ function WheelItem({ option, rel, metrics, reduced, onSelect, isSelected }) {
           height: "100%",
           display: "flex",
           alignItems: "center",
-          gap: 16,
+          justifyContent: "center",
           padding: "0 22px",
           borderRadius: 20,
           filter: blur ? `blur(${blur}px)` : "none",
@@ -122,17 +122,10 @@ function WheelItem({ option, rel, metrics, reduced, onSelect, isSelected }) {
           transition: "background 180ms linear, border-color 180ms linear",
         }}
       >
-        <span
-          style={{
-            fontSize: focus > 0.5 ? 26 : 20,
-            lineHeight: 1,
-            filter: `saturate(${0.4 + focus * 0.6})`,
-            transition: "font-size 160ms ease-out",
-          }}
-        >
-          {option.icon}
-        </span>
-        <span style={{ minWidth: 0 }}>
+        {/* METIS home-wheel: no icon, text-only cards (per 작업10-a) - the
+            demo's leading icon <span>{option.icon}</span> is intentionally
+            not rendered here. */}
+        <span style={{ minWidth: 0, textAlign: "center" }}>
           <span
             style={{
               display: "block",
