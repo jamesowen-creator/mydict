@@ -107,6 +107,16 @@
   input:checked + .toggle-slider { background: var(--accent); }
   input:checked + .toggle-slider:before { transform: translateX(16px); }
   .toggle-danger input:checked + .toggle-slider { background: var(--danger); }
+  .toggle-warn input:checked + .toggle-slider { background: var(--warn); }
+
+  /* Row waiting for approval - stand out in the list */
+  tr.row-pending td { background: #fffbeb; }
+  tr.row-pending:hover td { background: #fef3c7; }
+  .pending-badge {
+    display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px;
+    border-radius: 20px; letter-spacing: 0.3px; background: #fef3c7; color: var(--warn);
+    margin-left: 6px;
+  }
 
   /* ── Perms grid ── */
   .perms { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -208,6 +218,7 @@
             <tr>
               <th>사용자</th>
               <th>역할</th>
+              <th>승인</th>
               <th>차단</th>
               <th>검색</th>
               <th>단어장</th>
@@ -281,6 +292,10 @@ function renderStats(data) {
       <div class="stat-label">차단된 사용자</div>
       <div class="stat-value">${fmt(u.blocked)}</div>
     </div>
+    <div class="stat-card warn">
+      <div class="stat-label">승인 대기</div>
+      <div class="stat-value">${fmt(u.pending)}</div>
+    </div>
     <div class="stat-card">
       <div class="stat-label">관리자</div>
       <div class="stat-value">${fmt(u.admins)}</div>
@@ -336,13 +351,14 @@ function renderUsers(users) {
 
 function renderUserRow(u) {
   const isMe = u.id === myId;
+  const isPending = u.is_approved === false;
   return `
-  <tr id="row-${u.id}">
+  <tr id="row-${u.id}" ${isPending ? 'class="row-pending"' : ''}>
     <td>
       <div class="user-cell">
         <div class="user-avatar">${(u.name || '?')[0].toUpperCase()}</div>
         <div>
-          <div class="user-name">${escHtml(u.name || '')} ${isMe ? '<span style="font-size:10px;color:var(--text3)">(나)</span>' : ''}</div>
+          <div class="user-name">${escHtml(u.name || '')} ${isMe ? '<span style="font-size:10px;color:var(--text3)">(나)</span>' : ''}${isPending ? '<span class="pending-badge">승인대기</span>' : ''}</div>
           <div class="user-email">${escHtml(u.email || '')}</div>
         </div>
       </div>
@@ -352,6 +368,12 @@ function renderUserRow(u) {
         <option value="user"  ${u.role !== 'admin' ? 'selected' : ''}>user</option>
         <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
       </select>
+    </td>
+    <td>
+      <label class="toggle toggle-warn">
+        <input type="checkbox" ${u.is_approved !== false ? 'checked' : ''} onchange="setPending(${u.id}, 'is_approved', this.checked)" ${isMe ? 'disabled' : ''}>
+        <span class="toggle-slider"></span>
+      </label>
     </td>
     <td>
       <label class="toggle toggle-danger">

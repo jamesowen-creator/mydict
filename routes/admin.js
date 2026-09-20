@@ -10,7 +10,7 @@ router.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
-        u.id, u.email, u.name, u.role, u.is_blocked,
+        u.id, u.email, u.name, u.role, u.is_blocked, u.is_approved,
         u.can_search, u.can_wordbook, u.can_quiz, u.can_tts, u.can_podcast,
         u.perm_literature_compass, u.perm_digest_reading,
         u.created_at,
@@ -34,23 +34,23 @@ router.patch('/api/admin/users/:id', requireAdmin, async (req, res) => {
   const targetId = parseInt(req.params.id);
   if (isNaN(targetId)) return res.status(400).json({ error: '잘못된 ID입니다.' });
 
-  const allowed = ['role', 'is_blocked', 'can_search', 'can_wordbook', 'can_quiz', 'can_tts', 'can_podcast', 'perm_literature_compass', 'perm_digest_reading'];
+  const allowed = ['role', 'is_blocked', 'is_approved', 'can_search', 'can_wordbook', 'can_quiz', 'can_tts', 'can_podcast', 'perm_literature_compass', 'perm_digest_reading'];
   const updates = Object.entries(req.body).filter(([k]) => allowed.includes(k));
   if (!updates.length) return res.status(400).json({ error: '변경할 항목이 없습니다.' });
 
-  // Prevent self-demotion or self-block
+  // Prevent self-demotion, self-block, or self-unapproval
   if (targetId === req.user.id) {
     const hasDanger = updates.some(([k, v]) =>
-      (k === 'role' && v !== 'admin') || (k === 'is_blocked' && v === true)
+      (k === 'role' && v !== 'admin') || (k === 'is_blocked' && v === true) || (k === 'is_approved' && v === false)
     );
-    if (hasDanger) return res.status(400).json({ error: '자기 자신의 권한을 제거하거나 차단할 수 없습니다.' });
+    if (hasDanger) return res.status(400).json({ error: '자기 자신의 권한을 제거하거나 차단/승인취소할 수 없습니다.' });
   }
 
   try {
     const setClauses = updates.map(([k], i) => `${k} = $${i + 2}`).join(', ');
     const values = [targetId, ...updates.map(([, v]) => v)];
     const { rows } = await pool.query(
-      `UPDATE users SET ${setClauses} WHERE id = $1 RETURNING id, email, name, role, is_blocked, can_search, can_wordbook, can_quiz, can_tts, can_podcast, perm_literature_compass, perm_digest_reading`,
+      `UPDATE users SET ${setClauses} WHERE id = $1 RETURNING id, email, name, role, is_blocked, is_approved, can_search, can_wordbook, can_quiz, can_tts, can_podcast, perm_literature_compass, perm_digest_reading`,
       values
     );
     if (!rows.length) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
@@ -69,6 +69,7 @@ router.get('/api/admin/stats', requireAdmin, async (req, res) => {
           COUNT(*)::int AS total,
           COUNT(*) FILTER (WHERE NOT is_blocked)::int AS active,
           COUNT(*) FILTER (WHERE is_blocked)::int AS blocked,
+          COUNT(*) FILTER (WHERE NOT is_approved)::int AS pending,
           COUNT(*) FILTER (WHERE role = 'admin')::int AS admins
         FROM users
       `),

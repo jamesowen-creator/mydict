@@ -16,8 +16,18 @@ export default function HomeWheelApp() {
   const [selected, setSelected] = useState(OPTIONS[0].id);
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState(false);
 
   useEffect(() => {
+    // 9-a: unapproved signups never get a JWT (see routes/auth.js's OAuth
+    // callback) - they're bounced back here with this query param instead of
+    // `?token=...`, so there's no `/api/me` call to make for this case.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('approval') === 'pending') {
+      setPendingApproval(true);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     const token = getToken();
     if (!token) { setAuthChecked(true); return; }
     fetchMe(token)
@@ -62,11 +72,22 @@ export default function HomeWheelApp() {
           fill whatever space is left between the top edge and the fixed-size
           login row below, and centers the wheel within that space - the
           "위/중간/아래 자연스럽게 분배" 작업10-b asked for. */}
-      <div className="flex flex-1 items-center justify-center">
-        <div className="w-full max-w-xl">
-          <ThreeDWheelPicker options={OPTIONS} value={selected} onChange={setSelected} onCenterTap={goTo} />
+      {pendingApproval ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+          <div className="text-lg font-bold" style={{ color: 'rgba(30,41,59,.85)' }}>승인 대기중</div>
+          <div className="text-sm leading-relaxed" style={{ color: 'rgba(30,41,59,.6)' }}>
+            관리자 승인 후 이용 가능합니다.
+            <br />
+            승인이 완료되면 다시 로그인해 주세요.
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="w-full max-w-xl">
+            <ThreeDWheelPicker options={OPTIONS} value={selected} onChange={setSelected} onCenterTap={goTo} />
+          </div>
+        </div>
+      )}
 
       {/* 8-b: login/logout + admin, in the space below the wheel. Reads the
           same localStorage token + /api/me role check the vanilla pages use
@@ -74,7 +95,7 @@ export default function HomeWheelApp() {
           instead, since the vanilla pages are plain inline <script>, not
           built with anything a Vite bundle could import from. */}
       <div className="flex flex-col items-center gap-3 pb-2">
-        {authChecked && (
+        {!pendingApproval && authChecked && (
           user ? (
             <div className="flex items-center gap-3">
               {user.role === 'admin' && (

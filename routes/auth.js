@@ -19,17 +19,18 @@ if (googleOAuthEnabled) {
   }, async (accessToken, refreshToken, profile, done) => {
     try {
       const email = profile.emails?.[0]?.value;
-      const role = ADMIN_EMAILS.includes((email || '').toLowerCase()) ? 'admin' : null;
+      const isAdminEmail = ADMIN_EMAILS.includes((email || '').toLowerCase());
+      const role = isAdminEmail ? 'admin' : null;
       const displayName = (profile.displayName || '').normalize('NFC');
       const { rows } = await pool.query(
-        `INSERT INTO users (google_id, email, name, role)
-         VALUES ($1, $2, $3, COALESCE($4, 'user'))
+        `INSERT INTO users (google_id, email, name, role, is_approved)
+         VALUES ($1, $2, $3, COALESCE($4, 'user'), $5)
          ON CONFLICT (google_id) DO UPDATE
            SET email = EXCLUDED.email,
                name  = EXCLUDED.name,
                role  = CASE WHEN $4 IS NOT NULL THEN $4 ELSE users.role END
          RETURNING *`,
-        [profile.id, email, displayName, role]
+        [profile.id, email, displayName, role, isAdminEmail]
       );
       done(null, rows[0]);
     } catch (err) {
@@ -63,6 +64,9 @@ router.get('/auth/google/callback', (req, res, next) => {
   }
   passport.authenticate('google', { failureRedirect: '/?login=failed' })(req, res, next);
 }, (req, res) => {
+    if (req.user.is_approved === false) {
+      return res.redirect('/?approval=pending');
+    }
     const token = jwt.sign(
       { id: req.user.id, email: req.user.email, name: req.user.name, role: req.user.role || 'user' },
       JWT_SECRET,
