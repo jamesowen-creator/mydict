@@ -2262,7 +2262,7 @@ Respond ONLY in valid JSON with this exact structure:
     {
       "pos": "noun",
       "domain": "일반",
-      "definition": "순수 사전적 정의만 한국어로 (뉘앙스·사용 상황 설명 없이 핵심 뜻만)",
+      "definition": "암기하기 쉬운 짧은 한국어 대응어/구 2~4개를 쉼표로 나열 (완전한 문장 금지, 예: '심한, 극심한' - '정도가 심하거나 극단적인' 같은 문장형 금지)",
       "usage_note": "이 의미가 실제로 자주 쓰이는 상황·장소·톤을 1~2문장 한국어로 (뉘앙스 보조 설명)",
       "example": "English example sentence.",
       "translation": "예문의 한국어 해석"
@@ -2292,6 +2292,7 @@ Respond ONLY in valid JSON with this exact structure:
 
 Rules:
 - meanings: 2-4 entries, ordered by REAL-WORLD USAGE FREQUENCY (most common sense first). If the word has senses across different parts of speech, include them all in this SAME array (still frequency-ordered overall) - each entry's "pos" marks which part of speech it belongs to. "definition" must be a plain dictionary definition only; never put usage context, situation, or tone commentary there - that belongs in "usage_note".
+- definition: 짧고 기억하기 쉬운 한국어 단어/구 위주로 작성. "정도가 심하거나 극단적인" 같은 완전한 문장 대신 "심한, 극심한"처럼 짧은 대응어 2~4개를 쉼표로 나열. 의미가 안 통할 정도로 지나치게 줄이지는 말고, 단어 하나로 어색하면 2~3단어 짧은 구 형태(예: "정도가 심한")는 허용. 이 필드는 short_gloss(퀴즈용으로 쓰이는 가장 흔한 의미 1개, 1~3단어)와는 별개이니 통합하거나 혼동하지 말 것 - definition은 그 의미 하나를 설명하는 여러 개의 간결한 한국어 대응어 나열이다.
 - derivatives: up to 5 related word forms.
 - similar: 3-4 near-synonyms with a one-line nuance difference from the searched word.
 - collocations: 2-3 real, commonly-used word combinations (adjective+noun, verb+noun, etc.) built around "${query}" or its base form, each with its Korean meaning.
