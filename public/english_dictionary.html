@@ -1862,6 +1862,7 @@
 
         <div class="wb-side-group">
           <button class="wb-side-btn" id="wb-mode-listen-btn" onclick="setWordbookMode('listen')"><span class="wb-side-icon">🎙</span><span>선택 듣기</span></button>
+          <button class="wb-side-btn" id="wb-mode-quiz-btn" onclick="setWordbookMode('quiz')"><span class="wb-side-icon">🎯</span><span>선택 퀴즈</span></button>
         </div>
 
         <div class="wb-side-group wb-side-gap-before">
@@ -3095,7 +3096,10 @@ function updateSelectedBtn() {
   const count = tabWords.filter(w => selectedWords.has(w.word + '|' + tab)).length;
   const btn = document.getElementById('wb-selected-action-btn');
   if (btn) {
-    btn.textContent = wordbookMode === 'delete' ? `🗑 선택 삭제 (${count}개)` : `🎧 재생 (${count}개)`;
+    const label = wordbookMode === 'delete' ? '🗑 선택 삭제'
+      : wordbookMode === 'quiz' ? '🎯 퀴즈'
+      : '🎧 재생';
+    btn.textContent = `${label} (${count}개)`;
     btn.disabled = count === 0;
     btn.style.opacity = count === 0 ? '0.4' : '1';
   }
@@ -3121,6 +3125,30 @@ function podcastStartSelected() {
   podcastIndex = 0; podcastAudio = null; podcastSegments = []; podcastSegIdx = 0;
   podcastPlaying = true;
   _updatePodcastBtn(); _showPodcastPlayer(); _podcastPlayFromCurrentWord();
+}
+
+// 작업16: 선택 퀴즈 - 현재 퀴즈 엔진(startQuiz/renderQuizQuestion)은
+// 영어 단어장(en2ko/ko2en/similar) 전제로 만들어져 있어서, 다른 언어
+// 탭에서 선택한 단어로 돌리면 오답 보기 풀(enWords 기준)이나 nuance
+// 필드 등이 안 맞아 깨질 수 있음 - 영어 탭에서만 허용.
+function startSelectedWordsQuiz() {
+  const tab = currentWordbookTab;
+  if (tab !== 'en') {
+    showToast('선택 퀴즈는 영어 단어장에서만 가능합니다.');
+    return;
+  }
+  const words = wordbook.filter(w => (w.lang || 'en') === tab && selectedWords.has(w.word + '|' + tab));
+  if (words.length === 0) { showToast('선택된 단어가 없습니다.'); return; }
+  setWordbookMode('none'); // 선택 모드 종료 (words는 이미 위에서 확보해뒀으니 clear돼도 무방)
+  isWrongQuiz = false;
+  selectedQuizType = 'en2ko';
+  // showPage('quiz')는 항상 renderQuizStart(false)를 먼저 호출해 유형
+  // 선택 화면을 그리지만, 같은 동기 실행 흐름 안에서 바로 이어지는
+  // startQuiz(words)가 그 내용을 즉시 덮어써서 실제로는 화면에 그려질
+  // 틈 없이 퀴즈 문제 화면으로 바로 넘어감 - renderQuizStart나 showPage를
+  // 건드리지 않고 "유형 선택 화면 건너뛰기"를 구현하는 방법.
+  showPage('quiz');
+  startQuiz(words);
 }
 
 async function confirmDeleteSelectedWords() {
@@ -3149,8 +3177,10 @@ function setWordbookMode(mode) {
 
 function updateModeButtons() {
   const listenBtn = document.getElementById('wb-mode-listen-btn');
+  const quizBtn = document.getElementById('wb-mode-quiz-btn');
   const deleteBtn = document.getElementById('wb-mode-delete-btn');
   if (listenBtn) listenBtn.classList.toggle('active', wordbookMode === 'listen');
+  if (quizBtn) quizBtn.classList.toggle('active', wordbookMode === 'quiz');
   if (deleteBtn) deleteBtn.classList.toggle('active', wordbookMode === 'delete');
 }
 
@@ -3162,6 +3192,11 @@ function updateSelectRow() {
       '<button class="btn secondary" onclick="toggleSelectAll()" id="wb-select-all-btn" style="white-space:nowrap;font-size:12px;padding:8px 12px">전체선택</button>' +
       '<button class="btn" onclick="podcastStartSelected()" id="wb-selected-action-btn" style="flex:1;font-size:13px;padding:10px 12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);opacity:0.4" disabled>🎧 재생 (0개)</button>' +
       '<button class="btn secondary" onclick="setWordbookMode(\'listen\')" style="font-size:12px;padding:8px 12px;white-space:nowrap">취소</button>';
+  } else if (wordbookMode === 'quiz') {
+    row.innerHTML =
+      '<button class="btn secondary" onclick="toggleSelectAll()" id="wb-select-all-btn" style="white-space:nowrap;font-size:12px;padding:8px 12px">전체선택</button>' +
+      '<button class="btn" onclick="startSelectedWordsQuiz()" id="wb-selected-action-btn" style="flex:1;font-size:13px;padding:10px 12px;background:var(--accent);opacity:0.4" disabled>🎯 퀴즈 (0개)</button>' +
+      '<button class="btn secondary" onclick="setWordbookMode(\'quiz\')" style="font-size:12px;padding:8px 12px;white-space:nowrap">취소</button>';
   } else if (wordbookMode === 'delete') {
     row.innerHTML =
       '<button class="btn secondary" onclick="toggleSelectAll()" id="wb-select-all-btn" style="white-space:nowrap;font-size:12px;padding:8px 12px">전체선택</button>' +
@@ -3330,9 +3365,11 @@ function selectQuizType(type) {
   });
 }
 
-function startQuiz() {
+// 작업16: customPool(선택 퀴즈에서 넘기는 특정 단어 목록)이 있으면 그것만
+// 사용, 없으면 기존과 동일하게 단어장 전체/오답노트 중에서 고름.
+function startQuiz(customPool) {
   const enWords = wordbook.filter(w => (w.lang || 'en') === 'en');
-  const pool = isWrongQuiz ? wrongNote : enWords;
+  const pool = customPool || (isWrongQuiz ? wrongNote : enWords);
   const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(10, pool.length));
 
   let questions;
