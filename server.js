@@ -37,7 +37,7 @@ app.use(passport.session());
 
 app.get('/', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
-  res.sendFile(path.join(__dirname, 'public', 'english_dictionary.html'));
+  res.sendFile(path.join(__dirname, 'public', 'home', 'index.html'));
 });
 app.get('/admin', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');

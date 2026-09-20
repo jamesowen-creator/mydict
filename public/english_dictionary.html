@@ -1856,13 +1856,7 @@ function logout() {
 }
 
 function goHome() {
-  showPage('search');
-  document.getElementById('search-input').value = '';
-  document.getElementById('search-result').innerHTML = '';
-  const clearBtn = document.getElementById('search-clear-btn');
-  if (clearBtn) clearBtn.style.display = 'none';
-  const searchBarWrap = document.getElementById('search-bar-wrap');
-  if (searchBarWrap) searchBarWrap.style.display = 'none';
+  window.location.href = '/';
 }
 
 // ─── WORDBOOK DB API ──────────────────────────────────────────────────────────

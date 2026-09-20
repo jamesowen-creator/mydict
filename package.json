@@ -4,7 +4,8 @@
   "description": "English dictionary web app powered by Claude Haiku",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build:home": "npm --prefix home-wheel install && npm --prefix home-wheel run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
