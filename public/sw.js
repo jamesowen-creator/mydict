@@ -1,8 +1,12 @@
-const CACHE_NAME = 'metis-v3';
+const CACHE_NAME = 'metis-v4';
 const STATIC_ASSETS = [
   '/',
   '/english_dictionary.html',
   '/metis-logo-2.png',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/apple-touch-icon-180.png',
+  '/icons/favicon-32.png',
   // manifest.json은 서버에서 no-cache로 제공 — SW 캐시 제외하여 항상 최신 상태 유지
   'https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap'
 ];
