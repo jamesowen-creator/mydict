@@ -2186,6 +2186,11 @@ document.getElementById('search-input').addEventListener('input', e => {
   updateLangIndicator(detectLang(e.target.value));
   document.getElementById('search-clear-btn').style.display = e.target.value ? 'block' : 'none';
 });
+// 작업15: 검색 결과를 본 뒤 다시 검색창을 탭/클릭하면 이전 검색어가
+// 전체 선택되어, 바로 타이핑만 해도 새 단어로 덮어써지게 함.
+document.getElementById('search-input').addEventListener('focus', e => {
+  e.target.select();
+});
 
 function clearSearchInput() {
   const input = document.getElementById('search-input');
