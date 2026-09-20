@@ -1,7 +1,14 @@
 /* 작업13: 전 화면 공통 상단 헤더. 각 페이지마다 테마 색상(--accent 등)이
    달라서(사전=파랑, 문학나침반=보라 등) 페이지 변수에 기대지 않고 METIS
    브랜드 색(로고의 코랄/레드)을 직접 지정해 어느 페이지에서나 동일하게
-   보이게 함. */
+   보이게 함. #e2583b는 home-wheel(--accent-rgb: 226,88,59)과 사전
+   페이지 OCR 스캐너(--ocr-ember)에 이미 쓰이던 것과 동일한 코랄 값 -
+   기존 색과 통일하기 위해 새 색을 만들지 않고 그대로 재사용. */
+/* :root 스코프 - admin.html처럼 .metis-app-header 래퍼 없이 버튼/이름
+   클래스만 자기 헤더 안에 재사용하는 경우에도 이 변수가 보이게 함. */
+:root {
+  --metis-coral: #e2583b;
+}
 .metis-app-header {
   position: sticky;
   top: 0;
@@ -22,12 +29,16 @@
 .metis-app-header-logo {
   display: flex;
   align-items: center;
-  line-height: 0;
-}
-.metis-app-header-logo img {
-  height: 40px;
-  width: auto;
-  display: block;
+  /* 작업13-b: 이미지 로고(아이콘+워드마크) 대신 "METIS" 텍스트만.
+     Sora는 사전/관리자 페이지에는 로드돼 있지만 문학나침반/한입독서/
+     MetaCong에는 없어서, 있으면 쓰고 없으면 Noto Sans KR로 자연스럽게
+     대체되도록 폴백을 둠 - 페이지마다 폰트가 달라 보이는 것을 방지. */
+  font-family: 'Sora', 'Noto Sans KR', ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--metis-coral);
+  text-decoration: none;
+  letter-spacing: 0.01em;
 }
 .metis-app-header-right {
   display: flex;
@@ -55,12 +66,12 @@
   font-family: 'Noto Sans KR', sans-serif;
 }
 .metis-app-header-btn.primary {
-  background: #e2583b;
+  background: var(--metis-coral);
   color: #fff;
-  border-color: #e2583b;
+  border-color: var(--metis-coral);
 }
 .metis-app-header-btn.admin {
   background: rgba(226, 88, 59, 0.08);
   border-color: rgba(226, 88, 59, 0.4);
-  color: #e2583b;
+  color: var(--metis-coral);
 }

@@ -83,8 +83,8 @@
   // (뒤로가기/진행률 등 기존 기능을 대체하지 않음).
   function inject() {
     const header = el('header', { class: 'metis-app-header' });
-    const logo = el('a', { href: '/', class: 'metis-app-header-logo', 'aria-label': 'METIS' });
-    logo.appendChild(el('img', { src: '/icons/metis-logo-with-wordmark-v4.png', alt: 'METIS' }));
+    // 작업13-b: 아이콘+워드마크 이미지 대신 "METIS" 텍스트(코랄 볼드)만 사용
+    const logo = el('a', { href: '/', class: 'metis-app-header-logo', 'aria-label': 'METIS' }, 'METIS');
     const right = el('div', { class: 'metis-app-header-right' });
     header.appendChild(logo);
     header.appendChild(right);
