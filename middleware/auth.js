@@ -19,12 +19,33 @@ function requireAuth(req, res, next) {
   }
 }
 
-function requireAdmin(req, res, next) {
-  requireAuth(req, res, () => {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: '관리자 권한이 필요합니다.' });
+// Does NOT trust req.user.role from the JWT payload: that role is fixed at login
+// time and can go stale for up to 7 days (the token's expiry) if ADMIN_EMAILS
+// changes or the DB role is updated afterward - /api/me re-derives the current
+// role on every call (and even auto-upgrades the DB row), but has no way to
+// reach back into a token the client already has. So this always re-checks
+// against the current ADMIN_EMAILS list and, when a DB is configured, the
+// user's current DB role - the same two sources /api/me itself trusts.
+async function requireAdmin(req, res, next) {
+  requireAuth(req, res, async () => {
+    const emailIsAdmin = ADMIN_EMAILS.includes((req.user.email || '').toLowerCase());
+    if (emailIsAdmin) return next();
+    if (!process.env.DATABASE_URL) {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: '관리자 권한이 필요합니다.' });
+      }
+      return next();
     }
-    next();
+    try {
+      const { rows } = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+      if (rows[0]?.role !== 'admin') {
+        return res.status(403).json({ error: '관리자 권한이 필요합니다.' });
+      }
+      next();
+    } catch (err) {
+      console.error('requireAdmin DB error:', err.message);
+      res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+    }
   });
 }
 
