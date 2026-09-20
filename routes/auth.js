@@ -7,6 +7,19 @@ const { JWT_SECRET, ADMIN_EMAILS, requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
+// 작업9-b: 작업8 이전에는 '/'가 english_dictionary.html 그 자체였어서 콜백이
+// 항상 '/'로 보내도 사용자가 있던 화면 그대로였음. 작업8에서 '/'가 홈 휠로
+// 바뀐 뒤에도 콜백은 여전히 '/'만 바라보고 있어서, 사전 페이지에서 로그인한
+// 사람이 검색 화면이 아니라 홈으로 튕겨나가는 회귀가 생겼음. OAuth의 state
+// 파라미터로 로그인을 시작한 페이지 경로를 왕복시켜 원래 페이지로 되돌려줌.
+// 내부 상대 경로만 허용해 state를 통한 오픈 리다이렉트를 막음.
+function safeNextPath(raw) {
+  if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('://')) {
+    return '/';
+  }
+  return raw;
+}
+
 // ─── Google OAuth ─────────────────────────────────────────────────────────────
 
 const googleOAuthEnabled = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -55,7 +68,8 @@ router.get('/auth/google', (req, res, next) => {
   if (!googleOAuthEnabled) {
     return res.status(503).json({ error: 'OAuth 설정이 필요합니다.' });
   }
-  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+  const state = safeNextPath(req.query.next);
+  passport.authenticate('google', { scope: ['profile', 'email'], state })(req, res, next);
 });
 
 router.get('/auth/google/callback', (req, res, next) => {
@@ -64,15 +78,17 @@ router.get('/auth/google/callback', (req, res, next) => {
   }
   passport.authenticate('google', { failureRedirect: '/?login=failed' })(req, res, next);
 }, (req, res) => {
+    const target = safeNextPath(req.query.state);
+    const sep = target.includes('?') ? '&' : '?';
     if (req.user.is_approved === false) {
-      return res.redirect('/?approval=pending');
+      return res.redirect(`${target}${sep}approval=pending`);
     }
     const token = jwt.sign(
       { id: req.user.id, email: req.user.email, name: req.user.name, role: req.user.role || 'user' },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
-    res.redirect(`/?token=${token}`);
+    res.redirect(`${target}${sep}token=${token}`);
   }
 );
 
