@@ -618,11 +618,23 @@
     gap: 10px;
     align-items: flex-start;
   }
+  /* 작업5-a: 페이지는 body 전체 스크롤 방식(별도 스크롤 컨테이너 없음)이고
+     .wb-layout이 그냥 flex라서, .wb-side가 static이면 .wb-main과 함께
+     그대로 스크롤되어 화면 밖으로 밀려남. sticky + top을 공용 헤더의
+     실측 높이(48px)로 맞춰서 항상 화면에 붙어있게 함. .wb-layout에
+     이미 align-items:flex-start가 있어서 .wb-side가 .wb-main 높이만큼
+     늘어나 있지 않은 상태라 sticky가 바로 효과를 냄. 배경을 불투명하게
+     줘서(#wb-select-row와 동일한 이유) 밑에서 스크롤되는 단어 카드가
+     비쳐 보이지 않게 함. */
   .wb-side {
     width: 74px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
+    position: sticky;
+    top: 48px;
+    background: var(--bg);
+    z-index: 15;
   }
   .wb-side-group {
     display: flex;
@@ -669,12 +681,15 @@
   .wb-main { flex: 1; min-width: 0; }
 
   /* Selection action bar (전체선택/재생 or 전체선택/선택 삭제/취소) - sticks
-     just below the sticky top nav (nav's own height is 52px) while the word
-     list scrolls, in both 선택 듣기 and 삭제 모드. Solid background so list
-     chips scrolling underneath don't show through. */
+     just below the common top header (작업13, 48px) while the word list
+     scrolls, in both 선택 듣기 and 삭제 모드. Solid background so list
+     chips scrolling underneath don't show through.
+     작업5-a: top이 예전 상단 nav(52px, 작업12에서 하단으로 옮겨져 지금은
+     존재하지 않음) 기준 그대로 남아있던 걸 공용 헤더의 실측 높이로 수정 -
+     .wb-side와 같은 값을 써서 둘이 같은 줄에 나란히 고정되게 맞춤. */
   #wb-select-row {
     position: sticky;
-    top: 52px;
+    top: 48px;
     z-index: 20;
     background: var(--bg);
     padding: 8px 0;
