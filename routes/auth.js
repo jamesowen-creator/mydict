@@ -20,14 +20,6 @@ function safeNextPath(raw) {
   return raw;
 }
 
-// 작업9-c 임시 디버그용: 특정 계정만 승인 후에도 pending 루프에 걸리는
-// 원인을 실 배포 로그로 확인하기 위한 마스킹 헬퍼. 원인 확인 끝나면
-// 이 함수와 호출부의 console.log를 함께 제거할 것.
-function maskEmail(email) {
-  if (!email) return email;
-  return email.length <= 4 ? '*'.repeat(email.length) : '*'.repeat(email.length - 4) + email.slice(-4);
-}
-
 // ─── Google OAuth ─────────────────────────────────────────────────────────────
 
 const googleOAuthEnabled = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -88,8 +80,6 @@ router.get('/auth/google/callback', (req, res, next) => {
 }, (req, res) => {
     const target = safeNextPath(req.query.state);
     const sep = target.includes('?') ? '&' : '?';
-    // 작업9-c 임시 디버그 로그 - 원인 확인 끝나면 제거할 것
-    console.log('[auth-debug]', maskEmail(req.user.email), '| is_approved:', req.user.is_approved, '(type:', typeof req.user.is_approved, ')');
     if (req.user.is_approved === false) {
       return res.redirect(`${target}${sep}approval=pending`);
     }
@@ -126,25 +116,15 @@ router.get('/api/me', requireAuth, async (req, res) => {
        FROM users WHERE id = $1`,
       [req.user.id]
     );
-    if (!rows.length) {
-      console.log('[me-debug]', maskEmail(req.user.email), '| jwt id:', req.user.id, '| NO MATCHING ROW IN DB');
-      return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
-    }
+    if (!rows.length) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
     const user = rows[0];
     // Auto-upgrade to admin if email is in ADMIN_EMAILS but DB hasn't been updated yet
     if (emailIsAdmin && user.role !== 'admin') {
       await pool.query('UPDATE users SET role = $1 WHERE id = $2', ['admin', req.user.id]);
       user.role = 'admin';
     }
-    // 작업9-c 임시 디버그 로그 - 원인 확인 끝나면 제거할 것. 클라이언트에
-    // 실제로 내려가는 JSON 전체 + name 필드의 코드포인트(인코딩 깨짐 확인용)
-    const nameCodepoints = user.name
-      ? [...user.name].map(c => 'U+' + c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')).join(' ')
-      : '(no name)';
-    console.log('[me-debug]', maskEmail(req.user.email), '| full response:', JSON.stringify(user), '| name codepoints:', nameCodepoints);
     res.json(user);
   } catch (err) {
-    console.log('[me-debug]', maskEmail(req.user.email), '| jwt id:', req.user.id, '| QUERY THREW:', err.message);
     console.error('DB error:', err.message);
     res.status(500).json({ error: '서버 오류가 발생했습니다.' });
   }
