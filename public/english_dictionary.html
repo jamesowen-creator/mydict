@@ -2251,8 +2251,13 @@ async function doSearch() {
 }
 
 // ─── ENGLISH SEARCH ───────────────────────────────────────────────────────────
-async function searchEnglish(query, resultDiv) {
-  const prompt = `You are an English dictionary assistant for a Korean learner.
+// 작업14: Claude 호출 1회로 전체(사전적의미+파생어+활용뉘앙스+예문+유의어+
+// Collocation+번역)를 다 받던 것을 2단계로 분리 - 1차는 사전적 의미/발음/
+// 기본 파생어만 빠르게 받아 즉시 렌더링하고, 나머지는 2차 호출로 이어받아
+// 채워넣는다. 최종 result 객체의 필드 구성은 기존과 동일하게 맞춰서
+// 단어장/퀴즈 등 다른 기능이 이 함수 밖에서 받는 데이터 형태는 그대로다.
+function buildDictQuickPrompt(query) {
+  return `You are an English dictionary assistant for a Korean learner. This is STEP 1 of 2 - respond with ONLY the core lookup info as fast as possible. A second call right after this one will fill in usage notes, examples, synonyms and collocations, so do NOT include those here.
 For the English word or phrase: "${query}"
 
 First identify the base/dictionary form (e.g., running→run, better→good, mice→mouse, meandering→meander). If it's already the base form, set word equal to search_query.
@@ -2267,10 +2272,7 @@ Respond ONLY in valid JSON with this exact structure:
     {
       "pos": "noun",
       "domain": "일반",
-      "definition": "암기하기 쉬운 짧은 한국어 대응어/구 2~4개를 쉼표로 나열 (완전한 문장 금지, 예: '심한, 극심한' - '정도가 심하거나 극단적인' 같은 문장형 금지)",
-      "usage_note": "이 의미가 실제로 자주 쓰이는 상황·장소·톤을 1~2문장 한국어로 (뉘앙스 보조 설명)",
-      "example": "English example sentence.",
-      "translation": "예문의 한국어 해석"
+      "definition": "암기하기 쉬운 짧은 한국어 대응어/구 2~4개를 쉼표로 나열 (완전한 문장 금지, 예: '심한, 극심한' - '정도가 심하거나 극단적인' 같은 문장형 금지)"
     }
   ],
   "derivatives": [
@@ -2278,6 +2280,36 @@ Respond ONLY in valid JSON with this exact structure:
       "word": "derived word",
       "pos": "명사",
       "meaning": "의미 한국어"
+    }
+  ]
+}
+
+Rules:
+- meanings: 2-4 entries, ordered by REAL-WORLD USAGE FREQUENCY (most common sense first). If the word has senses across different parts of speech, include them all in this SAME array (still frequency-ordered overall) - each entry's "pos" marks which part of speech it belongs to.
+- definition: 짧고 기억하기 쉬운 한국어 단어/구 위주로 작성. "정도가 심하거나 극단적인" 같은 완전한 문장 대신 "심한, 극심한"처럼 짧은 대응어 2~4개를 쉼표로 나열. 의미가 안 통할 정도로 지나치게 줄이지는 말고, 단어 하나로 어색하면 2~3단어 짧은 구 형태(예: "정도가 심한")는 허용. 이 필드는 short_gloss(퀴즈용으로 쓰이는 가장 흔한 의미 1개, 1~3단어)와는 별개이니 통합하거나 혼동하지 말 것 - definition은 그 의미 하나를 설명하는 여러 개의 간결한 한국어 대응어 나열이다.
+- derivatives: up to 5 related word forms.
+- domain: one of 일반, 비즈니스, 의학, 법률, 기술, 구어체, 문학, 격식체, 비격식.
+- short_gloss must be a single short word/phrase (1-3 words), never a full clause or sentence - it is used as a multiple-choice quiz answer, not a definition.
+- Do NOT include etymology or word-origin information anywhere in the response.
+- Do NOT include usage_note, example, translation, similar, or collocations fields - those belong to the follow-up call only.
+YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
+}
+
+function buildDictDetailPrompt(result) {
+  const meaningsList = result.meanings.map((m, i) => `${i + 1}. [${m.pos || ''}] ${m.definition || ''}`).join('\n');
+  return `You are continuing an English dictionary lookup for a Korean learner. This is STEP 2 of 2 - the word and its core definitions were already determined in a previous call; add only the remaining detail sections below.
+
+Word: "${result.word}" (original search query: "${result.search_query || result.word}")
+Existing meanings, in this exact order - your "meanings" array below MUST have exactly this many entries, in this same order, one per index (do not add, remove, or reorder):
+${meaningsList}
+
+Respond ONLY in valid JSON with this exact structure:
+{
+  "meanings": [
+    {
+      "usage_note": "이 의미가 실제로 자주 쓰이는 상황·장소·톤을 1~2문장 한국어로 (뉘앙스 보조 설명)",
+      "example": "English example sentence.",
+      "translation": "예문의 한국어 해석"
     }
   ],
   "similar": [
@@ -2296,29 +2328,46 @@ Respond ONLY in valid JSON with this exact structure:
 }
 
 Rules:
-- meanings: 2-4 entries, ordered by REAL-WORLD USAGE FREQUENCY (most common sense first). If the word has senses across different parts of speech, include them all in this SAME array (still frequency-ordered overall) - each entry's "pos" marks which part of speech it belongs to. "definition" must be a plain dictionary definition only; never put usage context, situation, or tone commentary there - that belongs in "usage_note".
-- definition: 짧고 기억하기 쉬운 한국어 단어/구 위주로 작성. "정도가 심하거나 극단적인" 같은 완전한 문장 대신 "심한, 극심한"처럼 짧은 대응어 2~4개를 쉼표로 나열. 의미가 안 통할 정도로 지나치게 줄이지는 말고, 단어 하나로 어색하면 2~3단어 짧은 구 형태(예: "정도가 심한")는 허용. 이 필드는 short_gloss(퀴즈용으로 쓰이는 가장 흔한 의미 1개, 1~3단어)와는 별개이니 통합하거나 혼동하지 말 것 - definition은 그 의미 하나를 설명하는 여러 개의 간결한 한국어 대응어 나열이다.
-- derivatives: up to 5 related word forms.
-- similar: 3-4 near-synonyms with a one-line nuance difference from the searched word.
-- collocations: 2-3 real, commonly-used word combinations (adjective+noun, verb+noun, etc.) built around "${query}" or its base form, each with its Korean meaning.
-- domain: one of 일반, 비즈니스, 의학, 법률, 기술, 구어체, 문학, 격식체, 비격식.
-- short_gloss must be a single short word/phrase (1-3 words), never a full clause or sentence - it is used as a multiple-choice quiz answer, not a definition.
+- meanings: exactly ${result.meanings.length} entries, matching the numbered list above 1:1 in the same order - entry i in your response is additional detail for meaning i above.
+- similar: 3-4 near-synonyms with a one-line nuance difference from "${result.word}".
+- collocations: 2-3 real, commonly-used word combinations (adjective+noun, verb+noun, etc.) built around "${result.word}", each with its Korean meaning.
 - Do NOT include etymology or word-origin information anywhere in the response.
 YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
+}
 
-  const text = await callAI(prompt);
-  const result = safeParseJSON(text);
+async function searchEnglish(query, resultDiv) {
+  const t0 = performance.now();
+  const quickText = await callAI(buildDictQuickPrompt(query));
+  const result = safeParseJSON(quickText);
   result.lang = 'en';
-  // backward compat for quiz/podcast, which read these two top-level fields
-  // regardless of how the per-meaning schema changes underneath them.
-  // short_meaning specifically doubles as the multiple-choice quiz/review
-  // answer text (renderQuizQuestion, getMcMeaning both read it off saved
-  // wordbook entries) - short_gloss is deliberately terse for that reason,
-  // vs. meanings[0].definition which can be a fuller dictionary clause.
-  result.short_meaning = result.short_gloss || result.meanings?.[0]?.definition || '';
-  result.nuance = result.meanings?.map(m => m.usage_note).filter(Boolean).join(' ') || '';
   currentResult = result;
+  console.log(`[dict-2stage] 1차(사전적 의미) 응답: ${Math.round(performance.now() - t0)}ms`);
 
+  // 1차만으로도 화면에 바로 보여줄 수 있는 최소 필드(short_meaning)는 지금
+  // 채워두고, usage_note가 필요한 nuance는 2차 완료 후 다시 계산한다.
+  result.short_meaning = result.short_gloss || result.meanings?.[0]?.definition || '';
+  result.nuance = '';
+
+  // 활용/예문/유의어/Collocation은 아직 없음 - 스켈레톤과 함께 1차 결과부터 즉시 렌더링
+  renderResultEN(result, false, { loadingDetail: true });
+
+  try {
+    const detailText = await callAI(buildDictDetailPrompt(result));
+    const detail = safeParseJSON(detailText);
+    (result.meanings || []).forEach((m, i) => {
+      Object.assign(m, detail.meanings?.[i] || {});
+    });
+    result.similar = detail.similar || [];
+    result.collocations = detail.collocations || [];
+    result.nuance = result.meanings?.map(m => m.usage_note).filter(Boolean).join(' ') || '';
+    console.log(`[dict-2stage] 2차(나머지 상세) 응답: ${Math.round(performance.now() - t0)}ms (전체 경과)`);
+  } catch (e) {
+    console.error('[dict-2stage] 2차 호출 실패 - 1차 결과만 유지:', e);
+  }
+
+  // 사용자가 1차만 보고 페이지를 떠날 수도 있으니, 2차까지 끝난 완전한
+  // 형태가 됐을 때 저장한다(완성 전 저장 시 단어장/퀴즈에 반쪽짜리
+  // usage_note/example 없는 데이터가 남는 것을 방지).
   const alreadySaved = wordbook.some(w => w.word.toLowerCase() === result.word.toLowerCase() && w.lang === 'en');
   if (!alreadySaved) {
     const saved = await saveWordToDB(result);
@@ -2328,7 +2377,15 @@ YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
   renderResultEN(result, alreadySaved);
 }
 
-function renderResultEN(result, alreadySaved) {
+function renderResultEN(result, alreadySaved, opts = {}) {
+  const loadingDetail = !!opts.loadingDetail;
+  // 작업14: 2차 호출이 아직 안 끝난 섹션 자리에 표시할 스켈레톤 -
+  // 홈 대시보드에서 쓰던 것과 같은 .skel-block 셰이머 재사용
+  const detailSkeleton = (lines = 2) =>
+    Array.from({ length: lines }).map(() =>
+      `<div class="skel-block" style="height:36px;margin-bottom:8px"></div>`
+    ).join('');
+
   const posMap = {
     'noun': '명사', 'verb': '동사', 'adjective': '형용사', 'adverb': '부사',
     'preposition': '전치사', 'conjunction': '접속사', 'pronoun': '대명사',
@@ -2407,6 +2464,13 @@ function renderResultEN(result, alreadySaved) {
     </div>
   `).join('');
 
+  // 2차가 아직 안 끝난 상태에서 각 섹션이 비어있으면(정상 - 1차 응답에는
+  // 애초에 이 필드들이 없음) 빈 채로 숨기는 대신 스켈레톤을 보여줌
+  const usageNotesSection = usageNotesHtml || (loadingDetail ? detailSkeleton(2) : '');
+  const examplesSection = examplesHtml || (loadingDetail ? detailSkeleton(2) : '');
+  const similarSection = similarHtml || (loadingDetail ? detailSkeleton(3) : '');
+  const collocationsSection = collocationsHtml || (loadingDetail ? detailSkeleton(2) : '');
+
   const searchQuery = result.search_query || '';
   const baseFormHint = searchQuery && searchQuery.toLowerCase() !== result.word.toLowerCase()
     ? `<div class="base-form-hint">${searchQuery} → ${result.word}</div>`
@@ -2440,27 +2504,27 @@ function renderResultEN(result, alreadySaved) {
         </div>
       </div>` : ''}
 
-      ${usageNotesHtml ? `
+      ${usageNotesSection ? `
       <div class="result-section">
         <div class="result-section-title">활용 · 뉘앙스</div>
-        ${usageNotesHtml}
+        ${usageNotesSection}
       </div>` : ''}
 
-      ${examplesHtml ? `
+      ${examplesSection ? `
       <div class="result-section">
         <div class="result-section-title">예문</div>
-        ${examplesHtml}
+        ${examplesSection}
       </div>` : ''}
 
       <div class="result-section">
         <div class="result-section-title">유의어</div>
-        <div class="similar-list">${similarHtml}</div>
+        <div class="similar-list">${similarSection}</div>
       </div>
 
-      ${collocationsHtml ? `
+      ${collocationsSection ? `
       <div class="result-section">
         <div class="result-section-title">Collocation</div>
-        <div class="derivatives-list">${collocationsHtml}</div>
+        <div class="derivatives-list">${collocationsSection}</div>
       </div>` : ''}
 
       <div class="extra-trans-wrap">
