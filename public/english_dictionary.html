@@ -1616,13 +1616,10 @@
     <img src="/icons/logo-header.png" alt="METIS" style="height: 40px;">
   </div>
   <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showPage('home')">홈</button>
-    <button class="nav-tab" onclick="showPage('search')">검색</button>
     <button class="nav-tab" onclick="showPage('wordbook')">단어장 <span class="badge" id="wordbook-count">0</span></button>
     <button class="nav-tab" onclick="showPage('quiz')">퀴즈</button>
     <button class="nav-tab" onclick="showPage('metacog')">복습</button>
     <button class="nav-tab" onclick="showPage('wrong')">오답노트 <span class="badge" id="wrong-count">0</span></button>
-    <button class="nav-tab-metacong" onclick="openMetaCong()">🧠 MetaCong 학습</button>
   </div>
 </nav>
 
@@ -1641,7 +1638,7 @@
 <main>
 
   <!-- HOME DASHBOARD -->
-  <div class="page active" id="page-home">
+  <div class="page" id="page-home">
     <div id="home-container">
       <div style="padding:16px">
         <div class="skel-block" style="height:96px;margin-bottom:6px"></div>
@@ -1659,7 +1656,7 @@
   </div>
 
   <!-- SEARCH PAGE -->
-  <div class="page" id="page-search">
+  <div class="page active" id="page-search">
     <div class="search-page-wrap">
       <div class="search-wrap" style="margin-bottom:8px">
         <div class="search-input-wrap">
@@ -1841,7 +1838,7 @@ async function initAuth() {
   updateBadges();
   backfillShortMeanings();
   setupBackButtonBlock();
-  showPage('home');
+  showPage('search');
 }
 
 function showLoginScreen() {
@@ -1938,7 +1935,7 @@ function showPage(name, push = true) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
-  const tabIdx = ['home','search','wordbook','quiz','metacog','wrong'].indexOf(name);
+  const tabIdx = ['wordbook','quiz','metacog','wrong'].indexOf(name);
   if (tabIdx >= 0) document.querySelectorAll('.nav-tab')[tabIdx].classList.add('active');
 
   const stickyBar = document.getElementById('search-bar-wrap');
@@ -2631,7 +2628,7 @@ let selectedWords = new Set();
 let currentUserName = '';
 let wordbookDeleteMode = false;
 let wordbookSelectMode = false;
-let _currentPage = 'home';
+let _currentPage = 'search';
 
 function switchWordbookTab(tab) {
   currentWordbookTab = tab;
@@ -4192,7 +4189,7 @@ function setupBackButtonBlock() {
     if (e.state && e.state.page) {
       showPage(e.state.page, false);
     } else {
-      history.pushState({ page: _currentPage || 'home' }, '');
+      history.pushState({ page: _currentPage || 'search' }, '');
     }
   });
 }
