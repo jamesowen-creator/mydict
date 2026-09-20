@@ -3318,9 +3318,16 @@ const QUIZ_TYPES = [
 
 let selectedQuizType = 'en2ko';
 let isWrongQuiz = false;
+// 작업16-a: 선택 퀴즈(startSelectedWordsQuiz)로 시작했을 때만 채워지는
+// 단어 목록. "다시 풀기"가 startQuiz()를 인자 없이 부를 때 이 값이
+// 있으면 그대로 재사용해서 같은 선택 범위를 유지함. 일반 퀴즈
+// 메뉴로 돌아오면(renderQuizStart) 매번 비워서 다음 "퀴즈 시작"이나
+// "다시 풀기"가 엉뚱하게 이 값을 물려받지 않게 함.
+let currentQuizPool = null;
 
 function renderQuizStart(wrongMode) {
   isWrongQuiz = wrongMode;
+  currentQuizPool = null;
   const enWords = wordbook.filter(w => (w.lang || 'en') === 'en');
   const pool = wrongMode ? wrongNote : enWords;
   const container = document.getElementById('quiz-container');
@@ -3367,9 +3374,13 @@ function selectQuizType(type) {
 
 // 작업16: customPool(선택 퀴즈에서 넘기는 특정 단어 목록)이 있으면 그것만
 // 사용, 없으면 기존과 동일하게 단어장 전체/오답노트 중에서 고름.
+// 작업16-a: customPool로 명시적으로 불렸을 때 currentQuizPool에 기억해둬서,
+// "다시 풀기"처럼 인자 없이 다시 불렸을 때도(customPool === undefined)
+// 같은 선택 범위를 계속 쓸 수 있게 함.
 function startQuiz(customPool) {
+  if (customPool) currentQuizPool = customPool;
   const enWords = wordbook.filter(w => (w.lang || 'en') === 'en');
-  const pool = customPool || (isWrongQuiz ? wrongNote : enWords);
+  const pool = currentQuizPool || (isWrongQuiz ? wrongNote : enWords);
   const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(10, pool.length));
 
   let questions;
