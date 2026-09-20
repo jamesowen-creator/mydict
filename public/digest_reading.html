@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- 작업13: 전 화면 공통 상단 헤더(로고+로그인상태) -->
+<link rel="stylesheet" href="/css/common/appHeader.css">
 <style>
   :root {
     --primary: #1D9E75;
@@ -409,6 +411,11 @@
 </style>
 </head>
 <body>
+
+<!-- 작업13: 전 화면 공통 상단 헤더 - 화면별 top-bar(뒤로가기/제목)는
+     그대로 두고 그 위에 얹음(대체하지 않음) -->
+<script src="/js/common/appHeader.js"></script>
+<script>MetisAppHeader.inject();</script>
 
 <!-- Loading -->
 <div id="loading">

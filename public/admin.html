@@ -6,6 +6,8 @@
 <title>METIS Admin</title>
 <link rel="icon" type="image/png" href="/icons/favicon-32.png">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+<!-- 작업13: 공용 인증 위젯 스타일(.metis-app-header-btn 등) 재사용 -->
+<link rel="stylesheet" href="/css/common/appHeader.css">
 <style>
   :root {
     --bg: #f5f7ff; --surface: #fff; --border: #dde2f5;
@@ -19,12 +21,17 @@
   /* ── Header ── */
   header {
     background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 0 24px; height: 52px;
+    padding: 10px 16px; min-height: 52px;
+    /* 작업13: 인증 위젯(이름+로그아웃)이 추가되면서 좁은 모바일 폭에서
+       기존 height:52px 고정 + justify-content:space-between만으로는
+       내용이 넘쳐 "돌아가기" 링크가 세로로 찌그러졌음 - 감싸지도록
+       바꾸고 높이를 내용에 맞게 늘어나도록 함 */
     display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; row-gap: 8px;
     position: sticky; top: 0; z-index: 50;
     box-shadow: 0 1px 8px rgba(74,110,245,0.07);
   }
-  .header-left { display: flex; align-items: center; gap: 12px; }
+  .header-left { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
   .header-logo { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 18px; color: var(--accent); }
   .header-badge {
     background: var(--accent); color: #fff; font-size: 10px; font-weight: 700;
@@ -34,6 +41,7 @@
     font-size: 13px; color: var(--text2); background: none; border: 1px solid var(--border);
     border-radius: 8px; padding: 5px 12px; cursor: pointer; text-decoration: none;
     display: inline-flex; align-items: center; gap: 5px;
+    white-space: nowrap; flex-shrink: 0;
   }
   .btn-back:hover { background: var(--bg); }
 
@@ -171,7 +179,14 @@
     <span class="header-logo">METIS</span>
     <span class="header-badge">ADMIN</span>
   </div>
-  <a href="/" class="btn-back">← 앱으로 돌아가기</a>
+  <!-- 작업13: 별도 헤더 바를 새로 얹지 않고, 이미 있는 이 헤더의 우측에
+       공용 인증 위젯(이름+로그아웃)을 병합. admin.html은 원래 로그아웃
+       기능이 아예 없었음 - 관리자 버튼은 현재 페이지가 /admin이라
+       renderAuthWidget이 알아서 생략함. -->
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;row-gap:6px">
+    <div id="metis-header-auth" class="metis-app-header-right"></div>
+    <a href="/" class="btn-back">← 앱으로 돌아가기</a>
+  </div>
 </header>
 
 <main>
@@ -242,6 +257,7 @@
 
 <div id="toast"></div>
 
+<script src="/js/common/appHeader.js"></script>
 <script>
 const TOKEN_KEY = 'mydict_token';
 
@@ -477,6 +493,8 @@ async function loadData() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+MetisAppHeader.renderAuthWidget(document.getElementById('metis-header-auth'));
+
 (async () => {
   const ok = await checkAuth();
   document.getElementById('loading').style.display = 'none';

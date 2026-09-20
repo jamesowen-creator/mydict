@@ -19,6 +19,8 @@
 <link rel="icon" type="image/png" href="/icons/favicon-32.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<!-- 작업13: 전 화면 공통 상단 헤더(로고+로그인상태) -->
+<link rel="stylesheet" href="/css/common/appHeader.css">
 <style>
   :root {
     --bg: #f5f7ff;
@@ -170,9 +172,17 @@
 
   /* 작업12: 검색 입력 블록을 화면 상단에서 1/3 지점(세로 중앙보다 약간
      위)에 오도록 배치 - 예전에는 상단 nav 바로 아래에 sticky로 붙어
-     있었지만, nav가 하단으로 옮겨가면서 그럴 이유가 없어짐. */
+     있었지만, nav가 하단으로 옮겨가면서 그럴 이유가 없어짐.
+     작업13: 검색을 실행하면 .searched 클래스가 붙어서 공통 헤더 바로
+     아래로 부드럽게 이동함(margin-top 트랜지션) - 한 번 이동한 뒤에는
+     입력창을 지우거나 다시 검색해도 계속 위에 머무름(doSearch()에서
+     한 번 추가된 클래스를 다시 제거하지 않음). */
   .search-page-wrap {
     margin-top: 33vh;
+    transition: margin-top 0.4s ease;
+  }
+  .search-page-wrap.searched {
+    margin-top: 12px;
   }
 
   .search-wrap {
@@ -1715,6 +1725,11 @@
 </head>
 <body>
 
+<!-- 작업13: 전 화면 공통 상단 헤더 - body 맨 앞에 prepend되므로 아래
+     로그인 오버레이/nav/main보다 항상 위(DOM 순서상으로도, sticky로도)에 옴 -->
+<script src="/js/common/appHeader.js"></script>
+<script>MetisAppHeader.inject();</script>
+
 <!-- LOGIN OVERLAY -->
 <div id="login-overlay" style="display:none">
   <div class="login-card">
@@ -2168,6 +2183,9 @@ function clearSearchInput() {
 async function doSearch() {
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
+
+  // 작업13: 검색 실행 시 입력 블록을 헤더 바로 아래로 애니메이션 이동
+  document.querySelector('.search-page-wrap').classList.add('searched');
 
   // 모바일 키보드 내리기
   document.getElementById('search-input').blur();
