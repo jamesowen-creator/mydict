@@ -44,19 +44,23 @@ function usePrefersReducedMotion() {
   return reduced;
 }
 
-// 뷰포트 폭 → desktop / tablet / mobile
-function useBreakpoint() {
-  const [bp, setBp] = useState("desktop");
+// 뷰포트 폭 → desktop / tablet / mobile 기본값 + 실제 뷰포트 높이에 맞춘
+// 안전 캡. 작업11: 폭 기준 브레이크포인트만으로는 "폭은 좁지만 높이도 짧은"
+// 실기기(모바일 브라우저 주소창이 떠 있는 상태 등)를 구분하지 못해서, 고정
+// 300px 뷰포트 높이가 실제 남은 공간보다 커서 하단이 잘리는 원인이 됐음.
+// window.innerHeight를 함께 추적해서 짧은 화면에서는 viewportH 자체를 줄임.
+function useViewportMetrics() {
+  const [size, setSize] = useState(() => ({
+    w: typeof window !== "undefined" ? window.innerWidth : 1024,
+    h: typeof window !== "undefined" ? window.innerHeight : 800,
+  }));
   useLayoutEffect(() => {
-    const update = () => {
-      const w = window.innerWidth;
-      setBp(w < 640 ? "mobile" : w < 1024 ? "tablet" : "desktop");
-    };
+    const update = () => setSize({ w: window.innerWidth, h: window.innerHeight });
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
-  return bp;
+  return size;
 }
 
 const METRICS = {
@@ -171,8 +175,18 @@ function WheelItem({ option, rel, metrics, reduced, onSelect, isSelected }) {
 // unchanged either way, and callers that don't pass it see no difference.
 export function ThreeDWheelPicker({ options, value, onChange, onCenterTap }) {
   const n = options.length;
-  const bp = useBreakpoint();
-  const metrics = METRICS[bp];
+  const { w, h } = useViewportMetrics();
+  const bp = w < 640 ? "mobile" : w < 1024 ? "tablet" : "desktop";
+  const base = METRICS[bp];
+  // 작업11: 이 컴포넌트를 감싸는 HomeWheelApp의 바깥 컨테이너 여백 +
+  // 로그인/로그아웃 버튼 줄 + 이 컴포넌트 자체의 위/아래 네비게이션 버튼
+  // 줄까지 합쳐 대략 170px을 차지한다고 보고, 남은 공간의 90%까지만
+  // 뷰포트 카드 높이로 사용 (5~10% 안전 여유). 700~844px 사이에서 테스트한
+  // 범위에서는 원래 고정값(300px 등)이 그대로 유지되고, 그보다 실제로 더
+  // 짧은 화면(주소창이 계속 떠 있는 실기기, 가로모드 등)에서만 줄어들어서
+  // 하단이 잘리는 일을 막음.
+  const viewportH = Math.min(base.viewportH, Math.max(160, Math.round((h - 170) * 0.9)));
+  const metrics = { ...base, viewportH };
   const reduced = usePrefersReducedMotion();
 
   const onCenterTapRef = useRef(onCenterTap);

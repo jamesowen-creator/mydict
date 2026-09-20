@@ -48,7 +48,14 @@ export default function HomeWheelApp() {
 
   return (
     <div
-      className="h-dvh w-full flex flex-col overflow-hidden px-5 py-6"
+      // 작업11: h-dvh는 모바일 브라우저 주소창이 접혔다 펴짐에 따라 값 자체가
+      // 커졌다 작아졌다 함 - 주소창이 접힌 순간의 큰 dvh 기준으로 레이아웃이
+      // 자리잡은 뒤 주소창이 다시 나타나면(또는 애초에 그 상태로 측정되면)
+      // 실제 보이는 영역보다 콘텐츠가 커져서 하단이 잘림(390x844 같은 고정
+      // 가상 뷰포트로는 재현 안 됨 - 그건 주소창이 없어서 애초에 흔들리지
+      // 않기 때문). h-svh(small viewport height)는 주소창이 완전히 펼쳐진
+      // "가장 작은" 상태 기준으로 고정되므로 항상 그 안에 들어가는 걸 보장함.
+      className="h-svh w-full flex flex-col overflow-hidden px-5 py-6"
       style={{
         '--accent-rgb': '226, 88, 59',
         '--accent': 'rgb(var(--accent-rgb))',
@@ -94,7 +101,13 @@ export default function HomeWheelApp() {
           (see auth.js) - no separate shared module exists yet to import
           instead, since the vanilla pages are plain inline <script>, not
           built with anything a Vite bundle could import from. */}
-      <div className="flex flex-col items-center gap-3 pb-2">
+      <div
+        className="flex flex-col items-center gap-3"
+        // 작업11: viewport-fit=cover라 홈 인디케이터/제스처 바 영역까지 페이지가
+        // 그려짐 - 고정 pb-2(8px)만으로는 그 바 밑에 버튼이 깔릴 수 있어서
+        // env(safe-area-inset-bottom)와 비교해 더 큰 쪽을 여백으로 사용.
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+      >
         {!pendingApproval && authChecked && (
           user ? (
             <div className="flex items-center gap-3">
