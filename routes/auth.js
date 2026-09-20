@@ -20,6 +20,14 @@ function safeNextPath(raw) {
   return raw;
 }
 
+// 작업9-c 임시 디버그용: 특정 계정만 승인 후에도 pending 루프에 걸리는
+// 원인을 실 배포 로그로 확인하기 위한 마스킹 헬퍼. 원인 확인 끝나면
+// 이 함수와 호출부의 console.log를 함께 제거할 것.
+function maskEmail(email) {
+  if (!email) return email;
+  return email.length <= 4 ? '*'.repeat(email.length) : '*'.repeat(email.length - 4) + email.slice(-4);
+}
+
 // ─── Google OAuth ─────────────────────────────────────────────────────────────
 
 const googleOAuthEnabled = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -80,6 +88,8 @@ router.get('/auth/google/callback', (req, res, next) => {
 }, (req, res) => {
     const target = safeNextPath(req.query.state);
     const sep = target.includes('?') ? '&' : '?';
+    // 작업9-c 임시 디버그 로그 - 원인 확인 끝나면 제거할 것
+    console.log('[auth-debug]', maskEmail(req.user.email), '| is_approved:', req.user.is_approved, '(type:', typeof req.user.is_approved, ')');
     if (req.user.is_approved === false) {
       return res.redirect(`${target}${sep}approval=pending`);
     }
