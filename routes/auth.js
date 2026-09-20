@@ -126,15 +126,21 @@ router.get('/api/me', requireAuth, async (req, res) => {
        FROM users WHERE id = $1`,
       [req.user.id]
     );
-    if (!rows.length) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+    if (!rows.length) {
+      console.log('[me-debug]', maskEmail(req.user.email), '| jwt id:', req.user.id, '| NO MATCHING ROW IN DB');
+      return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+    }
     const user = rows[0];
     // Auto-upgrade to admin if email is in ADMIN_EMAILS but DB hasn't been updated yet
     if (emailIsAdmin && user.role !== 'admin') {
       await pool.query('UPDATE users SET role = $1 WHERE id = $2', ['admin', req.user.id]);
       user.role = 'admin';
     }
+    // 작업9-c 임시 디버그 로그 - 원인 확인 끝나면 제거할 것
+    console.log('[me-debug]', maskEmail(req.user.email), '| jwt id:', req.user.id, '| db id:', user.id, '| is_blocked:', user.is_blocked, '| role:', user.role);
     res.json(user);
   } catch (err) {
+    console.log('[me-debug]', maskEmail(req.user.email), '| jwt id:', req.user.id, '| QUERY THREW:', err.message);
     console.error('DB error:', err.message);
     res.status(500).json({ error: '서버 오류가 발생했습니다.' });
   }
