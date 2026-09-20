@@ -3,8 +3,10 @@ import { createLiveEnglishOcrSession } from './liveEnglishOcrSession.js';
 import { deriveLiveOcrCandidates, preloadEnglishWordSet } from './extractEnglishCandidates.js';
 import { projectOverlayRect } from './liveOverlayGeometry.js';
 
-const PLAY_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5.14v13.72c0 .79.87 1.27 1.54.84L20.3 12.84a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14Z"/></svg>';
-const PAUSE_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M7 5a2 2 0 0 1 2 2v10a2 2 0 1 1-4 0V7a2 2 0 0 1 2-2Zm10 0a2 2 0 0 1 2 2v10a2 2 0 1 1-4 0V7a2 2 0 0 1 2-2Z"/></svg>';
+// 작업7: 원 크기(56px)는 그대로 두고 아이콘만 22px -> 28px로 키워서
+// 원 안에 더 꽉 차 보이게 함
+const PLAY_ICON = '<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M8 5.14v13.72c0 .79.87 1.27 1.54.84L20.3 12.84a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14Z"/></svg>';
+const PAUSE_ICON = '<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M7 5a2 2 0 0 1 2 2v10a2 2 0 1 1-4 0V7a2 2 0 0 1 2-2Zm10 0a2 2 0 0 1 2 2v10a2 2 0 1 1-4 0V7a2 2 0 0 1 2-2Z"/></svg>';
 
 function describeCameraError(e) {
   const name = e?.name || '';
