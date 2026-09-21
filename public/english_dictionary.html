@@ -1046,17 +1046,28 @@
     font-size: 12px; color: var(--text3);
   }
   /* TTS BUTTON */
+  /* 작업35: 아이콘 전용 버튼 대신 아이콘+"발음" 텍스트를 나란히 배치한
+     심플 버튼으로. 아이콘(이모지)은 재생 상태(대기/로딩/재생중)에 따라
+     playTTS()가 .tts-icon만 바꿔치기하고, .tts-label("발음")은 그대로 둠 */
   .tts-btn {
-    background: none;
-    border: 1.5px solid var(--border);
-    border-radius: 8px;
-    padding: 3px 10px;
-    font-size: 15px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
     cursor: pointer;
     transition: all 0.15s;
-    line-height: 1.4;
+    line-height: 1.2;
     flex-shrink: 0;
+    font-family: 'Noto Sans KR', sans-serif;
   }
+  .tts-icon { font-size: 16px; line-height: 1; }
   .tts-btn:hover { border-color: var(--accent); background: rgba(74,110,245,0.06); }
   .tts-btn.playing { border-color: var(--accent); background: rgba(74,110,245,0.12); }
 
@@ -2267,7 +2278,7 @@ function renderResultEN(result, alreadySaved, opts = {}) {
     <div class="result-card">
       <div style="display:flex;align-items:center;gap:10px">
         <div class="result-word">${result.word}</div>
-        <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="en" onclick="playTTSFromBtn(this)" title="발음 듣기">🔊</button>
+        <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="en" onclick="playTTSFromBtn(this)" title="발음 듣기"><span class="tts-icon">🔊</span><span class="tts-label">발음</span></button>
       </div>
       ${baseFormHint}
       ${result.pronunciation ? `<div class="result-pronunciation">${result.pronunciation}</div>` : ''}
@@ -2398,7 +2409,7 @@ function renderResultKO(result, alreadySaved) {
     <div class="result-card">
       <div style="display:flex;align-items:center;gap:10px">
         <div class="result-word" style="color:var(--accent-ko)">${result.word}</div>
-        <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="ko" onclick="playTTSFromBtn(this)" title="발음 듣기">🔊</button>
+        <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="ko" onclick="playTTSFromBtn(this)" title="발음 듣기"><span class="tts-icon">🔊</span><span class="tts-label">발음</span></button>
       </div>
       ${result.headline ? `<div class="word-headline">${result.headline}</div>` : ''}
       ${result.etymology ? `<div class="word-etymology">어원: ${result.etymology}</div>` : ''}
@@ -2525,7 +2536,7 @@ function renderResultJA(result, alreadySaved) {
     <div class="result-card">
       <div style="display:flex;align-items:center;gap:10px">
         <div class="result-word" style="color:var(--accent-ja)">${result.word}</div>
-        <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="ja" onclick="playTTSFromBtn(this)" title="발음 듣기">🔊</button>
+        <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="ja" onclick="playTTSFromBtn(this)" title="발음 듣기"><span class="tts-icon">🔊</span><span class="tts-label">발음</span></button>
       </div>
       ${result.reading ? `<div class="result-pronunciation">${result.reading}</div>` : ''}
       ${result.headline ? `<div class="word-headline">${result.headline}</div>` : ''}
@@ -2628,7 +2639,7 @@ function renderResultZH(result, alreadySaved) {
     <div class="result-card">
       <div style="display:flex;align-items:center;gap:10px">
         <div class="result-word" style="color:var(--accent-zh)">${result.word}</div>
-        <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="zh" onclick="playTTSFromBtn(this)" title="발음 듣기">🔊</button>
+        <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="zh" onclick="playTTSFromBtn(this)" title="발음 듣기"><span class="tts-icon">🔊</span><span class="tts-label">발음</span></button>
       </div>
       ${result.pinyin ? `<div class="result-pronunciation">${result.pinyin}</div>` : ''}
       ${result.headline ? `<div class="word-headline">${result.headline}</div>` : ''}
@@ -2905,7 +2916,7 @@ function podcastStartSelected() {
   setWordbookMode('none');
   if (ttsCurrentAudio) {
     ttsCurrentAudio.pause(); ttsCurrentAudio = null;
-    document.querySelectorAll('.tts-btn').forEach(b => { b.textContent = '🔊'; b.classList.remove('playing'); });
+    document.querySelectorAll('.tts-btn').forEach(b => { setTtsIcon(b, '🔊'); b.classList.remove('playing'); });
   }
   const locale = { en: 'en', ko: 'ko', ja: 'ja', zh: 'zh' }[tab] || 'en';
   podcastPlaylist = words.slice().sort((a, b) => a.word.localeCompare(b.word, locale));
@@ -3727,6 +3738,15 @@ async function backfillShortMeanings() {
 const ttsMemCache = {};
 let ttsCurrentAudio = null;
 
+// 작업35: .tts-btn이 아이콘(.tts-icon) + "발음" 텍스트(.tts-label)로
+// 나뉘면서, 재생 상태 아이콘 갱신은 버튼 전체가 아니라 .tts-icon만
+// 바꿔야 라벨 텍스트가 지워지지 않음
+function setTtsIcon(btn, icon) {
+  const iconEl = btn.querySelector('.tts-icon');
+  if (iconEl) iconEl.textContent = icon;
+  else btn.textContent = icon;
+}
+
 function playTTSFromBtn(btn) {
   const text = decodeURIComponent(btn.dataset.tts);
   const lang = btn.dataset.lang || 'en';
@@ -3749,7 +3769,7 @@ async function playTTS(text, lang, btnEl) {
     ttsCurrentAudio.pause();
     ttsCurrentAudio = null;
     document.querySelectorAll('.tts-btn').forEach(b => {
-      b.textContent = '🔊'; b.classList.remove('playing');
+      setTtsIcon(b, '🔊'); b.classList.remove('playing');
     });
     if (btnEl && btnEl.dataset._ttsKey === key) {
       delete btnEl.dataset._ttsKey; return;
@@ -3757,7 +3777,7 @@ async function playTTS(text, lang, btnEl) {
   }
 
   if (btnEl) {
-    btnEl.textContent = '⏳';
+    setTtsIcon(btnEl, '⏳');
     btnEl.classList.add('playing');
     btnEl.dataset._ttsKey = key;
   }
@@ -3779,26 +3799,26 @@ async function playTTS(text, lang, btnEl) {
       ttsMemCache[key] = url;
     }
 
-    if (btnEl) btnEl.textContent = '🔉';
+    if (btnEl) setTtsIcon(btnEl, '🔉');
     ttsCurrentAudio = new Audio(url);
     ttsCurrentAudio.onended = () => {
-      if (btnEl) { btnEl.textContent = '🔊'; btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
+      if (btnEl) { setTtsIcon(btnEl, '🔊'); btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
       ttsCurrentAudio = null;
     };
     ttsCurrentAudio.onerror = (e) => {
-      if (btnEl) { btnEl.textContent = '🔊'; btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
+      if (btnEl) { setTtsIcon(btnEl, '🔊'); btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
       ttsCurrentAudio = null;
       showToast('오디오 재생 오류');
       console.warn('TTS audio error:', e);
     };
     ttsCurrentAudio.play().catch(e => {
-      if (btnEl) { btnEl.textContent = '🔊'; btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
+      if (btnEl) { setTtsIcon(btnEl, '🔊'); btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
       ttsCurrentAudio = null;
       showToast('발음 재생 실패: ' + e.message);
       console.warn('TTS play() error:', e.message);
     });
   } catch (e) {
-    if (btnEl) { btnEl.textContent = '🔊'; btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
+    if (btnEl) { setTtsIcon(btnEl, '🔊'); btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; }
     showToast('발음 재생 실패: ' + e.message);
     console.warn('TTS error:', e.message);
   }
