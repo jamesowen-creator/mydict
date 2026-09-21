@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>사전 - 검색 화면</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body{margin:0;}
+  button{font-family:inherit;}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;display:flex;flex-direction:column;background:{{bg}};color:{{textPrimary}};font-family:'Noto Sans KR',sans-serif;overflow:hidden;">
+  <div style="flex:0 0 auto;padding:26px 20px 0 20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:22px;font-weight:700;letter-spacing:-0.01em;">사전</div>
+      <button aria-label="설정" style="background:none;border:none;padding:8px;margin:-8px;cursor:pointer;color:{{textSecondary}};display:flex;align-items:center;justify-content:center;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
+    </div>
+    <div style="margin-top:22px;display:flex;align-items:center;gap:10px;background:{{surface}};border:1px solid {{border}};border-radius:14px;padding:14px 16px;">
+      <span style="color:{{textSecondary}};display:flex;">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </span>
+      <input type="text" placeholder="궁금한 단어를 검색해보세요" style="border:none;outline:none;background:transparent;flex:1;font-size:16px;color:{{textPrimary}};font-family:inherit;min-width:0;" />
+      <button aria-label="음성으로 검색" style="background:none;border:none;padding:6px;margin:-6px;cursor:pointer;color:{{textSecondary}};display:flex;">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+      </button>
+    </div>
+    <div style="display:flex;gap:28px;margin-top:22px;">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+        <button onClick="{{t.pick}}" style="{{t.style}}">{{t.name}}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="flex:1 1 auto;overflow-y:auto;padding:26px 20px 20px 20px;">
+    <div style="font-size:12px;font-weight:700;letter-spacing:0.06em;color:{{textSecondary}};text-transform:uppercase;">최근 검색</div>
+    <sc-for list="{{recents}}" as="r" hint-placeholder-count="4">
+      <div style="display:flex;align-items:center;justify-content:space-between;min-height:52px;border-bottom:1px solid {{border}};">
+        <span style="font-size:16px;color:{{textPrimary}};">{{r.word}}</span>
+        <span style="color:{{textSecondary}};display:flex;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="flex:0 0 auto;display:flex;border-top:1px solid {{border}};padding:10px 0 18px 0;">
+    <button style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px;justify-content:center;background:none;border:none;cursor:pointer;color:{{textPrimary}};">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <span style="font-size:11px;font-weight:700;">검색</span>
+    </button>
+    <button style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px;justify-content:center;background:none;border:none;cursor:pointer;color:{{textSecondary}};">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 16 14"></polyline></svg>
+      <span style="font-size:11px;font-weight:500;">최근 검색</span>
+    </button>
+    <button style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px;justify-content:center;background:none;border:none;cursor:pointer;color:{{textSecondary}};">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+      <span style="font-size:11px;font-weight:500;">단어장</span>
+    </button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false,"section":"Theme"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { tab: '영한' };
+  }
+  renderVals(){
+    const dark = this.props.dark ?? false;
+    const bg = dark ? '#151619' : '#FFFFFF';
+    const surface = dark ? '#1D1E22' : '#F7F7F8';
+    const textPrimary = dark ? '#F1F1F2' : '#1A1A1E';
+    const textSecondary = dark ? '#989FA8' : '#6B7280';
+    const border = dark ? '#2B2C30' : '#E6E6E8';
+    const accent = dark ? '#A9B7CC' : '#42506A';
+    const tabNames = ['영한', '한영', '국어'];
+    const tabs = tabNames.map((name) => {
+      const selected = this.state.tab === name;
+      return {
+        name,
+        pick: () => this.setState({ tab: name }),
+        style: selected
+          ? `margin:0;padding:0 0 10px 0;font-size:15px;font-weight:700;color:${textPrimary};background:none;border:none;border-bottom:2px solid ${accent};cursor:pointer;`
+          : `margin:0;padding:0 0 10px 0;font-size:15px;font-weight:500;color:${textSecondary};background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;`
+      };
+    });
+    const recents = [
+      { word: 'consider' },
+      { word: 'ambiguous' },
+      { word: 'threshold' },
+      { word: 'consequence' }
+    ];
+    return { bg, surface, textPrimary, textSecondary, border, accent, tabs, recents };
+  }
+}
+</script>
+</body>
+</html>

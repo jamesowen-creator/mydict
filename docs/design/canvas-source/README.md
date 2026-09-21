@@ -1,0 +1,1 @@
+이 폴더의 .dc.html 파일은 Claude.ai 디자인 캔버스 전용 형식이며 그대로 실행되지 않습니다 — `<x-dc>`, `{{홀}}`, `support.js` 등 캔버스 전용 문법을 사용합니다. 실제 코드가 아니라 디자인 참고 자료(색상/구조/아이콘 마크업 확인용)이며, 사람이 읽는 스펙 요약은 `docs/design/dictionary-minimal-redesign.md` 참고.

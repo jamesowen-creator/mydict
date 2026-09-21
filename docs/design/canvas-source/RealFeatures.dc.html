@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>사전 - 실제 기능 반영 (관리자 로그인 상태)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body{margin:0;}
+  button{font-family:inherit;}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;position:relative;display:flex;flex-direction:column;background:{{bg}};color:{{textPrimary}};font-family:'Noto Sans KR',sans-serif;overflow:hidden;">
+  <div style="flex:0 0 auto;padding:24px 20px 0 20px;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+      <div>
+        <div style="font-size:20px;font-weight:800;letter-spacing:-0.01em;">METIS</div>
+        <div style="margin-top:3px;font-size:12px;color:{{textSecondary}};">관리자 · Changryul Lee 님</div>
+      </div>
+      <button style="background:none;border:none;padding:8px;margin:-8px;font-size:13px;font-weight:600;color:{{textSecondary}};cursor:pointer;">로그아웃</button>
+    </div>
+
+    <div style="margin-top:18px;display:flex;gap:10px;">
+      <div style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;background:{{surface}};border:1px solid {{border}};border-radius:14px;padding:14px 16px;">
+        <span style="color:{{textSecondary}};display:flex;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </span>
+        <input type="text" value="artifact" style="border:none;outline:none;background:transparent;flex:1;min-width:0;font-size:16px;color:{{textPrimary}};font-family:inherit;" />
+      </div>
+      <button style="flex:0 0 auto;padding:0 20px;border-radius:14px;border:none;background:{{textPrimary}};color:{{bg}};font-size:15px;font-weight:700;cursor:pointer;">검색</button>
+    </div>
+
+    <div style="display:flex;gap:20px;margin-top:20px;">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+        <button onClick="{{t.pick}}" style="{{t.style}}">{{t.name}}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="flex:1 1 auto;overflow-y:auto;padding:22px 20px 100px 20px;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+      <div>
+        <div style="font-size:30px;font-weight:800;letter-spacing:-0.01em;line-height:1.1;">artifact</div>
+        <div style="margin-top:6px;font-size:15px;color:{{textSecondary}};font-family:ui-monospace, 'SFMono-Regular', Menlo, monospace;">/ˈɑːrtɪfækt/</div>
+      </div>
+      <button style="flex:0 0 auto;display:flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border:1px solid {{border}};border-radius:10px;background:{{surface}};color:{{textPrimary}};font-size:14px;font-weight:600;cursor:pointer;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M18.36 5.64a9 9 0 0 1 0 12.73"></path></svg>
+        발음
+      </button>
+    </div>
+
+    <div style="margin-top:22px;border-top:1px solid {{border}};"></div>
+
+    <sc-for list="{{meanings}}" as="m" hint-placeholder-count="3">
+      <div style="margin-top:16px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:17px;font-weight:800;">{{m.no}}</span>
+          <span style="font-size:12px;font-weight:600;color:{{textSecondary}};">{{m.tag}}</span>
+        </div>
+        <div style="margin-top:6px;font-size:18px;font-weight:700;line-height:1.4;">{{m.text}}</div>
+        <div style="margin-top:10px;margin-left:26px;padding-left:14px;border-left:2px solid {{accent}};">
+          <div style="font-size:15px;line-height:1.55;">{{m.example}}</div>
+          <div style="margin-top:4px;font-size:14px;color:{{textSecondary}};line-height:1.55;">{{m.translation}}</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;border-top:1px solid {{border}};"></div>
+    </sc-for>
+
+    <div style="margin-top:6px;font-size:12px;font-weight:700;letter-spacing:0.06em;color:{{textSecondary}};text-transform:uppercase;">파생어</div>
+    <sc-for list="{{derivatives}}" as="d" hint-placeholder-count="2">
+      <div style="margin-top:14px;padding-bottom:14px;border-bottom:1px solid {{border}};">
+        <div style="display:flex;align-items:baseline;gap:8px;">
+          <span style="font-size:17px;font-weight:700;">{{d.word}}</span>
+          <span style="font-size:12px;font-weight:600;color:{{textSecondary}};">{{d.pos}}</span>
+        </div>
+        <div style="margin-top:4px;font-size:14px;color:{{textSecondary}};line-height:1.5;">{{d.meaning}}</div>
+      </div>
+    </sc-for>
+
+    <div style="margin-top:28px;font-size:12px;font-weight:700;letter-spacing:0.06em;color:{{textSecondary}};text-transform:uppercase;">유의어</div>
+    <sc-for list="{{synonyms}}" as="s" hint-placeholder-count="3">
+      <div style="margin-top:14px;padding-bottom:14px;border-bottom:1px solid {{border}};">
+        <div style="display:flex;align-items:baseline;gap:8px;">
+          <span style="font-size:17px;font-weight:700;">{{s.word}}</span>
+          <span style="font-size:13px;color:{{textSecondary}};">{{s.gloss}}</span>
+        </div>
+        <div style="margin-top:6px;font-size:14px;color:{{textSecondary}};line-height:1.6;">{{s.explanation}}</div>
+      </div>
+    </sc-for>
+
+    <div style="margin-top:28px;font-size:12px;font-weight:700;letter-spacing:0.06em;color:{{textSecondary}};text-transform:uppercase;">Collocation</div>
+    <sc-for list="{{collocations}}" as="c" hint-placeholder-count="3">
+      <div style="margin-top:12px;">
+        <span style="font-size:15px;font-weight:700;">{{c.phrase}}</span>
+        <span style="font-size:14px;color:{{textSecondary}};margin-left:8px;">{{c.meaning}}</span>
+      </div>
+    </sc-for>
+
+    <div style="margin-top:28px;font-size:12px;font-weight:700;letter-spacing:0.06em;color:{{textSecondary}};text-transform:uppercase;">추가 번역</div>
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <button style="flex:1;min-height:44px;border:1px solid {{border}};border-radius:10px;background:{{surface}};color:{{textPrimary}};font-size:14px;font-weight:600;cursor:pointer;">일본어로 보기</button>
+      <button style="flex:1;min-height:44px;border:1px solid {{border}};border-radius:10px;background:{{surface}};color:{{textPrimary}};font-size:14px;font-weight:600;cursor:pointer;">중국어로 보기</button>
+    </div>
+  </div>
+
+  <button style="position:absolute;right:20px;bottom:96px;display:flex;align-items:center;gap:8px;padding:12px 18px;border-radius:999px;border:none;background:{{textPrimary}};color:{{bg}};font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,0.22);">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+    OCR 스캔
+  </button>
+
+  <div style="flex:0 0 auto;border-top:1px solid {{border}};">
+    <div style="display:flex;overflow-x:auto;padding:10px 4px 18px 4px;">
+      <button style="flex:0 0 auto;min-width:78px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px;justify-content:center;background:none;border:none;cursor:pointer;color:{{textPrimary}};">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <span style="font-size:11px;font-weight:700;white-space:nowrap;">검색</span>
+      </button>
+      <button style="flex:0 0 auto;min-width:78px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px;justify-content:center;background:none;border:none;cursor:pointer;color:{{textSecondary}};">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+        <span style="font-size:11px;font-weight:500;white-space:nowrap;">단어장 39</span>
+      </button>
+      <button style="flex:0 0 auto;min-width:78px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px;justify-content:center;background:none;border:none;cursor:pointer;color:{{textSecondary}};">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+        <span style="font-size:11px;font-weight:500;white-space:nowrap;">퀴즈</span>
+      </button>
+      <button style="flex:0 0 auto;min-width:78px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px;justify-content:center;background:none;border:none;cursor:pointer;color:{{textSecondary}};">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 .49-9.36L1 10"></path></svg>
+        <span style="font-size:11px;font-weight:500;white-space:nowrap;">복습</span>
+      </button>
+      <button style="flex:0 0 auto;min-width:86px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px;justify-content:center;background:none;border:none;cursor:pointer;color:{{textSecondary}};">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        <span style="font-size:11px;font-weight:500;white-space:nowrap;">오답노트 1</span>
+      </button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false,"section":"Theme"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { tab: '영어' };
+  }
+  renderVals(){
+    const dark = this.props.dark ?? false;
+    const bg = dark ? '#151619' : '#FFFFFF';
+    const surface = dark ? '#1D1E22' : '#F7F7F8';
+    const textPrimary = dark ? '#F1F1F2' : '#1A1A1E';
+    const textSecondary = dark ? '#989FA8' : '#6B7280';
+    const border = dark ? '#2B2C30' : '#E6E6E8';
+    const accent = dark ? '#A9B7CC' : '#42506A';
+
+    const tabNames = ['영어', '한국어', '일본어', '중국어'];
+    const tabs = tabNames.map((name) => {
+      const selected = this.state.tab === name;
+      return {
+        name,
+        pick: () => this.setState({ tab: name }),
+        style: selected
+          ? `margin:0;padding:0 0 10px 0;font-size:15px;font-weight:700;color:${textPrimary};background:none;border:none;border-bottom:2px solid ${accent};cursor:pointer;`
+          : `margin:0;padding:0 0 10px 0;font-size:15px;font-weight:500;color:${textSecondary};background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;`
+      };
+    });
+
+    const meanings = [
+      { no: '1', tag: '명사 · 일반', text: '인간이 만든 고고학적 유물', example: 'Archaeologists found several artifacts at the site.', translation: '고고학자들은 유적지에서 여러 유물을 발견했다.' },
+      { no: '2', tag: '명사 · 기술', text: '기술적 오류로 인한 부산물', example: 'The image contains compression artifacts.', translation: '그 이미지에는 압축으로 인한 잡음이 포함되어 있다.' },
+      { no: '3', tag: '명사 · 일반', text: '인공적으로 만들어진 산물', example: 'The result may be an artifact of the experimental setup.', translation: '그 결과는 실험 설계로 인한 인위적 산물일 수 있다.' }
+    ];
+
+    const derivatives = [
+      { word: 'artifactual', pos: '형용사', meaning: '유물과 관련된, 인공물의 특성을 가진' },
+      { word: 'artifact-free', pos: '형용사', meaning: '기술적 오류나 부산물이 없는' }
+    ];
+
+    const synonyms = [
+      { word: 'relic', gloss: '유물, 잔재', explanation: 'relic은 역사적 가치가 있는 유물이나 잔재를 뜻하며, artifact는 인간이 만든 인공물 전반을 더 포괄적으로 가리킨다.' },
+      { word: 'byproduct', gloss: '부산물', explanation: 'byproduct는 어떤 과정에서 부수적으로 생긴 결과물을 뜻하며, artifact는 그중에서도 기술적 오류나 왜곡으로 생긴 인공물을 가리킬 때 주로 쓰인다.' },
+      { word: 'anomaly', gloss: '이상 현상', explanation: 'anomaly는 예상과 다른 이상 현상 자체를 뜻하며, artifact는 그 이상 현상이 장비나 처리 과정 같은 인위적 요인에서 비롯됐음을 강조한다.' }
+    ];
+
+    const collocations = [
+      { phrase: 'cultural artifact', meaning: '문화 유물' },
+      { phrase: 'digital artifact', meaning: '디지털 처리 과정에서 생긴 오류·노이즈' },
+      { phrase: 'artifact of', meaning: '~로 인해 생긴 산물/부작용' }
+    ];
+
+    return { bg, surface, textPrimary, textSecondary, border, accent, tabs, meanings, derivatives, synonyms, collocations };
+  }
+}
+</script>
+</body>
+</html>
