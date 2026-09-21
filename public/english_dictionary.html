@@ -1414,8 +1414,8 @@
   .ocr-error:empty{display:none}
   /* 작업12: 하단 고정 nav 위로 띄워서 겹치지 않게 */
   /* 작업31: 텍스트 필 버튼 대신 원형 그레이스케일 아이콘 버튼으로 */
-  .ocr-open-btn{position:fixed;right:16px;bottom:calc(var(--navbar-h) + env(safe-area-inset-bottom) + 12px);z-index:120;width:52px;height:52px;padding:0;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.15);border-radius:50%;background:#4B5157;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,0.2)}
-  .ocr-open-btn svg{width:24px;height:24px}
+  /* 작업34: 아이콘 원형 버튼 대신 텍스트 전용 버튼으로 */
+  .ocr-open-btn{position:fixed;right:16px;bottom:calc(var(--navbar-h) + env(safe-area-inset-bottom) + 12px);z-index:120;padding:12px 20px;border:0;border-radius:999px;background:#1A1A1E;color:#fff;font-size:14px;font-weight:700;font-family:'Noto Sans KR',sans-serif;box-shadow:0 2px 10px rgba(0,0,0,0.2)}
 
   /* 작업27: 사전 페이지 한정 헤더/검색창/언어탭 미니멀 리디자인 실험.
      appHeader.js/css는 그대로 두고, 이 페이지 전용 스크립트가 inject()가
@@ -4107,7 +4107,7 @@ if ('serviceWorker' in navigator) {
   </div>
   <p data-ocr-error class="ocr-error" role="status"></p>
 </section>
-<button id="ocr-open" type="button" class="ocr-open-btn" aria-label="OCR 스캔" title="OCR 스캔"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></button>
+<button id="ocr-open" type="button" class="ocr-open-btn">OCR 스캔</button>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <script type="module">
   import { createOcrScanner } from '/js/ocr/ocrScanner.js';
