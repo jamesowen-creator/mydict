@@ -44,8 +44,6 @@ export function createOcrScanner(root, { onSelect } = {}) {
     laserEl.classList.toggle('is-paused', state.paused);
     captureBtn.innerHTML = state.cameraOpen ? (state.paused ? PLAY_ICON : PAUSE_ICON) : PLAY_ICON;
     captureBtn.setAttribute('aria-label', state.cameraOpen ? (state.paused ? '재개' : '일시정지') : '시작');
-    prevBtn.hidden = !state.cameraOpen;
-    nextBtn.hidden = !state.cameraOpen;
     prevBtn.disabled = state.cursor <= 0;
     nextBtn.disabled = state.cursor >= state.history.length - 1;
   }

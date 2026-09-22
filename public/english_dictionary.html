@@ -1394,7 +1394,7 @@
   .ocr-close-btn{padding:8px 14px;border:none;border-radius:999px;background:transparent;color:var(--ocr-text1);font-size:14px;font-weight:700}
   .ocr-torch-btn{padding:8px 10px;border:none;background:transparent;color:rgba(245,242,237,.9);font-size:13px;font-weight:700}
   .ocr-torch-btn.active{color:#ff9b87}
-  .ocr-live-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;border:1px solid rgba(226,88,59,.5);background:rgba(226,88,59,.1);color:#f17c63;font-size:12px;font-weight:800;letter-spacing:.08em}
+  .ocr-live-badge{display:inline-flex;align-items:center;gap:8px;color:var(--ocr-text1);font-size:12px;font-weight:800;letter-spacing:.08em}
   .ocr-live-dot{width:6px;height:6px;border-radius:50%;background:var(--ocr-ember);box-shadow:0 0 0 3px rgba(226,88,59,.25);animation:ocr-live-pulse 1.8s ease-in-out infinite}
   @keyframes ocr-live-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.85)}}
   .ocr-preview{position:relative;flex:1;min-height:0;overflow:hidden;background:var(--ocr-void)}
@@ -4113,9 +4113,12 @@ if ('serviceWorker' in navigator) {
     <!-- 작업7: 화살표 문자(‹›) 대신 표준 skip-previous/skip-next 아이콘
          (세로 바+삼각형 / 삼각형+세로 바)으로 교체, 재생/일시정지 아이콘과
          같은 28px 크기로 맞춤 -->
-    <button data-ocr-prev type="button" class="ocr-circle-btn" aria-label="이전 후보" hidden><svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+    <!-- 작업53: 스캔 시작 전에도 이전/다음 버튼을 계속 같은 자리에
+         렌더링(disabled로 시작)해서 재생->일시정지 전환 시 가운데
+         버튼이 안 흔들리게 함 - hidden 토글은 ocrScanner.js에서 제거 -->
+    <button data-ocr-prev type="button" class="ocr-circle-btn" aria-label="이전 후보" disabled><svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
     <button data-ocr-capture type="button" class="ocr-circle-btn" aria-label="시작"></button>
-    <button data-ocr-next type="button" class="ocr-circle-btn" aria-label="다음 후보" hidden><svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+    <button data-ocr-next type="button" class="ocr-circle-btn" aria-label="다음 후보" disabled><svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
   </div>
   <p data-ocr-error class="ocr-error" role="status"></p>
 </section>
