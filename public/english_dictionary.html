@@ -1116,6 +1116,13 @@
     line-height: 1.6;
     margin-bottom: 8px;
   }
+  /* 작업38: 뜻 블록 안 예문만 왼쪽 세로선으로 강조 - 작업31에서 뺀
+     "뜻풀이 블록 전체" 박스+강조선과는 별개로, 예문 한 줄에만 스코프 */
+  .meaning-set .usage-example {
+    border-left: 2px solid var(--accent);
+    padding-left: 10px;
+    margin-top: 6px;
+  }
   .base-form-hint {
     font-size: 12px;
     color: var(--text3);
@@ -2190,12 +2197,19 @@ function renderResultEN(result, alreadySaved, opts = {}) {
     'interjection': '감탄사', 'phrase': '구', 'idiom': '관용어'
   };
 
-  // New structure: meanings[] (pos + definition + usage_note + example/translation)
+  // 작업38: meanings[]를 한 번만 순회해 뜻 번호당 정의→뉘앙스→예문/번역을
+  // 한 .meaning-set 블록에 묶는다(기존엔 이 세 가지를 각각 따로 순회해서
+  // "사전적 의미"/"활용·뉘앙스"/"예문" 3개 섹션에 같은 번호가 반복 출력됐음)
   let definitionsHtml = '';
-  let usageNotesHtml = '';
   let examplesHtml = '';
   if (result.meanings && result.meanings.length > 0) {
-    definitionsHtml = result.meanings.map((m, i) => `
+    definitionsHtml = result.meanings.map((m, i) => {
+      const note = m.usage_note || m.nuance;
+      const noteHtml = note ? `<div class="meaning-nuance">${note}</div>` : '';
+      const exampleHtml = m.example
+        ? `<div class="usage-example">${m.example}</div>${m.translation ? `<div class="usage-translation">→ ${m.translation}</div>` : ''}`
+        : (loadingDetail ? detailSkeleton(1) : '');
+      return `
       <div class="meaning-set">
         <div class="meaning-header">
           <span class="meaning-num">${i + 1}</span>
@@ -2203,29 +2217,8 @@ function renderResultEN(result, alreadySaved, opts = {}) {
           ${m.domain ? `<span class="meaning-domain">${m.domain}</span>` : ''}
         </div>
         <div class="meaning-core">${m.definition || m.core_meaning || ''}</div>
-      </div>
-    `).join('');
-
-    usageNotesHtml = result.meanings.map((m, i) => {
-      const note = m.usage_note || m.nuance;
-      if (!note) return '';
-      return `
-      <div class="meaning-set">
-        <div class="meaning-header">
-          <span class="meaning-num">${i + 1}</span>
-          <span class="result-pos-tag">${posMap[(m.pos || '').toLowerCase()] || m.pos || ''}</span>
-        </div>
-        <div class="meaning-nuance">${note}</div>
-      </div>`;
-    }).join('');
-
-    examplesHtml = result.meanings.map((m, i) => {
-      if (!m.example) return '';
-      return `
-      <div class="meaning-set">
-        <div class="meaning-header"><span class="meaning-num">${i + 1}</span></div>
-        <div class="usage-example">${m.example}</div>
-        ${m.translation ? `<div class="usage-translation">→ ${m.translation}</div>` : ''}
+        ${noteHtml}
+        ${exampleHtml}
       </div>`;
     }).join('');
   } else {
@@ -2263,9 +2256,14 @@ function renderResultEN(result, alreadySaved, opts = {}) {
   `).join('');
 
   // 2차가 아직 안 끝난 상태에서 각 섹션이 비어있으면(정상 - 1차 응답에는
-  // 애초에 이 필드들이 없음) 빈 채로 숨기는 대신 스켈레톤을 보여줌
-  const usageNotesSection = usageNotesHtml || (loadingDetail ? detailSkeleton(2) : '');
-  const examplesSection = examplesHtml || (loadingDetail ? detailSkeleton(2) : '');
+  // 애초에 이 필드들이 없음) 빈 채로 숨기는 대신 스켈레톤을 보여줌.
+  // (뜻풀이당 예문 스켈레톤은 위 definitionsHtml 조립 시 블록 안에서 처리됨 -
+  // examplesSection은 이제 옛 스키마 fallback(usages[])의 "예문" 섹션에만 쓰임.
+  // loadingDetail=true는 항상 새 meanings[] 스키마 쪽에서만 오고 그 경로에서는
+  // examplesHtml을 채우지 않으므로, 여기엔 별도 스켈레톤 분기를 두지 않는다 -
+  // 안 그러면 2차 로딩 중에 뜻 블록별 스켈레톤과 별개로 빈 "예문" 섹션에도
+  // 스켈레톤이 중복으로 떴었음)
+  const examplesSection = examplesHtml;
   const similarSection = similarHtml || (loadingDetail ? detailSkeleton(3) : '');
   const collocationsSection = collocationsHtml || (loadingDetail ? detailSkeleton(2) : '');
 
@@ -2300,12 +2298,6 @@ function renderResultEN(result, alreadySaved, opts = {}) {
             </div>
           `).join('')}
         </div>
-      </div>` : ''}
-
-      ${usageNotesSection ? `
-      <div class="result-section">
-        <div class="result-section-title">활용 · 뉘앙스</div>
-        ${usageNotesSection}
       </div>` : ''}
 
       ${examplesSection ? `
