@@ -45,6 +45,9 @@
     white-space: nowrap; flex-shrink: 0;
   }
   .btn-back:hover { color: var(--text); text-decoration: underline; }
+  /* 작업77: 공용 appHeader.css의 필(999px) 로그아웃 버튼을 이 페이지에서만
+     각지게 - appHeader.css는 다른 4개 화면이 공유하므로 여기서 스코프 override */
+  #metis-header-auth .metis-app-header-btn { border-radius: 0; }
 
   /* ── Layout ── */
   main { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
