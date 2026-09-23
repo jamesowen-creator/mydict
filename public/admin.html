@@ -16,7 +16,8 @@
     --radius: 12px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans KR', sans-serif; min-height: 100vh; }
+  /* 작업76: 카드 박스를 걷어내면서 배경도 흰색으로 - 구분은 여백과 1px 구분선으로만 */
+  body { background: var(--surface); color: var(--text); font-family: 'Noto Sans KR', sans-serif; min-height: 100vh; }
 
   /* ── Header ── */
   header {
@@ -33,31 +34,30 @@
   }
   .header-left { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
   .header-logo { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 18px; color: var(--accent); }
+  /* 작업76: 필 제거 - 코랄 색 텍스트만 남김 */
   .header-badge {
-    background: var(--accent); color: #fff; font-size: 10px; font-weight: 700;
-    padding: 2px 7px; border-radius: 20px; letter-spacing: 0.5px;
+    color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 1px;
   }
   .btn-back {
-    font-size: 13px; color: var(--text2); background: none; border: 1px solid var(--border);
-    border-radius: 8px; padding: 5px 12px; cursor: pointer; text-decoration: none;
+    font-size: 13px; color: var(--text2); background: none; border: none;
+    padding: 0 4px; min-height: 44px; cursor: pointer; text-decoration: none;
     display: inline-flex; align-items: center; gap: 5px;
     white-space: nowrap; flex-shrink: 0;
   }
-  .btn-back:hover { background: var(--bg); }
+  .btn-back:hover { color: var(--text); text-decoration: underline; }
 
   /* ── Layout ── */
   main { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
-  .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; overflow: hidden; }
-  .section-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-  .section-title { font-size: 14px; font-weight: 700; color: var(--text); }
-  .section-body { padding: 20px; }
+  /* 작업76: 카드 박스 제거 - 섹션 사이는 여백 + 하단 구분선 */
+  .section { margin-bottom: 32px; padding-bottom: 32px; border-bottom: 1px solid var(--border); }
+  .section:last-child { border-bottom: none; margin-bottom: 0; }
+  .section-header { padding: 0 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .section-title { font-size: 12px; font-weight: 700; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; }
+  .section-body { padding: 0; }
 
   /* ── Stats cards ── */
-  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-  .stat-card {
-    background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
-    padding: 14px 16px;
-  }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); column-gap: 24px; }
+  .stat-card { padding: 12px 0; border-top: 1px solid var(--border); }
   .stat-label { font-size: 11px; color: var(--text3); font-weight: 500; margin-bottom: 6px; }
   .stat-value { font-size: 22px; font-weight: 700; color: var(--text); font-family: 'Sora', sans-serif; }
   .stat-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
@@ -67,8 +67,8 @@
   .stat-card.danger .stat-value { color: var(--danger); }
 
   /* ── Cost ── */
-  .cost-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
-  .cost-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .cost-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 32px; }
+  .cost-card { padding-top: 12px; border-top: 1px solid var(--border); }
   .cost-card-title { font-size: 11px; color: var(--text3); font-weight: 600; margin-bottom: 8px; }
   .cost-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
   .cost-row .label { color: var(--text2); }
@@ -78,7 +78,7 @@
   /* ── Table ── */
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { background: var(--bg); padding: 10px 12px; text-align: left; font-weight: 600; font-size: 11px; color: var(--text3); letter-spacing: 0.5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { background: var(--surface); padding: 10px 12px; text-align: left; font-weight: 600; font-size: 11px; color: var(--text3); letter-spacing: 0.5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: var(--bg); }
@@ -93,24 +93,24 @@
   .user-name { font-weight: 600; color: var(--text); }
   .user-email { font-size: 11px; color: var(--text3); }
 
-  /* Role badge */
-  .role-badge {
-    display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px;
-    border-radius: 20px; letter-spacing: 0.3px;
-  }
-  .role-admin { background: #ede9fe; color: #6d28d9; }
-  .role-user  { background: var(--bg); color: var(--text3); border: 1px solid var(--border); }
+  /* Role badge (작업76: 필 제거, 색 텍스트만) */
+  .role-badge { font-size: 11px; font-weight: 700; letter-spacing: 0.3px; }
+  .role-admin { color: #6d28d9; }
+  .role-user  { color: var(--text3); }
 
   /* ── Toggle switch ── */
-  .toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+  /* 작업76: 각진 토글. 보이는 크기(36x20)는 그대로 두고 label의 ::after로
+     클릭 영역만 44x44까지 넓힘 - label 위 클릭이라 체크박스가 그대로 토글됨 */
+  .toggle { position: relative; display: inline-block; width: 36px; height: 20px; vertical-align: middle; }
+  .toggle::after { content: ''; position: absolute; inset: -12px -4px; cursor: pointer; }
   .toggle input { opacity: 0; width: 0; height: 0; }
   .toggle-slider {
     position: absolute; inset: 0; cursor: pointer;
-    background: #d1d5db; border-radius: 20px; transition: 0.2s;
+    background: #d1d5db; transition: 0.2s;
   }
   .toggle-slider:before {
     content: ''; position: absolute; width: 14px; height: 14px;
-    left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s;
+    left: 3px; top: 3px; background: #fff; transition: 0.2s;
   }
   input:checked + .toggle-slider { background: var(--accent); }
   input:checked + .toggle-slider:before { transform: translateX(16px); }
@@ -120,11 +120,12 @@
   /* Row waiting for approval - stand out in the list */
   tr.row-pending td { background: #fffbeb; }
   tr.row-pending:hover td { background: #fef3c7; }
+  /* 작업76: 필 제거 - 경고색 점 + 텍스트 */
   .pending-badge {
-    display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px;
-    border-radius: 20px; letter-spacing: 0.3px; background: #fef3c7; color: var(--warn);
-    margin-left: 6px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.3px; color: var(--warn);
+    margin-left: 6px; white-space: nowrap;
   }
+  .pending-badge::before { content: '\25CF'; font-size: 8px; margin-right: 3px; vertical-align: 2px; }
 
   /* ── Perms grid ── */
   .perms { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -132,23 +133,32 @@
 
   /* ── Role select ── */
   select.role-select {
-    font-size: 12px; padding: 3px 6px; border: 1px solid var(--border);
-    border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer;
+    font-size: 13px; padding: 0 8px; min-height: 44px; min-width: 72px; border: 1px solid var(--border);
+    border-radius: 0; background: var(--surface); color: var(--text); cursor: pointer;
   }
 
   /* ── Action buttons ── */
+  /* 작업76: 주요 액션이라 radius는 여기만 남김(10px), 터치 영역 44px */
   .btn-save {
-    font-size: 12px; font-weight: 600; padding: 4px 12px;
-    background: var(--accent); color: #fff; border: none; border-radius: 6px;
-    cursor: pointer; transition: opacity 0.15s;
+    font-size: 13px; font-weight: 600; padding: 0 16px; min-height: 44px; min-width: 64px;
+    background: var(--accent); color: #fff; border: none; border-radius: 10px;
+    cursor: pointer; transition: opacity 0.15s; white-space: nowrap;
   }
   .btn-save:hover { opacity: 0.85; }
   .btn-save:disabled { opacity: 0.4; cursor: default; }
 
+  /* 작업76: 표가 가로 스크롤돼도 저장 열은 오른쪽에 고정. 배경은 행 배경과
+     같게(승인대기/hover 행은 기존 tr.row-pending td, tr:hover td 규칙이 더
+     구체적이라 그대로 덮어씀) + 왼쪽 구분선으로 스크롤되는 내용과 분리 */
+  th.col-save, td.col-save {
+    position: sticky; right: 0; z-index: 1;
+    background: var(--surface); box-shadow: inset 1px 0 0 var(--border);
+  }
+
   /* ── Toast ── */
   #toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
-    background: #1a1f3c; color: #fff; padding: 10px 20px; border-radius: 8px;
+    background: #1a1f3c; color: #fff; padding: 10px 20px;
     font-size: 13px; opacity: 0; pointer-events: none; transition: all 0.25s; z-index: 999;
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -245,7 +255,7 @@
               <th style="text-align:right">검색 횟수</th>
               <th style="text-align:right">TTS 횟수</th>
               <th style="text-align:right">단어장</th>
-              <th>저장</th>
+              <th class="col-save">저장</th>
             </tr>
           </thead>
           <tbody id="user-tbody"></tbody>
@@ -418,7 +428,7 @@ function renderUserRow(u) {
     <td style="text-align:right;font-weight:600">${fmt(u.search_count)}</td>
     <td style="text-align:right;font-weight:600">${fmt(u.tts_count)}</td>
     <td style="text-align:right">${fmt(u.wordbook_count)}</td>
-    <td>
+    <td class="col-save">
       <button class="btn-save" id="save-${u.id}" onclick="saveUser(${u.id})" disabled>저장</button>
     </td>
   </tr>`;
