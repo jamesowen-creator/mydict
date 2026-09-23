@@ -1421,8 +1421,13 @@
   /* 작업7: 가이드 프레임(top:50%, height:224px → 하단 가장자리는
      50% + 112px)과 화면 맨 아래(nav가 있었을 자리, 100%) 사이 구간의
      2/3 지점(가이드 프레임 쪽으로 치우침)에 배치.
-     target = (1/3)*100% + (2/3)*(50% + 112px) = 66.667% + 74.667px */
-  .ocr-controls{position:absolute;left:50%;top:calc(66.667% + 74.667px);transform:translate(-50%,-50%);z-index:25;display:flex;align-items:center;gap:16px}
+     target = (1/3)*100% + (2/3)*(50% + 112px) = 66.667% + 74.667px
+     작업65: 프레임 하단-버튼 사이 간격이 좁아 보여 약 2배로 확대.
+     % 계수(66.667%)는 그대로 두고 px 상수만 74.667px -> 150px로
+     키움 - top의 px 항이 오른 만큼 간격도 뷰포트 높이와 무관하게
+     그대로 더해지므로(가이드 하단 위치는 이 상수와 무관), 뷰포트
+     크기에 상관없이 정확히 그 차이(약 75px)만큼 간격이 넓어짐 */
+  .ocr-controls{position:absolute;left:50%;top:calc(66.667% + 150px);transform:translate(-50%,-50%);z-index:25;display:flex;align-items:center;gap:16px}
   /* 작업7: 배경 불투명도 75% -> 80%(20% 투명). 대기 화면(재생 버튼
      하나만 보이는 상태)과 스캔 중 화면(이전/재생-일시정지/다음 3버튼)이
      동일한 .ocr-circle-btn 엘리먼트/클래스를 공유하므로 이 한 줄로 둘
