@@ -1933,9 +1933,18 @@ function showToast(msg) {
 }
 
 function showPage(name, push = true) {
+  const target = document.getElementById('page-' + name);
+  if (!target) {
+    // 작업58: 'home'처럼 markup이 없는 죽은 페이지 이름이 history state로
+    // 들어와도(예: 스택 밑바닥까지 뒤로가기) 조용히 무시하지 않고 기본
+    // 탭으로 대체 이동한다. name이 이미 'search'인데도 타겟이 없으면
+    // 마크업 자체가 깨진 것이므로 더 재귀하지 않고 그대로 멈춘다.
+    if (name !== 'search') showPage('search', push);
+    return;
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
+  target.classList.add('active');
   const tabIdx = ['search','wordbook','quiz','metacog','wrong'].indexOf(name);
   if (tabIdx >= 0) document.querySelectorAll('.nav-tab')[tabIdx].classList.add('active');
 
@@ -4063,14 +4072,26 @@ function setPodcastGap(gap) {
 let _backBlockInstalled = false;
 
 function setupBackButtonBlock() {
-  history.replaceState({ page: 'home' }, '');
+  // 작업58: 예전엔 'home'이었으나 #page-home은 도달 불가능한 죽은
+  // 코드라 실제 DOM에 없음 - 탭 전환 기록을 다 소진하고 이 바닥
+  // 상태까지 뒤로가면 showPage('home')이 null.classList로 죽었다.
+  // 실제 랜딩 탭인 'search'를 바닥 상태로 깔아서 근본 원인을 없앤다.
+  history.replaceState({ page: 'search' }, '');
   if (_backBlockInstalled) return;
   _backBlockInstalled = true;
   window.addEventListener('popstate', function(e) {
     if (!getToken()) return;
-    if (e.state && e.state.page) {
+    // 작업55: OCR 스캐너가 열려있는 상태에서 뒤로가기로 'ocr' 상태를
+    // 벗어났으면(스캐너를 열 때 push해둔 항목을 떠난 것) 탭 화면은
+    // 원래 그대로였으니 showPage는 부르지 않고 스캐너만 정리해서 닫는다.
+    const ocrPanel = document.getElementById('ocr-scanner');
+    if (ocrPanel && !ocrPanel.hidden && (!e.state || e.state.page !== 'ocr')) {
+      if (typeof window.__closeOcrPanel === 'function') window.__closeOcrPanel({ viaBack: true });
+      return;
+    }
+    if (e.state && e.state.page && e.state.page !== 'ocr') {
       showPage(e.state.page, false);
-    } else {
+    } else if (!e.state || !e.state.page) {
       history.pushState({ page: _currentPage || 'search' }, '');
     }
   });
@@ -4129,7 +4150,19 @@ if ('serviceWorker' in navigator) {
   import { createOcrScanner } from '/js/ocr/ocrScanner.js';
   const panel = document.getElementById('ocr-scanner');
   let scanner;
-  function closePanel() { scanner?.stop(); panel.hidden = true; }
+  // 작업55: OCR을 열 때 히스토리에 'ocr' 상태를 남겨서(아래 pushState)
+  // 뒤로가기가 setupBackButtonBlock()의 popstate 핸들러를 거치도록 함.
+  // viaBack=true면 이미 뒤로가기로 상태가 넘어간 뒤라 history.back()을
+  // 또 부르면 안 되고(이중 이동/무한루프 위험), 종료버튼/단어선택처럼
+  // 사용자가 직접 닫은 경우에만 아까 push한 'ocr' 항목을 pop해준다.
+  function closePanel(opts = {}) {
+    scanner?.stop();
+    panel.hidden = true;
+    if (!opts.viaBack) history.back();
+  }
+  // setupBackButtonBlock()(비-module 스크립트)이 popstate에서 이 패널을
+  // 닫을 수 있도록 최소한의 전역 브릿지만 노출.
+  window.__closeOcrPanel = closePanel;
   document.getElementById('ocr-open').onclick = () => {
     panel.hidden = false;
     scanner = createOcrScanner(panel, {
@@ -4140,7 +4173,8 @@ if ('serviceWorker' in navigator) {
     });
     // createOcrScanner binds its own close-button handler (camera stop only);
     // rebind after creation so closing also hides the panel.
-    panel.querySelector('[data-ocr-close]').onclick = closePanel;
+    panel.querySelector('[data-ocr-close]').onclick = () => closePanel();
+    history.pushState({ page: 'ocr' }, '');
   };
 </script>
 </body>
