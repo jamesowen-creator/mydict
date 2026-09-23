@@ -1807,15 +1807,11 @@ async function initAuth() {
     // refresh, which would then actually navigate to '/' (now the home-wheel
     // app) instead of reloading this page. Keep the actual current path.
     window.history.replaceState({}, document.title, window.location.pathname);
-  } else if (params.get('approval') === 'pending') {
-    // 작업9-b: /auth/google now returns to whichever page started the login
-    // (see routes/auth.js's state round-trip), so a pending account logging
-    // in from here lands back here with this param instead of always on '/'.
-    window.history.replaceState({}, document.title, window.location.pathname);
-    showLoginScreen();
-    showToast('관리자 승인 후 이용 가능합니다.');
-    return;
   }
+  // 작업74: ?approval=pending 안내는 appHeader.js(renderAuthWidget)가 공용으로
+  // 처리함 - 헤더 inject()가 이 initAuth()보다 먼저 돌며 파라미터를 지우므로
+  // 여기 있던 자체 분기는 죽은 코드였음. 승인 대기 계정은 토큰이 없어서
+  // 아래 !token 분기로 로그인 화면이 뜨는 건 그대로.
 
   const token = getToken();
   if (!token) { showLoginScreen(); return; }
