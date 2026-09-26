@@ -51,7 +51,11 @@ export function createOcrScanner(root, { onSelect } = {}) {
   function render(words = []) {
     list.innerHTML = words.map(w => `<button type="button" class="ocr-candidate"><span>${w.text}</span></button>`).join('');
     list.querySelectorAll('button').forEach((b, i) => {
-      b.onclick = () => onSelect?.(words[i].text);
+      // 작업107: 선택한 단어 하나만이 아니라, 같은 프레임에서 인식된 후보
+      // 전체 목록과 그 안에서의 인덱스도 함께 넘겨서(호출부가 순차 탐색
+      // 큐를 구성할 수 있도록) - 기존 onSelect(word) 호출자와도 호환되게
+      // 뒤에 추가 인자로만 붙인다.
+      b.onclick = () => onSelect?.(words[i].text, i, words.map(w => w.text));
     });
     overlay.innerHTML = words.map(w => {
       const r = projectOverlayRect(w.bbox, video, overlay, guide);

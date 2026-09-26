@@ -171,6 +171,13 @@
     margin-top: 12px;
   }
 
+  /* 작업107: OCR 인식 후보 순차 탐색 - "이전 / N / 다음" */
+  .ocr-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 12px;padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;width:fit-content}
+  .ocr-nav[hidden]{display:none}
+  .ocr-nav-btn{width:32px;height:32px;border-radius:50%;border:none;background:var(--surface);color:var(--accent);font-size:18px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .ocr-nav-btn:disabled{opacity:.35}
+  .ocr-nav-counter{font-size:13px;font-weight:700;color:var(--text2);min-width:44px;text-align:center}
+
   .search-wrap {
     display: flex;
     gap: 8px;
@@ -1640,7 +1647,7 @@
           <input class="search-input" id="search-input" type="text" placeholder="영어 또는 한국어 입력..." autocomplete="off" autocorrect="off" spellcheck="false">
           <button class="search-clear-btn" id="search-clear-btn" tabindex="-1" onclick="clearSearchInput()">×</button>
         </div>
-        <button class="btn" id="search-btn" onclick="doSearch()">검색</button>
+        <button class="btn" id="search-btn" onclick="clearOcrQueue();doSearch()">검색</button>
       </div>
       <div class="lang-indicator">
         <button type="button" class="lang-tag" id="lang-tag-en2" onclick="selectLang('en')">영어</button>
@@ -1648,6 +1655,14 @@
         <button type="button" class="lang-tag" id="lang-tag-ja2" onclick="selectLang('ja')">일본어</button>
         <button type="button" class="lang-tag" id="lang-tag-zh2" onclick="selectLang('zh')">중국어</button>
       </div>
+    </div>
+    <!-- 작업107: OCR 인식 후보 순차 탐색 내비게이션 - #search-result는
+         renderResult*()가 innerHTML을 통째로 갈아끼우므로, 그 바깥의
+         고정 위치에 둬야 검색 결과가 바뀌어도 지워지지 않는다. -->
+    <div id="ocr-nav" class="ocr-nav" hidden>
+      <button type="button" id="ocr-nav-prev" class="ocr-nav-btn" onclick="ocrNavGo(-1)" aria-label="이전 후보">‹</button>
+      <span id="ocr-nav-counter" class="ocr-nav-counter"></span>
+      <button type="button" id="ocr-nav-next" class="ocr-nav-btn" onclick="ocrNavGo(1)" aria-label="다음 후보">›</button>
     </div>
     <div id="search-result"></div>
   </div>
@@ -1865,16 +1880,16 @@ async function loadWordbookFromDB() {
     const res = await fetch('/api/wordbook', { headers: authHeaders() });
     if (!res.ok) return;
     const rows = await res.json();
-    wordbook = rows.map(r => ({ ...(r.data || {}), id: r.id, word: r.word, lang: r.lang, savedAt: new Date(r.created_at).getTime() }));
+    wordbook = rows.map(r => ({ ...(r.data || {}), id: r.id, word: r.word, lang: r.lang, savedAt: new Date(r.created_at).getTime(), source: r.source || 'manual' }));
   } catch (e) { console.error('wordbook load error:', e); }
 }
 
-async function saveWordToDB(wordData) {
+async function saveWordToDB(wordData, source = 'manual') {
   try {
     const res = await fetch('/api/wordbook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ word: wordData.word, lang: wordData.lang || 'en', data: wordData })
+      body: JSON.stringify({ word: wordData.word, lang: wordData.lang || 'en', data: wordData, source })
     });
     if (!res.ok) return null;
     return await res.json();
@@ -1944,6 +1959,8 @@ function showPage(name, push = true) {
     if (name !== 'search') showPage('search', push);
     return;
   }
+  // 작업107: 검색 결과 화면(search 탭)을 벗어나면 OCR 순차 탐색 큐 초기화
+  if (name !== 'search') clearOcrQueue();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   target.classList.add('active');
@@ -1986,6 +2003,54 @@ function updateLangIndicator(lang) {
 // 풀리는 임시 오버라이드 - "다음 타이핑 전까지만 유지".
 let _langOverride = null;
 
+// 작업107: OCR로 선택되어 넘어온 검색인지 표시. searchWord()/ocrNavGo()가
+// 지정하고 doSearch()가 이번 1회 검색에서만 소비 후 바로 리셋한다(안
+// 그러면 OCR 검색 뒤 사용자가 직접 입력한 다음 검색까지 'ocr'로 잘못 태깅됨).
+let _sourceOverride = null;
+
+// ─── OCR 인식 후보 순차 탐색 큐 ────────────────────────────────────────────────
+// 작업107: OCR 스캔 한 번으로 인식된 후보 단어 전체(N개)를 순서대로 큐에
+// 담아두고, 검색 결과 화면에서 이전/다음으로 넘겨보게 한다. 영구 저장은
+// 하지 않으며, 검색 결과 화면을 벗어나거나 새 스캔을 시작하면 초기화된다.
+// 경계 처리: 순환하지 않고 양 끝에서 이전/다음 버튼을 비활성화한다
+// (ocrScanner.js의 프레임 후보 탐색 버튼과 동일한 컨벤션).
+let ocrQueue = null; // { words: string[], index: number } | null
+
+function setOcrQueue(words, index) {
+  ocrQueue = (words && words.length > 1) ? { words, index } : null;
+  renderOcrNav();
+}
+
+function clearOcrQueue() {
+  ocrQueue = null;
+  renderOcrNav();
+}
+
+function renderOcrNav() {
+  const el = document.getElementById('ocr-nav');
+  if (!el) return;
+  if (!ocrQueue) { el.hidden = true; return; }
+  el.hidden = false;
+  document.getElementById('ocr-nav-counter').textContent = (ocrQueue.index + 1) + ' / ' + ocrQueue.words.length;
+  document.getElementById('ocr-nav-prev').disabled = ocrQueue.index <= 0;
+  document.getElementById('ocr-nav-next').disabled = ocrQueue.index >= ocrQueue.words.length - 1;
+}
+
+function ocrNavGo(delta) {
+  if (!ocrQueue) return;
+  const next = ocrQueue.index + delta;
+  if (next < 0 || next >= ocrQueue.words.length) return;
+  ocrQueue.index = next;
+  const word = ocrQueue.words[next];
+  document.getElementById('search-input').value = word;
+  _langOverride = 'en';
+  _sourceOverride = 'ocr';
+  updateLangIndicator('en');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  doSearch();
+  renderOcrNav();
+}
+
 function selectLang(lang) {
   _langOverride = lang;
   updateLangIndicator(lang);
@@ -1994,7 +2059,7 @@ function selectLang(lang) {
 
 // ─── SEARCH ───────────────────────────────────────────────────────────────────
 document.getElementById('search-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doSearch();
+  if (e.key === 'Enter') { clearOcrQueue(); doSearch(); }
 });
 document.getElementById('search-input').addEventListener('input', e => {
   _langOverride = null;
@@ -2012,6 +2077,7 @@ function clearSearchInput() {
   input.value = '';
   document.getElementById('search-clear-btn').style.display = 'none';
   _langOverride = null;
+  clearOcrQueue();
   updateLangIndicator('en');
   input.focus();
 }
@@ -2030,6 +2096,12 @@ async function doSearch() {
   // 작업27: 언어 탭으로 명시적으로 고른 언어가 있으면 그걸 우선 사용
   const lang = _langOverride || detectLang(query);
   updateLangIndicator(lang);
+
+  // 작업107: OCR 검색 출처 표시 - 캐시 적중 여부와 무관하게 1회 검색에만
+  // 적용되도록 여기서 바로 소비하고 리셋한다(안 그러면 다음 무관한 검색에
+  // 잘못 남아있을 수 있음).
+  const source = _sourceOverride || 'manual';
+  _sourceOverride = null;
 
   const resultDiv = document.getElementById('search-result');
   const btn = document.getElementById('search-btn');
@@ -2052,13 +2124,13 @@ async function doSearch() {
 
   try {
     if (lang === 'en') {
-      await searchEnglish(query, resultDiv);
+      await searchEnglish(query, resultDiv, source);
     } else if (lang === 'ko') {
-      await searchKorean(query, resultDiv);
+      await searchKorean(query, resultDiv, source);
     } else if (lang === 'ja') {
-      await searchJapanese(query, resultDiv);
+      await searchJapanese(query, resultDiv, source);
     } else if (lang === 'zh') {
-      await searchChinese(query, resultDiv);
+      await searchChinese(query, resultDiv, source);
     }
   } catch (err) {
     resultDiv.innerHTML = `<div class="result-card" style="color:var(--wrong)">오류가 발생했습니다. 다시 시도해주세요.<br><small>${err.message}</small></div>`;
@@ -2152,7 +2224,7 @@ Rules:
 YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
 }
 
-async function searchEnglish(query, resultDiv) {
+async function searchEnglish(query, resultDiv, source = 'manual') {
   const t0 = performance.now();
   const quickText = await callAI(buildDictQuickPrompt(query));
   const result = safeParseJSON(quickText);
@@ -2187,8 +2259,8 @@ async function searchEnglish(query, resultDiv) {
   // usage_note/example 없는 데이터가 남는 것을 방지).
   const alreadySaved = wordbook.some(w => w.word.toLowerCase() === result.word.toLowerCase() && w.lang === 'en');
   if (!alreadySaved) {
-    const saved = await saveWordToDB(result);
-    if (saved) wordbook.push({ ...result, id: saved.id, savedAt: Date.now() });
+    const saved = await saveWordToDB(result, source);
+    if (saved) wordbook.push({ ...result, id: saved.id, savedAt: Date.now(), source });
     updateBadges();
   }
   renderResultEN(result, alreadySaved);
@@ -2343,7 +2415,7 @@ function renderResultEN(result, alreadySaved, opts = {}) {
 }
 
 // ─── KOREAN SEARCH ────────────────────────────────────────────────────────────
-async function searchKorean(query, resultDiv) {
+async function searchKorean(query, resultDiv, source = 'manual') {
   const prompt = `You are a Korean-English dictionary assistant.
 For the Korean word or phrase: "${query}"
 
@@ -2379,8 +2451,8 @@ Return up to 5 derivatives and 2-4 English entries representing different nuance
   const alreadySaved = wordbook.some(w => w.word === result.word && w.lang === 'ko');
   if (!alreadySaved) {
     const entry = { ...result, short_meaning: result.nuance.slice(0, 20) };
-    const saved = await saveWordToDB(entry);
-    if (saved) wordbook.push({ ...entry, id: saved.id, savedAt: Date.now() });
+    const saved = await saveWordToDB(entry, source);
+    if (saved) wordbook.push({ ...entry, id: saved.id, savedAt: Date.now(), source });
     updateBadges();
   }
   renderResultKO(result, alreadySaved);
@@ -2460,16 +2532,22 @@ function searchEnFromKO(word) {
 
 
 // ─── 유사어/추가번역 단어 클릭 검색 ──────────────────────────────────────────
-function searchWord(word, lang) {
+function searchWord(word, lang, source = 'manual') {
+  // 작업107: OCR 모듈의 onSelect가 이 함수 호출 직후 setOcrQueue()로
+  // 새 큐를 세팅하므로(같은 동기 실행 흐름 안), 여기서 먼저 비워도
+  // 화면에 깜빡임 없이 바로 새 큐로 대체된다. 그 외 호출자(유사어 클릭
+  // 등)는 OCR 탐색과 무관한 검색이므로 그대로 큐가 사라지는 게 맞다.
+  clearOcrQueue();
   document.getElementById('search-input').value = word;
   _langOverride = lang;
+  _sourceOverride = source;
   updateLangIndicator(lang);
   window.scrollTo({ top: 0, behavior: 'smooth' });
   doSearch();
 }
 
 // ─── JAPANESE SEARCH ──────────────────────────────────────────────────────────
-async function searchJapanese(query, resultDiv) {
+async function searchJapanese(query, resultDiv, source = 'manual') {
   const prompt = `You are a Japanese-Korean dictionary assistant.
 For the Japanese word or phrase: "${query}"
 
@@ -2506,8 +2584,8 @@ Return up to 5 derivatives and 2-3 entries. YOUR ENTIRE RESPONSE MUST BE A SINGL
   const alreadySaved = wordbook.some(w => w.word === result.word && w.lang === 'ja');
   if (!alreadySaved) {
     const entry = { ...result, short_meaning: result.nuance.slice(0, 20) };
-    const saved = await saveWordToDB(entry);
-    if (saved) wordbook.push({ ...entry, id: saved.id, savedAt: Date.now() });
+    const saved = await saveWordToDB(entry, source);
+    if (saved) wordbook.push({ ...entry, id: saved.id, savedAt: Date.now(), source });
     updateBadges();
   }
   renderResultJA(result, alreadySaved);
@@ -2572,7 +2650,7 @@ function renderResultJA(result, alreadySaved) {
 }
 
 // ─── CHINESE SEARCH ───────────────────────────────────────────────────────────
-async function searchChinese(query, resultDiv) {
+async function searchChinese(query, resultDiv, source = 'manual') {
   const prompt = `You are a Chinese-Korean dictionary assistant.
 For the Chinese word or phrase (Simplified): "${query}"
 
@@ -2609,8 +2687,8 @@ Return up to 5 derivatives and 2-3 entries. YOUR ENTIRE RESPONSE MUST BE A SINGL
   const alreadySaved = wordbook.some(w => w.word === result.word && w.lang === 'zh');
   if (!alreadySaved) {
     const entry = { ...result, short_meaning: result.nuance.slice(0, 20) };
-    const saved = await saveWordToDB(entry);
-    if (saved) wordbook.push({ ...entry, id: saved.id, savedAt: Date.now() });
+    const saved = await saveWordToDB(entry, source);
+    if (saved) wordbook.push({ ...entry, id: saved.id, savedAt: Date.now(), source });
     updateBadges();
   }
   renderResultZH(result, alreadySaved);
@@ -3010,6 +3088,7 @@ function updateSelectRow() {
 }
 
 function searchFromWordbook(word, lang) {
+  clearOcrQueue();
   document.getElementById('search-input').value = word;
   _langOverride = lang;
   updateLangIndicator(lang);
@@ -4166,11 +4245,16 @@ if ('serviceWorker' in navigator) {
   // 닫을 수 있도록 최소한의 전역 브릿지만 노출.
   window.__closeOcrPanel = closePanel;
   document.getElementById('ocr-open').onclick = () => {
+    // 작업107: 새 스캔을 시작하면 이전 순차 탐색 큐는 버린다.
+    if (typeof clearOcrQueue === 'function') clearOcrQueue();
     panel.hidden = false;
     scanner = createOcrScanner(panel, {
-      onSelect: (word) => {
+      onSelect: (word, index, candidateWords) => {
         closePanel();
-        if (typeof searchWord === 'function') searchWord(word, 'en');
+        // searchWord()가 내부에서 clearOcrQueue()를 먼저 호출하므로,
+        // 새 큐는 반드시 그 다음에 세팅해야 지워지지 않는다.
+        if (typeof searchWord === 'function') searchWord(word, 'en', 'ocr');
+        if (typeof setOcrQueue === 'function') setOcrQueue(candidateWords, index);
       }
     });
     // createOcrScanner binds its own close-button handler (camera stop only);
