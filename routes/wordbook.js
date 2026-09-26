@@ -24,15 +24,15 @@ router.get('/api/wordbook', requireAuth, async (req, res) => {
 router.post('/api/wordbook', requireAuth, async (req, res) => {
   const allowed = await checkPermission(req.user.id, 'can_wordbook');
   if (!allowed) return res.status(403).json({ error: '단어장 권한이 없습니다.' });
-  const { word, lang = 'en', data, source = 'manual' } = req.body;
+  const { word, lang = 'en', data } = req.body;
   if (!word) return res.status(400).json({ error: '단어를 입력해주세요.' });
   try {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowDate = tomorrow.toISOString().split('T')[0];
     const { rows } = await pool.query(
-      'INSERT INTO wordbook (user_id, word, lang, data, next_review_date, source) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [req.user.id, word, lang, data ? JSON.stringify(data) : null, tomorrowDate, source]
+      'INSERT INTO wordbook (user_id, word, lang, data, next_review_date) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [req.user.id, word, lang, data ? JSON.stringify(data) : null, tomorrowDate]
     );
     res.json(rows[0]);
   } catch (err) {
