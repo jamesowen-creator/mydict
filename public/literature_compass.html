@@ -98,7 +98,12 @@
     transition: color 0.15s;
     font-family: 'Noto Sans KR', sans-serif;
   }
-  .tab-btn.active { color: var(--primary); }
+  /* 작업83: 활성 탭은 색 + 굵기 + 밑줄 (색 단독 구분 금지 원칙) - digest_reading.html과
+     literature_compass.html의 탭바가 같은 복사본이라 두 파일 동일하게 유지 */
+  .tab-btn.active {
+    color: var(--primary); font-weight: 700;
+    text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px;
+  }
   .tab-btn svg { width: 22px; height: 22px; }
   .tab-btn.disabled { opacity: 0.4; cursor: not-allowed; }
 
