@@ -598,6 +598,47 @@ function showView(id) {
   document.getElementById('tab-quiz').classList.toggle('active', id === 'view-quiz' || id === 'view-result');
 }
 
+// ── History (작업95) ──
+// 원래 showView는 화면만 바꾸고 기록을 전혀 남기지 않아서, 상세/퀴즈 화면에서
+// 기기·브라우저 뒤로가기를 누르면 이 페이지 자체를 떠나 앱 홈(/)으로 나갔음.
+// 사전 페이지(작업55/58)와 같은 방식으로: 목록(list)을 바닥 상태로 깔고,
+// 상세·퀴즈·결과는 그 위에 한 칸만 쌓음(이미 한 칸 위면 replace). 그래서
+// 어느 화면에서든 뒤로가기 한 번이면 목록, 목록에서 한 번 더면 페이지를 떠남.
+// 연결 작품으로 옮겨 갈 때도 replace라서 앱 안 ‹ 버튼(goList)과 똑같이 목록으로 감.
+let _navFromPop = false;
+function navState(state) {
+  if (_navFromPop) return; // popstate로 그리는 중에는 기록을 건드리지 않음
+  const cur = history.state && history.state.view;
+  if (!cur || cur === 'list') history.pushState(state, '');
+  else history.replaceState(state, '');
+}
+function showListView() {
+  renderList();
+  showView('view-list');
+  window.scrollTo(0, 0);
+}
+window.addEventListener('popstate', e => {
+  if (!DB) return;
+  const st = e.state || { view: 'list' };
+  _navFromPop = true;
+  try {
+    // 방어적 확인(작업58 교훈): 없는 작품 id나 이미 사라진 퀴즈 상태로 돌아오면 목록으로
+    if (st.view === 'digest' && DB.works.some(w => w.id === st.id)) {
+      showDigest(st.id);
+    } else if (st.view === 'quiz' && quizState.questions.length && quizState.currentIdx < quizState.questions.length) {
+      showView('view-quiz');
+      renderQuestion();
+      window.scrollTo(0, 0);
+    } else if (st.view === 'result' && quizState.questions.length) {
+      showResult();
+    } else {
+      showListView();
+    }
+  } finally {
+    _navFromPop = false;
+  }
+});
+
 // ── Permission Check ──
 async function checkPermission() {
   const token = localStorage.getItem('mydict_token');
@@ -625,6 +666,15 @@ async function loadDB() {
     document.getElementById('loading').style.display = 'none';
     renderList();
     showView('view-list');
+    // 작업95: 새로고침해도 history.state는 남음 - 상세였으면 그 작품을 다시 열고,
+    // 퀴즈/결과처럼 메모리 상태가 사라진 화면이었으면 목록 상태로 바꿔 둠
+    const st = history.state;
+    if (st && st.view === 'digest' && DB.works.some(w => w.id === st.id)) {
+      _navFromPop = true;
+      try { showDigest(st.id); } finally { _navFromPop = false; }
+    } else {
+      history.replaceState({ view: 'list' }, '');
+    }
   } catch (e) {
     document.getElementById('loading').innerHTML =
       `<div class="error-msg">데이터를 불러오지 못했습니다.<br>${e.message}</div>`;
@@ -996,9 +1046,14 @@ function updateTabQuizState() {
 }
 
 function goList() {
-  renderList();
-  showView('view-list');
-  window.scrollTo(0, 0);
+  // 작업95: 상세/퀴즈 위에 쌓아둔 한 칸이 있으면 history.back()으로 되돌려서
+  // popstate가 목록을 그리게 함 - 여기서 직접 그리면 그 칸이 기록에 남아서
+  // 목록에서 기기 뒤로가기를 눌렀을 때 방금 본 상세로 되돌아가 버림
+  if (history.state && history.state.view && history.state.view !== 'list') {
+    history.back();
+    return;
+  }
+  showListView();
 }
 
 // ── View 2: Digest ──
@@ -1074,6 +1129,7 @@ function showDigest(workId) {
   updateConquestBtn();
   showView('view-digest');
   window.scrollTo(0, 0);
+  navState({ view: 'digest', id: workId });
 }
 
 // 작업91: 시 전문 - full_text = { stanzas: [[줄, ...], ...], source: "출전", orthography }.
@@ -1131,6 +1187,7 @@ function startQuizFlow() {
   showView('view-quiz');
   renderQuestion();
   window.scrollTo(0, 0);
+  navState({ view: 'quiz' });
 }
 
 function buildQuestions(conquered) {
@@ -1325,6 +1382,7 @@ function showResult() {
 
   showView('view-result');
   window.scrollTo(0, 0);
+  navState({ view: 'result' });
 }
 
 // ── Boot ──
