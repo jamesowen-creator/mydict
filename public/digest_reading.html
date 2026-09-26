@@ -241,7 +241,17 @@
   }
 
   /* ── View 2: Digest ── */
+  /* 작업88: 미니멀 원칙 정리 - 초록 계열 제거, 앱 코랄로 통일.
+     코랄 #e2583b는 흰 배경 대비 3.7:1이라 선·아이콘(비텍스트 3:1 기준)에만 쓰고,
+     코랄 글자는 짙은 코랄 #b8442e(5.4:1, 틴트 배경 위 4.8:1)로.
+     제목은 사전 상세(표제어)처럼 본문 큰 제목 하나만 - 상단 바에선 뺌 */
+  #view-digest {
+    --coral: var(--metis-coral, #e2583b);
+    --coral-ink: #b8442e;
+    --coral-tint: #FDF0EC;
+  }
   #view-digest .content { padding: 20px 16px 100px; }
+  #view-digest .back-btn:hover { background: var(--coral-tint); color: var(--coral-ink); }
 
   .digest-work-header {
     background: var(--card);
@@ -262,53 +272,56 @@
     margin-bottom: 14px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
   }
+  /* 섹션 라벨: 색 강조 없이 짙은 회색, 본문(400)과는 굵기(700)로 구분 */
   .digest-section-label {
-    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
-    color: var(--primary); text-transform: uppercase; margin-bottom: 10px;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
+    color: #3A3A40; margin-bottom: 10px;
   }
+  /* 인용 강조 규칙: 배경 박스 없이 왼쪽 2px 코랄 세로선만 */
   .digest-one-line {
-    border-left: 4px solid var(--primary);
-    padding: 10px 14px;
-    background: var(--primary-light);
-    border-radius: 0 10px 10px 0;
-    font-size: 14px; font-weight: 600; line-height: 1.6; color: var(--primary-dark);
+    border-left: 2px solid var(--coral);
+    padding: 2px 0 2px 12px;
+    font-size: 15px; font-weight: 600; line-height: 1.6; color: var(--text1);
   }
   .digest-summary {
     font-size: 14px; line-height: 1.8; color: var(--text1);
   }
   .key-scene-list { display: flex; flex-direction: column; gap: 12px; }
-  .key-scene-item { display: flex; gap: 12px; align-items: flex-start; }
+  .key-scene-item { display: flex; gap: 8px; align-items: baseline; }
+  /* 원형 숫자 배지 대신 굵은 숫자 + 점 (사전 .meaning-num과 같은 기준) */
   .scene-num {
-    width: 24px; height: 24px; flex-shrink: 0;
-    background: var(--primary); color: #fff;
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 12px; font-weight: 700; font-family: 'Inter', sans-serif;
-    margin-top: 1px;
+    flex-shrink: 0; min-width: 16px;
+    font-size: 14px; font-weight: 800; font-family: 'Inter', sans-serif;
+    color: var(--text1);
   }
   .scene-text { font-size: 14px; line-height: 1.7; color: var(--text1); flex: 1; }
 
-  .tag-group { display: flex; flex-wrap: wrap; gap: 8px; }
-  .tag {
-    background: var(--primary-light); color: var(--primary-dark);
-    border-radius: 20px; padding: 5px 12px;
-    font-size: 13px; font-weight: 500;
-  }
+  /* 주제·정서: 알약 배지 대신 텍스트 - 주제는 굵게, 정서는 쉼표로 이어서 */
+  .digest-theme { font-size: 15px; font-weight: 600; line-height: 1.6; color: var(--text1); }
+  .digest-emotion { margin-top: 6px; font-size: 14px; line-height: 1.6; color: #4B5563; }
 
-  .related-list { display: flex; flex-direction: column; gap: 10px; }
+  /* 연결 작품: 회색 박스 대신 1px 구분선으로 나눈 줄, 화살표·관계는 코랄 */
+  .related-list { display: flex; flex-direction: column; }
+  /* 작업88-a: div onclick → 실제 <button>. 버튼 기본 모양(배경·테두리·가운데
+     정렬·폰트)만 걷어내고 기존 줄 스타일 그대로 */
   .related-item {
     display: flex; align-items: flex-start; gap: 10px;
-    padding: 12px 14px;
-    background: var(--bg); border-radius: 12px;
+    width: 100%; margin: 0;
+    padding: 12px 4px;
+    background: none; border: none; border-top: 1px solid var(--border);
+    font: inherit; color: inherit; text-align: left;
     cursor: pointer; transition: background 0.15s;
-    border: 1px solid transparent;
   }
-  .related-item:hover { background: var(--primary-light); border-color: rgba(29,158,117,0.2); }
-  .related-item svg { width: 14px; height: 14px; color: var(--primary); flex-shrink: 0; margin-top: 3px; }
+  .related-item:focus-visible { outline: 2px solid var(--coral); outline-offset: -2px; }
+  .related-item:first-child { border-top: none; padding-top: 4px; }
+  .related-item:hover { background: var(--coral-tint); }
+  .related-item svg { width: 14px; height: 14px; color: var(--coral); flex-shrink: 0; margin-top: 3px; }
+  /* 버튼 안에는 phrasing 요소만 둘 수 있어 span을 block으로 */
   .related-info { flex: 1; }
-  .related-title { font-size: 13px; font-weight: 600; color: var(--text1); }
+  .related-info > span { display: block; }
+  .related-title { font-size: 14px; font-weight: 700; color: var(--text1); }
   .related-author { font-size: 12px; color: var(--text2); }
-  .related-relation { font-size: 11px; color: var(--primary); font-weight: 500; margin-top: 2px; }
+  .related-relation { font-size: 12px; color: var(--coral-ink); font-weight: 600; margin-top: 2px; }
 
   /* Conquest toggle */
   .conquest-bar {
@@ -329,8 +342,8 @@
     color: var(--text2); transition: all 0.2s;
   }
   .conquest-btn.conquered {
-    background: var(--primary-light); border-color: var(--primary);
-    color: var(--primary-dark);
+    background: var(--coral-tint); border-color: var(--coral);
+    color: var(--coral-ink);
   }
   .conquest-btn svg { width: 18px; height: 18px; }
 
@@ -484,12 +497,11 @@
 <!-- View 2: Digest -->
 <div id="view-digest" class="view">
   <div class="top-bar">
-    <button class="back-btn" onclick="goList()">
+    <button class="back-btn" onclick="goList()" aria-label="목록으로">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="15 18 9 12 15 6"></polyline>
       </svg>
     </button>
-    <h1 id="digest-top-title" style="font-size:16px"></h1>
   </div>
   <div class="content" id="digest-content"></div>
   <div class="conquest-bar">
@@ -984,25 +996,24 @@ function showDigest(workId) {
   const work = DB.works.find(w => w.id === workId);
   if (!work) return;
   currentWorkId = workId;
-
-  document.getElementById('digest-top-title').textContent = `「${work.title}」`;
+  // 작업88: 제목은 본문 .digest-work-title 하나만 (상단 바 제목 제거)
 
   const relatedHtml = work.related_works.length > 0
     ? `<div class="digest-section">
         <div class="digest-section-label">연결 작품</div>
         <div class="related-list">
           ${work.related_works.map(r => `
-            <div class="related-item" onclick="showDigest('${r.id}')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <button type="button" class="related-item" onclick="showDigest('${r.id}')">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="5" y1="12" x2="19" y2="12"></line>
                 <polyline points="12 5 19 12 12 19"></polyline>
               </svg>
-              <div class="related-info">
-                <div class="related-title">「${r.title}」</div>
-                <div class="related-author">${r.author}</div>
-                <div class="related-relation">${r.relation}</div>
-              </div>
-            </div>`).join('')}
+              <span class="related-info">
+                <span class="related-title">「${r.title}」</span>
+                <span class="related-author">${r.author}</span>
+                <span class="related-relation">${r.relation}</span>
+              </span>
+            </button>`).join('')}
         </div>
       </div>`
     : '';
@@ -1025,19 +1036,15 @@ function showDigest(workId) {
       <div class="key-scene-list">
         ${work.key_scenes.map((s, i) => `
           <div class="key-scene-item">
-            <div class="scene-num">${i + 1}</div>
+            <div class="scene-num">${i + 1}.</div>
             <div class="scene-text">${s}</div>
           </div>`).join('')}
       </div>
     </div>
     <div class="digest-section">
       <div class="digest-section-label">주제 · 정서</div>
-      <div class="tag-group" style="margin-bottom:10px">
-        <span class="tag">${work.theme}</span>
-      </div>
-      <div class="tag-group">
-        ${work.emotion.split(',').map(e => `<span class="tag">${e.trim()}</span>`).join('')}
-      </div>
+      <div class="digest-theme">${work.theme}</div>
+      <div class="digest-emotion">${work.emotion.split(',').map(e => e.trim()).join(', ')}</div>
     </div>
     ${relatedHtml}`;
 
