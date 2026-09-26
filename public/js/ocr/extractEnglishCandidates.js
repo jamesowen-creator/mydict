@@ -10,6 +10,20 @@ const stopwords = new Set([
 const liveShortWordAllowlist = new Set(['ox']);
 const wordInputPattern = /^[a-z]+(?:[ -][a-z]+)*$/i;
 
+// 작업102: 2단어 "구(phrase)" 후보는 실제 구동사(phrasal verb)일 때만 만든다.
+// 예전에는 서로 이웃한 두 토큰이 각각 사전 단어이기만 하면 무조건 구 후보로
+// 묶었는데, 실측 결과(테서랙트로 합성 이미지 인식) 이 방식이 "machine syn",
+// "region today", "your vocabulary", "comprehension quickly"처럼 뜻 없는
+// 조합을 후보로 계속 만들어냈음 - 사전 페이지/문장 안에서 우연히 붙어 있을
+// 뿐인 서로 무관한 두 단어가 프레임 중심 근처에 있으면 그대로 후보가 됐기
+// 때문. 두 번째 토큰이 구동사에 흔히 쓰이는 불변화사(particle)일 때만 구를
+// 만들면 "give up", "look out"류의 진짜 구동사는 그대로 남고 위 같은 잘못된
+// 조합은 애초에 생성되지 않음.
+const phrasalParticles = new Set([
+  'up', 'out', 'down', 'off', 'away', 'back', 'over', 'through', 'around',
+  'along', 'aside', 'forward', 'together', 'into', 'about', 'apart',
+]);
+
 function normalizeWord(value) {
   return value.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
 }
@@ -89,6 +103,7 @@ export function rankEnglishCandidates(text, structuredTokens, imageSize, wordSet
   for (let index = 0; index < tokens.length - 1; index += 1) {
     const first = normalizeToken(tokens[index].text);
     const second = normalizeToken(tokens[index + 1].text);
+    if (!phrasalParticles.has(second)) continue;
     if (!isCandidateWord(first, wordSet) || !isCandidateWord(second, wordSet)) continue;
     const phrase = `${first} ${second}`;
     const current = grouped.get(phrase) ?? { firstIndex: index, occurrences: 0, confidences: [], proximityScores: [], phrase: true };
@@ -139,9 +154,16 @@ export function extractEnglishCandidates(text, structuredTokens, imageSize, word
   return rankEnglishCandidates(text, structuredTokens, imageSize, wordSet).slice(0, 12).map(({ word }) => word);
 }
 
+// 작업102: 실측 결과 실제 단어는 신뢰도 70~97% 범위였고, 노이즈성 오인식은
+// 대체로 사전 단어 매칭 자체에서 걸러졌지만(예: "wouid"), 방어적으로 최소
+// 신뢰도 기준을 하나 더 둠 - 관측된 정상 단어 최저치(70)보다 한참 낮게 잡아
+// 정상 단어의 재현율은 건드리지 않으면서, 짧은 후보 중 패턴 검사만으로는
+// 못 거른 노이즈성 오인식만 추가로 막는 안전망.
+const MIN_LIVE_CONFIDENCE = 40;
+
 function filterLiveCandidates(ranked) {
   return ranked
-    .filter((candidate) => candidate.confidence !== undefined)
+    .filter((candidate) => candidate.confidence !== undefined && candidate.confidence >= MIN_LIVE_CONFIDENCE)
     .filter((candidate) => candidate.word.length > 2 || liveShortWordAllowlist.has(candidate.word) || (candidate.word.length === 2 && (candidate.proximityScore ?? 0) >= 10))
     .slice(0, 5);
 }
