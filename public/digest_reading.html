@@ -1096,16 +1096,17 @@ function showDigest(workId) {
       <div class="digest-emotion">${work.emotion.split(',').map(e => e.trim()).join(', ')}</div>
     </div>`;
 
-  // 작업91: 전문 모드 / 요약 모드 분기. full_text는 사람이 원전에서 입력한
-  // 퍼블릭도메인 작품에만 들어감 (scripts/validate_digest.js가 강제) - 화면에서도
-  // rights.status를 한 번 더 확인해서 보호 중인 작품 원문은 절대 그리지 않음
+  // 작업101: 원본(full_text) 유무와 관계없이 항상 같은 기본 레이아웃(핵심 한 줄 →
+  // [원문] → 줄거리 → 핵심 장면 → 주제·정서 → 연결 작품)을 쓴다. 원본이 있는
+  // 작품만 "원문" 섹션이 그 위에 추가로 붙고, 없는 작품은 그 자리가 그냥 빈다 -
+  // 예전처럼 원본 유무로 줄거리/핵심 장면 자체가 사라지는 별도 레이아웃은 없앰.
+  // full_text는 사람이 원전에서 입력한 퍼블릭도메인 작품에만 들어감
+  // (scripts/validate_digest.js가 강제) - 화면에서도 rights.status를 한 번 더
+  // 확인해서 보호 중인 작품 원문은 절대 그리지 않음
   const fullMode = !!work.full_text && !!work.rights && work.rights.status === 'public_domain';
 
-  document.getElementById('digest-content').innerHTML = fullMode
-    ? `${headerHtml}
-    ${renderFullText(work.full_text)}${oneLineHtml}${themeHtml}
-    ${relatedHtml}`
-    : `${headerHtml}${oneLineHtml}
+  document.getElementById('digest-content').innerHTML = `${headerHtml}${oneLineHtml}
+    ${fullMode ? renderFullText(work.full_text) : ''}
     <div class="digest-section">
       <div class="digest-section-label">줄거리</div>
       <div class="digest-summary">${work.summary}</div>
