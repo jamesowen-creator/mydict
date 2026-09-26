@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build:home": "npm --prefix home-wheel install && npm --prefix home-wheel run build"
+    "build:home": "npm --prefix home-wheel install && npm --prefix home-wheel run build",
+    "validate:digest": "node scripts/validate_digest.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",

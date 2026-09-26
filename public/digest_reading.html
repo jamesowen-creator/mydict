@@ -323,6 +323,16 @@
   .related-author { font-size: 12px; color: var(--text2); }
   .related-relation { font-size: 12px; color: var(--coral-ink); font-weight: 600; margin-top: 2px; }
 
+  /* 작업91: 전문 모드 - 시 원문 (연 = 문단, 줄 = 한 줄) */
+  .poem { font-size: 16px; line-height: 1.9; color: var(--text1); word-break: keep-all; }
+  .poem-stanza + .poem-stanza { margin-top: 1.2em; }
+  .poem-line {
+    display: block;
+    white-space: pre-wrap;              /* 줄 앞 공백(들여쓰기) 보존 */
+    padding-left: 1em; text-indent: -1em; /* 화면에서 접힌 줄은 내어쓰기 */
+  }
+  .poem-source { margin-top: 16px; font-size: 12px; color: var(--text2); }
+
   /* Conquest toggle */
   .conquest-bar {
     position: fixed; bottom: var(--tab-height); left: 50%; transform: translateX(-50%);
@@ -1018,15 +1028,33 @@ function showDigest(workId) {
       </div>`
     : '';
 
-  document.getElementById('digest-content').innerHTML = `
+  const headerHtml = `
     <div class="digest-work-header">
       <div class="digest-work-title">「${work.title}」</div>
       <div class="digest-work-meta">${work.author} · ${work.year} · ${work.genre}</div>
-    </div>
+    </div>`;
+  const oneLineHtml = `
     <div class="digest-section">
       <div class="digest-section-label">핵심 한 줄</div>
       <div class="digest-one-line">${work.one_line}</div>
-    </div>
+    </div>`;
+  const themeHtml = `
+    <div class="digest-section">
+      <div class="digest-section-label">주제 · 정서</div>
+      <div class="digest-theme">${work.theme}</div>
+      <div class="digest-emotion">${work.emotion.split(',').map(e => e.trim()).join(', ')}</div>
+    </div>`;
+
+  // 작업91: 전문 모드 / 요약 모드 분기. full_text는 사람이 원전에서 입력한
+  // 퍼블릭도메인 작품에만 들어감 (scripts/validate_digest.js가 강제) - 화면에서도
+  // rights.status를 한 번 더 확인해서 보호 중인 작품 원문은 절대 그리지 않음
+  const fullMode = !!work.full_text && !!work.rights && work.rights.status === 'public_domain';
+
+  document.getElementById('digest-content').innerHTML = fullMode
+    ? `${headerHtml}
+    ${renderFullText(work.full_text)}${oneLineHtml}${themeHtml}
+    ${relatedHtml}`
+    : `${headerHtml}${oneLineHtml}
     <div class="digest-section">
       <div class="digest-section-label">줄거리</div>
       <div class="digest-summary">${work.summary}</div>
@@ -1040,17 +1068,31 @@ function showDigest(workId) {
             <div class="scene-text">${s}</div>
           </div>`).join('')}
       </div>
-    </div>
-    <div class="digest-section">
-      <div class="digest-section-label">주제 · 정서</div>
-      <div class="digest-theme">${work.theme}</div>
-      <div class="digest-emotion">${work.emotion.split(',').map(e => e.trim()).join(', ')}</div>
-    </div>
+    </div>${themeHtml}
     ${relatedHtml}`;
 
   updateConquestBtn();
   showView('view-digest');
   window.scrollTo(0, 0);
+}
+
+// 작업91: 시 전문 - full_text = { stanzas: [[줄, ...], ...], source: "출전", orthography }.
+// 작업93: 출전 옆에 표기 방식(원문 표기/현대 표기)을 있는 그대로 덧붙임.
+// 원문 글자는 데이터 그대로 이스케이프해서 넣고(줄 앞 공백 들여쓰기 보존),
+// 연은 문단, 줄은 한 줄씩. 긴 줄이 화면에서 접히면 내어쓰기로 원래 줄바꿈과 구분
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function renderFullText(ft) {
+  const stanzas = ft.stanzas.map(lines =>
+    `<div class="poem-stanza">${lines.map(l => `<span class="poem-line">${escHtml(l)}</span>`).join('')}</div>`
+  ).join('');
+  return `
+    <div class="digest-section">
+      <div class="digest-section-label">전문</div>
+      <div class="poem">${stanzas}</div>
+      ${ft.source ? `<div class="poem-source">출전 · ${escHtml(ft.source)}${ft.orthography ? ` · ${escHtml(ft.orthography)}` : ''}</div>` : ''}
+    </div>`;
 }
 
 function updateConquestBtn() {
