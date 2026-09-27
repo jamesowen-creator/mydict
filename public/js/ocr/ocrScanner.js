@@ -106,8 +106,16 @@ export function createOcrScanner(root, { onSelect } = {}) {
     showError('');
     void preloadEnglishWordSet(); // kick off in parallel with the camera prompt below
     try {
+      // 작업115: 720p -> 1080p. 작업114 실측 결과, 매우 작은/빽빽한 인쇄
+      // 텍스트에서 720p는 실패하는 경우가 많았고 1080p로만 올려도 대부분
+      // 회복됐음(반면 4K는 그 이상 추가 이득이 적어 채택 안 함). ideal은
+      // 강제 아님 - 카메라가 1080p를 지원 못 하면 브라우저가 에러 없이
+      // 가장 가까운 해상도로 자동 폴백하므로 구형 기기 호환성 리스크 없음.
+      // 가이드 박스 크롭(liveFrameCapture.js)과 오버레이 투영
+      // (liveOverlayGeometry.js) 모두 video.videoWidth/videoHeight를 실시간
+      // 조회해 비율로 계산하므로 이 값만 바꾸면 나머지는 자동으로 맞춰짐.
       state.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false
       });
     } catch (e) {
