@@ -1,7 +1,7 @@
 import { captureLiveFrame } from './liveFrameCapture.js';
 import { createLiveOcrSession } from './liveOcrSession.js';
 import { deriveLiveOcrCandidates, preloadEnglishWordSet } from './extractEnglishCandidates.js';
-import { deriveLiveJapaneseCandidates } from './extractJapaneseCandidates.js';
+import { deriveLiveJapaneseCandidates, preloadJapaneseTokenizer } from './extractJapaneseCandidates.js';
 import { projectOverlayRect } from './liveOverlayGeometry.js';
 import { createCandidateStabilityTracker } from './ocrCandidateStability.js';
 
@@ -120,9 +120,12 @@ export function createOcrScanner(root, { onSelect } = {}) {
 
   async function start() {
     showError('');
-    // 작업118: 영어로 시작할 때만 274k 단어 목록을 미리 불러옴 - 일본어는
-    // 정적 목록이 없으므로 불필요
-    if (state.lang === 'en') void preloadEnglishWordSet(); // kick off in parallel with the camera prompt below
+    // 작업118/121: 활성 언어에 필요한 사전 리소스를 카메라 권한 프롬프트와
+    // 병렬로 미리 불러오기 시작 - 영어는 274k 단어 목록, 일본어는 형태소
+    // 분석 사전(17.8MB). 이미 로딩됐거나 로딩 중이면 캐시된 프로미스를
+    // 그대로 재사용(재다운로드 없음).
+    if (state.lang === 'en') void preloadEnglishWordSet();
+    if (state.lang === 'ja') void preloadJapaneseTokenizer(); // kick off in parallel with the camera prompt below
     try {
       // 작업115: 720p -> 1080p. 작업114 실측 결과, 매우 작은/빽빽한 인쇄
       // 텍스트에서 720p는 실패하는 경우가 많았고 1080p로만 올려도 대부분
@@ -188,8 +191,12 @@ export function createOcrScanner(root, { onSelect } = {}) {
   // 작업118: 언어 탭 전환. 이전 언어의 후보/안정성 스트릭은 새 언어와
   // 무관하므로 그대로 초기화한다. 카메라가 이미 열려있으면 워커를 새로
   // 만들지 않고 worker.reinitialize()만 호출(liveOcrSession.js) - 최초
-  // 사용하는 언어만 다운로드가 발생하므로 그동안 "언어 준비 중..."을
-  // 짧게 보여준다. scan()과 겹치지 않도록 busy 플래그로 잠근다.
+  // 사용하는 언어만 다운로드가 발생한다.
+  // 작업121: 일본어는 형태소 분석 사전(17.8MB)까지 같이 준비해야 해서
+  // 영어 전환보다 오래 걸릴 수 있음 - 카메라가 아직 안 열려있어도(탭만
+  // 누른 시점) 미리 받아두도록 명시적으로 기다리면서 "일본어 사전
+  // 준비 중..."을 보여준다(다운로드 자체는 Promise 캐싱 덕분에 여기서
+  // 시작해두면 이후 촬영 시작 시 다시 기다릴 필요가 없어짐).
   async function setLanguage(lang) {
     if (lang === state.lang || !(lang in TESSERACT_LANG)) return;
     state.lang = lang;
@@ -200,12 +207,17 @@ export function createOcrScanner(root, { onSelect } = {}) {
     overlay.innerHTML = '';
     updateChrome();
     updateLangTabs();
-    if (state.lang === 'en') void preloadEnglishWordSet();
-    if (!state.session) return;
+    if (lang === 'en') void preloadEnglishWordSet();
+
+    const tasks = [];
+    if (state.session) tasks.push(state.session.setLanguage(TESSERACT_LANG[lang]));
+    if (lang === 'ja') tasks.push(preloadJapaneseTokenizer());
+    if (!tasks.length) return;
+
     state.busy = true;
-    showError('언어 준비 중...');
+    showError(lang === 'ja' ? '일본어 사전 준비 중...' : '언어 준비 중...');
     try {
-      await state.session.setLanguage(TESSERACT_LANG[lang]);
+      await Promise.all(tasks);
       showError('');
     } catch (e) {
       showError('언어 전환에 실패했습니다. 다시 시도해주세요.');

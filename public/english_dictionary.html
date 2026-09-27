@@ -4239,6 +4239,11 @@ if ('serviceWorker' in navigator) {
 </section>
 <button id="ocr-open" type="button" class="ocr-open-btn">OCR검색</button>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<!-- 작업121: 일본어 형태소 분석(kuromoji.js) - 사전 데이터(17.8MB)는
+     public/js/ocr/extractJapaneseCandidates.js가 일본어 탭 최초 선택 시에만
+     별도로 jsdelivr에서 받아온다. 이 스크립트 자체는 라이브러리 코드(약
+     300KB)만 로드. -->
+<script src="https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js"></script>
 <script type="module">
   import { createOcrScanner } from '/js/ocr/ocrScanner.js';
   const panel = document.getElementById('ocr-scanner');
