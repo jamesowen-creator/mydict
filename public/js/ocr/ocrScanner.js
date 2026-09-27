@@ -2,6 +2,7 @@ import { captureLiveFrame } from './liveFrameCapture.js';
 import { createLiveEnglishOcrSession } from './liveEnglishOcrSession.js';
 import { deriveLiveOcrCandidates, preloadEnglishWordSet } from './extractEnglishCandidates.js';
 import { projectOverlayRect } from './liveOverlayGeometry.js';
+import { createCandidateStabilityTracker } from './ocrCandidateStability.js';
 
 // 작업7: 원 크기(56px)는 그대로 두고 아이콘만 22px -> 28px로 키워서
 // 원 안에 더 꽉 차 보이게 함
@@ -36,6 +37,8 @@ export function createOcrScanner(root, { onSelect } = {}) {
     cameraOpen: false, paused: false,
     history: [], cursor: -1
   };
+  // 작업112: 같은 단어가 연속 프레임 동안 재인식돼야만 후보로 승인
+  const stability = createCandidateStabilityTracker();
 
   function showError(message) { errorEl.textContent = message || ''; }
 
@@ -83,7 +86,9 @@ export function createOcrScanner(root, { onSelect } = {}) {
       const blob = await captureLiveFrame(video, canvas, guide);
       const imageSize = { width: canvas.width, height: canvas.height };
       const data = await state.session.recognize(blob);
-      const words = await deriveLiveOcrCandidates(data, imageSize);
+      const rawWords = await deriveLiveOcrCandidates(data, imageSize);
+      // 작업112: 매 프레임(빈 프레임 포함) 넣어야 스트릭이 정확히 유지/리셋됨
+      const words = stability.filter(rawWords);
       if (words.length) {
         recordHistory(words);
         render(words);
@@ -148,6 +153,7 @@ export function createOcrScanner(root, { onSelect } = {}) {
     state.paused = false;
     state.history = [];
     state.cursor = -1;
+    stability.reset();
     list.innerHTML = '';
     overlay.innerHTML = '';
     updateChrome();
