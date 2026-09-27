@@ -1406,11 +1406,6 @@
   .ocr-live-badge{display:inline-flex;align-items:center;gap:8px;color:var(--ocr-text1);font-size:12px;font-weight:800;letter-spacing:.08em}
   .ocr-live-dot{width:6px;height:6px;border-radius:50%;background:var(--ocr-ember);box-shadow:0 0 0 3px rgba(226,88,59,.25);animation:ocr-live-pulse 1.8s ease-in-out infinite}
   @keyframes ocr-live-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.85)}}
-  /* 작업118: OCR 언어 선택 탭 - 사전 검색 화면의 .lang-tag 시각 언어를
-     OCR 패널 다크 테마(--ocr-void/--ocr-ember)에 맞춰 재사용 */
-  .ocr-lang-tabs{display:flex;gap:8px;padding:0 20px 12px;flex:none}
-  .ocr-lang-tab{padding:6px 16px;border:1px solid rgba(255,255,255,.25);border-radius:999px;background:rgba(255,255,255,.06);color:rgba(245,242,237,.75);font-size:13px;font-weight:700}
-  .ocr-lang-tab.active{background:var(--ocr-ember);border-color:var(--ocr-ember);color:#fff}
   .ocr-preview{position:relative;flex:1;min-height:0;overflow:hidden;background:var(--ocr-void)}
   .ocr-preview video{width:100%;height:100%;object-fit:cover;display:block}
   .ocr-guide{position:absolute;left:50%;top:50%;width:min(78vw,280px);height:224px;transform:translate(-50%,-50%);pointer-events:none;opacity:1;transition:opacity .3s;z-index:20}
@@ -2019,12 +2014,10 @@ let _sourceOverride = null;
 // 하지 않으며, 검색 결과 화면을 벗어나거나 새 스캔을 시작하면 초기화된다.
 // 경계 처리: 순환하지 않고 양 끝에서 이전/다음 버튼을 비활성화한다
 // (ocrScanner.js의 프레임 후보 탐색 버튼과 동일한 컨벤션).
-let ocrQueue = null; // { words: string[], index: number, lang: string } | null
+let ocrQueue = null; // { words: string[], index: number } | null
 
-// 작업118: 어떤 언어로 인식된 큐인지 같이 저장해서, 이전/다음으로 넘길 때
-// 언어를 'en'으로 하드코딩하지 않고 그 큐의 실제 언어로 검색되게 한다.
-function setOcrQueue(words, index, lang) {
-  ocrQueue = (words && words.length > 1) ? { words, index, lang } : null;
+function setOcrQueue(words, index) {
+  ocrQueue = (words && words.length > 1) ? { words, index } : null;
   renderOcrNav();
 }
 
@@ -2050,9 +2043,9 @@ function ocrNavGo(delta) {
   ocrQueue.index = next;
   const word = ocrQueue.words[next];
   document.getElementById('search-input').value = word;
-  _langOverride = ocrQueue.lang;
+  _langOverride = 'en';
   _sourceOverride = 'ocr';
-  updateLangIndicator(ocrQueue.lang);
+  updateLangIndicator('en');
   window.scrollTo({ top: 0, behavior: 'smooth' });
   doSearch();
   renderOcrNav();
@@ -4206,11 +4199,6 @@ if ('serviceWorker' in navigator) {
     </div>
     <span class="ocr-live-badge"><span class="ocr-live-dot"></span>LIVE OCR</span>
   </div>
-  <!-- 작업118: OCR 인식 언어 선택 (기본값 영어) -->
-  <div class="ocr-lang-tabs">
-    <button type="button" data-ocr-lang="en" class="ocr-lang-tab active">영어</button>
-    <button type="button" data-ocr-lang="ja" class="ocr-lang-tab">일본어</button>
-  </div>
   <div class="ocr-preview">
     <video data-ocr-video playsinline muted></video>
     <div data-ocr-overlay class="ocr-overlay"></div>
@@ -4239,11 +4227,6 @@ if ('serviceWorker' in navigator) {
 </section>
 <button id="ocr-open" type="button" class="ocr-open-btn">OCR검색</button>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<!-- 작업121: 일본어 형태소 분석(kuromoji.js) - 사전 데이터(17.8MB)는
-     public/js/ocr/extractJapaneseCandidates.js가 일본어 탭 최초 선택 시에만
-     별도로 jsdelivr에서 받아온다. 이 스크립트 자체는 라이브러리 코드(약
-     300KB)만 로드. -->
-<script src="https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js"></script>
 <script type="module">
   import { createOcrScanner } from '/js/ocr/ocrScanner.js';
   const panel = document.getElementById('ocr-scanner');
@@ -4266,14 +4249,12 @@ if ('serviceWorker' in navigator) {
     if (typeof clearOcrQueue === 'function') clearOcrQueue();
     panel.hidden = false;
     scanner = createOcrScanner(panel, {
-      onSelect: (word, index, candidateWords, lang) => {
+      onSelect: (word, index, candidateWords) => {
         closePanel();
         // searchWord()가 내부에서 clearOcrQueue()를 먼저 호출하므로,
         // 새 큐는 반드시 그 다음에 세팅해야 지워지지 않는다.
-        // 작업118: 어떤 언어(영어/일본어)로 인식됐는지 ocrScanner.js가
-        // 넘겨준 값을 그대로 써서 올바른 언어로 검색되게 한다.
-        if (typeof searchWord === 'function') searchWord(word, lang, 'ocr');
-        if (typeof setOcrQueue === 'function') setOcrQueue(candidateWords, index, lang);
+        if (typeof searchWord === 'function') searchWord(word, 'en', 'ocr');
+        if (typeof setOcrQueue === 'function') setOcrQueue(candidateWords, index);
       }
     });
     // createOcrScanner binds its own close-button handler (camera stop only);
