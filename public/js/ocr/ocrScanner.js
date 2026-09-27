@@ -1,8 +1,13 @@
 import { captureLiveFrame } from './liveFrameCapture.js';
-import { createLiveEnglishOcrSession } from './liveEnglishOcrSession.js';
+import { createLiveOcrSession } from './liveOcrSession.js';
 import { deriveLiveOcrCandidates, preloadEnglishWordSet } from './extractEnglishCandidates.js';
+import { deriveLiveJapaneseCandidates } from './extractJapaneseCandidates.js';
 import { projectOverlayRect } from './liveOverlayGeometry.js';
 import { createCandidateStabilityTracker } from './ocrCandidateStability.js';
+
+// 작업118: 앱 전역에서 쓰는 언어 코드(en/ja - searchWord 등과 통일)를
+// Tesseract 언어 코드로 변환
+const TESSERACT_LANG = { en: 'eng', ja: 'jpn' };
 
 // 작업7: 원 크기(56px)는 그대로 두고 아이콘만 22px -> 28px로 키워서
 // 원 안에 더 꽉 차 보이게 함
@@ -31,16 +36,22 @@ export function createOcrScanner(root, { onSelect } = {}) {
   const torchBtn = root.querySelector('[data-ocr-torch]');
   const guideEl = root.querySelector('[data-ocr-guide]');
   const laserEl = root.querySelector('[data-ocr-laser]');
+  const langTabBtns = root.querySelectorAll('[data-ocr-lang]');
   const guide = { left: .11, top: .38, width: .78, height: .28 };
   const state = {
     stream: null, session: null, timer: null, busy: false,
     cameraOpen: false, paused: false,
-    history: [], cursor: -1
+    history: [], cursor: -1,
+    lang: 'en' // 작업118: 기본값 영어
   };
   // 작업112: 같은 단어가 연속 프레임 동안 재인식돼야만 후보로 승인
   const stability = createCandidateStabilityTracker();
 
   function showError(message) { errorEl.textContent = message || ''; }
+
+  function updateLangTabs() {
+    langTabBtns.forEach(b => b.classList.toggle('active', b.dataset.ocrLang === state.lang));
+  }
 
   function updateChrome() {
     guideEl.classList.toggle('camera-open', state.cameraOpen);
@@ -58,7 +69,9 @@ export function createOcrScanner(root, { onSelect } = {}) {
       // 전체 목록과 그 안에서의 인덱스도 함께 넘겨서(호출부가 순차 탐색
       // 큐를 구성할 수 있도록) - 기존 onSelect(word) 호출자와도 호환되게
       // 뒤에 추가 인자로만 붙인다.
-      b.onclick = () => onSelect?.(words[i].text, i, words.map(w => w.text));
+      // 작업118: 어떤 언어로 인식된 후보인지도 같이 넘겨서(searchWord에
+      // 'en'을 하드코딩하지 않고) 검색이 올바른 언어로 실행되게 함.
+      b.onclick = () => onSelect?.(words[i].text, i, words.map(w => w.text), state.lang);
     });
     overlay.innerHTML = words.map(w => {
       const r = projectOverlayRect(w.bbox, video, overlay, guide);
@@ -86,7 +99,10 @@ export function createOcrScanner(root, { onSelect } = {}) {
       const blob = await captureLiveFrame(video, canvas, guide);
       const imageSize = { width: canvas.width, height: canvas.height };
       const data = await state.session.recognize(blob);
-      const rawWords = await deriveLiveOcrCandidates(data, imageSize);
+      // 작업118: 활성 언어에 맞는 후보 추출 함수로 분기
+      const rawWords = state.lang === 'ja'
+        ? await deriveLiveJapaneseCandidates(data, imageSize)
+        : await deriveLiveOcrCandidates(data, imageSize);
       // 작업112: 매 프레임(빈 프레임 포함) 넣어야 스트릭이 정확히 유지/리셋됨
       const words = stability.filter(rawWords);
       if (words.length) {
@@ -104,7 +120,9 @@ export function createOcrScanner(root, { onSelect } = {}) {
 
   async function start() {
     showError('');
-    void preloadEnglishWordSet(); // kick off in parallel with the camera prompt below
+    // 작업118: 영어로 시작할 때만 274k 단어 목록을 미리 불러옴 - 일본어는
+    // 정적 목록이 없으므로 불필요
+    if (state.lang === 'en') void preloadEnglishWordSet(); // kick off in parallel with the camera prompt below
     try {
       // 작업115: 720p -> 1080p. 작업114 실측 결과, 매우 작은/빽빽한 인쇄
       // 텍스트에서 720p는 실패하는 경우가 많았고 1080p로만 올려도 대부분
@@ -136,7 +154,7 @@ export function createOcrScanner(root, { onSelect } = {}) {
           torchBtn.classList.toggle('active', !on);
         };
       }
-      state.session = await createLiveEnglishOcrSession();
+      state.session = await createLiveOcrSession(TESSERACT_LANG[state.lang]);
     } catch (e) {
       showError(e.message || '라이브 OCR 엔진을 준비하지 못했습니다. 다시 시도해주세요.');
       stopCamera();
@@ -167,6 +185,37 @@ export function createOcrScanner(root, { onSelect } = {}) {
     updateChrome();
   }
 
+  // 작업118: 언어 탭 전환. 이전 언어의 후보/안정성 스트릭은 새 언어와
+  // 무관하므로 그대로 초기화한다. 카메라가 이미 열려있으면 워커를 새로
+  // 만들지 않고 worker.reinitialize()만 호출(liveOcrSession.js) - 최초
+  // 사용하는 언어만 다운로드가 발생하므로 그동안 "언어 준비 중..."을
+  // 짧게 보여준다. scan()과 겹치지 않도록 busy 플래그로 잠근다.
+  async function setLanguage(lang) {
+    if (lang === state.lang || !(lang in TESSERACT_LANG)) return;
+    state.lang = lang;
+    stability.reset();
+    state.history = [];
+    state.cursor = -1;
+    list.innerHTML = '';
+    overlay.innerHTML = '';
+    updateChrome();
+    updateLangTabs();
+    if (state.lang === 'en') void preloadEnglishWordSet();
+    if (!state.session) return;
+    state.busy = true;
+    showError('언어 준비 중...');
+    try {
+      await state.session.setLanguage(TESSERACT_LANG[lang]);
+      showError('');
+    } catch (e) {
+      showError('언어 전환에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  langTabBtns.forEach(b => { b.onclick = () => setLanguage(b.dataset.ocrLang); });
+
   captureBtn.onclick = () => {
     if (!state.cameraOpen) { void start(); return; }
     state.paused = !state.paused;
@@ -180,5 +229,6 @@ export function createOcrScanner(root, { onSelect } = {}) {
   root.querySelector('[data-ocr-close]').onclick = stopCamera;
 
   updateChrome();
+  updateLangTabs();
   return { stop: stopCamera };
 }
