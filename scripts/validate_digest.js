@@ -38,16 +38,18 @@ const statusFor = deathYear => (deathYear <= PD_LAST_DEATH_YEAR ? 'public_domain
 for (const w of db.works) {
   const label = `${w.id} 「${w.title}」(${w.author})`;
   const a = authors[w.author];
-  if (!a || !Number.isInteger(a.death_year)) {
+  if (!a || (!a.alive && !Number.isInteger(a.death_year))) {
     errors.push(`${label}: authors 맵에 사망 연도(death_year)가 없음`);
     continue;
   }
-  const expected = statusFor(a.death_year);
+  // 생존 작가(alive: true)는 사망 연도가 없어도 저작권이 당연히 살아 있으므로 protected 고정
+  const expected = a.alive ? 'protected' : statusFor(a.death_year);
+  const expectedDeathYear = a.alive ? null : a.death_year;
 
   if (fix) {
     w.rights = {
       status: expected,
-      author_death_year: a.death_year,
+      author_death_year: expectedDeathYear,
       checked: (w.rights && w.rights.checked) || new Date().toISOString().slice(0, 10),
     };
   }
@@ -57,11 +59,11 @@ for (const w of db.works) {
     errors.push(`${label}: rights 필드 없음 (--fix로 채울 수 있음)`);
     continue;
   }
-  if (r.author_death_year !== a.death_year) {
-    errors.push(`${label}: rights.author_death_year(${r.author_death_year}) ≠ authors 맵(${a.death_year})`);
+  if (r.author_death_year !== expectedDeathYear) {
+    errors.push(`${label}: rights.author_death_year(${r.author_death_year}) ≠ authors 맵(${expectedDeathYear})`);
   }
   if (r.status !== expected) {
-    errors.push(`${label}: rights.status "${r.status}" ≠ 계산값 "${expected}" (사망 ${a.death_year})`);
+    errors.push(`${label}: rights.status "${r.status}" ≠ 계산값 "${expected}" (사망 ${a.alive ? '생존' : a.death_year})`);
   }
 
   if (w.full_text !== undefined) {
