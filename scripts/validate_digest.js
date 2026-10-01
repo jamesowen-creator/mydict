@@ -12,6 +12,9 @@
  *      원문이 실수로 배포되는 것을 막는 안전장치
  *   4. full_text 모양: { stanzas: [[줄, ...], ...], source: "출전" } (사람이 원전에서
  *      입력한 것만. generate_literature_content.js 같은 AI 생성으로 채우지 않음)
+ *   5. 장르별/전체 작품 수는 EXPECTED_GENRE_COUNTS와 일치해야 함 (작업130) - 새
+ *      배치를 추가할 때마다 이 상수를 갱신할 것
+ *   6. 수필 장르는 저작권 상태와 무관하게 full_text를 포함하지 않음 (작업130)
  *
  * 사용법
  *   node scripts/validate_digest.js          # 검증만, 위반 있으면 exit 1
@@ -26,6 +29,10 @@ const DIG_PATH = process.argv.slice(2).find(a => !a.startsWith('--')) ||
   path.join(__dirname, '..', 'public', 'digest_db.json');
 // 이 연도 이하에 사망한 작가의 저작물은 퍼블릭도메인 (위 규칙 2 참고)
 const PD_LAST_DEATH_YEAR = 1962;
+
+// 장르별 기대 작품 수 (작업130: 수필 10편 신설) - 새 배치를 추가할 때마다 갱신
+const EXPECTED_GENRE_COUNTS = { '소설': 60, '시': 34, '수필': 10 };
+const EXPECTED_TOTAL = Object.values(EXPECTED_GENRE_COUNTS).reduce((a, b) => a + b, 0);
 
 const fix = process.argv.includes('--fix');
 const raw = fs.readFileSync(DIG_PATH, 'utf8');
@@ -70,11 +77,27 @@ for (const w of db.works) {
     if (expected !== 'public_domain') {
       errors.push(`${label}: 저작권 보호 중(사망 ${a.death_year}, ${a.death_year + 70}-12-31까지)인 작품에 full_text가 있음 - 원문 게재 불가`);
     }
+    // 수필은 저작권 상태와 무관하게 전문을 싣지 않음 (작업130) - 원문 문장
+    // 인용·번역 없이 패러프레이즈만 허용한다는 방침의 연장
+    if (w.genre === '수필') {
+      errors.push(`${label}: 수필 장르는 public_domain 여부와 무관하게 full_text를 포함하지 않는 것이 원칙(작업130)`);
+    }
     const ft = w.full_text;
     const shapeOk = ft && Array.isArray(ft.stanzas) && ft.stanzas.length > 0 &&
       ft.stanzas.every(s => Array.isArray(s) && s.length > 0 && s.every(l => typeof l === 'string'));
     if (!shapeOk) errors.push(`${label}: full_text.stanzas는 [[줄, ...], ...] 형태의 비어 있지 않은 배열이어야 함`);
     if (!ft || typeof ft.source !== 'string' || !ft.source.trim()) errors.push(`${label}: full_text.source(출전)가 없음`);
+  }
+}
+
+// 장르별/전체 작품 수 기대값 검사 (작업130)
+if (db.works.length !== EXPECTED_TOTAL) {
+  errors.push(`전체 작품 수(${db.works.length}) ≠ 기대값(${EXPECTED_TOTAL})`);
+}
+for (const [genre, expectedCount] of Object.entries(EXPECTED_GENRE_COUNTS)) {
+  const actual = db.works.filter(w => w.genre === genre).length;
+  if (actual !== expectedCount) {
+    errors.push(`장르 "${genre}" 작품 수(${actual}) ≠ 기대값(${expectedCount})`);
   }
 }
 
