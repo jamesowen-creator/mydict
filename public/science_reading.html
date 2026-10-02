@@ -387,12 +387,16 @@ function fieldHasConcepts(f) { return !!(DB.concepts.some(c => c.field === f)); 
 // push해서, 뒤로가기 한 번이면 "건너간 과목"의 캐러셀로 돌아가게 함.
 let _navFromPop = false;
 
+// 작업158: "과목 선택" 버튼은 history.back()(한 단계 뒤로가기) 대신 항상 과목
+// 선택 화면을 직접 보여주고 그 상태를 새로 push한다. 교차 과목 이동(관련 개념
+// 클릭)으로 history가 예상보다 깊어진 경우에도 이 버튼이 항상 과목 선택
+// 화면에 도달하게 하기 위함 - 버튼은 #view-list(과목별 캐러셀)에만 있으므로
+// 호출 시점의 history.state.view는 항상 'list'다. 이 변경 후 브라우저
+// 뒤로가기를 누르면 이 push 이전 상태(= 버튼을 누르기 직전의 캐러셀)로
+// 돌아간다.
 function goSubjects() {
-  if (history.state && history.state.view && history.state.view !== 'subjects') {
-    history.back();
-    return;
-  }
   renderAndShowSubjects();
+  if (!_navFromPop) history.pushState({ view: 'subjects' }, '', SUBJECTS_URL);
 }
 function renderAndShowSubjects() {
   renderSubjectsGrid();
