@@ -23,6 +23,10 @@
  *   11. summary/key_points/misconception에 금지 일반화 표현이 없어야 함(작업154) -
  *       근거 범위를 벗어난 과장된 단정("널리 퍼져", "많은 사람", "대부분의 학생",
  *       "가장 흔한")을 막기 위함
+ *   12. tier가 "1차"인 source는 note가 반드시 "직접열람"으로 시작해야 함(작업157) -
+ *       "부분확인"인 1차 출처는 금지, 그런 출처는 tier를 "보조"로 낮출 것
+ *   13. 어떤 source든 note가 "미열람"으로 시작하면 금지(작업157) - 열람 실패한
+ *       출처는 애초에 sources 배열에 올리지 않음
  *
  * 사용법
  *   node scripts/validate_science.js          # 검증만, 위반 있으면 exit 1
@@ -34,8 +38,8 @@ const path = require('path');
 const SCI_PATH = process.argv.slice(2).find(a => !a.startsWith('--')) ||
   path.join(__dirname, '..', 'public', 'science_db.json');
 
-// 분야별 기대 개수(파일럿: 물리/화학/생물/지구과학 각 2개, 총 8개) - 작업153
-const EXPECTED_FIELD_COUNTS = { '물리': 2, '화학': 2, '생물': 2, '지구과학': 2 };
+// 분야별 기대 개수(작업157: 물리/화학/생물/지구과학 각 4개, 총 16개로 확장)
+const EXPECTED_FIELD_COUNTS = { '물리': 4, '화학': 4, '생물': 4, '지구과학': 4 };
 const EXPECTED_TOTAL = Object.values(EXPECTED_FIELD_COUNTS).reduce((a, b) => a + b, 0);
 const FIELD_WHITELIST = Object.keys(EXPECTED_FIELD_COUNTS);
 const TIER_WHITELIST = ['1차', '보조'];
@@ -151,6 +155,15 @@ for (const c of concepts) {
       }
       if (s && s.tier === '1차') primaryCount++;
       if (s && s.tier === '1차' && nonEmptyStr(s.note) && s.note.startsWith('직접열람')) directPrimaryCount++;
+      // 작업157 규칙 12: tier가 "1차"인 source는 note가 반드시 "직접열람"으로 시작해야 함
+      // (부분확인 1차 출처 금지 - 그런 출처는 tier를 "보조"로 낮출 것)
+      if (s && s.tier === '1차' && nonEmptyStr(s.note) && !s.note.startsWith('직접열람')) {
+        errors.push(`${label}: sources[${i}]("${s.name}")는 tier가 "1차"이지만 note가 "직접열람"으로 시작하지 않음("${s.note.slice(0, 20)}...") - tier를 "보조"로 낮추거나 note를 수정할 것`);
+      }
+      // 작업157 규칙 13: 어떤 source든 note가 "미열람"으로 시작하면 금지
+      if (s && nonEmptyStr(s.note) && s.note.startsWith('미열람')) {
+        errors.push(`${label}: sources[${i}]("${s.name}")의 note가 "미열람"으로 시작함 - 열람 실패한 출처는 sources 배열에 올리지 않음`);
+      }
     });
     if (primaryCount < 1) errors.push(`${label}: sources 중 1차급 출처가 1개 이상 있어야 함`);
     if (directPrimaryCount < 1) {
