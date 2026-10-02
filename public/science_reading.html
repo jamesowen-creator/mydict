@@ -13,7 +13,9 @@
 <style>
   /* 작업153: digest_reading.html을 복제한 독립 파일. 정복·퀴즈·권한 게이트는
      이번 파일럿에 포함하지 않으므로 탭바·conquest-bar·quiz/result 뷰는
-     아예 없음(그래서 .view 의 하단 탭바용 padding-bottom도 없음) */
+     아예 없음(그래서 .view 의 하단 탭바용 padding-bottom도 없음).
+     작업155: 범례 필터 방식을 버리고 과목 선택 화면(view-subjects)을 추가 -
+     3단계(과목 선택 → 과목별 캐러셀 → 개념 상세) 구조로 바뀜 */
   :root {
     --primary: #1D9E75;
     --primary-light: #E1F5EE;
@@ -61,8 +63,8 @@
   .view { display: none; min-height: 100dvh; }
   .view.active { display: block; }
 
-  /* ── Top Bar ── */
-  .top-bar {
+  /* ── Top Bar(상세) / Subject Bar(과목별 캐러셀) 공통 ── */
+  .top-bar, .subject-bar {
     position: sticky; top: 0; z-index: 100;
     background: var(--card);
     border-bottom: 1px solid var(--border);
@@ -73,12 +75,47 @@
     background: none; border: none; cursor: pointer;
     padding: 6px; border-radius: 8px;
     color: var(--text2); display: flex; align-items: center;
+    min-width: 44px; min-height: 44px; justify-content: center;
     transition: background 0.15s;
   }
   .back-btn:hover { background: var(--primary-light); color: var(--primary); }
   .back-btn svg { width: 20px; height: 20px; }
 
-  /* ── View 1: List (digest_reading.html 작업81의 3D 캐러셀과 동일 메커니즘) ── */
+  /* 작업155: 과목별 캐러셀 상단의 현재 과목 칩 */
+  .subject-chip {
+    display: inline-flex; align-items: center;
+    padding: 6px 14px; border-radius: 999px;
+    font-size: 14px; font-weight: 700;
+    background: var(--field-tone, #8A8F99); color: #fff;
+  }
+
+  /* ── View 0: Subject select (작업155) ── */
+  #view-subjects .content { padding: 20px 16px; }
+  .subjects-title { font-size: 20px; font-weight: 700; color: var(--text1); margin-bottom: 4px; }
+  .subjects-sub { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
+  .subject-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  }
+  .subject-card {
+    display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
+    min-height: 120px; padding: 16px;
+    border-radius: 16px; border: 1.5px solid var(--field-tone, var(--border));
+    background: color-mix(in srgb, var(--field-tone, #8A8F99) 10%, #FFFFFF);
+    cursor: pointer; text-align: left;
+    font-family: inherit;
+    transition: transform 0.1s, box-shadow 0.15s;
+  }
+  .subject-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  .subject-card:active { transform: scale(0.98); }
+  .subject-card .subject-name { font-size: 17px; font-weight: 700; color: var(--field-ink, var(--text1)); margin-bottom: 4px; }
+  .subject-card .subject-count { font-size: 13px; color: var(--text2); }
+  .subject-card.disabled {
+    cursor: default; opacity: 0.55;
+    background: var(--bg); border-style: dashed;
+  }
+  .subject-card.disabled .subject-name { color: var(--text2); }
+
+  /* ── View 1: 과목별 캐러셀 (digest_reading.html 작업81의 3D 캐러셀과 동일 메커니즘) ── */
   #view-list.active {
     display: flex; flex-direction: column;
     min-height: calc(100dvh - var(--hdr-h, 0px));
@@ -164,25 +201,6 @@
   }
   .carousel-nav-btn svg { width: 16px; height: 16px; }
   .carousel-nav-btn::after { content: ''; position: absolute; inset: -6px; }
-  .carousel-legend {
-    display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 10px;
-    margin-top: 12px; font-size: 12px; color: var(--text2);
-  }
-  .carousel-legend-item {
-    display: inline-flex; align-items: center; min-height: 36px;
-    padding: 0 6px; border-radius: 8px; cursor: pointer;
-    user-select: none; -webkit-user-select: none;
-    transition: opacity 0.15s, color 0.15s, background 0.15s;
-  }
-  .carousel-legend-item:hover { background: rgba(0,0,0,0.04); }
-  .carousel-legend-item:focus-visible { outline: 2px solid var(--field-ink); outline-offset: 1px; }
-  .carousel-legend-item.dim { opacity: 0.4; }
-  .carousel-legend-item.active { color: var(--text1); font-weight: 700; }
-  .carousel-legend-item::before {
-    content: ''; display: inline-block; width: 8px; height: 8px;
-    margin-right: 5px; background: var(--field-ink); vertical-align: 0;
-    flex-shrink: 0;
-  }
 
   @media (max-height: 599px) {
     #view-list .content { padding-top: 10px; padding-bottom: 10px; }
@@ -294,8 +312,25 @@
   <p>개념 데이터 로딩 중…</p>
 </div>
 
-<!-- View 1: List -->
+<!-- View 0: Subject select (작업155) -->
+<div id="view-subjects" class="view">
+  <div class="content">
+    <div class="subjects-title">과학</div>
+    <div class="subjects-sub">과목을 선택하세요</div>
+    <div class="subject-grid" id="subject-grid"></div>
+  </div>
+</div>
+
+<!-- View 1: 과목별 캐러셀 -->
 <div id="view-list" class="view">
+  <div class="subject-bar">
+    <button class="back-btn" onclick="goSubjects()" aria-label="과목 선택으로">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <span class="subject-chip" id="subject-chip"></span>
+  </div>
   <div class="content">
     <div id="list-carousel"></div>
   </div>
@@ -316,48 +351,91 @@
 <script>
 // ── State ──
 let DB = null;
+let currentField = null;
 let currentConceptId = null;
 
-// 작업153: digest_reading.html의 FILTER_STORAGE_KEY('digest_genre_filter')와
-// 겹치지 않는 독립 키 사용
-const FILTER_STORAGE_KEY = 'science_field_filter';
-let fieldFilter = localStorage.getItem(FILTER_STORAGE_KEY) || null;
-let legendItems = []; // 전체 DB 기준 분야별 개수 - 필터와 무관하게 한 번만 계산
+// 분야 → 카드 색. digest_reading.html의 GENRE_COLORS와 같은 {tone,ink} 형식.
+const FIELD_COLORS = {
+  '물리':     { tone: '#D1574F', ink: '#A33E38' },
+  '화학':     { tone: '#3F9E9E', ink: '#2C7373' },
+  '생물':     { tone: '#4F9E63', ink: '#357048' },
+  '지구과학': { tone: '#5E72C9', ink: '#4254A0' },
+};
+const FIELD_FALLBACK = { tone: '#8A8F99', ink: '#5E6470' };
+const fieldColor = f => FIELD_COLORS[f] || FIELD_FALLBACK;
+const FIELD_ORDER = ['물리', '화학', '생물', '지구과학'];
 
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
 
-// ── History (digest_reading.html 작업95와 같은 방식) ──
+function fieldUrl(field) { return '/science_reading.html?field=' + encodeURIComponent(field); }
+const SUBJECTS_URL = '/science_reading.html';
+function fieldCounts() {
+  const counts = {};
+  DB.concepts.forEach(c => { counts[c.field] = (counts[c.field] || 0) + 1; });
+  return counts;
+}
+function fieldHasConcepts(f) { return !!(DB.concepts.some(c => c.field === f)); }
+
+// ── History (digest_reading.html 작업95와 같은 방식을 3단계로 확장) ──
+// 작업155: 과목 선택(subjects) ↔ 과목별 캐러셀(list) ↔ 개념 상세(science) 3단계.
+// subjects/list는 "뒤로가기 버튼" 클릭 시 history.back()으로 돌아가고(goSubjects/
+// goList), list→science/subjects→list는 forward push. 관련 개념 링크로 다른
+// 과목의 개념으로 건너뛸 때는 그 과목의 list 상태를 먼저 push한 뒤 science를
+// push해서, 뒤로가기 한 번이면 "건너간 과목"의 캐러셀로 돌아가게 함.
 let _navFromPop = false;
-function navState(state) {
-  if (_navFromPop) return;
-  const cur = history.state && history.state.view;
-  if (!cur || cur === 'list') history.pushState(state, '');
-  else history.replaceState(state, '');
-}
-function syncListHistoryState() {
-  if (_navFromPop) return;
-  if (!history.state || history.state.view === 'list') {
-    history.replaceState({ view: 'list', filter: fieldFilter }, '');
+
+function goSubjects() {
+  if (history.state && history.state.view && history.state.view !== 'subjects') {
+    history.back();
+    return;
   }
+  renderAndShowSubjects();
 }
-function showListView() {
-  renderList();
+function renderAndShowSubjects() {
+  renderSubjectsGrid();
+  showView('view-subjects');
+  window.scrollTo(0, 0);
+}
+
+function goList() {
+  if (history.state && history.state.view && history.state.view !== 'list') {
+    history.back();
+    return;
+  }
+  renderAndShowFieldList(currentField);
+}
+function renderAndShowFieldList(field) {
+  currentField = field;
+  renderFieldCarousel(field);
   showView('view-list');
   window.scrollTo(0, 0);
 }
+
+function openField(field) {
+  currentField = field;
+  renderFieldCarousel(field);
+  showView('view-list');
+  window.scrollTo(0, 0);
+  if (!_navFromPop) history.pushState({ view: 'list', field }, '', fieldUrl(field));
+}
+
 window.addEventListener('popstate', e => {
   if (!DB) return;
-  const st = e.state || { view: 'list' };
+  const st = e.state || { view: 'subjects' };
   _navFromPop = true;
   try {
     if (st.view === 'science' && DB.concepts.some(c => c.id === st.id)) {
+      const concept = DB.concepts.find(c => c.id === st.id);
+      currentField = (st.field && FIELD_ORDER.includes(st.field)) ? st.field : concept.field;
+      renderFieldCarousel(currentField);
       showScience(st.id);
+    } else if (st.view === 'list' && st.field && fieldHasConcepts(st.field)) {
+      renderAndShowFieldList(st.field);
     } else {
-      if ('filter' in st) fieldFilter = st.filter;
-      showListView();
+      renderAndShowSubjects();
     }
   } finally {
     _navFromPop = false;
@@ -370,16 +448,35 @@ async function loadDB() {
     const res = await fetch('science_db.json');
     if (!res.ok) throw new Error('네트워크 오류');
     DB = await res.json();
-    legendItems = buildLegendItems();
     document.getElementById('loading').style.display = 'none';
-    renderList();
-    showView('view-list');
+
     const st = history.state;
     if (st && st.view === 'science' && DB.concepts.some(c => c.id === st.id)) {
+      const concept = DB.concepts.find(c => c.id === st.id);
+      currentField = (st.field && FIELD_ORDER.includes(st.field)) ? st.field : concept.field;
+      renderFieldCarousel(currentField);
       _navFromPop = true;
       try { showScience(st.id); } finally { _navFromPop = false; }
+      return;
+    }
+    if (st && st.view === 'list' && st.field && fieldHasConcepts(st.field)) {
+      _navFromPop = true;
+      try { renderAndShowFieldList(st.field); } finally { _navFromPop = false; }
+      return;
+    }
+
+    // 히스토리 상태가 없는 첫 진입(또는 새로고침) - URL의 ?field= 로 판단
+    const params = new URLSearchParams(location.search);
+    const f = params.get('field');
+    if (f && FIELD_ORDER.includes(f) && fieldHasConcepts(f)) {
+      currentField = f;
+      renderFieldCarousel(f);
+      showView('view-list');
+      history.replaceState({ view: 'list', field: f }, '', fieldUrl(f));
     } else {
-      syncListHistoryState();
+      renderSubjectsGrid();
+      showView('view-subjects');
+      history.replaceState({ view: 'subjects' }, '', SUBJECTS_URL);
     }
   } catch (e) {
     document.getElementById('loading').innerHTML =
@@ -387,44 +484,45 @@ async function loadDB() {
   }
 }
 
-// ── View 1: List ──
-
-// 분야 → 카드 색. digest_reading.html의 GENRE_COLORS와 같은 {tone,ink} 형식.
-// 작업150~152에서 기존 6개 문학 색상과 색조가 겹치지 않도록 설계.
-const FIELD_COLORS = {
-  '물리':     { tone: '#D1574F', ink: '#A33E38' },
-  '화학':     { tone: '#3F9E9E', ink: '#2C7373' },
-  '생물':     { tone: '#4F9E63', ink: '#357048' },
-  '지구과학': { tone: '#5E72C9', ink: '#4254A0' },
-};
-const FIELD_FALLBACK = { tone: '#8A8F99', ink: '#5E6470' };
-const fieldColor = f => FIELD_COLORS[f] || FIELD_FALLBACK;
-// 작업154: 범례는 편수순/가나다순이 아니라 물리→화학→생물→지구과학(science_db.json
-// 개념 id 순서와 동일)으로 고정 표시
-const FIELD_ORDER = ['물리', '화학', '생물', '지구과학'];
-
-function buildLegendItems() {
-  const counts = {};
-  DB.concepts.forEach(c => { counts[c.field] = (counts[c.field] || 0) + 1; });
-  return FIELD_ORDER
-    .filter(f => counts[f])
-    .map(f => ({ field: f, count: counts[f] }));
+// ── View 0: Subject select ──
+function renderSubjectsGrid() {
+  const counts = fieldCounts();
+  const root = document.getElementById('subject-grid');
+  root.innerHTML = FIELD_ORDER.map(f => {
+    const n = counts[f] || 0;
+    const col = fieldColor(f);
+    const style = `--field-tone:${col.tone};--field-ink:${col.ink}`;
+    if (n === 0) {
+      return `<div class="subject-card disabled" style="${style}">
+        <div class="subject-name">${f}</div>
+        <div class="subject-count">준비 중</div>
+      </div>`;
+    }
+    return `<button type="button" class="subject-card" style="${style}" onclick="openField('${f}')">
+      <div class="subject-name">${f}</div>
+      <div class="subject-count">개념 ${n}개</div>
+    </button>`;
+  }).join('');
 }
 
-function getFilteredConcepts() {
-  const sorted = [...DB.concepts].sort((a, b) => a.title.localeCompare(b.title, 'ko'));
-  return fieldFilter ? sorted.filter(c => c.field === fieldFilter) : sorted;
-}
-
-function setFieldFilter(field) {
-  fieldFilter = (fieldFilter === field) ? null : field;
-  if (fieldFilter) localStorage.setItem(FILTER_STORAGE_KEY, fieldFilter);
-  else localStorage.removeItem(FILTER_STORAGE_KEY);
-  renderList();
+// ── View 1: 과목별 캐러셀 ──
+function renderFieldCarousel(field) {
+  const list = DB.concepts.filter(c => c.field === field).sort((a, b) => a.title.localeCompare(b.title, 'ko'));
+  if (!Carousel.isMounted()) {
+    Carousel.mount(document.getElementById('list-carousel'), list);
+  } else {
+    Carousel.setList(list);
+  }
+  Carousel.jumpTo(currentConceptId);
+  const col = fieldColor(field);
+  const chip = document.getElementById('subject-chip');
+  chip.textContent = field;
+  chip.style.setProperty('--field-tone', col.tone);
 }
 
 // home-wheel ThreeDWheelPicker.jsx → digest_reading.html Carousel을 그대로
 // 복제한 모듈. 정복 여부 표시 갱신 기능은 제거함(작업153: 정복 기능 없음).
+// 작업155: 범례(renderLegend) 제거 - 범례 필터 대신 과목 선택 화면을 씀.
 const Carousel = (() => {
   const mod = (n, m) => ((n % m) + m) % m;
   const relativePos = (index, offset, n) => mod(index - offset + n / 2, n) - n / 2;
@@ -435,7 +533,7 @@ const Carousel = (() => {
   const finePointerMq = window.matchMedia ? window.matchMedia('(hover: hover) and (pointer: fine)') : null;
 
   let items = [], n = 0, cards = [];
-  let viewport, track, countEl, legendEl;
+  let viewport, track, countEl;
   let offset = 0, target = 0, vel = 0, raf = null;
   let dragging = false, wheelAcc = 0;
   let pointer = { lastX: 0, moved: 0 };
@@ -652,34 +750,13 @@ const Carousel = (() => {
   }
 
   function setList(list) {
-    if (!viewport) return;
+    if (!viewport) { buildCardsDOM(list); return; }
     if (raf) { cancelAnimationFrame(raf); raf = null; }
     dragging = false;
     vel = 0;
     offset = 0;
     target = 0;
     buildCardsDOM(list);
-  }
-
-  function renderLegend(legendList, activeField, onItemClick) {
-    if (!legendEl) return;
-    legendEl.innerHTML = '';
-    legendList.forEach(it => {
-      const s = document.createElement('span');
-      s.className = 'carousel-legend-item';
-      s.tabIndex = 0;
-      s.setAttribute('role', 'button');
-      s.setAttribute('aria-pressed', String(it.field === activeField));
-      if (activeField && it.field !== activeField) s.classList.add('dim');
-      if (it.field === activeField) s.classList.add('active');
-      s.style.setProperty('--field-ink', fieldColor(it.field).ink);
-      s.textContent = `${it.field} ${it.count}`;
-      s.addEventListener('click', () => onItemClick(it.field));
-      s.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onItemClick(it.field); }
-      });
-      legendEl.appendChild(s);
-    });
   }
 
   function mount(root, list) {
@@ -698,13 +775,11 @@ const Carousel = (() => {
         <button class="carousel-nav-btn" data-dir="1" aria-label="다음 개념">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
         </button>
-      </div>
-      <div class="carousel-legend"></div>`;
+      </div>`;
 
     viewport = root.querySelector('.carousel-viewport');
     track = root.querySelector('.carousel-track');
     countEl = root.querySelector('.carousel-nav-count');
-    legendEl = root.querySelector('.carousel-legend');
 
     viewport.addEventListener('wheel', onWheel, { passive: false });
     viewport.addEventListener('pointerdown', onPointerDown);
@@ -728,34 +803,23 @@ const Carousel = (() => {
     buildCardsDOM(list);
   }
 
-  return { mount, setList, renderLegend, jumpTo, isMounted: () => !!viewport };
+  return { mount, setList, jumpTo, isMounted: () => !!viewport };
 })();
-
-function renderList() {
-  const wantId = currentConceptId;
-  const filtered = getFilteredConcepts();
-  if (!Carousel.isMounted()) {
-    Carousel.mount(document.getElementById('list-carousel'), filtered);
-  } else {
-    Carousel.setList(filtered);
-  }
-  Carousel.renderLegend(legendItems, fieldFilter, setFieldFilter);
-  Carousel.jumpTo(wantId);
-  syncListHistoryState();
-}
-
-function goList() {
-  if (history.state && history.state.view && history.state.view !== 'list') {
-    history.back();
-    return;
-  }
-  showListView();
-}
 
 // ── View 2: Concept detail ──
 function showScience(conceptId) {
   const concept = DB.concepts.find(c => c.id === conceptId);
   if (!concept) return;
+
+  // 작업155: 관련 개념 링크가 다른 과목을 가리키면 그 과목의 캐러셀로 먼저
+  // 전환(및 push)한 뒤 상세를 연다 - 뒤로가기 한 번이면 "건너간 과목"의
+  // 캐러셀로 돌아가게 하기 위함
+  if (concept.field !== currentField) {
+    currentField = concept.field;
+    renderFieldCarousel(currentField);
+    if (!_navFromPop) history.pushState({ view: 'list', field: currentField }, '', fieldUrl(currentField));
+  }
+
   currentConceptId = conceptId;
 
   const relatedHtml = (concept.related || []).length > 0
@@ -838,7 +902,13 @@ function showScience(conceptId) {
 
   showView('view-science');
   window.scrollTo(0, 0);
-  navState({ view: 'science', id: conceptId });
+
+  if (!_navFromPop) {
+    const cur = history.state && history.state.view;
+    const state = { view: 'science', id: conceptId, field: currentField };
+    if (!cur || cur === 'list') history.pushState(state, '');
+    else history.replaceState(state, '');
+  }
 }
 
 function escAttr(s) { return String(s).replace(/"/g, '&quot;'); }
