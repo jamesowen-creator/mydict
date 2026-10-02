@@ -7,82 +7,279 @@
 <link rel="icon" type="image/png" href="/icons/favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- 작업13: 전 화면 공통 상단 헤더(로고+로그인상태) -->
 <link rel="stylesheet" href="/css/common/appHeader.css">
 <style>
-  /* 작업149: digest_reading.html의 색상 토큰과 같은 계열(초록 primary,
-     따뜻한 회백색 bg)로 맞추되, 이 페이지는 목록/상세 뷰가 없는 단일
-     정적 화면이라 해당 레이아웃은 가져오지 않고 새로 작성함 */
+  /* 작업153: digest_reading.html을 복제한 독립 파일. 정복·퀴즈·권한 게이트는
+     이번 파일럿에 포함하지 않으므로 탭바·conquest-bar·quiz/result 뷰는
+     아예 없음(그래서 .view 의 하단 탭바용 padding-bottom도 없음) */
   :root {
     --primary: #1D9E75;
     --primary-light: #E1F5EE;
+    --primary-dark: #085041;
     --bg: #FAFAF9;
+    --card: #FFFFFF;
     --text1: #1a1a1a;
     --text2: #6b7280;
     --border: rgba(0,0,0,0.08);
+    --error: #E24B4A;
+    --error-light: #FCEBEB;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
   body {
-    font-family: 'Noto Sans KR', sans-serif;
+    font-family: 'Noto Sans KR', 'Inter', sans-serif;
     background: var(--bg);
     color: var(--text1);
     min-height: 100dvh;
     max-width: 480px;
     margin: 0 auto;
+    position: relative;
     overflow-x: hidden;
   }
 
-  .science-empty {
-    min-height: calc(100dvh - 57px); /* 57px ≈ appHeader 실측 높이(패딩 8px×2 + 콘텐츠) */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    padding: 24px;
-    text-align: center;
+  /* ── Loading ── */
+  #loading {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: var(--bg); z-index: 999; gap: 16px;
   }
-
-  .science-empty-icon {
-    width: 64px;
-    height: 64px;
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--primary-light);
+    border-top-color: var(--primary);
     border-radius: 50%;
-    background: var(--primary-light);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { color: var(--text2); font-size: 14px; }
+
+  /* ── Views ── */
+  .view { display: none; min-height: 100dvh; }
+  .view.active { display: block; }
+
+  /* ── Top Bar ── */
+  .top-bar {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .back-btn {
+    background: none; border: none; cursor: pointer;
+    padding: 6px; border-radius: 8px;
+    color: var(--text2); display: flex; align-items: center;
+    transition: background 0.15s;
+  }
+  .back-btn:hover { background: var(--primary-light); color: var(--primary); }
+  .back-btn svg { width: 20px; height: 20px; }
+
+  /* ── View 1: List (digest_reading.html 작업81의 3D 캐러셀과 동일 메커니즘) ── */
+  #view-list.active {
+    display: flex; flex-direction: column;
+    min-height: calc(100dvh - var(--hdr-h, 0px));
+  }
+  #view-list .content {
+    flex: 1; display: flex; flex-direction: column;
+    padding: 16px;
   }
 
-  .science-empty-title {
-    font-size: 17px;
-    font-weight: 700;
+  #list-carousel {
+    flex: 1; display: flex; flex-direction: column; justify-content: center;
+    padding: 8px 0;
+  }
+  .carousel-clip {
+    overflow: hidden;
+    margin: 0 -16px;
+  }
+  .carousel-viewport {
+    position: relative;
+    outline: none;
+    user-select: none; -webkit-user-select: none;
+    touch-action: pan-y;
+    perspective-origin: 50% 50%;
+  }
+  .carousel-viewport:focus-visible { box-shadow: inset 0 0 0 2px var(--metis-coral, #e2583b); }
+  .carousel-track {
+    position: absolute; inset: 0;
+    transform-style: preserve-3d; -webkit-transform-style: preserve-3d;
+  }
+  .carousel-card {
+    --card-edge:
+      inset 0 4px 0 var(--field-ink),
+      inset 0 -2px 0 rgba(0,0,0,0.035),
+      0 0 0 1px rgba(0,0,0,0.07),
+      0 4px 0 -1px #E6E2DA,
+      0 5px 0 -1px rgba(0,0,0,0.07);
+    position: absolute; top: 50%; left: 50%;
+    display: flex; flex-direction: column;
+    padding: 20px 18px 16px;
+    border-radius: 14px;
+    color: #1A1A1E;
+    background: linear-gradient(180deg, #FFFFFF 0%, #FBFAF8 100%);
+    box-shadow: var(--card-edge);
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .carousel-track.moving .carousel-card { will-change: transform, opacity; }
+  .carousel-card.is-center {
+    box-shadow: var(--card-edge), 0 16px 30px -8px rgba(0,0,0,0.18), 0 4px 10px rgba(0,0,0,0.05);
+  }
+  .carousel-card-meta {
+    margin-bottom: 12px;
+    font-size: 11px; letter-spacing: 0.08em; color: #6B7280;
+  }
+  .carousel-card-meta .g { color: var(--field-ink); font-weight: 700; }
+  .carousel-card-title {
+    margin-top: auto;
+    font-size: var(--title-size, 22px); font-weight: 500; line-height: 1.3;
+    word-break: keep-all;
+  }
+  .carousel-card.is-center .carousel-card-title { font-weight: 700; }
+  .carousel-card-line {
+    flex-shrink: 0;
+    margin-top: 14px; margin-bottom: auto; padding-left: 10px;
+    border-left: 2px solid var(--field-ink);
+    font-size: 13px; line-height: 1.6; color: #374151;
+    display: -webkit-box; -webkit-line-clamp: var(--line-clamp, 4); -webkit-box-orient: vertical;
+    overflow: hidden; word-break: keep-all;
+  }
+  .carousel-nav {
+    display: flex; align-items: center; justify-content: center; gap: 18px;
+    margin-top: 8px;
+    font-size: 12px; color: var(--text2);
+  }
+  .carousel-nav-count { font-family: 'Inter', sans-serif; min-width: 56px; text-align: center; }
+  .carousel-nav-btn {
+    position: relative;
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--card);
+    color: var(--text1); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .carousel-nav-btn svg { width: 16px; height: 16px; }
+  .carousel-nav-btn::after { content: ''; position: absolute; inset: -6px; }
+  .carousel-legend {
+    display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 10px;
+    margin-top: 12px; font-size: 12px; color: var(--text2);
+  }
+  .carousel-legend-item {
+    display: inline-flex; align-items: center; min-height: 36px;
+    padding: 0 6px; border-radius: 8px; cursor: pointer;
+    user-select: none; -webkit-user-select: none;
+    transition: opacity 0.15s, color 0.15s, background 0.15s;
+  }
+  .carousel-legend-item:hover { background: rgba(0,0,0,0.04); }
+  .carousel-legend-item:focus-visible { outline: 2px solid var(--field-ink); outline-offset: 1px; }
+  .carousel-legend-item.dim { opacity: 0.4; }
+  .carousel-legend-item.active { color: var(--text1); font-weight: 700; }
+  .carousel-legend-item::before {
+    content: ''; display: inline-block; width: 8px; height: 8px;
+    margin-right: 5px; background: var(--field-ink); vertical-align: 0;
+    flex-shrink: 0;
+  }
+
+  @media (max-height: 599px) {
+    #view-list .content { padding-top: 10px; padding-bottom: 10px; }
+    #list-carousel { padding: 0; }
+    .carousel-card.is-center {
+      box-shadow: var(--card-edge), 0 8px 16px -6px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.05);
+    }
+    .carousel-nav { margin-top: 0; }
+  }
+
+  /* ── View 2: Concept detail ── */
+  #view-science {
+    --coral: var(--metis-coral, #e2583b);
+    --coral-ink: #b8442e;
+    --coral-tint: #FDF0EC;
+  }
+  #view-science .content { padding: 20px 16px 40px; }
+  #view-science .back-btn:hover { background: var(--coral-tint); color: var(--coral-ink); }
+
+  .science-work-header {
+    background: var(--card);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 20px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .science-work-title { font-size: 24px; font-weight: 700; color: var(--text1); margin-bottom: 6px; line-height: 1.3; }
+  .science-work-meta { font-size: 14px; color: var(--text2); font-family: 'Inter', sans-serif; }
+
+  .science-section {
+    background: var(--card);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 18px 20px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .science-section-label {
+    font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
+    color: #3A3A40; margin-bottom: 10px;
+  }
+  .science-one-line {
+    border-left: 2px solid var(--coral);
+    padding: 2px 0 2px 12px;
+    font-size: 15px; font-weight: 600; line-height: 1.6; color: var(--text1);
+  }
+  .science-summary {
+    font-size: 14px; line-height: 1.8; color: var(--text1);
+  }
+  .key-point-list { display: flex; flex-direction: column; gap: 12px; }
+  .key-point-item { display: flex; gap: 8px; align-items: baseline; }
+  .point-num {
+    flex-shrink: 0; min-width: 16px;
+    font-size: 14px; font-weight: 800; font-family: 'Inter', sans-serif;
     color: var(--text1);
   }
+  .point-text { font-size: 14px; line-height: 1.7; color: var(--text1); flex: 1; }
 
-  .science-empty-text {
-    font-size: 14px;
-    color: var(--text2);
-    line-height: 1.6;
-  }
+  .science-example { font-size: 14px; line-height: 1.8; color: var(--text1); }
+  .science-misconception { font-size: 14px; line-height: 1.8; color: var(--text1); }
 
-  .science-home-link {
-    margin-top: 8px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--primary);
-    color: #fff;
-    padding: 12px 22px;
-    border-radius: 999px;
-    font-size: 14px;
-    font-weight: 700;
-    text-decoration: none;
-    border: none;
+  /* 관련 개념: 연결 작품(digest)과 같은 줄 구분선 패턴 */
+  .related-list { display: flex; flex-direction: column; }
+  .related-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    width: 100%; margin: 0;
+    padding: 12px 4px;
+    background: none; border: none; border-top: 1px solid var(--border);
+    font: inherit; color: inherit; text-align: left;
+    cursor: pointer; transition: background 0.15s;
   }
+  .related-item:focus-visible { outline: 2px solid var(--coral); outline-offset: -2px; }
+  .related-item:first-child { border-top: none; padding-top: 4px; }
+  .related-item:hover { background: var(--coral-tint); }
+  .related-item svg { width: 14px; height: 14px; color: var(--coral); flex-shrink: 0; margin-top: 3px; }
+  .related-info { flex: 1; }
+  .related-info > span { display: block; }
+  .related-title { font-size: 14px; font-weight: 700; color: var(--text1); }
+  .related-relation { font-size: 12px; color: var(--coral-ink); font-weight: 600; margin-top: 2px; }
+
+  /* 출처 목록 */
+  .source-list { display: flex; flex-direction: column; gap: 10px; }
+  .source-item { padding: 10px 0; border-top: 1px solid var(--border); }
+  .source-item:first-child { border-top: none; padding-top: 0; }
+  .source-name { font-size: 13px; font-weight: 700; color: var(--text1); }
+  .source-name a { color: inherit; text-decoration: underline; }
+  .source-tier {
+    display: inline-block; margin-left: 6px; padding: 1px 6px;
+    border-radius: 999px; font-size: 10px; font-weight: 700;
+    background: var(--primary-light); color: var(--primary-dark);
+    vertical-align: middle;
+  }
+  .source-publisher { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .source-note { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+
+  .error-msg { text-align: center; padding: 40px 24px; color: var(--error); font-size: 14px; }
 </style>
 </head>
 <body>
@@ -91,12 +288,560 @@
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
 
-<div class="science-empty">
-  <div class="science-empty-icon">🔬</div>
-  <div class="science-empty-title">과학 콘텐츠를 준비하고 있습니다</div>
-  <div class="science-empty-text">곧 새로운 과학 콘텐츠로 찾아올게요.<br>잠시만 기다려 주세요.</div>
-  <a href="/" class="science-home-link">METIS 홈으로</a>
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p>개념 데이터 로딩 중…</p>
 </div>
 
+<!-- View 1: List -->
+<div id="view-list" class="view">
+  <div class="content">
+    <div id="list-carousel"></div>
+  </div>
+</div>
+
+<!-- View 2: Concept detail -->
+<div id="view-science" class="view">
+  <div class="top-bar">
+    <button class="back-btn" onclick="goList()" aria-label="목록으로">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+  </div>
+  <div class="content" id="science-content"></div>
+</div>
+
+<script>
+// ── State ──
+let DB = null;
+let currentConceptId = null;
+
+// 작업153: digest_reading.html의 FILTER_STORAGE_KEY('digest_genre_filter')와
+// 겹치지 않는 독립 키 사용
+const FILTER_STORAGE_KEY = 'science_field_filter';
+let fieldFilter = localStorage.getItem(FILTER_STORAGE_KEY) || null;
+let legendItems = []; // 전체 DB 기준 분야별 개수 - 필터와 무관하게 한 번만 계산
+
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── History (digest_reading.html 작업95와 같은 방식) ──
+let _navFromPop = false;
+function navState(state) {
+  if (_navFromPop) return;
+  const cur = history.state && history.state.view;
+  if (!cur || cur === 'list') history.pushState(state, '');
+  else history.replaceState(state, '');
+}
+function syncListHistoryState() {
+  if (_navFromPop) return;
+  if (!history.state || history.state.view === 'list') {
+    history.replaceState({ view: 'list', filter: fieldFilter }, '');
+  }
+}
+function showListView() {
+  renderList();
+  showView('view-list');
+  window.scrollTo(0, 0);
+}
+window.addEventListener('popstate', e => {
+  if (!DB) return;
+  const st = e.state || { view: 'list' };
+  _navFromPop = true;
+  try {
+    if (st.view === 'science' && DB.concepts.some(c => c.id === st.id)) {
+      showScience(st.id);
+    } else {
+      if ('filter' in st) fieldFilter = st.filter;
+      showListView();
+    }
+  } finally {
+    _navFromPop = false;
+  }
+});
+
+// ── Data Load (권한 게이트 없음 - 작업153에서는 아직 추가하지 않음) ──
+async function loadDB() {
+  try {
+    const res = await fetch('science_db.json');
+    if (!res.ok) throw new Error('네트워크 오류');
+    DB = await res.json();
+    legendItems = buildLegendItems();
+    document.getElementById('loading').style.display = 'none';
+    renderList();
+    showView('view-list');
+    const st = history.state;
+    if (st && st.view === 'science' && DB.concepts.some(c => c.id === st.id)) {
+      _navFromPop = true;
+      try { showScience(st.id); } finally { _navFromPop = false; }
+    } else {
+      syncListHistoryState();
+    }
+  } catch (e) {
+    document.getElementById('loading').innerHTML =
+      `<div class="error-msg">데이터를 불러오지 못했습니다.<br>${e.message}</div>`;
+  }
+}
+
+// ── View 1: List ──
+
+// 분야 → 카드 색. digest_reading.html의 GENRE_COLORS와 같은 {tone,ink} 형식.
+// 작업150~152에서 기존 6개 문학 색상과 색조가 겹치지 않도록 설계.
+const FIELD_COLORS = {
+  '물리':     { tone: '#D1574F', ink: '#A33E38' },
+  '화학':     { tone: '#3F9E9E', ink: '#2C7373' },
+  '생물':     { tone: '#4F9E63', ink: '#357048' },
+  '지구과학': { tone: '#5E72C9', ink: '#4254A0' },
+};
+const FIELD_FALLBACK = { tone: '#8A8F99', ink: '#5E6470' };
+const fieldColor = f => FIELD_COLORS[f] || FIELD_FALLBACK;
+
+function buildLegendItems() {
+  const counts = {};
+  DB.concepts.forEach(c => { counts[c.field] = (counts[c.field] || 0) + 1; });
+  return Object.keys(counts)
+    .sort((a, b) => counts[b] - counts[a] || a.localeCompare(b, 'ko'))
+    .map(f => ({ field: f, count: counts[f] }));
+}
+
+function getFilteredConcepts() {
+  const sorted = [...DB.concepts].sort((a, b) => a.title.localeCompare(b.title, 'ko'));
+  return fieldFilter ? sorted.filter(c => c.field === fieldFilter) : sorted;
+}
+
+function setFieldFilter(field) {
+  fieldFilter = (fieldFilter === field) ? null : field;
+  if (fieldFilter) localStorage.setItem(FILTER_STORAGE_KEY, fieldFilter);
+  else localStorage.removeItem(FILTER_STORAGE_KEY);
+  renderList();
+}
+
+// home-wheel ThreeDWheelPicker.jsx → digest_reading.html Carousel을 그대로
+// 복제한 모듈. 정복 여부 표시 갱신 기능은 제거함(작업153: 정복 기능 없음).
+const Carousel = (() => {
+  const mod = (n, m) => ((n % m) + m) % m;
+  const relativePos = (index, offset, n) => mod(index - offset + n / 2, n) - n / 2;
+  const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+  const RENDER_RANGE = 4.5;
+
+  const reducedMq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  const finePointerMq = window.matchMedia ? window.matchMedia('(hover: hover) and (pointer: fine)') : null;
+
+  let items = [], n = 0, cards = [];
+  let viewport, track, countEl, legendEl;
+  let offset = 0, target = 0, vel = 0, raf = null;
+  let dragging = false, wheelAcc = 0;
+  let pointer = { lastX: 0, moved: 0 };
+  let reduced = false, metrics = null;
+  let lastCenter = -1;
+
+  function computeMetrics() {
+    const w = Math.min(window.innerWidth, 480);
+    const maxH = Math.max(200, window.innerHeight - 280);
+    let cardW = clamp(Math.round(w * 0.62), 190, 270);
+    let cardH = Math.round(cardW * 1.4);
+    if (cardH > maxH) { cardH = maxH; cardW = Math.min(cardW, Math.round(cardH * 0.9)); }
+    const spacing = cardW * 1.04;
+    const baseStep = 24;
+    const vpad = window.innerHeight < 600 ? 40 : 64;
+    return { cardW, cardH, spacing, baseStep, viewportH: cardH + vpad, drag: cardW * 0.45 };
+  }
+
+  function render() {
+    const depth = reduced ? 0.35 : 1;
+    const stepDeg = metrics.baseStep * depth;
+    const radius = metrics.spacing / (2 * Math.sin((stepDeg * Math.PI) / 360));
+    const blurOn = !reduced && finePointerMq && finePointerMq.matches;
+    track.style.transform = `translateZ(${-radius}px)`;
+
+    for (let i = 0; i < n; i++) {
+      const el = cards[i];
+      const rel = relativePos(i, offset, n);
+      const abs = Math.abs(rel);
+      if (abs > RENDER_RANGE) {
+        if (el.style.display !== 'none') el.style.display = 'none';
+        continue;
+      }
+      if (el.style.display === 'none') el.style.display = '';
+      const scale = 1 - clamp(abs, 0, 3) * 0.06;
+      el.style.transform = `rotateY(${rel * stepDeg}deg) translateZ(${radius}px) scale(${scale})`;
+      el.style.opacity = clamp(1 - abs * 0.3, 0.06, 1);
+      el.style.filter = blurOn ? `blur(${clamp(abs * 1.25 - 0.15, 0, 4.5)}px)` : '';
+    }
+
+    const center = mod(Math.round(offset), n);
+    if (center !== lastCenter) {
+      if (lastCenter >= 0) {
+        cards[lastCenter].classList.remove('is-center');
+        cards[lastCenter].setAttribute('aria-selected', 'false');
+      }
+      cards[center].classList.add('is-center');
+      cards[center].setAttribute('aria-selected', 'true');
+      lastCenter = center;
+      currentConceptId = items[center].id;
+      countEl.textContent = `${center + 1} / ${n}`;
+    }
+  }
+
+  function setMoving(on) { track.classList.toggle('moving', on); }
+
+  function tick() {
+    raf = null;
+    if (dragging) return;
+    const stiffness = reduced ? 0.32 : 0.14;
+    const damping = reduced ? 0.6 : 0.78;
+    const d = target - offset;
+    vel = (vel + d * stiffness) * damping;
+    offset += vel;
+    if (Math.abs(d) < 0.0008 && Math.abs(vel) < 0.0008) {
+      offset = target;
+      vel = 0;
+      render();
+      setMoving(false);
+      return;
+    }
+    render();
+    raf = requestAnimationFrame(tick);
+  }
+  function kick() {
+    setMoving(true);
+    if (raf == null) raf = requestAnimationFrame(tick);
+  }
+  function goBy(delta) {
+    target = Math.round(target) + delta;
+    kick();
+  }
+
+  function onWheel(e) {
+    const dv = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    e.preventDefault();
+    wheelAcc += dv;
+    if (Math.abs(wheelAcc) >= 45) {
+      goBy(Math.sign(wheelAcc));
+      wheelAcc = 0;
+    }
+  }
+
+  function onPointerDown(e) {
+    if (e.button != null && e.button > 0) return;
+    dragging = true;
+    vel = 0;
+    pointer = { lastX: e.clientX, moved: 0 };
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    setMoving(true);
+  }
+  function onPointerMove(e) {
+    if (!dragging) return;
+    const dx = e.clientX - pointer.lastX;
+    pointer.lastX = e.clientX;
+    pointer.moved += Math.abs(dx);
+    const delta = -dx / metrics.drag;
+    offset += delta;
+    vel = vel * 0.6 + delta * 0.4;
+    render();
+  }
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    const fling = reduced ? 0 : clamp(vel * 9, -4, 4);
+    target = Math.round(offset + fling);
+    kick();
+  }
+
+  function onCardClick(e) {
+    const el = e.target.closest('.carousel-card');
+    if (!el) return;
+    if (pointer.moved > 6) return;
+    const rel = relativePos(Number(el.dataset.idx), offset, n);
+    if (Math.abs(rel) < 0.5) { showScience(items[Number(el.dataset.idx)].id); return; }
+    goBy(Math.round(rel));
+    viewport.focus({ preventScroll: true });
+  }
+
+  function onKeyDown(e) {
+    if (e.key === 'ArrowRight') { e.preventDefault(); goBy(1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); goBy(-1); }
+    else if (e.key === 'Home') {
+      e.preventDefault();
+      target = Math.round(target) + relativePos(0, target, n);
+      kick();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      startCurrent();
+    }
+  }
+
+  function startCurrent() {
+    showScience(items[mod(Math.round(target), n)].id);
+  }
+
+  function applyMetrics() {
+    const hdr = document.querySelector('.metis-app-header');
+    document.documentElement.style.setProperty('--hdr-h', (hdr ? hdr.offsetHeight : 0) + 'px');
+    metrics = computeMetrics();
+    viewport.style.height = metrics.viewportH + 'px';
+    viewport.style.perspective = (reduced ? 2400 : 1100) + 'px';
+    viewport.style.setProperty('--line-clamp', metrics.cardH < 230 ? 2 : metrics.cardH < 280 ? 3 : 4);
+    viewport.style.setProperty('--title-size', metrics.cardH < 230 ? '17px' : metrics.cardH < 300 ? '20px' : '22px');
+    cards.forEach(el => {
+      el.style.width = metrics.cardW + 'px';
+      el.style.height = metrics.cardH + 'px';
+      el.style.marginLeft = -metrics.cardW / 2 + 'px';
+      el.style.marginTop = -metrics.cardH / 2 + 'px';
+    });
+    fitCards();
+    render();
+  }
+
+  function fitCards() {
+    const base = Number(viewport.style.getPropertyValue('--line-clamp')) || 4;
+    cards.forEach(el => {
+      el.style.display = '';
+      el.style.removeProperty('--line-clamp');
+      for (let c = base; c > 1 && el.scrollHeight > el.clientHeight; ) {
+        el.style.setProperty('--line-clamp', --c);
+      }
+    });
+  }
+
+  function buildCard(c, i) {
+    const el = document.createElement('div');
+    el.className = 'carousel-card';
+    el.dataset.idx = i;
+    el.setAttribute('role', 'option');
+    el.setAttribute('aria-selected', 'false');
+    el.style.setProperty('--field-ink', fieldColor(c.field).ink);
+    el.innerHTML = `
+      <div class="carousel-card-meta"><span class="g"></span></div>
+      <div class="carousel-card-title"></div>
+      <div class="carousel-card-line"></div>`;
+    el.querySelector('.g').textContent = c.field || '';
+    el.querySelector('.carousel-card-title').textContent = c.title;
+    el.querySelector('.carousel-card-line').textContent = c.one_line;
+    return el;
+  }
+
+  function jumpTo(id) {
+    if (n === 0) return;
+    let idx = items.findIndex(c => c.id === id);
+    if (idx < 0) idx = 0;
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    dragging = false;
+    target = offset = Math.round(offset) + relativePos(idx, Math.round(offset), n);
+    vel = 0;
+    setMoving(false);
+    render();
+  }
+
+  function buildCardsDOM(list) {
+    items = list;
+    n = list.length;
+    track.innerHTML = '';
+    cards = list.map((c, i) => buildCard(c, i));
+    cards.forEach(el => track.appendChild(el));
+    lastCenter = -1;
+    applyMetrics();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { fitCards(); render(); });
+  }
+
+  function setList(list) {
+    if (!viewport) return;
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    dragging = false;
+    vel = 0;
+    offset = 0;
+    target = 0;
+    buildCardsDOM(list);
+  }
+
+  function renderLegend(legendList, activeField, onItemClick) {
+    if (!legendEl) return;
+    legendEl.innerHTML = '';
+    legendList.forEach(it => {
+      const s = document.createElement('span');
+      s.className = 'carousel-legend-item';
+      s.tabIndex = 0;
+      s.setAttribute('role', 'button');
+      s.setAttribute('aria-pressed', String(it.field === activeField));
+      if (activeField && it.field !== activeField) s.classList.add('dim');
+      if (it.field === activeField) s.classList.add('active');
+      s.style.setProperty('--field-ink', fieldColor(it.field).ink);
+      s.textContent = `${it.field} ${it.count}`;
+      s.addEventListener('click', () => onItemClick(it.field));
+      s.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onItemClick(it.field); }
+      });
+      legendEl.appendChild(s);
+    });
+  }
+
+  function mount(root, list) {
+    if (viewport) return;
+    root.innerHTML = `
+      <div class="carousel-clip">
+        <div class="carousel-viewport" role="listbox" tabindex="0" aria-label="개념 선택 - 좌우로 넘기고 Enter 또는 가운데 카드를 눌러 읽기">
+          <div class="carousel-track"></div>
+        </div>
+      </div>
+      <div class="carousel-nav">
+        <button class="carousel-nav-btn" data-dir="-1" aria-label="이전 개념">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <span class="carousel-nav-count"></span>
+        <button class="carousel-nav-btn" data-dir="1" aria-label="다음 개념">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+      </div>
+      <div class="carousel-legend"></div>`;
+
+    viewport = root.querySelector('.carousel-viewport');
+    track = root.querySelector('.carousel-track');
+    countEl = root.querySelector('.carousel-nav-count');
+    legendEl = root.querySelector('.carousel-legend');
+
+    viewport.addEventListener('wheel', onWheel, { passive: false });
+    viewport.addEventListener('pointerdown', onPointerDown);
+    viewport.addEventListener('pointermove', onPointerMove);
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+    window.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('keydown', onKeyDown);
+    track.addEventListener('click', onCardClick);
+    root.querySelectorAll('.carousel-nav-btn').forEach(b =>
+      b.addEventListener('click', () => goBy(Number(b.dataset.dir))));
+
+    reduced = !!(reducedMq && reducedMq.matches);
+    const onReducedChange = () => { reduced = reducedMq.matches; applyMetrics(); };
+    if (reducedMq) {
+      if (reducedMq.addEventListener) reducedMq.addEventListener('change', onReducedChange);
+      else if (reducedMq.addListener) reducedMq.addListener(onReducedChange);
+    }
+    window.addEventListener('resize', applyMetrics);
+
+    buildCardsDOM(list);
+  }
+
+  return { mount, setList, renderLegend, jumpTo, isMounted: () => !!viewport };
+})();
+
+function renderList() {
+  const wantId = currentConceptId;
+  const filtered = getFilteredConcepts();
+  if (!Carousel.isMounted()) {
+    Carousel.mount(document.getElementById('list-carousel'), filtered);
+  } else {
+    Carousel.setList(filtered);
+  }
+  Carousel.renderLegend(legendItems, fieldFilter, setFieldFilter);
+  Carousel.jumpTo(wantId);
+  syncListHistoryState();
+}
+
+function goList() {
+  if (history.state && history.state.view && history.state.view !== 'list') {
+    history.back();
+    return;
+  }
+  showListView();
+}
+
+// ── View 2: Concept detail ──
+function showScience(conceptId) {
+  const concept = DB.concepts.find(c => c.id === conceptId);
+  if (!concept) return;
+  currentConceptId = conceptId;
+
+  const relatedHtml = (concept.related || []).length > 0
+    ? `<div class="science-section">
+        <div class="science-section-label">관련 개념</div>
+        <div class="related-list">
+          ${concept.related.map(r => {
+            const target = DB.concepts.find(c => c.id === r.id);
+            if (!target) return '';
+            return `
+            <button type="button" class="related-item" onclick="showScience('${r.id}')">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+              <span class="related-info">
+                <span class="related-title">${target.title}</span>
+                <span class="related-relation">${r.relation}</span>
+              </span>
+            </button>`;
+          }).join('')}
+        </div>
+      </div>`
+    : '';
+
+  const headerHtml = `
+    <div class="science-work-header">
+      <div class="science-work-title">${concept.title}</div>
+      <div class="science-work-meta">${concept.field} · ${concept.level}</div>
+    </div>`;
+  const oneLineHtml = `
+    <div class="science-section">
+      <div class="science-section-label">핵심 한 줄</div>
+      <div class="science-one-line">${concept.one_line}</div>
+    </div>`;
+  const summaryHtml = `
+    <div class="science-section">
+      <div class="science-section-label">핵심 설명</div>
+      <div class="science-summary">${concept.summary}</div>
+    </div>`;
+  const keyPointsHtml = `
+    <div class="science-section">
+      <div class="science-section-label">핵심 포인트</div>
+      <div class="key-point-list">
+        ${concept.key_points.map((p, i) => `
+          <div class="key-point-item">
+            <div class="point-num">${i + 1}.</div>
+            <div class="point-text">${p}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  const exampleHtml = `
+    <div class="science-section">
+      <div class="science-section-label">일상 예시</div>
+      <div class="science-example">${concept.example}</div>
+    </div>`;
+  // 작업150~152: misconception은 선택 필드 - 있을 때만 섹션 자체를 렌더
+  // (digest_reading.html의 full_text 조건부 렌더와 같은 패턴)
+  const misconceptionHtml = concept.misconception
+    ? `<div class="science-section">
+        <div class="science-section-label">흔한 오해</div>
+        <div class="science-misconception">${concept.misconception}</div>
+      </div>`
+    : '';
+  const sourcesHtml = `
+    <div class="science-section">
+      <div class="science-section-label">출처</div>
+      <div class="source-list">
+        ${concept.sources.map(s => `
+          <div class="source-item">
+            <div class="source-name"><a href="${escAttr(s.url)}" target="_blank" rel="noopener">${s.name}</a><span class="source-tier">${s.tier}</span></div>
+            <div class="source-publisher">${s.publisher}</div>
+            <div class="source-note">${s.note}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  document.getElementById('science-content').innerHTML =
+    `${headerHtml}${oneLineHtml}${summaryHtml}${keyPointsHtml}${exampleHtml}${misconceptionHtml}${relatedHtml}${sourcesHtml}`;
+
+  showView('view-science');
+  window.scrollTo(0, 0);
+  navState({ view: 'science', id: conceptId });
+}
+
+function escAttr(s) { return String(s).replace(/"/g, '&quot;'); }
+
+// ── Boot ──
+loadDB();
+</script>
 </body>
 </html>
