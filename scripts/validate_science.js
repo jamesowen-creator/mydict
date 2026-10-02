@@ -18,6 +18,11 @@
  *   7. related[].id는 concepts 안에 실제로 존재하는 id여야 함(자기 자신 금지)
  *   8. sources는 최소 2개, tier는 "1차"/"보조" 화이트리스트 내, 최소 1개는 "1차"
  *   9. 모든 필수 문자열 필드는 trim() 후 길이 0이 아니어야 함(undefined/빈 문자열 금지)
+ *   10. sources 중 tier가 "1차"이면서 note가 "직접열람"으로 시작하는 항목이 1개 이상
+ *       있어야 함(작업154) - "부분확인"/"미열람" 출처만으로는 사실 주장을 뒷받침할 수 없음
+ *   11. summary/key_points/misconception에 금지 일반화 표현이 없어야 함(작업154) -
+ *       근거 범위를 벗어난 과장된 단정("널리 퍼져", "많은 사람", "대부분의 학생",
+ *       "가장 흔한")을 막기 위함
  *
  * 사용법
  *   node scripts/validate_science.js          # 검증만, 위반 있으면 exit 1
@@ -34,6 +39,8 @@ const EXPECTED_FIELD_COUNTS = { '물리': 2, '화학': 2, '생물': 2, '지구�
 const EXPECTED_TOTAL = Object.values(EXPECTED_FIELD_COUNTS).reduce((a, b) => a + b, 0);
 const FIELD_WHITELIST = Object.keys(EXPECTED_FIELD_COUNTS);
 const TIER_WHITELIST = ['1차', '보조'];
+// 작업154: 근거 범위를 벗어난 일반화 표현 금지
+const BANNED_PHRASES = ['널리 퍼져', '많은 사람', '대부분의 학생', '가장 흔한'];
 
 const LENGTH_RULES = {
   one_line: [20, 40],
@@ -134,6 +141,7 @@ for (const c of concepts) {
       errors.push(`${label}: sources는 최소 2개 필요(현재 ${c.sources.length}개)`);
     }
     let primaryCount = 0;
+    let directPrimaryCount = 0;
     c.sources.forEach((s, i) => {
       for (const field of ['name', 'publisher', 'url', 'tier']) {
         if (!nonEmptyStr(s && s[field])) errors.push(`${label}: sources[${i}].${field}가 없거나 빈 문자열`);
@@ -142,8 +150,26 @@ for (const c of concepts) {
         errors.push(`${label}: sources[${i}].tier "${s.tier}"는 화이트리스트(${TIER_WHITELIST.join('/')})에 없음`);
       }
       if (s && s.tier === '1차') primaryCount++;
+      if (s && s.tier === '1차' && nonEmptyStr(s.note) && s.note.startsWith('직접열람')) directPrimaryCount++;
     });
     if (primaryCount < 1) errors.push(`${label}: sources 중 1차급 출처가 1개 이상 있어야 함`);
+    if (directPrimaryCount < 1) {
+      errors.push(`${label}: sources 중 "1차"이면서 note가 "직접열람"으로 시작하는 출처가 1개 이상 있어야 함(부분확인/미열람 출처만으로는 사실 주장을 뒷받침할 수 없음)`);
+    }
+  }
+
+  // 작업154: 근거 범위를 벗어난 일반화 표현 금지
+  const textFieldsToCheck = { summary: c.summary, misconception: c.misconception };
+  if (Array.isArray(c.key_points)) {
+    c.key_points.forEach((kp, i) => { textFieldsToCheck[`key_points[${i}]`] = kp; });
+  }
+  for (const [fieldName, text] of Object.entries(textFieldsToCheck)) {
+    if (typeof text !== 'string') continue;
+    for (const phrase of BANNED_PHRASES) {
+      if (text.includes(phrase)) {
+        errors.push(`${label}: ${fieldName}에 금지 표현 "${phrase}"가 포함되어 있음`);
+      }
+    }
   }
 }
 

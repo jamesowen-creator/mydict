@@ -399,12 +399,15 @@ const FIELD_COLORS = {
 };
 const FIELD_FALLBACK = { tone: '#8A8F99', ink: '#5E6470' };
 const fieldColor = f => FIELD_COLORS[f] || FIELD_FALLBACK;
+// 작업154: 범례는 편수순/가나다순이 아니라 물리→화학→생물→지구과학(science_db.json
+// 개념 id 순서와 동일)으로 고정 표시
+const FIELD_ORDER = ['물리', '화학', '생물', '지구과학'];
 
 function buildLegendItems() {
   const counts = {};
   DB.concepts.forEach(c => { counts[c.field] = (counts[c.field] || 0) + 1; });
-  return Object.keys(counts)
-    .sort((a, b) => counts[b] - counts[a] || a.localeCompare(b, 'ko'))
+  return FIELD_ORDER
+    .filter(f => counts[f])
     .map(f => ({ field: f, count: counts[f] }));
 }
 
