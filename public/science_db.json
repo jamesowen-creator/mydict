@@ -8,7 +8,7 @@
       "field": "물리",
       "level": "고등",
       "one_line": "무거운 물체가 더 빨리 떨어진다는 생각은 틀렸다",
-      "summary": "공기저항이 없는 상태에서는 질량이 다른 물체라도 똑같은 가속도로 떨어진다. 지구 표면에서 물체의 중력가속도는 평균 약 9.8 m/s²이다. 1971년 8월 2일 아폴로 15호의 선외활동(EVA-3) 중 사령관 David Scott는 달 표면에서 약 1.6 m 높이에서 1.32 kg 지질학 망치와 0.03 kg 매 깃털을 동시에 떨어뜨렸다. 달에는 공기가 거의 없어 공기저항이 없었기 때문에, 질량이 크게 다른 두 물체는 동시에 표면에 닿았다. 지구에서는 공기저항 때문에 가벼운 물체가 더 늦게 떨어지는 것처럼 보이지만, 이는 공기저항의 영향일 뿐 중력가속도 자체가 달라지는 것은 아니다. 2009년 한국과학교육학회지에 실린 비물리 전공 중학교 과학교사 9명 대상 연구에서, 질량이 큰 물체가 더 빨리 떨어진다고 답한 교사 사례가 있었다.",
+      "summary": "공기저항이 없는 상태에서는 질량이 다른 물체라도 똑같은 가속도로 떨어진다. 지구 표면에서 물체의 중력가속도는 평균 약 9.8 m/s²이다. 1971년 8월 아폴로 15호의 선외활동(EVA-3) 중 사령관 David Scott는 달 표면에서 약 1.6 m 높이에서 1.32 kg 지질학 망치와 0.03 kg 매 깃털을 동시에 떨어뜨렸다. 달에는 공기가 거의 없어 공기저항이 없었기 때문에, 질량이 크게 다른 두 물체는 동시에 표면에 닿았다. 지구에서는 공기저항 때문에 가벼운 물체가 더 늦게 떨어지는 것처럼 보이지만, 이는 공기저항의 영향일 뿐 중력가속도 자체가 달라지는 것은 아니다. 2009년 한국과학교육학회지에 실린 비물리 전공 중학교 과학교사 9명 대상 연구에서, 질량이 큰 물체가 더 빨리 떨어진다고 답한 교사 사례가 있었다.",
       "key_points": [
         "공기저항이 없으면 무게와 무관하게 같은 속도로 떨어진다",
         "지구 표면의 중력가속도는 평균 약 9.8 m/s²이다",
@@ -23,7 +23,7 @@
         { "name": "표준 중력/중력 가속도", "publisher": "위키백과", "url": "https://ko.wikipedia.org/wiki/표준_중력", "tier": "보조", "note": "부분확인 — 9.8/9.80665 수치 교차확인" },
         { "name": "중력 가속도(과학백과사전)", "publisher": "사이언스올(한국과학창의재단)", "url": "https://www.scienceall.com/brd/board/390/L/menu/317?bbsSn=42144", "tier": "보조", "note": "부분확인(검색스니펫) — 9.8 m/s²는 OpenStax 직접열람이 이미 뒷받침함(작업157 B-1, tier 1차→보조 재분류)" },
         { "name": "3.5 Free Fall", "publisher": "OpenStax University Physics Volume 1", "url": "https://openstax.org/books/university-physics-volume-1/pages/3-5-free-fall", "tier": "1차", "note": "직접열람 — \"let's use an average value of 9.8 m/s² rounded to two significant figures\" 확인" },
-        { "name": "Apollo 15 Lunar Surface Journal, EVA-3 Closeout (The Hammer and the Feather)", "publisher": "Apollo Lunar Surface Journal(Eric M. Jones 편집, NASA 안내로 이관된 후속 사이트)", "url": "https://www.apollojournals.org/alsj/a15/a15.clsout3.html", "tier": "1차", "note": "직접열람(작업160, 기존 nasa.gov URL인 a15.eva3post.html 404 확인 후 교체 — NASA 공식 안내 페이지(nasa.gov/history/alsj-and-afj/)가 안내하는 후속 사이트 apollojournals.org에서 같은 EVA-3 클로즈아웃 문서 'The Hammer and the Feather' 열람) — 'During the final minutes of the third extravehicular activity, a short demonstration experiment was conducted.'/'A heavy object (a 1.32-kg aluminum geological hammer) and a light object (a 0.03-kg falcon feather) were released simultaneously from approximately the same height (approximately 1.6 m)'(Apollo 15 Preliminary Science Report 인용문) 확인. 날짜는 같은 구간(MET 167:19:30 부근)에서 사령관 Scott가 기념봉투 소인을 읽는 대사 중 'August the second, 1971, first day of issue' 확인" },
+        { "name": "Apollo 15 Lunar Surface Journal, EVA-3 Closeout (The Hammer and the Feather)", "publisher": "Apollo Lunar Surface Journal(Eric M. Jones 편집, NASA 안내로 이관된 후속 사이트)", "url": "https://www.apollojournals.org/alsj/a15/a15.clsout3.html", "tier": "1차", "note": "직접열람(작업160/161, 기존 nasa.gov URL인 a15.eva3post.html 404 확인 후 교체) — 'publisher'의 'NASA 안내로 이관된 후속 사이트' 표현은 nasa.gov/history/alsj-and-afj/ 페이지를 직접 열람해 \"아폴로 미션 자료는 apollojournals.org에서 보라\"는 안내를 확인한 데 근거함(작업161 재확인, 유지). 본문 — 'During the final minutes of the third extravehicular activity, a short demonstration experiment was conducted.'/'A heavy object (a 1.32-kg aluminum geological hammer) and a light object (a 0.03-kg falcon feather) were released simultaneously from approximately the same height (approximately 1.6 m)'(Apollo 15 Preliminary Science Report 인용문) 확인. 날짜(1971-08-02)는 이 페이지가 EVA-3 발생일로 직접 명시한 것이 아니라, 같은 구간(MET 167:19:30 부근)에서 사령관 Scott가 기념봉투 소인을 읽는 대사 'August the second, 1971, first day of issue'에서의 간접 근거임(작업161) — 직접 근거가 아니므로 summary의 날짜 표현을 '1971년 8월 2일'에서 '1971년 8월'로 완화" },
         { "name": "The Apollo 15 Hammer-Feather Drop", "publisher": "NASA Science", "url": "https://science.nasa.gov/resource/the-apollo-15-hammer-feather-drop/", "tier": "1차", "note": "직접열람" },
         { "name": "물리 전공이 아닌 중학교 과학교사들의 '힘과 운동' 내용 지식 영역의 전문성", "publisher": "한국과학교육학회지(KCI), 박경영·김영민, 2009, 29(8), 910-922", "url": "https://koreascience.kr/article/JAKO200914035210749.pdf", "tier": "1차", "note": "직접열람(PDF 본문) — 비물리전공 중학교 과학교사 9명 대상 연구. '질량이 큰 물체가 빨리 떨어진다' 오개념을 가진 교사 사례 확인" }
       ]
@@ -78,18 +78,18 @@
       "field": "화학",
       "level": "고등",
       "one_line": "순수한 물의 pH는 25℃에서 약 7.0이다",
-      "summary": "pH는 수소 이온 농도를 다루기 쉽게 나타낸 지표로, 수소 이온 농도의 음의 로그값(pH = -log[H+])으로 정의한다. pH가 7보다 작으면 산성, 7이면 중성, 7보다 크면 염기성(알칼리성)이라 한다. 덴마크 화학자 쇠렌 쇠렌센은 1909년 코펜하겐 칼스버그 연구소에서 단백질을 분석하던 중, 수소 이온 농도를 측정하기 쉽게 나타내기 위해 pH 개념을 고안했다. 당시는 색이 변하는 지시약 방식에서 전기화학적 측정 방식으로 넘어가던 시기였다. 25℃에서 물의 이온곱 상수(Kw)는 1.0×10⁻¹⁴이며, 이로부터 순수한 물의 수소 이온 농도와 수산화 이온 농도는 똑같이 1.0×10⁻⁷ mol/L로 계산되어, pH는 약 7.0이 된다. 다만 이 값은 25℃라는 온도 조건에서 성립하는 것으로, 온도가 달라지면 중성을 나타내는 pH 값도 달라진다. 레몬즙처럼 신맛이 나는 것은 산성에 가깝고, 비눗물처럼 미끈거리는 것은 염기성에 가까운 예로 흔히 든다.",
+      "summary": "pH는 수소 이온 농도를 다루기 쉽게 나타낸 지표로, 수소 이온 농도의 음의 로그값(pH = -log[H+])으로 정의한다. pH가 7보다 작으면 산성, 7이면 중성, 7보다 크면 염기성(알칼리성)이라 한다. 덴마크 화학자 쇠렌 쇠렌센은 1909년 코펜하겐 칼스버그 연구소에서 단백질을 분석하던 중, 수소 이온 농도를 측정하기 쉽게 나타내기 위해 pH 개념을 고안했다. 당시는 색이 변하는 지시약 방식에서 전기화학적 측정 방식으로 넘어가던 시기였다. 25℃에서 물의 이온곱 상수(Kw)는 1.0×10⁻¹⁴이며, 이로부터 순수한 물의 수소 이온 농도와 수산화 이온 농도는 똑같이 1.0×10⁻⁷ mol/L로 계산되어, pH는 약 7.0이 된다. 다만 이 값은 25℃라는 온도 조건에서 성립하는 것으로, 온도가 달라지면 중성을 나타내는 pH 값도 달라진다. OpenStax 화학 교재의 pH 척도 그림은 위산(gastric juices)을 pH 약 1.5, 가정용 암모니아(household ammonia)를 pH 12 부근의 물질로 보여준다.",
       "key_points": [
         "pH는 수소이온농도를 다루기 쉽게 나타낸 지표다",
         "1909년 쇠렌센이 칼스버그 연구소에서 고안했다",
         "25℃에서 순수한 물의 pH는 약 7.0이다"
       ],
-      "example": "레몬즙처럼 신맛이 나는 것은 산성(pH가 낮음)에 가깝고, 비눗물처럼 미끈거리는 것은 염기성(pH가 높음)에 가까운 예로 흔히 든다",
+      "example": "위산은 pH 약 1.5로 강한 산성이고, 가정용 암모니아는 pH 12 부근으로 염기성이 강한 물질의 예로 꼽힌다",
       "related": [],
       "sources": [
         { "name": "Søren Sørensen", "publisher": "Science History Institute", "url": "https://www.sciencehistory.org/education/scientific-biographies/soren-sorensen/", "tier": "1차", "note": "직접열람 — 1909년/칼스버그 연구소/배경 확인" },
         { "name": "Five ideas in chemical education that must die: pH 7 is neutral", "publisher": "Royal Society of Chemistry", "url": "https://edu.rsc.org/opinion/five-ideas-in-chemical-education-that-must-die-ph-7-is-neutral/2010031.article", "tier": "1차", "note": "직접열람 — pH 7 중성의 온도 조건성 확인" },
-        { "name": "14.2 pH and pOH", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/14-2-ph-and-poh", "tier": "1차", "note": "직접열람 — \"At 25 °C, the value of Kw is 1.0×10⁻¹⁴\"/\"pH=−log[H3O+]=−log(1.0×10⁻⁷)=7.00\" 확인" }
+        { "name": "14.2 pH and pOH", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/14-2-ph-and-poh", "tier": "1차", "note": "직접열람 — \"At 25 °C, the value of Kw is 1.0×10⁻¹⁴\"/\"pH=−log[H3O+]=−log(1.0×10⁻⁷)=7.00\" 확인. 작업161 — Figure 14.2 pH 척도 그림에서 \"Gastric juices are listed at a pH of about 1.5\"/\"Household ammonia is listed just before a pH of 12\" 확인. 기존 example·summary의 레몬즙·비눗물은 이 그림을 포함해 004의 어느 출처에도 없어 위산·가정용 암모니아로 교체(근거: 이 그림)" }
       ]
     },
     {
@@ -98,7 +98,7 @@
       "field": "생물",
       "level": "고등",
       "one_line": "생물의 진화에는 특별한 목적이나 의도가 없다",
-      "summary": "자연선택이란, 유전적으로 다양한 변이를 가진 개체들 중 주어진 환경에 더 잘 적응한 개체가 살아남아 번식하며 그 형질을 다음 세대에 전달하는 과정이다. 이것이 세대를 거쳐 누적되면서 생물의 진화가 일어난다. 찰스 다윈은 1859년 《종의 기원》을 출판해 이 이론을 체계화했다. 핵심 논리는 '과잉생산 → 개체 변이 → 생존경쟁 → 자연선택 → 진화'로 정리된다. '적자생존(survival of the fittest)'이라는 표현은 다윈이 만든 말이 아니라, 철학자 허버트 스펜서가 다윈보다 먼저 사용한 용어다. 다윈은 1869년 《종의 기원》 5판부터 이 표현을 받아들여 사용했는데, 제4장 제목에 처음 등장한다. 자연선택에서 '적자(fit)'란 가장 힘이 센 개체가 아니라, 주어진 환경에 가장 잘 적응한 개체를 뜻한다. 항생제에 노출된 세균 집단에서 민감한 세균은 죽고 우연히 내성을 가진 세균만 살아남아 번식하는 것도, 자연선택이 지금도 일어나고 있음을 보여주는 예로 흔히 언급된다.",
+      "summary": "자연선택이란, 유전적으로 다양한 변이를 가진 개체들 중 주어진 환경에 더 잘 적응한 개체가 살아남아 번식하며 그 형질을 다음 세대에 전달하는 과정이다. 이것이 세대를 거쳐 누적되면서 생물의 진화가 일어난다. 찰스 다윈은 1859년 《종의 기원》을 출판해 이 이론을 체계화했다. 핵심 논리는 '과잉생산 → 개체 변이 → 생존경쟁 → 자연선택 → 진화'로 정리된다. '적자생존(survival of the fittest)'이라는 표현은 다윈이 만든 말이 아니라, 철학자 허버트 스펜서가 다윈보다 먼저 사용한 용어다. 다윈은 1869년 《종의 기원》 5판부터 이 표현을 받아들여 사용했는데, 제4장 제목에 처음 등장한다. 자연선택에서 '적자(fit)'란 주어진 환경에 가장 잘 적응한 개체를 뜻한다. 항생제에 노출된 세균 집단에서 민감한 세균은 죽고 우연히 내성을 가진 세균만 살아남아 번식하는 것도, 자연선택이 지금도 일어나고 있음을 보여주는 예로 흔히 언급된다.",
       "key_points": [
         "환경에 잘 적응한 개체가 살아남아 번식한다",
         "다윈이 1859년 종의 기원에서 체계화했다",
@@ -111,8 +111,7 @@
         { "name": "On the Origin of Species", "publisher": "위키백과(영문)", "url": "https://en.wikipedia.org/wiki/On_the_Origin_of_Species", "tier": "보조", "note": "부분확인 — 1859년 출판 확인" },
         { "name": "선택형, 서술형, 면담 방법을 통한 생물 예비교사들의 자연선택개념 이해 비교분석", "publisher": "생물교육(KCI), 하민수·신세인·이준기, 2016, 44(4), 618-632", "url": "https://www.kci.go.kr/kciportal/landing/article.kci?arti_id=ART002187149", "tier": "1차", "note": "직접열람 — 목적론적(필요/목적) 오개념 직접 확인" },
         { "name": "Freeman, On the Origin of Species (Editorial Introduction)", "publisher": "Darwin Online", "url": "https://darwin-online.org.uk/EditorialIntroductions/Freeman_OntheOriginofSpecies.html", "tier": "1차", "note": "직접열람 — 5판(1869)/제4장 제목/스펜서 용어 기원 확인" },
-        { "name": "18.1 Understanding Evolution", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/18-1-understanding-evolution", "tier": "1차", "note": "직접열람(작업160, 금성출판사 티칭백과가 JS 렌더링으로 본문 열람 불가해 sources≥2·1차≥1 유지 조건 하에 대체) — 'Second, more offspring are produced than are able to survive, so resources for survival and reproduction are limited.'/'Third, offspring vary among each other in regard to their characteristics and those variations are inherited.'/'there is competition for those resources in each generation.'/'Darwin and Wallace reasoned that offspring with inherited characteristics which allow them to best compete for limited resources will survive and have more offspring than those individuals with variations that are less able to compete.'/'This will lead to change in populations over generations...' 확인 — '과잉생산→개체변이→생존경쟁→자연선택→진화' 핵심 논리 전체 뒷받침. 또한 'applying antibiotics to a population of bacteria will, over time, select a population of bacteria that are resistant to antibiotics' 확인 — example의 항생제 내성 사례도 이 출처로 뒷받침됨(CDC 403으로 못 채운 근거를 보완)" },
-        { "name": "Antimicrobial Resistance: Causes", "publisher": "CDC", "url": "https://www.cdc.gov/antimicrobial-resistance/causes/index.html", "tier": "1차", "note": "직접열람 이력은 작업156~159 보고서 기준(자동화 요청 403, 작업160 재시도도 403 — curl 기본 UA 등 우회는 쓰지 않음). 선택 메커니즘(민감균 사멸→내성균 생존)에 대한 명시적 서술은 과거 직접열람 당시에도 없었음 — example의 근거는 위 OpenStax Biology 2e 18.1로 보완됨" }
+        { "name": "18.1 Understanding Evolution", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/18-1-understanding-evolution", "tier": "1차", "note": "직접열람(작업160, 금성출판사 티칭백과가 JS 렌더링으로 본문 열람 불가해 sources≥2·1차≥1 유지 조건 하에 대체) — 'Second, more offspring are produced than are able to survive, so resources for survival and reproduction are limited.'/'Third, offspring vary among each other in regard to their characteristics and those variations are inherited.'/'there is competition for those resources in each generation.'/'Darwin and Wallace reasoned that offspring with inherited characteristics which allow them to best compete for limited resources will survive and have more offspring than those individuals with variations that are less able to compete.'/'This will lead to change in populations over generations...' 확인 — '과잉생산→개체변이→생존경쟁→자연선택→진화' 핵심 논리 전체 뒷받침. 또한 'applying antibiotics to a population of bacteria will, over time, select a population of bacteria that are resistant to antibiotics' 확인 — example의 항생제 내성 사례도 이 출처로 뒷받침됨(작업161에서 CDC 출처는 본문 열람 불가 상태가 지속돼 제거)" }
       ]
     },
     {
@@ -121,7 +120,7 @@
       "field": "생물",
       "level": "고등",
       "one_line": "식물의 양분은 흙이 아니라 이산화탄소와 물에서 온다",
-      "summary": "광합성이란, 식물이 빛에너지를 이용해 이산화탄소와 물로부터 양분(유기물)과 산소를 만들어내는 과정이다(6CO₂+6H₂O → C₆H₁₂O₆+6O₂). 식물의 몸을 이루는 물질 대부분은 흙이 아니라 이산화탄소와 물에서 만들어진다. 판 헬몬트는 버드나무 한 그루를 흙에 심고 수년간 물만 주며 기르는 실험을 했다. 그 결과 나무는 크게 자랐지만 흙의 무게는 거의 줄지 않았다. 그는 이 관찰을 근거로 식물이 흙을 먹고 자라는 것이 아니라 물을 이용해서 자란다는 결론을 내렸다. 이 실험은 '식물이 흙을 흡수해서 자란다'는 생각이 틀렸음을 보여준 실험으로 꼽힌다. 한 연구에서는 광합성 수업을 받은 뒤에도 소수의 학생(5% 미만)이 '흙'을 광합성에 필요한 물질로 계속 언급하는 것으로 나타났다.",
+      "summary": "광합성이란, 식물이 빛에너지를 이용해 이산화탄소와 물로부터 양분(유기물)과 산소를 만들어내는 과정이다(6CO₂+6H₂O → C₆H₁₂O₆+6O₂). 식물의 몸을 이루는 물질 대부분은 흙이 아니라 이산화탄소와 물에서 만들어진다. 판 헬몬트는 나무 한 그루를 흙에 심고 5년간 물만 주며 기르는 실험을 했다. 그 결과 나무는 크게 자랐지만 흙의 무게는 거의 줄지 않았다. 그는 이 관찰을 근거로 식물이 흙을 먹고 자라는 것이 아니라 물을 이용해서 자란다는 결론을 내렸다. 이 실험은 '식물이 흙을 흡수해서 자란다'는 생각이 틀렸음을 보여준 실험으로 꼽힌다. 한 연구에서는 광합성 수업을 받은 뒤에도 소수의 학생(5% 미만)이 '흙'을 광합성에 필요한 물질로 계속 언급하는 것으로 나타났다.",
       "key_points": [
         "식물은 이산화탄소와 물로 포도당과 산소를 만든다",
         "판 헬몬트는 나무가 크게 자라도 흙은 거의 줄지 않음을 보였다",
@@ -133,7 +132,7 @@
       "sources": [
         { "name": "생태 지위적 접근을 통한 5학년의 광합성 개념 분석", "publisher": "한국과학교육학회지(KCI), 정재훈·김영신, 2011, 31(4), 513-527", "url": "https://koreascience.kr/article/JAKO201125247233142.pdf", "tier": "1차", "note": "직접열람(PDF 본문) — 학습 후에도 '흙' 개념 언급이 5% 미만 수준에서나마 잔존함을 확인" },
         { "name": "8.1 Overview of Photosynthesis", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/8-1-overview-of-photosynthesis", "tier": "1차", "note": "직접열람 — 정의/반응식(6CO2+6H2O→C6H12O6+6O2) 확인. 판 헬몬트 실험은 이 자료에 언급 없음" },
-        { "name": "중학 과학 2-2 개념책(판 헬몬트 실험)", "publisher": "지학사", "url": "https://www.jihak.co.kr/upload/public/reference-book/cwdVygnnZgWdubAP/bB9SP6kgutYVcQKM.pdf", "tier": "보조", "note": "직접열람(PDF 본문 추출, 9페이지) — \"이를 통해 그는 식물이 자랄 때 흙을 먹고 자라는 것이 아니라 물을 이용해서 자란다는 결론을 내렸다\" 확인. 교과서 연계 학습서, 검정교과서 아님. 공기(이산화탄소) 관련 서술은 이 자료에 없음" }
+        { "name": "중학 과학 2-2 개념책(판 헬몬트 실험)", "publisher": "지학사", "url": "https://www.jihak.co.kr/upload/public/reference-book/cwdVygnnZgWdubAP/bB9SP6kgutYVcQKM.pdf", "tier": "보조", "note": "직접열람(PDF 페이지 렌더링 재확인, 작업161 — 이전 '9페이지' 표기 오류 정정, 실제로는 '01강 광합성 과정' 본문 10페이지) — \"헬몬트는 식물이 자랄 때 필요한 물질을 알아내기 위해 약 90.72 kg의 흙을 담은 화분에 약 2.27 kg의 나무 한 그루를 심고, 물만 주며 키웠다. 5 년 후, 식물이 흙을 먹고 자란다는 당시 생각과 달리, 나무의 무게는 약 74.47 kg 증가했지만, 흙의 무게는 약 0.06 kg 감소에 그쳤다. 이를 통해 그는 식물이 자랄 때 흙을 먹고 자라는 것이 아니라 물을 이용해서 자란다는 결론을 내렸다\" 확인. 수종(버드나무 등)은 이 자료에 명시되지 않고 기간도 '수년'이 아니라 '5 년'으로 명시돼 있어 작업161에서 summary 표현을 '나무 한 그루'·'5년간'으로 정정. 교과서 연계 학습서, 검정교과서 아님. 공기(이산화탄소) 관련 서술은 이 자료에 없음" }
       ]
     },
     {
@@ -142,11 +141,11 @@
       "field": "지구과학",
       "level": "고등",
       "one_line": "계절은 거리가 아니라 자전축 기울기 때문에 바뀐다",
-      "summary": "지구가 자전축을 약 23.5° 기울인 채 태양 주위를 공전하기 때문에, 위도별로 받는 태양빛의 양과 낮의 길이가 계절에 따라 달라진다. 계절 변화의 원인은 지구와 태양 사이의 거리가 아니라, 이 자전축 기울기와 공전의 조합이다. 실제로 지구가 태양에 가장 가까워지는 시기(근일점)는 매년 1월 초로, 북반구가 겨울인 시기와 겹친다. 즉 거리와 계절은 서로 반대 방향으로 움직인다. 1987년 하버드-스미스소니언 천체물리센터가 Annenberg Media(당시 Annenberg/CPB)와 함께 만든 다큐멘터리 《A Private Universe》에는, 하버드 졸업생들이 계절이 생기는 까닭을 '지구와 태양 사이의 거리' 때문이라고 답하는 장면이 담겼다. 국내 연구(이용섭, 2024)는 '계절의 변화 원인' 단원 지도에서 '거리 변화 때문'이라는 흔한 오개념이 사실이 아님을 먼저 설명해야 한다고 했다.",
+      "summary": "지구가 자전축을 약 23.5° 기울인 채 태양 주위를 공전하기 때문에, 위도별로 받는 태양빛의 양과 낮의 길이가 계절에 따라 달라진다. 계절 변화의 원인은 지구와 태양 사이의 거리가 아니라, 이 자전축 기울기와 공전의 조합이다. 실제로 지구가 태양에 가장 가까워지는 시기(근일점)는 매년 1월 초로, 북반구가 겨울인 시기와 겹친다. 즉 거리와 계절은 서로 반대 방향으로 움직인다. 1987년 하버드-스미스소니언 천체물리센터가 Annenberg Media(당시 Annenberg/CPB)와 함께 만든 다큐멘터리 《A Private Universe》는, 여러 해 물리·천문학 교육을 받은 하버드 졸업생들도 여름이 더운 까닭을 '태양이 더 가까워져서'라고 생각한다는 내용을 다룬다. 국내 연구(이용섭, 2024)는 '계절의 변화 원인' 단원 지도에서 '거리 변화 때문'이라는 흔한 오개념이 사실이 아님을 먼저 설명해야 한다고 했다.",
       "key_points": [
         "계절은 거리가 아니라 자전축 기울기 때문에 바뀐다",
         "지구가 태양에 가장 가까운 시기는 북반구 겨울인 1월이다",
-        "다큐에 하버드 졸업생이 거리를 계절 원인으로 답한 사례가 담겼다"
+        "다큐에는 하버드 졸업생들도 거리 때문이라고 생각한다는 내용이 나온다"
       ],
       "example": "(북반구 기준) 여름에는 해가 높이 떠서 낮이 길고 뜨겁고, 겨울에는 해가 낮게 떠서 낮이 짧고 추운 것을 체감으로 알 수 있다",
       "misconception": "지구와 태양 사이의 거리가 가까워지고 멀어져서 계절이 바뀐다고 생각하기 쉽지만, 실제로는 자전축의 기울기 때문에 계절이 바뀐다",
@@ -156,7 +155,7 @@
       "sources": [
         { "name": "An Epic View of the Seasons", "publisher": "NASA Science", "url": "https://science.nasa.gov/earth/earth-observatory/an-epic-view-of-the-seasons/", "tier": "1차", "note": "직접열람 — \"The substantial tilt, about 23.5 degrees\"/여름·겨울 원인 설명 확인" },
         { "name": "Welcome to Perihelion", "publisher": "NASA Science(APOD)", "url": "https://science.nasa.gov/image-article/apod-2025-january-4-welcome-to-perihelion/", "tier": "1차", "note": "직접열람 — 근일점 1월초 확인" },
-        { "name": "A Private Universe: online resources (by Matthew H. Schneps and Philip M. Sadler)", "publisher": "Science in School(저자: Erik Stengler)", "url": "https://scienceinschool.org/article/2010/privateuniverse/", "tier": "1차", "note": "직접열람(작업160 — 기존 learner.org URL이 301로 가리키는 최종 주소 learner.org/series/a-private-universe/(www 제거형)도 재요청 결과 404. learner.org 자체가 '2026-07-01 Sunset' 공지에 따라 콘텐츠가 내려간 것으로 보여(사이트 전역에서 사실상 모든 콘텐츠 페이지가 404), 같은 다큐멘터리를 소개하는 별도 매체로 대체) — 'This series started with an award-winning short documentary feature in 1987.'/'a collaboration between the Harvard-Smithsonian Center for Astrophysics and Annenberg Media (then Annenberg / CPB)'/'even Harvard graduates still think that it is hotter in summer because the Sun is nearer to the Earth than in winter.' 확인. 1987년 당시 공동제작 주체 명칭이 'Annenberg Learner'(현재 웹사이트 브랜드명)가 아니라 'Annenberg/CPB'(현 Annenberg Media)였음을 확인해 summary 표기를 정정. 또한 원문이 'Harvard graduates'(복수)이므로 summary의 '하버드 대학교 졸업생이'(단수)를 '하버드 졸업생들이'로 정정" },
+        { "name": "A Private Universe: online resources (by Matthew H. Schneps and Philip M. Sadler)", "publisher": "Science in School(저자: Erik Stengler)", "url": "https://scienceinschool.org/article/2010/privateuniverse/", "tier": "보조", "note": "부분확인(작업161, tier 1차→보조 하향 — 다큐멘터리 원본이 아니라 이를 소개하는 2차 해설 기사이므로). 기존 learner.org URL이 301로 가리키는 최종 주소(learner.org/series/a-private-universe/, www 제거형)도 404라 대체 열람. 열람 범위: 다큐멘터리를 소개하는 단락만 확인. 원문 인용 — 'This series started with an award-winning short documentary feature in 1987.'/'a collaboration between the Harvard-Smithsonian Center for Astrophysics and Annenberg Media (then Annenberg / CPB)'/'despite years of education in physical sciences and astronomy, even Harvard graduates still think that it is hotter in summer because the Sun is nearer to the Earth than in winter.' 이 범위를 넘어서는 '장면' 묘사(인터뷰 장면 구체 묘사 등)는 기사에 없어 작업161에서 summary·key_points 표현을 이 인용 범위로 축소" },
         { "name": "'계절의 변화 원인' 단원 지도에 대한 초등예비교사들의 인식분석", "publisher": "한국지구과학교육학회지(KCI), 이용섭, 2024, 17(3), 208-217", "url": "https://www.koreascience.or.kr/article/JAKO202405954720968.pdf", "tier": "1차", "note": "직접열람(PDF 본문) — \"'계절의 변화 원인' 단원은 지구와 태양 사이의 거리 변화로 인해 발생하는 것이라는 흔한 오개념이 사실이 아님을 먼저 설명해야 한다\" 확인" }
       ]
     },
