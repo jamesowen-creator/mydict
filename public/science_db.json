@@ -189,20 +189,20 @@
       "field": "물리",
       "level": "고등",
       "one_line": "힘은 항상 두 물체 사이에서 짝을 이루어 작용한다",
-      "summary": "한 물체가 다른 물체에 힘을 가하면, 그 물체도 똑같은 크기의 힘을 반대 방향으로 받는다. 이를 뉴턴 운동 제3법칙, 또는 작용·반작용의 법칙이라 한다. OpenStax 대학 물리학 교재는 이 두 힘이 '서로 다른 물체 또는 계에 작용한다 — A의 힘은 B에 작용하고 B의 힘은 A에 작용한다'고 설명하며, 그래서 이 두 힘은 서로 상쇄되지 않는다고 덧붙인다. 서울대학교 과학교육연구소 자료에는 다음과 같은 문항이 실려 있다 — '용수철저울의 양쪽에 질량이 같은 추를 매달았을 때 저울의 눈금은 어떻게 나타날까? ① 0N ② 1N ③ 2N ④ 3N ⑤ 4N'. 이 문항의 정답은 저울이 2N을 가리키는 것이며, 이는 한쪽에 걸린 힘의 크기와 같다. 그러나 '두 개의 추가 양쪽에 매달려 있으므로 무게를 합한다'며 4N을 고르거나, '양쪽 힘이 균형을 이루어 0이 된다'며 0N을 고른 학생 사례가 있었다.",
+      "summary": "한 물체가 다른 물체에 힘을 가하면, 그 물체도 똑같은 크기의 힘을 반대 방향으로 받는다. 이를 뉴턴 운동 제3법칙, 또는 작용·반작용의 법칙이라 한다. OpenStax 대학 물리학 교재는 이 두 힘이 서로 다른 물체 또는 계에 작용하기 때문에 상쇄되지 않는다고 설명한다. 서울대학교 과학교육연구소 자료에는 다음과 같은 문항이 실려 있다 — '용수철저울의 양쪽에 질량이 같은 추를 매달았을 때 저울의 눈금은 어떻게 나타날까? ① 0N ② 1N ③ 2N ④ 3N ⑤ 4N'. 문항의 그림에는 양쪽 추에 각각 '2N'이라는 무게가 표시되어 있으며, 이 경우 문항의 정답은 ③(2N)이다. 그러나 '두 개의 추가 양쪽에 매달려 있으므로 무게를 합한다'며 4N을 고르거나, '양쪽 힘이 균형을 이루어 0이 된다'며 0N을 고른 학생 사례가 있었다.",
       "key_points": [
         "힘을 받은 두 물체는 크기가 같고 방향이 반대인 힘을 서로 받는다",
         "작용과 반작용은 같은 물체가 아니라 서로 다른 두 물체에 작용한다",
         "이 때문에 작용과 반작용은 서로 상쇄되어 사라지지 않는다"
       ],
       "example": "줄다리기에서 내가 상대를 당기는 힘만큼 상대도 나를 당기는 힘으로 끌어당기며, 이 두 힘은 나와 상대라는 서로 다른 두 사람에게 작용한다",
-      "misconception": "서울대학교 과학교육연구소 자료의 용수철저울 문항(양쪽에 같은 질량의 추)에서, 무게를 합쳐 4N이라고 답하거나 힘이 상쇄되어 0N이라고 답한 학생 사례가 있었지만, 정답은 2N이다",
+      "misconception": "서울대학교 과학교육연구소 자료의 용수철저울 문항(양쪽에 각 2N으로 표시된 추)에서, 무게를 합쳐 4N이라고 답하거나 힘이 상쇄되어 0N이라고 답한 학생 사례가 있었지만, 문항의 정답은 2N이다",
       "related": [
         { "id": "science_002", "relation": "관성은 제1법칙, 작용·반작용은 제3법칙으로 둘 다 뉴턴 역학의 기초다" }
       ],
       "sources": [
-        { "name": "5.5 Newton's Third Law", "publisher": "OpenStax University Physics Volume 1", "url": "https://openstax.org/books/university-physics-volume-1/pages/5-5-newtons-third-law", "tier": "1차", "note": "직접열람 — \"Whenever one body exerts a force on a second body, the first body experiences a force that is equal in magnitude and opposite in direction to the force that it exerts\"/\"these forces are acting on different bodies or systems: A's force acts on B and B's force acts on A\" 확인" },
-        { "name": "작용, 반작용에 대한 학생들의 개념", "publisher": "서울대학교 과학교육연구소", "url": "https://serc.snu.ac.kr/wp-content/uploads/sites/80/2022/a/작용반작용에대한학생들의개념(전체).pdf", "tier": "1차", "note": "직접열람(PDF 본문 추출) — 용수철저울 문항/0N·4N 오답 사례 확인. 원출처 차영·서상오·권재술(2001), 한국과학교육학회지 21(2), 411-421(서지만 확인, 본문 미열람)" }
+        { "name": "5.5 Newton's Third Law", "publisher": "OpenStax University Physics Volume 1", "url": "https://openstax.org/books/university-physics-volume-1/pages/5-5-newtons-third-law", "tier": "1차", "note": "직접열람(재확인) — \"Whenever one body exerts a force on a second body, the first body experiences a force that is equal in magnitude and opposite in direction to the force that it exerts\"/\"these forces are acting on different bodies or systems: A's force acts on B and B's force acts on A\"/\"Thus, they do not cancel each other\" 확인" },
+        { "name": "작용, 반작용에 대한 학생들의 개념", "publisher": "서울대학교 과학교육연구소", "url": "https://serc.snu.ac.kr/wp-content/uploads/sites/80/2022/a/작용반작용에대한학생들의개념(전체).pdf", "tier": "1차", "note": "직접열람(PDF 재다운로드 후 PyMuPDF로 페이지 PNG 렌더링, 작업159 재확인) — 용수철저울 문항 그림에 양쪽 추가 각각 '2N'으로 라벨링되어 있음을 이미지로 확인. '과학적 개념으로... 용수철이 2N을 가리킨다고 답하는 학생도 있으나 많은 학생들이... 0N 혹은 4N을 가리킬 것이라고 응답하는 경향이 있다' 확인. 원출처 차영·서상오·권재술(2001), 한국과학교육학회지 21(2), 411-421(서지만 확인, 본문 미열람)" }
       ]
     },
     {
@@ -211,10 +211,10 @@
       "field": "물리",
       "level": "고등",
       "one_line": "열은 에너지의 이동이고 온도는 그 정도를 나타낸다",
-      "summary": "열은 온도 차이 때문에 생기는 에너지의 이동이다. OpenStax 고등학교 물리 교재는 '열이 참을 수 없을 정도였다'처럼, 실제로는 온도가 높았다는 뜻으로 일상에서 '열'이라는 말을 쓰는 경우가 많다며 열과 온도가 자주 혼동된다고 지적한다. 같은 교재는 온도를 입자들의 평균 운동 에너지로 설명한다. 즉 온도가 높을수록 물질을 이루는 입자들이 평균적으로 더 빠르게 움직인다는 것이다. 2005년 새물리에 실린 연구는 중등학생 6명을 면담해 열전도와 상태변화에 대한 선개념을 조사했다. 그 결과 6명 중 다수가 열을 에너지의 이동이 아니라 입자나 물질 같은 것으로 여기고 있었으며, 이 때문에 교과서에 실린 관련 삽화를 이해하는 데 어려움을 겪었다.",
+      "summary": "열은 온도 차이 때문에 생기는 에너지의 이동이다. OpenStax 고등학교 물리 교재는 '열이 참을 수 없을 정도였다'처럼, 실제로는 온도가 높았다는 뜻으로 일상에서 '열'이라는 말을 쓰는 경우가 많다며 열과 온도가 자주 혼동된다고 지적한다. 같은 교재는 물질을 이루는 입자(분자·원자)의 평균 운동 에너지를 열에너지(thermal energy)라 하며, 입자가 더 빠르게 움직일수록 열에너지가 커지고 온도도 높아진다고 설명한다. 2005년 새물리에 실린 연구는 중등학생 6명을 면담해 열전도와 상태변화에 대한 선개념을 조사했다. 그 결과 6명 중 다수가 열을 에너지의 이동이 아니라 입자나 물질 같은 것으로 여기고 있었으며, 이 때문에 교과서에 실린 관련 삽화를 이해하는 데 어려움을 겪었다.",
       "key_points": [
         "열은 온도 차이에 의한 에너지의 이동이다",
-        "온도는 입자들의 평균 운동 에너지를 나타낸다",
+        "물질을 이루는 입자의 평균 운동 에너지가 클수록 열에너지와 온도가 높아진다",
         "일상에서는 온도가 높다는 뜻으로 '열'이라는 말을 쓰기도 한다"
       ],
       "example": "'오늘 열이 정말 심하다'처럼 일상에서는 '열'이라는 말을 쓰지만, 과학적으로는 '오늘 온도가 높다'고 말하는 것이 더 정확한 표현이다",
@@ -223,8 +223,8 @@
         { "id": "science_011", "relation": "물질의 상태가 변할 때 열(에너지)의 출입이 함께 일어난다" }
       ],
       "sources": [
-        { "name": "11.1 Temperature and Thermal Energy", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/11-1-temperature-and-thermal-energy", "tier": "1차", "note": "직접열람 — \"Heat is the transfer of energy due to a temperature difference... Heat is often confused with temperature\" 확인" },
-        { "name": "열의 전도 및 상태 변화에 대한 중등학생들의 선개념이 교과서의 삽화 이해에 미치는 영향", "publisher": "새물리(한국물리학회, KCI), 오원근·강지영·박은정, 2005, 50(6), 363-374", "url": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART000964740", "tier": "1차", "note": "직접열람(KCI 초록, 영문 전문) — \"most students thought of heat as some particles or substance\" 확인, 중등학생 6명 면담 질적 연구" }
+        { "name": "11.1 Temperature and Thermal Energy", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/11-1-temperature-and-thermal-energy", "tier": "1차", "note": "직접열람(재확인) — \"Heat is often confused with temperature. For example, we may say that the heat was unbearable, when we actually mean that the temperature was high\"/\"thermal energy—the energy associated with heat—is the average kinetic energy of the particles (molecules or atoms) in a substance\"/\"Faster moving molecules have greater kinetic energies, and so the substance has greater thermal energy, and thus a higher temperature\" 확인. 온도 자체를 '평균 운동 에너지'로 정의하는 문장은 이 페이지에 없어(온도는 '무엇을 측정하는가'로 정의) summary·key_point에서 '열에너지=평균 운동 에너지' 구도로 교정" },
+        { "name": "열의 전도 및 상태 변화에 대한 중등학생들의 선개념이 교과서의 삽화 이해에 미치는 영향", "publisher": "새물리(한국물리학회, KCI), 오원근·강지영·박은정, 2005, 50(6), 363-374", "url": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART000964740", "tier": "1차", "note": "직접열람(KCI 초록, 영문 전문, 재확인) — \"Most students thought of heat as some particles or substance, which kept them from understanding the figures\" 확인(삽화 이해 어려움과의 인과관계가 초록 원문에 직접 명시됨), 중등학생 6명 면담 질적 연구" }
       ]
     },
     {
@@ -233,20 +233,20 @@
       "field": "화학",
       "level": "고등",
       "one_line": "상태가 변하는 동안 온도는 일정하게 유지된다",
-      "summary": "물질이 고체·액체·기체 사이에서 상태를 바꿀 때는 에너지의 출입이 함께 일어난다. OpenStax 화학 교재에 따르면 기화(vaporization)는 흡열 과정이며, 물이 액체에서 기체로 바뀔 때는 1몰당 44.01kJ의 에너지가 필요하다(ΔHvap = 44.01 kJ/mol). 이 교재는 물질이 상태변화 온도에 도달한 뒤에는, 더 가해지거나 빠져나가는 열이 입자의 운동 에너지를 바꾸는 대신 분자 사이의 인력을 약하게 하거나 강하게 하는 데 쓰인다고 설명한다. 그래서 상태가 변하는 동안에는 온도가 일정하게 유지된다. 2005년 교육방법연구에 실린 연구는 전주시 중학생 648명을 대상으로 17문항의 검사도구를 사용해 상태변화 개념을 조사했다. 그 결과 다음 네 가지 오개념이 확인되었다 — 상태변화 시 열의 출입을 인식하지 못함, 질량이 변하지 않음에도 변하는 것으로 인식, 성질이 변하지 않음에도 변하는 것으로 인식, 기체는 액체나 고체로 변할 수 없거나 고체가 반드시 액체를 거쳐야 기체가 된다고 인식.",
+      "summary": "물질이 고체·액체·기체 사이에서 상태를 바꿀 때는 에너지의 출입이 함께 일어난다. OpenStax 화학 교재에 따르면 기화(vaporization)는 흡열 과정이다. 이 교재는 물질이 상태변화 온도에 도달한 뒤에는, 더 가해지거나 빠져나가는 열이 입자의 운동 에너지를 바꾸는 대신 분자 사이의 인력을 약하게 하거나 강하게 하는 데 쓰인다고 설명한다. 그래서 상태가 변하는 동안에는 온도가 일정하게 유지된다. 2005년 교육방법연구에 실린 연구는 전주시 중학생 648명을 대상으로 17문항의 검사도구를 사용해 상태변화 개념을 조사했다. 그 결과 다음 세 가지 오개념이 확인되었다 — 상태변화 시 열의 출입을 인식하지 못함, 질량이 변하지 않음에도 변하는 것으로 인식, 기체는 액체나 고체로 변할 수 없거나 고체가 반드시 액체를 거쳐야 기체가 된다고 인식.",
       "key_points": [
         "상태 변화가 일어나는 동안 온도는 일정하게 유지된다",
         "기화는 에너지를 흡수하는 흡열 과정이다",
         "상태가 변해도 물질의 질량은 변하지 않는다"
       ],
       "example": "물을 끓일 때 계속 불을 가해도 끓는점에 도달한 뒤에는 온도계 눈금이 더 이상 올라가지 않는 것을 관찰할 수 있다",
-      "misconception": "전주시 중학생 648명을 대상으로 한 연구에서, 상태 변화가 일어날 때 열의 출입을 인식하지 못하거나 질량·성질이 변한다고 잘못 생각하는 사례가 확인되었다",
+      "misconception": "전주시 중학생 648명을 대상으로 한 연구에서, 상태 변화가 일어날 때 열의 출입을 인식하지 못하거나 질량이 변한다고 잘못 생각하는 사례가 확인되었다",
       "related": [
         { "id": "science_010", "relation": "물질의 상태가 변할 때 열(에너지)의 출입이 함께 일어난다" }
       ],
       "sources": [
-        { "name": "10.3 Phase Transitions", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/10-3-phase-transitions", "tier": "1차", "note": "직접열람 — \"While a substance is undergoing a change in state, its temperature remains constant\"/\"Vaporization is an endothermic process\"(ΔHvap=44.01 kJ/mol)/\"further gain or loss of heat is a result of diminishing or enhancing intermolecular attractions, instead of increasing or decreasing molecular kinetic energies\" 확인" },
-        { "name": "중학생들의 물질의 상태변화에 대한 오개념 분석", "publisher": "교육방법연구(한국교육방법학회, KCI), 신동로·이강님, 2005, 17(2), 223-242", "url": "https://www.kci.go.kr/kciportal/landing/article.kci?arti_id=ART000972730", "tier": "1차", "note": "직접열람(KCI 초록) — 전주시 중학생 648명, 4가지 오개념 유형 원문 확인(열 출입 미인식/질량 오인식/성질 오인식/기체-액체-고체 변화 오인식). F=7.358(p<.01)은 '학년별 개념 형성 차이'에 대한 통계로 확인되었으나 본문에는 사용하지 않음" }
+        { "name": "10.3 Phase Transitions", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/10-3-phase-transitions", "tier": "1차", "note": "직접열람(재확인) — \"While a substance is undergoing a change in state, its temperature remains constant\"/\"Vaporization is an endothermic process\"/\"further gain or loss of heat is a result of diminishing or enhancing intermolecular attractions, instead of increasing or decreasing molecular kinetic energies\" 확인. ΔHvap=44.01 kJ/mol 수치는 \"the vaporization of water at standard temperature\"라고만 되어 있어 25℃/298K 같은 명시적 수치 조건이 본문에 확인되지 않고, 끓는 물 example(끓는점≈100℃)과 온도 조건이 달라 혼동을 줄 수 있어 작업159에서 summary에서 삭제함" },
+        { "name": "중학생들의 물질의 상태변화에 대한 오개념 분석", "publisher": "교육방법연구(한국교육방법학회, KCI), 신동로·이강님, 2005, 17(2), 223-242", "url": "https://www.kci.go.kr/kciportal/landing/article.kci?arti_id=ART000972730", "tier": "1차", "note": "직접열람(KCI 초록, 재확인) — 전주시 중학생 648명, 4가지 오개념 유형 원문 확인(열 출입 미인식/질량 오인식/성질 오인식/기체-액체-고체 변화 오인식). '성질' 오인식 유형은 초록에 구체적 근거(색·맛·냄새 등) 없이 포괄적으로만 언급되어 작업159에서 summary·misconception에서는 제외하고 이 note에만 원문 그대로 남김. F=7.358(p<.01)은 '학년별 개념 형성 차이'에 대한 통계로 확인되었으나 본문에는 사용하지 않음" }
       ]
     },
     {
@@ -264,8 +264,8 @@
       "example": "나트륨과 염소가 반응해 염화나트륨을 만드는 2Na(s)+Cl₂(g)→2NaCl(s) 반응에서, 나트륨은 전자를 잃어 산화되고 염소는 전자를 얻어 환원된다",
       "related": [],
       "sources": [
-        { "name": "4.2 Classifying Chemical Reactions", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/4-2-classifying-chemical-reactions", "tier": "1차", "note": "직접열람 — \"oxidation-reduction (redox) reactions are those in which one or more elements involved undergo a change in oxidation number\"/\"Some redox reactions involve the transfer of electrons between reactant entities to yield ionic products, such as the reaction between sodium and chlorine to yield sodium chloride\"(2Na(s)+Cl2(g)→2NaCl(s)) 확인" },
-        { "name": "산화·환원 정의의 확장에 대한 교과서 분석 및 고등학생, 화학교사, 예비화학교사의 이해 조사", "publisher": "현장과학교육(한국현장과학교육학회, KCI), 윤희숙·박하나, 2012, 6(2), 103-108", "url": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART001673959", "tier": "1차", "note": "직접열람(KCI 초록) — \"7종의 교과서 분석 결과, 역사적 발달의 맥락으로 개념의 확장을 기술한 교과서는 1종에 불과하였으며\"/\"예비교사와 교사의 경우, 대부분이 산화수의 변화에 의한 정의를 적용하였으나, 연소나 금속의 반응성 비교 같은 상황에서 산소 또는 전자의 이동에 의한 정의를 혼용해서 적용하는 양상을 보였다\" 확인. 초록에 \"오개념\" 용어는 사용되지 않아 misconception 필드는 생략함" }
+        { "name": "4.2 Classifying Chemical Reactions", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/4-2-classifying-chemical-reactions", "tier": "1차", "note": "직접열람(재확인) — \"oxidation-reduction (redox) reactions are those in which one or more elements involved undergo a change in oxidation number\"/\"Some redox reactions involve the transfer of electrons between reactant entities to yield ionic products, such as the reaction between sodium and chlorine to yield sodium chloride\"(2Na(s)+Cl2(g)→2NaCl(s))/\"The product of this reaction is a covalent compound, so transfer of electrons in the explicit sense is not involved\"(산화수 정의로 확장하는 이유) 확인" },
+        { "name": "산화·환원 정의의 확장에 대한 교과서 분석 및 고등학생, 화학교사, 예비화학교사의 이해 조사", "publisher": "현장과학교육(한국현장과학교육학회, KCI), 윤희숙·박하나, 2012, 6(2), 103-108", "url": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART001673959", "tier": "1차", "note": "직접열람(KCI 초록, 재확인) — \"7종의 교과서 분석 결과, 역사적 발달의 맥락으로 개념의 확장을 기술한 교과서는 1종에 불과하였으며\"/\"고등학생의 경우, 전자의 이동으로 산화·환원 개념을 설명하는 경우가 가장 많았고, 산화수의 변화 개념으로 확장된 비율은 낮았다\"/\"예비교사와 교사의 경우, 대부분이 산화수의 변화에 의한 정의를 적용하였으나, 연소나 금속의 반응성 비교 같은 상황에서 산소 또는 전자의 이동에 의한 정의를 혼용해서 적용하는 양상을 보였다\" 확인. 초록에 \"오개념\" 용어는 사용되지 않아 misconception 필드는 생략함" }
       ]
     },
     {
@@ -274,19 +274,19 @@
       "field": "생물",
       "level": "고등",
       "one_line": "유전자는 기능을 암호화하는 DNA의 서열이다",
-      "summary": "유전자는 기능을 가진 산물을 만들어내도록 암호화된 DNA의 서열로 정의된다. OpenStax 생물학 교재는 멘델의 교배 실험을 바탕으로, 우성 형질은 교배에서 변하지 않고 그대로 나타나는 형질이며 열성 형질은 1세대 교배에서는 나타나지 않다가 그 다음 세대에서 다시 나타나는 형질이라고 설명한다. 2009년 교원교육에 실린 연구는 중학교 3학년, 고등학교 자연계열 3학년, 생물 교사를 대상으로 우성과 열성에 대한 오개념을 조사했다. 그 결과 학생들은 우성을 '열성을 억제하고 표현되는 형질'로, 열성을 '부모로부터 유전자를 전달받지 못하여 나타나는 것'으로 잘못 이해하고 있었다. 또한 '교배 결과 많이 출현하는 형질이 우성이다'라는 오개념을 가진 응답은 중학생 24.4%, 고등학생 19.4%였고, '열성은 생활에 불리하거나 우성이 우수한 형질이다'라는 오개념을 가진 응답은 중학생 48.1%, 고등학생 36.9%였다. 이 연구는 교사가 수업에서 '우성이 열성을 지배한다·억제한다·누른다' 같은 표현을 쓰지 않는 것이 타당하다고 제안했다.",
+      "summary": "유전자는 기능을 가진 산물을 만들어내도록 암호화된 DNA의 서열로 정의된다. OpenStax 생물학 교재는 멘델의 교배 실험을 바탕으로, 우성 형질은 교배에서 변하지 않고 그대로 나타나는 형질이며 열성 형질은 1세대 교배에서는 나타나지 않다가 그 다음 세대에서 다시 나타나는 형질이라고 설명한다. 2009년 교원교육에 실린 연구는 중학교 3학년, 고등학교 자연계열 3학년, 생물 교사를 대상으로 우성과 열성에 대한 오개념을 조사했다. 그 결과, 학생과 교사 모두에서 우성을 '열성을 억제하고 표현되는 형질'로, 열성을 '부모로부터 유전자를 전달받지 못하여 나타나는 것'으로 보는 오개념의 비율이 높게 나타났다. 또한 '교배 결과 많이 출현하는 형질이 우성이다'라는 오개념을 가진 응답은 중학생 24.4%, 고등학생 19.4%였고, '열성은 생활에 불리하거나 우성이 우수한 형질이다'라는 오개념을 가진 응답은 중학생 48.1%, 고등학생 36.9%였다. 이 연구는 교사가 수업에서 '우성이 열성을 지배한다·억제한다·누른다' 같은 표현을 쓰지 않는 것이 타당하다고 제안했다.",
       "key_points": [
         "유전자는 기능을 암호화하는 DNA의 서열이다",
         "우성 형질은 교배에서 변하지 않고 나타나는 형질이다",
         "교배 결과 많이 나타나는 형질이 곧 우성인 것은 아니다"
       ],
-      "example": "교사가 수업에서 '우성이 열성을 억제한다'거나 '누른다'는 표현을 쓰면 오해를 키울 수 있어, 이런 표현 대신 '교배에서 변하지 않고 나타나는 형질'처럼 설명하는 것이 좋다",
+      "example": "멘델의 교배 실험에서 보라색 꽃과 흰색 꽃을 교배하면 1세대(F1)에서는 100%가 보라색 꽃으로 나타나지만, 다음 세대(F2)에서는 보라색 705그루와 흰색 224그루, 약 3:1 비율로 흰색 꽃이 다시 나타난다",
       "misconception": "중-고등학생 중에는 '교배 결과 많이 출현하는 형질이 우성이다'(중학생 24.4%, 고등학생 19.4%) 또는 '열성은 생활에 불리하거나 우성이 우수한 형질이다'(중학생 48.1%, 고등학생 36.9%)라고 생각하는 경우가 있었다",
       "related": [],
       "sources": [
         { "name": "14 Introduction", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/14-introduction", "tier": "1차", "note": "직접열람 — \"A gene is defined as a sequence of DNA that codes for a functional product\" 확인" },
-        { "name": "12.1 Mendel's Experiments and the Laws of Probability", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/12-1-mendels-experiments-and-the-laws-of-probability", "tier": "1차", "note": "직접열람 — \"Dominant traits are those that are inherited unchanged in a hybridization\"/\"Recessive traits become latent, or disappear, in the offspring of a hybridization. The recessive trait does, however, reappear in the progeny of the hybrid offspring\" 확인" },
-        { "name": "유전의 우성과 열성에 대한 중-고등학생과 교사의 오개념 분석", "publisher": "교원교육(한국교원대학교 교육연구원, KCI), 박시호·권영식·이길재, 2009, 25(3), 73-91", "url": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART001377761", "tier": "1차", "note": "직접열람(KCI 초록) — \"우성은 '열성을 억제하고 표현되는 형질이다'\"/\"열성에 대해 학생들은 '부모로부터 유전자를 전달받지 못하여 나타난다'\"/\"중학생의 24.4%, 고등학생의 19.4%가 '교배 결과 많이 출현하는 형질이 우성이다'라는 오개념을\"/\"중학생의 48.1%, 고등학생의 36.9%가 '열성은 생활에 불리하거나 우성이 우수한 형질이다'라는 오개념을\"/\"'우성이 열성을 지배한다' '억제한다' '누른다' 등의 표현은 사용하지 않는 것이 타당할 것\" 확인" }
+        { "name": "12.1 Mendel's Experiments and the Laws of Probability", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/12-1-mendels-experiments-and-the-laws-of-probability", "tier": "1차", "note": "직접열람(재확인) — \"Dominant traits are those that are inherited unchanged in a hybridization\"/\"Recessive traits become latent, or disappear, in the offspring of a hybridization. The recessive trait does, however, reappear in the progeny of the hybrid offspring\"/\"Mendel found that 100 percent of the F1 hybrid generation had violet flowers\"/\"of F2-generation plants, 705 had violet flowers and 224 had white flowers... approximately 3:1\" 확인" },
+        { "name": "유전의 우성과 열성에 대한 중-고등학생과 교사의 오개념 분석", "publisher": "교원교육(한국교원대학교 교육연구원, KCI), 박시호·권영식·이길재, 2009, 25(3), 73-91", "url": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART001377761", "tier": "1차", "note": "직접열람(KCI 초록, 재확인) — \"특히, 학생과 교사 모두 우성은 '열성을 억제하고 표현되는 형질이다.' 열성에 대해 학생들은 '부모로부터 유전자를 전달받지 못하여 나타난다.'라는 오개념 비율이 높게 나타났다\"(정확한 수치는 제시되지 않음, '높게 나타났다'로만 서술)/\"중학생의 24.4%, 고등학생의 19.4%가 '교배 결과 많이 출현하는 형질이 우성이다'라는 오개념을\"/\"중학생의 48.1%, 고등학생의 36.9%가 '열성은 생활에 불리하거나 우성이 우수한 형질이다'라는 오개념을\"/\"'우성이 열성을 지배한다' '억제한다' '누른다' 등의 표현은 사용하지 않는 것이 타당할 것\" 확인" }
       ]
     },
     {
@@ -301,14 +301,14 @@
         "추출된 에너지는 모든 생물이 쓸 수 있는 공통된 형태로 바뀐다",
         "SERC 문항에서는 '호흡은 에너지를 소모하는 과정'이라는 설명이 정답으로 제시되었다"
       ],
-      "example": "우리 몸의 세포는 음식으로 섭취한 포도당을 분해해 에너지를 꺼내 쓰는데, 이 과정이 바로 세포호흡이다",
-      "misconception": "서울대학교 생물교육연구실 자료에 따르면, 광합성과 호흡의 에너지 관계를 묻는 문항에 바르게 응답한 학생 비율이 중학생 51.24%, 고등학생 77.18%였다",
+      "example": "식물이든 동물이든, 몸속에서 일어나는 세포호흡은 포도당의 결합에 저장된 에너지를 꺼내어 모든 생물이 쓸 수 있는 공통된 형태로 바꾸는 과정이다",
+      "misconception": "이 문항에서 '광합성은 이산화탄소를 발생시키며 호흡은 산소를 발생시키는 과정이다'라는 보기(기체 발생 관계를 거꾸로 설명)를 고른 학생이 중학생 24.24%(88명), 고등학생 4.36%(17명), 전체 13.94%(105명)였다",
       "related": [
         { "id": "science_006", "relation": "광합성과 세포호흡은 에너지 흐름에서 서로 반대 방향이다" }
       ],
       "sources": [
-        { "name": "7 Introduction", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/7-introduction", "tier": "1차", "note": "직접열람 — \"a series of metabolic pathways, collectively called cellular respiration, extracts the energy from the bonds in glucose\" 확인" },
-        { "name": "광합성과 호흡에 대한 오개념", "publisher": "서울대학교 생물교육연구실, 문경원, 2008", "url": "https://serc.snu.ac.kr/wp-content/uploads/sites/80/2022/a/6광합성과호흡에대한오개념(전체).pdf", "tier": "1차", "note": "직접열람(PDF 본문 추출, 재확인) — 문항 전문(\"다음은 광합성과 호흡을 비교한 것이다. 옳은 것은?\")과 보기 4개, 정답(③ 광합성은 에너지를 축적시키는 과정이고 호흡은 에너지를 소모하는 과정이다), 응답 비율(중학생 51.24%, 고등학생 77.18%, 전체 64.67%) 확인. 원출처 강경리(1997, 이화여대 교육대학원 석사논문)는 2차 인용" }
+        { "name": "7 Introduction", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/7-introduction", "tier": "1차", "note": "직접열람(재확인) — \"a series of metabolic pathways, collectively called cellular respiration, extracts the energy from the bonds in glucose and converts it into a form that all living things can use\" 확인. '음식으로 섭취한'이라는 표현은 이 페이지에 없어 작업159에서 example에서 삭제함" },
+        { "name": "광합성과 호흡에 대한 오개념", "publisher": "서울대학교 생물교육연구실, 문경원, 2008", "url": "https://serc.snu.ac.kr/wp-content/uploads/sites/80/2022/a/6광합성과호흡에대한오개념(전체).pdf", "tier": "1차", "note": "직접열람(PDF 본문 추출, 작업159 재확인) — 문항 전문(\"다음은 광합성과 호흡을 비교한 것이다. 옳은 것은?\")과 보기 4개(①광합성은 모든 세포에서 일어나며 호흡은 엽록체에서만 일어난다 ②광합성은 이산화탄소를 발생시키며 호흡은 산소를 발생시키는 과정이다 ③광합성은 에너지를 축적시키는 과정이고 호흡은 에너지를 소모하는 과정이다 ④광합성은 유기물을 무기물로 분해하는 과정이고 호흡은 무기물을 유기물로 합성하는 과정이다), 보기별 응답표(단위: 명(%)) 확인 — 정답③ 중학생186(51.24%)/고등학생301(77.18%)/전체487(64.67%), 오답② 중학생88(24.24%)/고등학생17(4.36%)/전체105(13.94%). 원출처 강경리(1997, 이화여대 교육대학원 석사논문)는 2차 인용" }
       ]
     },
     {
@@ -327,7 +327,7 @@
       "misconception": "서울대학교 자료에 따르면, 우리나라 학생 중에는 '오존층의 파괴로 인해 지구의 온도가 상승한다'고 생각하는 오개념 사례가 있었다(원 연구: 곽영순, 2004)",
       "related": [],
       "sources": [
-        { "name": "What is the greenhouse effect?", "publisher": "NASA Science", "url": "https://science.nasa.gov/climate-change/faq/what-is-the-greenhouse-effect/", "tier": "1차", "note": "직접열람(재확인) — \"The greenhouse effect is the process through which heat is trapped near Earth's surface by substances known as 'greenhouse gases'\"/\"approximately 33°C\" 기온 하강/\"an average temperature of 15°C\"/\"Imagine these gases as a cozy blanket enveloping our planet, helping to maintain a warmer temperature\"/\"human activities, primarily from burning fossil fuels... have disrupted Earth's energy balance\" 확인" },
+        { "name": "What is the greenhouse effect?", "publisher": "NASA Science", "url": "https://science.nasa.gov/climate-change/faq/what-is-the-greenhouse-effect/", "tier": "1차", "note": "직접열람(재확인, 작업159 근거표 재수록) — \"The greenhouse effect is the process through which heat is trapped near Earth's surface by substances known as 'greenhouse gases'\"/\"approximately 33°C\" 기온 하강/\"an average temperature of 15°C\"/\"Imagine these gases as a cozy blanket enveloping our planet, helping to maintain a warmer temperature\"/\"human activities, primarily from burning fossil fuels... have disrupted Earth's energy balance\" 확인(작업158에서 확인된 동일 인용문, 변경 없음)" },
         { "name": "온실효과에 대한 우리나라 학생들의 오개념", "publisher": "서울대학교 과학교육연구소", "url": "https://serc.snu.ac.kr/wp-content/uploads/sites/80/2022/a/온실효과에대한우리나라학생들의오개념(전체).pdf", "tier": "1차", "note": "직접열람(PDF 본문 추출) — 오개념 4유형(오존층 파괴/폐열·인공구조물/환경오염/산소도 온실기체) 확인. 원출처 곽영순(2004), 한국과학교육학회지 24(3), 668-674는 2차 인용" }
       ]
     },
@@ -337,7 +337,7 @@
       "field": "지구과학",
       "level": "고등",
       "one_line": "판의 경계에서 지각이 생성되거나 소멸한다",
-      "summary": "지구의 겉 부분은 여러 개의 단단한 판으로 나뉘어 있으며, 이 판들이 서서히 움직이면서 판의 경계에서 다양한 지질 현상이 일어난다는 것이 판구조론이다. 미국지질조사소(USGS)에 따르면 판의 경계는 세 가지로 나뉜다. 발산형 경계는 판이 서로 멀어지면서 새로운 지각이 만들어지는 곳이고, 수렴형 경계는 한 판이 다른 판 아래로 가라앉으면서 지각이 사라지는 곳이며, 변환형 경계는 판이 수평으로 서로 미끄러져 지나가면서 지각이 생성되지도 소멸되지도 않는 곳이다. 발산형 경계의 대표적인 예인 대서양 중앙 해령은 연평균 약 2.5cm씩(100만 년에 약 25km) 넓어진다. 수렴형 경계에서는 섭입이 일어나며, 바다에서 가장 깊은 해구가 만들어지고 화산 활동이 잦으며, 가라앉는 판이 주변과 상호작용하면서 중간 규모 이상의 지진이 자주 일어난다. 변환형 경계는 대부분 바다 밑에 있지만, 미국 캘리포니아의 샌안드레아스 단층처럼 육지에 있는 경우도 있다.",
+      "summary": "지구의 겉 부분은 여러 개의 단단한 판으로 나뉘어 있으며, 이 판들이 서서히 움직이면서 판의 경계에서 다양한 지질 현상이 일어난다는 것이 판구조론이다. 미국지질조사소(USGS)에 따르면 판의 경계는 세 가지로 나뉜다. 발산형 경계는 판이 서로 멀어지면서 새로운 지각이 만들어지는 곳이고, 수렴형 경계는 한 판이 다른 판 아래로 가라앉으면서 지각이 사라지는 곳이며, 변환형 경계는 판이 수평으로 서로 미끄러져 지나가면서 지각이 생성되지도 소멸되지도 않는 곳이다. 발산형 경계의 대표적인 예인 대서양 중앙 해령은 연평균 약 2.5cm씩(100만 년에 약 25km) 넓어진다. 수렴형 경계에서는 섭입이 일어난다. USGS에 따르면 해양판과 대륙판이 수렴하는 경계에서는 바다에서 가장 깊은 해구가 만들어지고 화산 활동이 활발하며(안데스산맥·캐스케이드산맥이 그 예다), 해양판과 해양판이 수렴하는 경계에서는 가라앉는 판의 상호작용으로 중간 규모 이상의 지진이 잦다. 변환형 경계는 대부분 바다 밑에 있지만, 미국 캘리포니아의 샌안드레아스 단층처럼 육지에 있는 경우도 있다.",
       "key_points": [
         "발산형 경계에서는 새로운 지각이 만들어진다",
         "수렴형 경계에서는 한 판이 다른 판 아래로 가라앉아 지각이 사라진다",
@@ -346,7 +346,7 @@
       "example": "대서양이 매년 조금씩 넓어지는 것은 대서양 중앙 해령이라는 발산형 경계에서 새로운 지각이 계속 만들어지고 있기 때문이다",
       "related": [],
       "sources": [
-        { "name": "This Dynamic Earth: Understanding Plate Motions", "publisher": "USGS", "url": "https://pubs.usgs.gov/gip/dynamic/understanding.html", "tier": "1차", "note": "직접열람(재확인) — \"where new crust is generated as the plates pull away from each other\"/\"where crust is destroyed as one plate dives under another\"/\"where crust is neither produced nor destroyed as the plates slide horizontally past each other\"/\"The rate of spreading along the Mid-Atlantic Ridge averages about 2.5 centimeters per year (cm/yr), or 25 km in a million years\"/\"Trenches are the deepest parts of the ocean floor and are created by subduction\"/\"Oceanic-continental convergence also sustains many of the Earth's active volcanoes\"/\"the descending plate also provides a source of stress... leading to frequent moderate to strong earthquakes\"/\"a few occur on land, for example the San Andreas fault zone in California\" 확인" },
+        { "name": "This Dynamic Earth: Understanding Plate Motions", "publisher": "USGS", "url": "https://pubs.usgs.gov/gip/dynamic/understanding.html", "tier": "1차", "note": "직접열람(재확인, 작업159) — \"where new crust is generated as the plates pull away from each other\"/\"where crust is destroyed as one plate dives under another\"/\"where crust is neither produced nor destroyed as the plates slide horizontally past each other\"/\"The rate of spreading along the Mid-Atlantic Ridge averages about 2.5 centimeters per year (cm/yr), or 25 km in a million years\"/\"Trenches are the deepest parts of the ocean floor and are created by subduction\"(해양-대륙 수렴 경계 절에 위치)/\"Oceanic-continental convergence also sustains many of the Earth's active volcanoes, such as those in the Andes and the Cascade Range\"(해양-대륙 수렴 경계 절에 위치)/\"the descending plate also provides a source of stress as the two plates interact, leading to frequent moderate to strong earthquakes\"(해양-해양 수렴 경계 절에 위치)/\"a few occur on land, for example the San Andreas fault zone in California\" 확인. 작업159에서 해구·화산은 해양-대륙 수렴, 지진은 해양-해양 수렴 경계로 범위를 좁혀 summary를 원문 절 구분에 맞게 수정함" },
         { "name": "판 구조론", "publisher": "위키백과", "url": "https://ko.wikipedia.org/wiki/판_구조론", "tier": "보조", "note": "직접열람 — 발산/수렴/보존(변환) 경계 구분, 대서양 중앙 해령/샌안드레아스 단층 예시 교차확인" }
       ]
     }
