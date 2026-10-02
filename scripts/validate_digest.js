@@ -37,9 +37,9 @@ const DIG_PATH = process.argv.slice(2).find(a => !a.startsWith('--')) ||
 // 이 연도 이하에 사망한 작가의 저작물은 퍼블릭도메인 (위 규칙 2 참고)
 const PD_LAST_DEATH_YEAR = 1962;
 
-// 장르별 기대 작품 수 (작업130: 수필 10편, 작업135: 고전소설 10편 신설, 작업138: 고전소설 10편 추가) - 새
-// 배치를 추가할 때마다 갱신
-const EXPECTED_GENRE_COUNTS = { '소설': 60, '시': 34, '수필': 10, '고전소설': 20 };
+// 장르별 기대 작품 수 (작업130: 수필 10편, 작업135: 고전소설 10편 신설, 작업138: 고전소설 10편 추가,
+// 작업144: 소설 3편·시 5편 추가) - 새 배치를 추가할 때마다 갱신
+const EXPECTED_GENRE_COUNTS = { '소설': 63, '시': 39, '수필': 10, '고전소설': 20 };
 const EXPECTED_TOTAL = Object.values(EXPECTED_GENRE_COUNTS).reduce((a, b) => a + b, 0);
 
 const fix = process.argv.includes('--fix');
