@@ -9,6 +9,7 @@ const OPTIONS = [
   { id: 'dictionary', name: '언어 사전', description: 'AI가 풀어주는 뜻과 예문', url: '/english_dictionary.html' },
   { id: 'literature', name: '문학 나침반', description: '시대별 문학 사조 타임라인', url: '/literature_compass.html' },
   { id: 'digest', name: '한입 독서', description: '한 입 크기로 읽는 작품 요약', url: '/digest_reading.html' },
+  { id: 'science', name: '과학', description: '오해를 바로잡는 과학 상식', url: '/science_reading.html' },
   { id: 'metacong', name: 'MetaCong', description: '한국사·세계사 음성 학습 퀴즈', url: '/metacong/' },
 ];
 
