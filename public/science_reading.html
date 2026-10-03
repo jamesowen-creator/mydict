@@ -11,9 +11,8 @@
 <!-- 작업13: 전 화면 공통 상단 헤더(로고+로그인상태) -->
 <link rel="stylesheet" href="/css/common/appHeader.css">
 <style>
-  /* 작업153: digest_reading.html을 복제한 독립 파일. 정복·퀴즈·권한 게이트는
-     이번 파일럿에 포함하지 않으므로 탭바·conquest-bar·quiz/result 뷰는
-     아예 없음(그래서 .view 의 하단 탭바용 padding-bottom도 없음).
+  /* 작업153: digest_reading.html을 복제한 독립 파일. 작업173: 하단 탭바와
+     개념 정복 버튼(conquest-bar)을 추가함(퀴즈 엔진·결과 화면은 작업174).
      작업155: 범례 필터 방식을 버리고 과목 선택 화면(view-subjects)을 추가 -
      3단계(과목 선택 → 과목별 캐러셀 → 개념 상세) 구조로 바뀜 */
   :root {
@@ -27,6 +26,7 @@
     --border: rgba(0,0,0,0.08);
     --error: #E24B4A;
     --error-light: #FCEBEB;
+    --tab-height: 64px;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -60,7 +60,7 @@
   #loading p { color: var(--text2); font-size: 14px; }
 
   /* ── Views ── */
-  .view { display: none; min-height: 100dvh; }
+  .view { display: none; min-height: 100dvh; padding-bottom: var(--tab-height); }
   .view.active { display: block; }
 
   /* ── Top Bar(상세) / Subject Bar(과목별 캐러셀) 공통 ── */
@@ -172,6 +172,7 @@
     font-size: 11px; letter-spacing: 0.08em; color: #6B7280;
   }
   .carousel-card-meta .g { color: var(--field-ink); font-weight: 700; }
+  .carousel-card-done { color: #1A1A1E; font-weight: 700; letter-spacing: 0.02em; }
   .carousel-card-title {
     margin-top: auto;
     font-size: var(--title-size, 22px); font-weight: 500; line-height: 1.3;
@@ -217,7 +218,7 @@
     --coral-ink: #b8442e;
     --coral-tint: #FDF0EC;
   }
-  #view-science .content { padding: 20px 16px 40px; }
+  #view-science .content { padding: 20px 16px 100px; }
   #view-science .back-btn:hover { background: var(--coral-tint); color: var(--coral-ink); }
 
   .science-work-header {
@@ -298,6 +299,55 @@
   .source-note { font-size: 12px; color: #9ca3af; margin-top: 2px; }
 
   .error-msg { text-align: center; padding: 40px 24px; color: var(--error); font-size: 14px; }
+
+  /* ── 하단 탭바 (작업173: digest_reading.html 82-105와 같은 모양) ── */
+  .tab-bar {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    height: var(--tab-height);
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    display: flex; z-index: 200;
+  }
+  .tab-btn {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 4px; background: none; border: none; cursor: pointer;
+    color: var(--text2); font-size: 11px; font-weight: 500;
+    transition: color 0.15s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  /* 활성 탭은 색 + 굵기 + 밑줄 (색 단독 구분 금지 원칙) */
+  .tab-btn.active {
+    color: var(--primary); font-weight: 700;
+    text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px;
+  }
+  .tab-btn svg { width: 22px; height: 22px; }
+  .tab-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── 개념 정복 버튼 (작업173: digest_reading.html 344-367와 같은 모양) ── */
+  .conquest-bar {
+    position: fixed; bottom: var(--tab-height); left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    padding: 10px 16px;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    z-index: 150;
+  }
+  .conquest-btn {
+    width: 100%; padding: 14px;
+    border-radius: 14px; border: 2px solid var(--border);
+    background: var(--bg); cursor: pointer;
+    font-size: 15px; font-weight: 700;
+    font-family: 'Noto Sans KR', sans-serif;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    color: var(--text2); transition: all 0.2s;
+  }
+  .conquest-btn.conquered {
+    background: var(--coral-tint); border-color: var(--coral);
+    color: var(--coral-ink);
+  }
+  .conquest-btn svg { width: 18px; height: 18px; }
 </style>
 </head>
 <body>
@@ -354,6 +404,33 @@
     </button>
   </div>
   <div class="content" id="science-content"></div>
+  <div class="conquest-bar">
+    <button class="conquest-btn" id="conquest-btn" onclick="toggleConquest()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      이 개념 정복 완료
+    </button>
+  </div>
+</div>
+
+<!-- Tab Bar (작업173) -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-concepts" onclick="goConceptsTab()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+      <polyline points="9 22 9 12 15 12 15 22"></polyline>
+    </svg>
+    개념
+  </button>
+  <button class="tab-btn disabled" id="tab-quiz" onclick="startQuizFlow()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>
+    퀴즈
+  </button>
 </div>
 
 <script>
@@ -376,6 +453,71 @@ const FIELD_ORDER = ['물리', '화학', '생물', '지구과학'];
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+}
+
+// ── Conquest (작업173) ──
+// 정복 기록은 브라우저 localStorage에만 저장(서버·DB 없음). localStorage가
+// 막혀 있어도(프라이빗 모드 등) 오류 없이 동작하도록 메모리 객체를 함께 쓴다:
+// 이 세션에서 바꾼 값은 메모리가 우선하고, 없으면 localStorage를 읽는다.
+const CONQUEST_PREFIX = 'science_conquest_';
+const _memConquest = {};
+
+function isConquered(id) {
+  if (Object.prototype.hasOwnProperty.call(_memConquest, id)) return _memConquest[id];
+  try { return localStorage.getItem(CONQUEST_PREFIX + id) === 'true'; } catch (e) { return false; }
+}
+
+function setConquered(id, val) {
+  _memConquest[id] = !!val;
+  try { localStorage.setItem(CONQUEST_PREFIX + id, val ? 'true' : 'false'); } catch (e) { /* 메모리 폴백 */ }
+}
+
+function getConqueredConcepts() {
+  if (!DB) return [];
+  return DB.concepts.filter(c => isConquered(c.id));
+}
+
+function updateConquestBtn() {
+  const btn = document.getElementById('conquest-btn');
+  const check = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+  if (isConquered(currentConceptId)) {
+    btn.classList.add('conquered');
+    btn.innerHTML = check + ' 정복 완료!';
+  } else {
+    btn.classList.remove('conquered');
+    btn.innerHTML = check + ' 이 개념 정복 완료';
+  }
+}
+
+function toggleConquest() {
+  if (!currentConceptId) return;
+  setConquered(currentConceptId, !isConquered(currentConceptId));
+  updateConquestBtn();
+  updateTabQuizState();
+}
+
+// "퀴즈" 탭: 정복 개념이 1개 이상이면 disabled 해제(0개면 흐리게, 클릭은 가능)
+function updateTabQuizState() {
+  document.getElementById('tab-quiz').classList.toggle('disabled', getConqueredConcepts().length === 0);
+}
+
+// 작업173 임시 처리: 퀴즈 엔진은 작업174에서 이 함수를 교체한다
+function startQuizFlow() {
+  if (getConqueredConcepts().length === 0) {
+    alert('먼저 개념을 정복해 주세요');
+    return;
+  }
+  alert('퀴즈는 준비 중입니다');
+}
+
+// "개념" 탭: 과목 선택 화면으로. 이미 과목 선택 화면이면 아무것도 하지 않아
+// 같은 상태가 history에 쌓이지 않는다(그 외에는 "과목 선택" 버튼과 같은 goSubjects)
+function goConceptsTab() {
+  if (document.getElementById('view-subjects').classList.contains('active')) {
+    window.scrollTo(0, 0);
+    return;
+  }
+  goSubjects();
 }
 
 function fieldUrl(field) { return '/science_reading.html?field=' + encodeURIComponent(field); }
@@ -459,7 +601,10 @@ window.addEventListener('popstate', e => {
 // /api/me의 perm_science_reading이 명시적으로 false일 때만 차단하고,
 // 토큰 없음·응답 오류·예외·필드 없음은 모두 통과(fail-open)
 async function checkPermission() {
-  const token = localStorage.getItem('mydict_token');
+  // 작업173: localStorage 접근 자체가 막힌 환경(프라이빗 모드 등)에서도 페이지가
+  // 멈추지 않도록 토큰 읽기를 try로 감쌈 - 읽지 못하면 미로그인과 같이 통과
+  let token = null;
+  try { token = localStorage.getItem('mydict_token'); } catch (e) { return true; }
   if (!token) return true;
   try {
     const r = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } });
@@ -481,6 +626,7 @@ async function loadDB() {
     const res = await fetch('science_db.json');
     if (!res.ok) throw new Error('네트워크 오류');
     DB = await res.json();
+    updateTabQuizState();
     document.getElementById('loading').style.display = 'none';
 
     const st = history.state;
@@ -547,6 +693,7 @@ function renderFieldCarousel(field) {
     Carousel.setList(list);
   }
   Carousel.jumpTo(currentConceptId);
+  Carousel.refreshConquered();
   const col = fieldColor(field);
   const chip = document.getElementById('subject-chip');
   chip.textContent = field;
@@ -554,7 +701,7 @@ function renderFieldCarousel(field) {
 }
 
 // home-wheel ThreeDWheelPicker.jsx → digest_reading.html Carousel을 그대로
-// 복제한 모듈. 정복 여부 표시 갱신 기능은 제거함(작업153: 정복 기능 없음).
+// 복제한 모듈. 정복 여부 표시 갱신은 작업173에서 새로 작성함(refreshConquered).
 // 작업155: 범례(renderLegend) 제거 - 범례 필터 대신 과목 선택 화면을 씀.
 const Carousel = (() => {
   const mod = (n, m) => ((n % m) + m) % m;
@@ -754,6 +901,12 @@ const Carousel = (() => {
       <div class="carousel-card-title"></div>
       <div class="carousel-card-line"></div>`;
     el.querySelector('.g').textContent = c.field || '';
+    if (isConquered(c.id)) {
+      const done = document.createElement('span');
+      done.className = 'carousel-card-done';
+      done.textContent = ' · 정복 ✓';
+      el.querySelector('.carousel-card-meta').append(done);
+    }
     el.querySelector('.carousel-card-title').textContent = c.title;
     el.querySelector('.carousel-card-line').textContent = c.one_line;
     return el;
@@ -836,7 +989,22 @@ const Carousel = (() => {
     buildCardsDOM(list);
   }
 
-  return { mount, setList, jumpTo, isMounted: () => !!viewport };
+  // 정복 여부는 상세에서 바뀔 수 있으므로 카드를 다시 만들지 않고 표시만 갱신
+  function refreshConquered() {
+    cards.forEach((el, i) => {
+      const meta = el.querySelector('.carousel-card-meta');
+      const old = meta.querySelector('.carousel-card-done');
+      if (old) old.remove();
+      if (items[i] && isConquered(items[i].id)) {
+        const done = document.createElement('span');
+        done.className = 'carousel-card-done';
+        done.textContent = ' · 정복 ✓';
+        meta.append(done);
+      }
+    });
+  }
+
+  return { mount, setList, jumpTo, refreshConquered, isMounted: () => !!viewport };
 })();
 
 // ── View 2: Concept detail ──
@@ -933,6 +1101,7 @@ function showScience(conceptId) {
   document.getElementById('science-content').innerHTML =
     `${headerHtml}${oneLineHtml}${summaryHtml}${keyPointsHtml}${exampleHtml}${misconceptionHtml}${relatedHtml}${sourcesHtml}`;
 
+  updateConquestBtn();
   showView('view-science');
   window.scrollTo(0, 0);
 
