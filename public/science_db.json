@@ -550,8 +550,8 @@
         { "id": "science_026", "relation": "빛의 굴절과 소리의 전달을 함께 보면 좋은 물리 개념이다" }
       ],
       "sources": [
-        { "name": "16.2 Refraction", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/16-2-refraction", "tier": "1차", "note": "직접열람 — \"The changing of a light ray’s direction (loosely called bending) when it passes a boundary between materials of different composition, or between layers in single material where there are changes in temperature and density, is called refraction.\"/\"The change in direction of the light ray depends on how the speed of light changes.\"/\"We define the index of refraction, n, of a material to be 𝑛=𝑐𝑣,n=cv,n=cv, where v is the observed speed of light in the material.\"/\"Because the speed of light is always less than c in matter and equals c only in a vacuum, the index of refraction (plural: indices of refraction) is always greater than or equal to one.\"/\"the path of the ray moves closer to the perpendicular when the ray slows down\"/\"the path of the ray moves away from the perpendicular when the ray speeds up\"/\"The exact mathematical relationship is the law of refraction, or Snell’s law, which is stated in equation form as 𝑛1⁢sin⁡𝜃1=𝑛2⁢sin⁡𝜃2 or 𝑛1𝑛2=sin⁡𝜃2sin⁡𝜃1.n1⁢sin⁡θ1=n2⁢sin⁡θ2 or n1n2=sin⁡θ2sin⁡θ1.n1sinθ1=n2sinθ2 or n1n2=sinθ2sinθ1.\"/\"Looking at the fish tank as shown, we can see the same fish in two different locations, because light changes directions when it passes from water to air.\" 확인. 수식은 텍스트 추출 시 기호가 중복(n1⁢sin⁡θ1=n2⁢sin⁡θ2 형태)되어 나타나므로 식 자체는 인용하지 않고 \"stated in equation form as\" 문장까지만 인용. 고등학교 물리 교재로 인용 범위가 고등 수준" },
-        { "name": "25.3 The Law of Refraction", "publisher": "OpenStax College Physics 2e", "url": "https://openstax.org/books/college-physics-2e/pages/25-3-the-law-of-refraction", "tier": "1차", "note": "직접열람 — \"The changing of a light ray’s direction (loosely called bending) when it passes through variations in matter is called refraction.\"/\"the direction of the ray moves closer to the perpendicular when it slows down\"/\"the direction of the ray moves away from the perpendicular when it speeds up\"/\"The exact mathematical relationship is the law of refraction, or “Snell’s Law,” which is stated in equation form as𝑛1⁢sin⁡𝜃1=𝑛2⁢sin⁡𝜃2.n1⁢sin⁡θ1=n2⁢sin⁡θ2.n1sinθ1=n2sinθ2. 25.7 Here 𝑛1n1n1 and 𝑛2n2n2 are the indices of refraction for medium 1 and 2, and 𝜃1θ1θ1 and 𝜃2θ2θ2 are the angles between the rays and the perpendicular in medium 1 and 2, as shown in Figure 25.12.\" 확인. 교차검증 — 굴절 정의(방향 바뀜)와 법선 쪽/바깥쪽 이동, 스넬 법칙 서술이 물리 교재(16.2)와 일치(식은 수식 중복 추출이라 인용하지 않음). 대학 교재이나 정의·원리 서술만 인용해 고등 수준에 적합" }
+        { "name": "16.2 Refraction", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/16-2-refraction", "tier": "1차", "note": "직접열람 — \"The changing of a light ray’s direction (loosely called bending) when it passes a boundary between materials of different composition, or between layers in single material where there are changes in temperature and density, is called refraction.\"/\"The change in direction of the light ray depends on how the speed of light changes.\"/\"We define the index of refraction, n, of a material to be\"/\"where v is the observed speed of light in the material.\"/\"Because the speed of light is always less than c in matter and equals c only in a vacuum, the index of refraction (plural: indices of refraction) is always greater than or equal to one.\"/\"the path of the ray moves closer to the perpendicular when the ray slows down\"/\"the path of the ray moves away from the perpendicular when the ray speeds up\"/\"The exact mathematical relationship is the law of refraction, or Snell’s law, which is stated in equation form as\"/\"Looking at the fish tank as shown, we can see the same fish in two different locations, because light changes directions when it passes from water to air.\" 확인. 수식 부분은 텍스트 추출 시 기호가 중복되어 인용에서 제외하고, \"stated in equation form as\"까지만 인용. 고등학교 물리 교재로 인용 범위가 고등 수준" },
+        { "name": "25.3 The Law of Refraction", "publisher": "OpenStax College Physics 2e", "url": "https://openstax.org/books/college-physics-2e/pages/25-3-the-law-of-refraction", "tier": "1차", "note": "직접열람 — \"The changing of a light ray’s direction (loosely called bending) when it passes through variations in matter is called refraction.\"/\"the direction of the ray moves closer to the perpendicular when it slows down\"/\"the direction of the ray moves away from the perpendicular when it speeds up\"/\"The exact mathematical relationship is the law of refraction, or “Snell’s Law,” which is stated in equation form as\" 확인. 교차검증 — 굴절 정의(방향 바뀜)와 법선 쪽/바깥쪽 이동, 스넬 법칙 서술이 물리 교재(16.2)와 일치(식은 수식 중복 추출이라 인용하지 않음). 대학 교재이나 정의·원리 서술만 인용해 고등 수준에 적합" }
       ]
     },
     {
@@ -564,7 +564,7 @@
       "key_points": [
         "소리는 음원에서 바깥으로 전달되는 물질의 교란이며 파동이다",
         "공기와 대부분의 유체에서 소리파는 종파다",
-        "매질이 단단할수록 소리가 빠르고 밀도가 클수록 느리다"
+        "매질의 강성(단단함)과 밀도의 조합이 소리의 속력을 정한다"
       ],
       "example": "기타 줄이 진동하면 줄 앞의 공기는 압축되고 뒤의 공기는 팽창하며, 이 압력 교란이 줄과 같은 진동수의 종파로 공기 속을 이동한다",
       "related": [
@@ -592,7 +592,7 @@
         { "id": "science_028", "relation": "몰과 화학 결합을 함께 보면 좋은 화학 개념이다" }
       ],
       "sources": [
-        { "name": "3.1 Formula Mass and the Mole Concept", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/3-1-formula-mass-and-the-mole-concept", "tier": "1차", "note": "직접열람 — \"The mole is an amount unit similar to familiar units like pair, dozen, gross, etc.\"/\"It provides a specific measure of the number of atoms or molecules in a sample of matter.\"/\"A mole of substance is that amount in which there are 6.02214076 ××× 1023 discrete entities (atoms or molecules).\"/\"This large number is a fundamental constant known as Avogadro’s number (NA) or the Avogadro constant in honor of Italian scientist Amedeo Avogadro.\"/\"Consistent with its definition as an amount unit, 1 mole of any element contains the same number of atoms as 1 mole of any other element.\"/\"The masses of 1 mole of different elements, however, are different, since the masses of the individual atoms are drastically different.\"/\"Each sample contains 6.022 ××× 1023 atoms —1.00 mol of atoms. From left to right (top row): 65.4 g zinc, 12.0 g carbon, 24.3 g magnesium, and 63.5 g copper.\" 확인. 원문 추출 텍스트는 곱셈 기호를 \"×××\", 거듭제곱을 \"1023\"(=10²³)으로 표기하므로 추출된 표기 그대로 인용. 일반화학 대학 교재이나 인용 범위가 몰의 정의·상수 서술로 고등 수준에 적합. 아보가드로 수 값은 NIST 값과 교차검증(일치: 6.02214076 vs 6.022 140 76)" },
+        { "name": "3.1 Formula Mass and the Mole Concept", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/3-1-formula-mass-and-the-mole-concept", "tier": "1차", "note": "직접열람 — \"The mole is an amount unit similar to familiar units like pair, dozen, gross, etc.\"/\"It provides a specific measure of the number of atoms or molecules in a sample of matter.\"/\"A mole of substance is that amount in which there are 6.02214076 ××× 1023 discrete entities (atoms or molecules).\"/\"This large number is a fundamental constant known as Avogadro’s number (NA) or the Avogadro constant in honor of Italian scientist Amedeo Avogadro.\"/\"Consistent with its definition as an amount unit, 1 mole of any element contains the same number of atoms as 1 mole of any other element.\"/\"The masses of 1 mole of different elements, however, are different, since the masses of the individual atoms are drastically different.\"/\"Each sample contains 6.022 ××× 1023 atoms —1.00 mol of atoms. From left to right (top row): 65.4 g zinc, 12.0 g carbon, 24.3 g magnesium, and 63.5 g copper.\" 확인. 원문 추출 텍스트는 곱셈 기호를 \"×××\", 거듭제곱을 \"1023\"(=10²³)으로 표기하므로 추출된 표기 그대로 인용. 일반화학 대학 교재이나 인용 범위가 몰의 정의·상수 서술로 고등 수준에 적합. 아보가드로 수 값은 NIST 값과 교차검증(일치: 6.02214076 vs 6.022 140 76) 작업172 — 저장해 둔 3.1 페이지 텍스트에서 그림 캡션 \"Figure 3.5 Each sample contains 6.022 ××× 1023 atoms —1.00 mol of atoms.\" 확인(example의 그림 3.5 근거)" },
         { "name": "Avogadro constant (Fundamental Physical Constants)", "publisher": "NIST(미국 국립표준기술연구소) The NIST Reference on Constants, Units and Uncertainty, 2022 CODATA", "url": "https://physics.nist.gov/cgi-bin/cuu/Value?na", "tier": "1차", "note": "직접열람 — \"Avogadro constant\"/\"Numerical value 6.022 140 76 x 1023 mol-1\"/\"Standard uncertainty (exact)\" 확인. 추출 텍스트의 \"1023\"은 10²³을 뜻하는 표기(상첨자 소실). OpenStax 6.02214076×10²³과 숫자열이 일치해 이 값을 채택" }
       ]
     },
@@ -630,7 +630,7 @@
         "백신은 병원체 유래 항원으로 약한 일차 면역 반응을 일으킨다",
         "백신의 목표는 감염을 겪지 않고 면역 기억을 만드는 것이다"
       ],
-      "example": "일부 백신 접종에는 추가 접종이 포함되는데, 재감염마다 기억 세포가 늘고 저항성이 커지므로 반복 노출을 흉내 내기 위해서다",
+      "example": "일부 백신 접종에는 추가 접종이 포함되는데, 교재는 재감염마다 기억 세포가 늘고 저항성이 커지지만 일부 기억 세포는 죽기 때문에 반복 노출을 흉내 내려는 것이라고 설명한다",
       "related": [
         { "id": "science_030", "relation": "면역과 백신, 항상성을 함께 보면 좋은 생물 개념이다" }
       ],
@@ -651,7 +651,7 @@
         "음성 되먹임은 설정값에서 벗어난 편차를 되돌리는 기전이다",
         "양성 되먹임은 몸의 생리 상태 변화를 되돌리지 않고 강화한다"
       ],
-      "example": "몸이 너무 따뜻해지면 동물을 식히는 조정이 일어나 편차가 설정값 쪽으로 되돌려진다(교재의 이 서술을 음성 되먹임 정의에 대입)",
+      "example": "몸이 너무 따뜻해지면 동물을 식히는 조정이 일어나 편차가 설정값 쪽으로 되돌려지며, 이것이 음성 되먹임의 작동이다",
       "related": [
         { "id": "science_029", "relation": "면역과 백신, 항상성을 함께 보면 좋은 생물 개념이다" }
       ],
@@ -677,7 +677,7 @@
         { "id": "science_016", "relation": "지진과 지진파, 판구조론을 함께 보면 좋은 지구과학 개념이다" }
       ],
       "sources": [
-        { "name": "지진파", "publisher": "한국지질자원연구원(KIGAM) 지진연구센터", "url": "https://www.kigam.re.kr/menu.es?mid=a40302010000", "tier": "1차", "note": "직접열람 — \"단층의 갑작스런 움직임은 두 가지 서로 다른 형태의 실체파(Body wave)인 P파(Primary waves)와 S파(Secondary waves)를 발생시킨다.\"/\"지진파 중 표면파(Surface wave)는 지구의 표면과 내부의 층에서 P파와 S파의 상호작용에 의해 발생한다.\"/\"P파는 가장 빠르게 전파한다. 공기 중에서 소리가 전파하듯이 P파는 수축과 확장의 연속으로 전달된다.\"/\"공기 중에서 소리가 전파하듯이 P파는 수축과 확장의 연속으로 전달된다.\"/\"S파가 전달될 때 암석내의 입자들은 파의 진행방향에 대해 수직으로 움직인다.\" 확인. 국내 공공 연구기관 자료. KIGAM은 P파·S파 속도를 km/s로 제시하고 USGS는 S파가 P파의 약 60% 속도라고 서술해 표현이 달라, 속도 수치는 본문에 쓰지 않음. 원문 표기 \"갑작스런\"을 요약문에서는 갑작스러운으로 옮김" },
+        { "name": "지진파", "publisher": "한국지질자원연구원(KIGAM) 지진연구센터", "url": "https://www.kigam.re.kr/menu.es?mid=a40302010000", "tier": "1차", "note": "직접열람 — \"단층의 갑작스런 움직임은 두 가지 서로 다른 형태의 실체파(Body wave)인 P파(Primary waves)와 S파(Secondary waves)를 발생시킨다.\"/\"지진파 중 표면파(Surface wave)는 지구의 표면과 내부의 층에서 P파와 S파의 상호작용에 의해 발생한다.\"/\"P파는 가장 빠르게 전파한다. 공기 중에서 소리가 전파하듯이 P파는 수축과 확장의 연속으로 전달된다.\"/\"S파가 전달될 때 암석내의 입자들은 파의 진행방향에 대해 수직으로 움직인다.\" 확인. 국내 공공 연구기관 자료. KIGAM은 P파·S파 속도를 km/s로 제시하고 USGS는 S파가 P파의 약 60% 속도라고 서술해 표현이 달라, 속도 수치는 본문에 쓰지 않음. 원문 표기 \"갑작스런\"을 요약문에서는 갑작스러운으로 옮김" },
         { "name": "Body waves inside the earth", "publisher": "USGS Earthquake Hazards Program (1906 San Francisco earthquake 해설 페이지)", "url": "https://earthquake.usgs.gov/earthquakes/events/1906calif/18april/earthwaves.php", "tier": "1차", "note": "직접열람 — \"Two kinds of waves are generated by earthquakes and travel through solid rock: In P or compressional waves, the vibration of the rock is in the direction of propagation.\"/\"P waves travel fastest and are the first to arrive from the earthquake.\"/\"In S or shear waves, rock oscillates perpendicular to the direction of wave propagation.\"/\"the S wave always arrives after the P wave\"/\"For example, sound waves are P waves at a high enough frequency to hear with your ear.\"/\"An example of an S wave is wiggling or shaking a rope which is tied down at one or both ends.\"/\"The slowest (and latest to arrive on seismograms) are surface waves, such as the L wave.\"/\"The surface waves are generally the largest recorded from an earthquake.\" 확인. 교차검증 — P파가 가장 빠르고 먼저 도착한다는 서술과 S파가 P파 뒤에 오며 진행 방향에 수직으로 진동한다는 서술이 KIGAM 자료와 일치. 예시는 이 페이지 문장을 그대로 옮긴 것(원리 대입 아님)" }
       ]
     },
@@ -687,7 +687,7 @@
       "field": "지구과학",
       "level": "고등",
       "one_line": "우주는 팽창해 왔으며 멀리 있는 은하일수록 우리에게서 빨리 멀어진다",
-      "summary": "OpenStax 천문학 교재는 '우주가 팽창하고 있다는 사실'을 천문학에서 이루어진 가장 중요한 발견 중 하나로 소개한다. 허블이 자신의 거리 추정치를 후퇴 속도 측정값과 비교했더니 '은하가 멀수록 우리에게서 더 빠르게 멀어지는' 관계가 나타났다. 교재는 적색편이를 스펙트럼선이 '더 긴 파장 쪽으로 옮겨지는 것'이라 하고, 적색편이는 '파동의 근원이 우리에게서 멀어질 때' 나타난다고 설명한다. 또 우주 팽창은 '은하가 정지한 공간 속을 움직이는 것보다 공간 자체가 늘어나는 것으로 생각하는 편이 더 정확하다'고 설명한다. NASA는 빅뱅 이론이 '하나의 점에서 시작해 급격히 팽창하며 지금의 우주로 서서히 진화했다'는 것이며, '우주가 계속 팽창하면서 온도와 밀도가 낮아졌다'고 설명한다. 원자 형성 때 풀려난 에너지는 오늘날 우주 마이크로파 배경 복사로 관측된다.",
+      "summary": "OpenStax 천문학 교재는 '우주가 팽창하고 있다는 사실'을 천문학에서 이루어진 가장 중요한 발견 중 하나로 소개한다. 허블이 자신의 거리 추정치를 후퇴 속도 측정값과 비교했더니 '은하가 멀수록 우리에게서 더 빠르게 멀어지는' 관계가 나타났다. 교재는 적색편이를 스펙트럼선이 '더 긴 파장 쪽으로 옮겨지는 것'이라 하고, 적색편이는 '파동의 근원이 우리에게서 멀어질 때' 나타난다고 설명한다. 또 우주 팽창은 '은하가 정지한 공간 속을 움직이는 것보다 공간 자체가 늘어나는 것으로 생각하는 편이 더 정확하다'고 설명한다. NASA는 빅뱅 이론이 '하나의 점에서 시작해 급격히 팽창하며 지금의 우주로 서서히 진화했다'는 것이며, '우주가 계속 팽창하면서 온도와 밀도가 낮아졌다'고 설명한다. 원자가 만들어질 때 풀려난 에너지의 일부는 오늘날 우주 마이크로파 배경 복사로 관측된다.",
       "key_points": [
         "멀리 있는 은하일수록 더 빠르게 우리에게서 멀어진다",
         "적색편이는 스펙트럼선이 더 긴 파장 쪽으로 옮겨지는 것이다",
