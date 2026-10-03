@@ -312,6 +312,14 @@
   <p>개념 데이터 로딩 중…</p>
 </div>
 
+<!-- Access Denied (작업171: 한입 독서·문학 나침반과 같은 형식) -->
+<div id="access-denied" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center">
+  <div style="font-size:48px">🔒</div>
+  <h2 style="font-size:20px;font-weight:700;color:var(--text1)">이용 권한이 없습니다</h2>
+  <p style="font-size:14px;color:var(--text2);line-height:1.6">과학 이용 권한이 없습니다.<br>관리자에게 문의해주세요.</p>
+  <a href="/" style="display:inline-flex;align-items:center;gap:8px;background:var(--primary);color:#fff;padding:14px 24px;border-radius:14px;font-size:15px;font-weight:700;text-decoration:none">METIS 홈으로</a>
+</div>
+
 <!-- View 0: Subject select (작업155) -->
 <div id="view-subjects" class="view">
   <div class="content">
@@ -446,8 +454,29 @@ window.addEventListener('popstate', e => {
   }
 });
 
-// ── Data Load (권한 게이트 없음 - 작업153에서는 아직 추가하지 않음) ──
+// ── Permission Check (작업171) ──
+// digest_reading.html·literature_compass.html의 checkPermission()과 같은 구조:
+// /api/me의 perm_science_reading이 명시적으로 false일 때만 차단하고,
+// 토큰 없음·응답 오류·예외·필드 없음은 모두 통과(fail-open)
+async function checkPermission() {
+  const token = localStorage.getItem('mydict_token');
+  if (!token) return true;
+  try {
+    const r = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) return true;
+    const me = await r.json();
+    return me.perm_science_reading !== false;
+  } catch { return true; }
+}
+
+// ── Data Load (작업171: 권한 게이트 - 차단되면 science_db.json을 요청하지 않음) ──
 async function loadDB() {
+  const allowed = await checkPermission();
+  if (!allowed) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('access-denied').style.display = 'flex';
+    return;
+  }
   try {
     const res = await fetch('science_db.json');
     if (!res.ok) throw new Error('네트워크 오류');
