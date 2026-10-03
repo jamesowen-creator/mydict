@@ -11,7 +11,7 @@
 <style>
   /* 작업180: 음성 학습 - 녹음 → 글로 변환 → 원문 수정 → 저장.
      science_reading.html의 색·글꼴 톤과 권한 확인(checkPermission) 패턴을 따른다.
-     음성은 서버에 저장되지 않으며, 이 화면은 요약·퀴즈·읽어주기를 제공하지 않는다. */
+     음성은 서버에 저장되지 않는다. 작업181: 원문 아래 요약 영역 추가(요약 읽어주기·퀴즈는 없음). */
   :root {
     --primary: #1D9E75;
     --primary-light: #E1F5EE;
@@ -147,6 +147,10 @@
   textarea { min-height: 280px; line-height: 1.7; resize: vertical; }
   input[type=text]:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
   .counter { font-size: 12px; color: var(--text2); text-align: right; margin-top: 4px; }
+  .sum-head { display: flex; align-items: center; justify-content: space-between; margin: 18px 0 6px; }
+  .sum-head .field-label { margin: 0; }
+  .btn.small { min-height: 36px; padding: 0 14px; font-size: 13px; border-radius: 10px; }
+  textarea.summary { min-height: 150px; }
   .meta { font-size: 12px; color: var(--text2); margin-top: 10px; line-height: 1.6; }
 </style>
 </head>
@@ -211,6 +215,14 @@
     <label class="field-label" for="edit-text">원문 (수정할 수 있습니다)</label>
     <textarea id="edit-text" maxlength="20000"></textarea>
     <div id="edit-counter" class="counter">0 / 20000</div>
+    <div class="sum-head">
+      <label class="field-label" for="edit-summary">요약 (수정할 수 있습니다)</label>
+      <button id="sum-make" class="btn small" type="button">요약 만들기</button>
+    </div>
+    <div id="sum-status" class="convert-status" style="display:none;margin-top:8px"><div class="spinner small"></div><span>요약하는 중…</span></div>
+    <textarea id="edit-summary" class="summary" maxlength="5000" placeholder="요약이 여기에 표시됩니다. 직접 쓰거나 고칠 수도 있습니다."></textarea>
+    <div id="sum-counter" class="counter">0 / 5000</div>
+    <div id="sum-msg" class="msg"></div>
     <div id="edit-meta" class="meta"></div>
     <div id="edit-msg" class="msg"></div>
     <div class="btn-row">
@@ -222,7 +234,7 @@
 </div>
 
 <script>
-const TITLE_MAX = 100, TEXT_MAX = 20000, MAX_REC_SEC = 600, MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+const TITLE_MAX = 100, TEXT_MAX = 20000, SUMMARY_MAX = 5000, MAX_REC_SEC = 600, MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'];
 
 const $ = id => document.getElementById(id);
@@ -589,9 +601,19 @@ $('rec-convert').addEventListener('click', convertPending);
 // ── ③ 변환 결과 편집 / ④ 자료 상세 ──
 function updateCounter() {
   $('edit-counter').textContent = Array.from($('edit-text').value).length + ' / ' + TEXT_MAX;
+  $('sum-counter').textContent = Array.from($('edit-summary').value).length + ' / ' + SUMMARY_MAX;
+}
+let editSession = 0;   // 편집 화면을 새로 열 때마다 증가 - 늦게 도착한 요약 응답이 다른 자료에 들어가지 않게 함
+function resetSummaryUi() {
+  editSession++;
+  $('edit-summary').value = '';
+  $('sum-status').style.display = 'none';
+  $('sum-make').disabled = false;
+  setMsg('sum-msg', '');
 }
 function openEditNew(text) {
   editMode = 'new'; editNoteId = null;
+  resetSummaryUi();
   $('edit-title').value = '';
   $('edit-text').value = text;
   $('edit-meta').textContent = text.trim() ? '' : '인식된 글이 없습니다. 직접 입력하거나 다시 녹음해 주세요.';
@@ -611,6 +633,8 @@ async function openDetail(id) {
   try { n = await api('GET', '/api/voice-notes/' + id); }
   catch (e) { setMsg('list-msg', e.message, 'error'); return; }
   editMode = 'detail'; editNoteId = n.id;
+  resetSummaryUi();
+  $('edit-summary').value = n.summary || '';
   $('edit-title').value = n.title || '';
   $('edit-text').value = n.transcript || '';
   $('edit-meta').textContent = '저장 ' + fmtDate(n.created_at) + (n.updated_at && n.updated_at !== n.created_at ? ' · 수정 ' + fmtDate(n.updated_at) : '');
@@ -623,17 +647,51 @@ async function openDetail(id) {
 }
 $('edit-title').addEventListener('input', () => { editDirty = true; });
 $('edit-text').addEventListener('input', () => { editDirty = true; updateCounter(); });
+$('edit-summary').addEventListener('input', () => { editDirty = true; updateCounter(); });
 $('edit-cancel').addEventListener('click', requestBack);
+
+// ── 요약 만들기 (작업181): 원문 → /api/voice-notes/summarize → 요약 textarea ──
+function summaryErrorText(e) {
+  if (e.status === 429) return '오늘 요약할 수 있는 횟수(하루 30건)를 모두 사용했습니다. 내일 다시 이용해 주세요.';
+  if (e.status === 502) return '요약을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  return e.message;
+}
+$('sum-make').addEventListener('click', async () => {
+  setMsg('sum-msg', '');
+  const transcript = $('edit-text').value;
+  if (!transcript.trim()) { setMsg('sum-msg', '원문이 비어 있어 요약할 수 없습니다. 원문을 입력해 주세요.', 'error'); return; }
+  if ($('edit-summary').value.trim() && !confirm('기존 요약을 덮어씁니다. 계속할까요?')) return;
+  const session = editSession;
+  $('sum-make').disabled = true;
+  $('sum-status').style.display = '';
+  let data;
+  try {
+    data = await api('POST', '/api/voice-notes/summarize', { transcript });
+  } catch (e) {
+    if (session !== editSession) return;
+    $('sum-status').style.display = 'none';
+    $('sum-make').disabled = false;
+    setMsg('sum-msg', summaryErrorText(e), 'error');
+    return;
+  }
+  if (session !== editSession) return;
+  $('sum-status').style.display = 'none';
+  $('sum-make').disabled = false;
+  $('edit-summary').value = (data && data.summary) || '';
+  editDirty = true;
+  updateCounter();
+});
 
 $('edit-save').addEventListener('click', async () => {
   const title = $('edit-title').value.trim();
   const transcript = $('edit-text').value;
+  const summary = $('edit-summary').value;
   setMsg('edit-msg', '');
   if (!transcript.trim()) { setMsg('edit-msg', '원문이 비어 있습니다. 내용을 입력해 주세요.', 'error'); return; }
   $('edit-save').disabled = true;
   try {
-    if (editMode === 'new') await api('POST', '/api/voice-notes', { title, transcript, summary: '' });
-    else await api('PATCH', '/api/voice-notes/' + editNoteId, { title, transcript });
+    if (editMode === 'new') await api('POST', '/api/voice-notes', { title, transcript, summary });
+    else await api('PATCH', '/api/voice-notes/' + editNoteId, { title, transcript, summary });
   } catch (e) {
     $('edit-save').disabled = false;
     setMsg('edit-msg', e.message, 'error');
