@@ -103,7 +103,7 @@ router.get('/api/admin/stats', requireAdmin, async (req, res) => {
     function calcCost(rows) {
       let anthropic = 0, openai = 0;
       for (const r of rows) {
-        if (r.event_type === 'search' || r.event_type === 'ai' || r.event_type === 'summary' || r.event_type === 'quiz') {
+        if (r.event_type === 'search' || r.event_type === 'ai' || r.event_type === 'summary' || r.event_type === 'quiz' || r.event_type === 'chat') {
           anthropic += (Number(r.input_tokens) / 1_000_000) * 1.00;
           anthropic += (Number(r.output_tokens) / 1_000_000) * 5.00;
         }

@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="/css/common/appHeader.css">
 <style>
   /* 작업180: 음성 학습 - 녹음 → 글로 변환 → 원문 수정 → 저장. 음성은 서버에 저장되지 않는다.
-     작업181: 원문 아래 요약 영역. 작업182: 요약 읽어주기(브라우저 내장 음성). 작업185: 퀴즈(원문 근거 검증, 점수는 저장하지 않음).
+     작업181: 원문 아래 요약 영역. 작업182: 요약 읽어주기(브라우저 내장 음성). 작업185: 퀴즈(원문 근거 검증, 점수는 저장하지 않음). 작업186: 질문하기(자료 1개 근거, 대화는 저장하지 않음).
      작업184: 겉모양을 science_reading.html과 통일 - 색·글꼴·버튼·카드·안내 스타일은
      그 화면의 값을 그대로 쓰고 새 색·새 글꼴은 도입하지 않는다. 상단은 공통 헤더(appHeader). */
   :root {
@@ -220,6 +220,21 @@
   .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
   .result-actions { display: flex; flex-direction: column; gap: 10px; }
 
+  /* 질문하기(대화) */
+  .chat-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .chat-top .quiz-question-counter { margin: 0; }
+  .chat-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .bubble { max-width: 85%; padding: 12px 14px; border-radius: 16px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .bubble.user { align-self: flex-end; background: var(--primary); color: #fff; }
+  .bubble.bot { align-self: flex-start; background: var(--card); color: var(--text1); border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+  .bubble .b-quote { font-size: 12px; color: var(--text2); margin-top: 8px; line-height: 1.5; }
+  .bubble .b-warn { margin-top: 8px; padding: 8px 12px; border-radius: 10px; font-size: 12px; font-weight: 500; background: var(--bg); color: var(--text1); border: 1px solid var(--border); }
+  .bubble.loading { display: flex; align-items: center; gap: 10px; color: var(--text2); }
+  .chat-input-bar { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0 4px; margin-top: 16px; }
+  .chat-input-bar textarea { min-height: 72px; }
+  .chat-input-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+  .chat-input-row .counter { margin: 0; }
+
   /* 요약 읽어주기 */
   .tts-box { margin-top: 10px; }
   .tts-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -335,12 +350,41 @@
       </div>
       <div id="quiz-msg" class="msg"></div>
     </div>
+    <div id="chat-section" class="quiz-section">
+      <div class="sum-head"><span class="field-label">자료에 질문하기</span></div>
+      <div id="chat-note" class="msg warn" style="display:none"></div>
+      <div id="chat-actions" class="btn-row" style="display:none">
+        <button id="chat-open" class="btn small" type="button">질문하기</button>
+      </div>
+    </div>
     <div id="edit-meta" class="meta"></div>
     <div id="edit-msg" class="msg"></div>
     <div class="btn-row">
       <button id="edit-delete" class="btn danger" type="button" style="display:none">삭제</button>
       <button id="edit-cancel" class="btn secondary" type="button">취소</button>
       <button id="edit-save" class="btn" type="button">저장</button>
+    </div>
+  </div>
+
+  <!-- ⑥ 질문하기(대화) - 대화는 저장하지 않는다 -->
+  <div id="view-chat" class="view">
+    <div class="chat-top">
+      <span id="chat-remaining" class="quiz-question-counter">남은 질문 10 / 10</span>
+      <button id="chat-reset" class="btn small secondary" type="button">새 대화 시작</button>
+    </div>
+    <div class="msg info" style="margin-top:0">이 자료의 내용만 근거로 답합니다. 자료에 없으면 '자료에 없습니다.'라고 답해요.</div>
+    <div id="chat-list" class="chat-list"></div>
+    <div id="chat-msg" class="msg"></div>
+    <div id="chat-exhausted" style="display:none">
+      <div class="msg warn">질문 10개를 모두 사용했습니다. 새 대화를 시작해 주세요.</div>
+      <button id="chat-reset2" class="btn block" type="button" style="margin-top:12px">새 대화 시작</button>
+    </div>
+    <div id="chat-input-bar" class="chat-input-bar">
+      <textarea id="chat-input" maxlength="500" placeholder="이 자료에 대해 궁금한 점을 물어보세요"></textarea>
+      <div class="chat-input-row">
+        <span id="chat-counter" class="counter">0 / 500</span>
+        <button id="chat-send" class="btn small" type="button">보내기</button>
+      </div>
     </div>
   </div>
 
@@ -452,11 +496,12 @@ let editNoteId = null;
 let editDirty = false;
 let pending = null;       // { blob, seconds, mime } - 변환 전/실패 시 메모리에만 유지
 
-const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료', quiz: '퀴즈' };
+const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료', quiz: '퀴즈', chat: '질문하기' };
 function showView(name) {
   stopSpeech();   // 작업182: 화면 이동 시 읽어주기 즉시 정지
+  if (name !== 'chat') chatSession++;   // 작업186: 대화 화면을 떠나면 늦게 오는 답변은 무시
   currentView = name;
-  for (const v of ['list', 'record', 'edit', 'quiz']) $('view-' + v).classList.toggle('active', v === name);
+  for (const v of ['list', 'record', 'edit', 'quiz', 'chat']) $('view-' + v).classList.toggle('active', v === name);
   $('page-title').textContent = TITLES[name];
   $('subbar').style.display = name === 'list' ? 'none' : '';
   window.scrollTo(0, 0);
@@ -506,7 +551,7 @@ function requestBack() {
 }
 window.addEventListener('popstate', () => {
   if (currentView === 'list') return;
-  if (currentView === 'quiz') { showView('edit'); return; }   // 작업185: 퀴즈에서 뒤로가기 → 자료 상세로 복귀
+  if (currentView === 'quiz' || currentView === 'chat') { showView('edit'); return; }   // 작업185·186: 퀴즈·대화에서 뒤로가기 → 자료 상세로 복귀
   if (!leaveConfirmed()) {
     history.pushState({ v: currentView }, '');   // 방금 pop된 항목을 되돌려 현재 화면 유지
     return;
@@ -740,6 +785,7 @@ function updateCounter() {
   $('sum-counter').textContent = Array.from($('edit-summary').value).length + ' / ' + SUMMARY_MAX;
   refreshTtsUi();
   refreshQuizUi();
+  refreshChatUi();
 }
 let editSession = 0;   // 편집 화면을 새로 열 때마다 증가 - 늦게 도착한 요약 응답이 다른 자료에 들어가지 않게 함
 function resetSummaryUi() {
@@ -1140,6 +1186,120 @@ $('quiz-retry').addEventListener('click', () => {
   window.scrollTo(0, 0);
 });
 $('quiz-back').addEventListener('click', () => { history.back(); });
+
+// ── 질문하기 (작업186): 이 자료 하나만 근거로 답한다. 대화는 저장하지 않고 화면을 나가면 사라진다 ──
+const CHAT_MAX_QUESTIONS = 10, CHAT_MAX_CHARS = 500;
+let chatSession = 0;           // 대화 화면에서 나갈 때마다 증가 - 늦게 도착한 답변이 다른 화면에 들어가지 않게 함
+let chatMessages = [];         // { role, content, quotes?, grounded? }
+let chatBusy = false;
+let chatNoteId = null;
+
+function chatUserCount() { return chatMessages.filter(m => m.role === 'user').length; }
+function refreshChatUi() {
+  const note = $('chat-note'), actions = $('chat-actions');
+  if (editMode === 'new') {
+    note.style.display = ''; note.textContent = '저장 후 질문할 수 있습니다.';
+    actions.style.display = 'none';
+    return;
+  }
+  const dirty = normNl($('edit-text').value) !== quizLoadedText;
+  actions.style.display = '';
+  note.style.display = dirty ? '' : 'none';
+  note.textContent = dirty ? '수정 내용을 저장한 뒤 질문할 수 있습니다.' : '';
+  $('chat-open').disabled = dirty;
+}
+function renderChat() {
+  const list = $('chat-list');
+  list.textContent = '';
+  for (const m of chatMessages) {
+    const b = document.createElement('div');
+    if (m.role === 'user') {
+      b.className = 'bubble user'; b.textContent = m.content;
+    } else {
+      b.className = 'bubble bot';
+      const t = document.createElement('div'); t.textContent = m.content; b.appendChild(t);
+      for (const q of (m.quotes || [])) {
+        const d = document.createElement('div'); d.className = 'b-quote'; d.textContent = '근거: 「' + q + '」'; b.appendChild(d);
+      }
+      if (m.grounded === false) {
+        const w = document.createElement('div'); w.className = 'b-warn'; w.textContent = '⚠ 근거를 확인하지 못했습니다. 원문과 대조해 보세요.'; b.appendChild(w);
+      }
+    }
+    list.appendChild(b);
+  }
+  if (chatBusy) {
+    const l = document.createElement('div'); l.className = 'bubble bot loading'; l.id = 'chat-loading';
+    const sp = document.createElement('div'); sp.className = 'spinner small';
+    const tx = document.createElement('span'); tx.textContent = '답변을 만드는 중…';
+    l.appendChild(sp); l.appendChild(tx); list.appendChild(l);
+  }
+  const remaining = CHAT_MAX_QUESTIONS - chatUserCount();
+  $('chat-remaining').textContent = '남은 질문 ' + remaining + ' / ' + CHAT_MAX_QUESTIONS;
+  const exhausted = remaining <= 0;
+  $('chat-exhausted').style.display = exhausted ? '' : 'none';
+  $('chat-input-bar').style.display = exhausted ? 'none' : '';
+  $('chat-input').disabled = chatBusy;
+  $('chat-send').disabled = chatBusy;
+  $('chat-reset').disabled = chatBusy;
+  $('chat-reset2').disabled = chatBusy;
+  $('chat-counter').textContent = Array.from($('chat-input').value).length + ' / ' + CHAT_MAX_CHARS;
+  window.scrollTo(0, document.documentElement.scrollHeight);
+}
+function chatErrorText(e) {
+  if (e.status === 429) return '오늘 질문할 수 있는 횟수(하루 60건)를 모두 사용했습니다. 내일 다시 이용해 주세요.';
+  if (e.status === 400) return e.message || '질문을 보낼 수 없습니다. 내용을 줄여 다시 시도해 주세요.';
+  if (e.status === 502) return '답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  return e.message;
+}
+$('chat-open').addEventListener('click', () => {
+  if (editMode !== 'detail' || normNl($('edit-text').value) !== quizLoadedText) return;
+  chatMessages = []; chatBusy = false; chatNoteId = editNoteId;
+  $('chat-input').value = '';
+  setMsg('chat-msg', '');
+  go('chat');                                   // history에 쌓아 뒤로가기로 상세 복귀 (showView가 읽어주기를 정지)
+  renderChat();
+});
+$('chat-input').addEventListener('input', () => {
+  $('chat-counter').textContent = Array.from($('chat-input').value).length + ' / ' + CHAT_MAX_CHARS;
+});
+$('chat-send').addEventListener('click', async () => {
+  if (chatBusy || chatUserCount() >= CHAT_MAX_QUESTIONS) return;
+  const text = $('chat-input').value.trim();
+  if (!text) return;
+  if (Array.from(text).length > CHAT_MAX_CHARS) { setMsg('chat-msg', '질문은 ' + CHAT_MAX_CHARS + '자 이하로 써 주세요.', 'error'); return; }
+  setMsg('chat-msg', '');
+  const session = chatSession;
+  chatMessages.push({ role: 'user', content: text });
+  chatBusy = true;
+  $('chat-input').value = '';
+  renderChat();
+  let data;
+  try {
+    data = await api('POST', '/api/voice-notes/' + chatNoteId + '/chat', { messages: chatMessages.map(m => ({ role: m.role, content: m.content })) });
+  } catch (e) {
+    if (session !== chatSession) return;
+    chatMessages.pop();                          // 실패한 질문은 대화에 남기지 않고 입력창으로 되돌린다
+    chatBusy = false;
+    $('chat-input').value = text;
+    setMsg('chat-msg', chatErrorText(e), 'error');
+    renderChat();
+    return;
+  }
+  if (session !== chatSession) return;
+  chatMessages.push({ role: 'assistant', content: data.answer, quotes: Array.isArray(data.quotes) ? data.quotes : [], grounded: data.grounded !== false });
+  chatBusy = false;
+  renderChat();
+});
+function resetChat() {
+  if (chatBusy) return;
+  if (chatMessages.length && !confirm('대화를 비우고 새로 시작할까요? 지금까지의 대화는 사라집니다.')) return;
+  chatMessages = [];
+  $('chat-input').value = '';
+  setMsg('chat-msg', '');
+  renderChat();
+}
+$('chat-reset').addEventListener('click', resetChat);
+$('chat-reset2').addEventListener('click', resetChat);
 
 $('edit-save').addEventListener('click', async () => {
   const title = $('edit-title').value.trim();
