@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>음성 학습 - METIS</title>
+<link rel="icon" type="image/png" href="/icons/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* 작업180: 음성 학습 - 녹음 → 글로 변환 → 원문 수정 → 저장.
+     science_reading.html의 색·글꼴 톤과 권한 확인(checkPermission) 패턴을 따른다.
+     음성은 서버에 저장되지 않으며, 이 화면은 요약·퀴즈·읽어주기를 제공하지 않는다. */
+  :root {
+    --primary: #1D9E75;
+    --primary-light: #E1F5EE;
+    --primary-dark: #085041;
+    --bg: #FAFAF9;
+    --card: #FFFFFF;
+    --text1: #1a1a1a;
+    --text2: #6b7280;
+    --border: rgba(0,0,0,0.08);
+    --error: #E24B4A;
+    --error-light: #FCEBEB;
+    --warn-bg: #FFF7E0;
+    --warn-text: #7a5b00;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Noto Sans KR', 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text1);
+    min-height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  #loading {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: var(--bg); z-index: 999; gap: 16px;
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--primary-light);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .spinner.small { width: 20px; height: 20px; border-width: 2px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { color: var(--text2); font-size: 14px; }
+
+  /* 상단 고정: 헤더 + 외부 전송 안내 */
+  .top {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .top-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px;
+  }
+  .top-bar a, .top-bar button.back {
+    width: 36px; height: 36px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: transparent; border-radius: 10px;
+    font-size: 20px; color: var(--text1); text-decoration: none; cursor: pointer;
+  }
+  .top-bar h1 { font-size: 17px; font-weight: 700; flex: 1; min-width: 0; }
+  .privacy-note {
+    background: var(--primary-light); color: var(--primary-dark);
+    font-size: 12px; line-height: 1.5; padding: 8px 14px;
+  }
+
+  .view { display: none; padding: 16px 16px 40px; }
+  .view.active { display: block; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 48px; padding: 0 20px;
+    border: none; border-radius: 14px;
+    font-family: inherit; font-size: 15px; font-weight: 700;
+    cursor: pointer; background: var(--primary); color: #fff;
+  }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn.secondary { background: var(--card); color: var(--text1); border: 1px solid var(--border); }
+  .btn.danger { background: var(--error-light); color: var(--error); }
+  .btn.block { display: flex; width: 100%; }
+  .btn-row { display: flex; gap: 8px; margin-top: 12px; }
+  .btn-row .btn { flex: 1; }
+
+  .msg { font-size: 13px; line-height: 1.6; padding: 10px 12px; border-radius: 10px; margin-top: 12px; }
+  .msg.error { background: var(--error-light); color: var(--error); }
+  .msg.warn { background: var(--warn-bg); color: var(--warn-text); }
+  .msg.info { background: var(--primary-light); color: var(--primary-dark); }
+  .msg:empty { display: none; }
+
+  /* 목록 */
+  .list-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .list-head h2 { font-size: 15px; font-weight: 700; }
+  .note-item {
+    display: block; width: 100%; text-align: left;
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 14px; margin-bottom: 8px; cursor: pointer; font-family: inherit; color: inherit;
+  }
+  .note-title { font-size: 15px; font-weight: 600; word-break: break-all; }
+  .note-title.empty { color: var(--text2); font-weight: 400; }
+  .note-sum { font-size: 13px; color: var(--text2); margin-top: 4px; line-height: 1.5; word-break: break-all; }
+  .note-date { font-size: 12px; color: var(--text2); margin-top: 6px; }
+  .empty-state { text-align: center; color: var(--text2); font-size: 14px; line-height: 1.7; padding: 40px 0; }
+
+  /* 녹음 */
+  .rec-box {
+    background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+    padding: 28px 16px; text-align: center;
+  }
+  .rec-time { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+  .rec-sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .rec-dot {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--error); margin-right: 6px; vertical-align: middle;
+    animation: blink 1s ease-in-out infinite;
+  }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  .rec-btn {
+    width: 84px; height: 84px; border-radius: 50%; border: none; margin-top: 20px;
+    background: var(--error); color: #fff; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer;
+  }
+  .rec-btn.stop { background: var(--text1); }
+  .rec-btn:disabled { opacity: 0.5; }
+  .convert-status { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14px; color: var(--text2); margin-top: 16px; }
+
+  /* 편집 */
+  .field-label { display: block; font-size: 13px; font-weight: 600; color: var(--text2); margin: 14px 0 6px; }
+  .field-label:first-child { margin-top: 0; }
+  input[type=text], textarea {
+    width: 100%; font-family: inherit; font-size: 16px; color: var(--text1);
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px;
+  }
+  textarea { min-height: 280px; line-height: 1.7; resize: vertical; }
+  input[type=text]:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+  .counter { font-size: 12px; color: var(--text2); text-align: right; margin-top: 4px; }
+  .meta { font-size: 12px; color: var(--text2); margin-top: 10px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>불러오는 중…</p>
+</div>
+
+<!-- Access Denied (작업180: 한입 독서·과학과 같은 형식) -->
+<div id="access-denied" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center">
+  <div style="font-size:48px">🔒</div>
+  <h2 style="font-size:20px;font-weight:700;color:var(--text1)">이용 권한이 없습니다</h2>
+  <p style="font-size:14px;color:var(--text2);line-height:1.6">음성 학습 이용 권한이 없습니다.<br>관리자에게 문의해주세요.</p>
+  <a href="/" style="display:inline-flex;align-items:center;gap:8px;background:var(--primary);color:#fff;padding:14px 24px;border-radius:14px;font-size:15px;font-weight:700;text-decoration:none">METIS 홈으로</a>
+</div>
+
+<div id="app" style="display:none">
+  <div class="top">
+    <div class="top-bar">
+      <a id="home-link" href="/" aria-label="홈으로">←</a>
+      <button id="back-btn" class="back" type="button" aria-label="목록으로" style="display:none">←</button>
+      <h1 id="page-title">음성 학습</h1>
+    </div>
+    <div class="privacy-note">녹음은 글로 바꾸기 위해 외부 서비스(OpenAI)로 전송되며 서버에는 저장되지 않습니다.</div>
+  </div>
+
+  <!-- ① 자료 목록 -->
+  <div id="view-list" class="view active">
+    <button id="new-rec-btn" class="btn block" type="button">🎙 새로 녹음</button>
+    <div class="list-head" style="margin-top:20px">
+      <h2>내 자료</h2>
+      <span id="list-count" style="font-size:12px;color:var(--text2)"></span>
+    </div>
+    <div id="list-msg" class="msg"></div>
+    <div id="note-list"></div>
+  </div>
+
+  <!-- ② 녹음 -->
+  <div id="view-record" class="view">
+    <div class="rec-box">
+      <div id="rec-time" class="rec-time">00:00</div>
+      <div id="rec-sub" class="rec-sub">최대 10분까지 녹음할 수 있습니다</div>
+      <button id="rec-toggle" class="rec-btn" type="button">시작</button>
+    </div>
+    <div id="rec-hint" class="msg warn" style="display:none">화면을 켜 둔 채 녹음하세요. 화면이 꺼지거나 다른 앱으로 이동하면 녹음이 중단될 수 있습니다.</div>
+    <div id="rec-msg" class="msg"></div>
+    <div id="rec-done" style="display:none">
+      <div class="btn-row">
+        <button id="rec-redo" class="btn secondary" type="button">다시 녹음</button>
+        <button id="rec-convert" class="btn" type="button">글로 변환</button>
+      </div>
+      <div id="convert-status" class="convert-status" style="display:none"><div class="spinner small"></div><span>글로 바꾸는 중… (최대 몇십 초 걸릴 수 있습니다)</span></div>
+    </div>
+  </div>
+
+  <!-- ③ 변환 결과 편집 / ④ 자료 상세 (같은 편집 폼을 공유) -->
+  <div id="view-edit" class="view">
+    <label class="field-label" for="edit-title">제목</label>
+    <input id="edit-title" type="text" maxlength="100" placeholder="제목 (선택)">
+    <label class="field-label" for="edit-text">원문 (수정할 수 있습니다)</label>
+    <textarea id="edit-text" maxlength="20000"></textarea>
+    <div id="edit-counter" class="counter">0 / 20000</div>
+    <div id="edit-meta" class="meta"></div>
+    <div id="edit-msg" class="msg"></div>
+    <div class="btn-row">
+      <button id="edit-delete" class="btn danger" type="button" style="display:none">삭제</button>
+      <button id="edit-cancel" class="btn secondary" type="button">취소</button>
+      <button id="edit-save" class="btn" type="button">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const TITLE_MAX = 100, TEXT_MAX = 20000, MAX_REC_SEC = 600, MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'];
+
+const $ = id => document.getElementById(id);
+let currentView = 'list';
+
+// ── Auth ──
+function getToken() {
+  try { return localStorage.getItem('mydict_token'); } catch (e) { return null; }
+}
+function authHeaders(extra) {
+  return Object.assign({ 'Authorization': 'Bearer ' + getToken() }, extra || {});
+}
+
+// ── Permission Check (science_reading.html과 같은 구조) ──
+// /api/me의 perm_voice_study가 명시적으로 false일 때만 차단하고,
+// 토큰 없음·응답 오류·예외·필드 없음은 모두 통과(fail-open)
+async function checkPermission() {
+  let token = null;
+  try { token = localStorage.getItem('mydict_token'); } catch (e) { return true; }
+  if (!token) return true;
+  try {
+    const r = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) return true;
+    const me = await r.json();
+    return me.perm_voice_study !== false;
+  } catch { return true; }
+}
+
+// ── API helper: 오류 문구를 상태코드별로 만든다 ──
+function apiErrorText(status, serverMsg) {
+  if (status === 401) return '로그인이 필요합니다. 홈에서 로그인한 뒤 다시 열어 주세요.';
+  if (status === 403) return '음성 학습 이용 권한이 없습니다.';
+  if (status === 404) return '자료를 찾을 수 없습니다. 이미 삭제되었을 수 있습니다.';
+  if (status === 429) return '오늘 변환할 수 있는 횟수(하루 20건)를 모두 사용했습니다. 내일 다시 이용해 주세요.';
+  if (status === 413) return '녹음 파일이 너무 큽니다(12MB 이하). 더 짧게 나눠 녹음해 주세요.';
+  if (status === 415) return '이 기기의 녹음 형식은 지원되지 않습니다. 다른 브라우저로 시도해 주세요.';
+  if (status === 502) return '음성 변환 서비스에 문제가 있었습니다. 잠시 후 다시 시도해 주세요.';
+  if (status === 503) return '지금은 이 기능을 사용할 수 없습니다.';
+  if (status === 400 && serverMsg) return serverMsg;
+  return '문제가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+}
+async function api(method, url, body) {
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: authHeaders(body !== undefined ? { 'Content-Type': 'application/json' } : null),
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    const err = new Error('네트워크 연결을 확인해 주세요.'); err.status = 0; throw err;
+  }
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* 본문 없음 */ }
+  if (!res.ok) {
+    const err = new Error(apiErrorText(res.status, data && data.error)); err.status = res.status; throw err;
+  }
+  return data;
+}
+
+function setMsg(id, text, kind) {
+  const el = $(id);
+  el.textContent = text || '';
+  el.className = 'msg' + (kind ? ' ' + kind : '');
+}
+
+function fmtTime(sec) {
+  sec = Math.max(0, Math.floor(sec));
+  return String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
+}
+function fmtDate(v) {
+  const d = new Date(v);
+  if (isNaN(d)) return '';
+  return d.toLocaleString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// ── 화면 전환 (작업180: 목록 외 화면은 history에 쌓아 뒤로가기로 목록 복귀) ──
+let editMode = null;      // 'new' | 'detail'
+let editNoteId = null;
+let editDirty = false;
+let pending = null;       // { blob, seconds, mime } - 변환 전/실패 시 메모리에만 유지
+
+const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료' };
+function showView(name) {
+  currentView = name;
+  for (const v of ['list', 'record', 'edit']) $('view-' + v).classList.toggle('active', v === name);
+  $('page-title').textContent = TITLES[name];
+  $('home-link').style.display = name === 'list' ? '' : 'none';
+  $('back-btn').style.display = name === 'list' ? 'none' : '';
+  window.scrollTo(0, 0);
+}
+function go(name) {
+  history.pushState({ v: name }, '');
+  showView(name);
+}
+function leaveConfirmed() {
+  if (currentView === 'record' && (recState === 'recording')) {
+    return confirm('녹음 중입니다. 나가면 녹음이 사라집니다. 나갈까요?');
+  }
+  if (currentView === 'record' && pending) {
+    return confirm('아직 글로 변환하지 않은 녹음이 있습니다. 나가면 사라집니다. 나갈까요?');
+  }
+  if (currentView === 'edit' && editDirty) {
+    return confirm('저장하지 않은 내용이 있습니다. 나갈까요?');
+  }
+  return true;
+}
+function resetRecording() {
+  discardRecorder();
+  pending = null;
+  recState = 'idle';
+  $('rec-time').textContent = '00:00';
+  $('rec-sub').textContent = '최대 10분까지 녹음할 수 있습니다';
+  $('rec-toggle').textContent = '시작';
+  $('rec-toggle').className = 'rec-btn';
+  $('rec-toggle').disabled = false;
+  $('rec-done').style.display = 'none';
+  $('convert-status').style.display = 'none';
+  $('rec-convert').textContent = '글로 변환';
+  $('rec-convert').disabled = false;
+  $('rec-redo').disabled = false;
+  setMsg('rec-msg', '');
+}
+function toList() {
+  resetRecording();
+  editDirty = false;
+  showView('list');
+  loadList();
+}
+// 뒤로가기(앱 내 버튼 포함): 확인이 필요하면 묻고, 거절하면 현재 화면을 유지
+function requestBack() {
+  if (currentView === 'list') return;
+  history.back();
+}
+window.addEventListener('popstate', () => {
+  if (currentView === 'list') return;
+  if (!leaveConfirmed()) {
+    history.pushState({ v: currentView }, '');   // 방금 pop된 항목을 되돌려 현재 화면 유지
+    return;
+  }
+  toList();
+});
+$('back-btn').addEventListener('click', requestBack);
+
+// ── ① 목록 ──
+async function loadList() {
+  setMsg('list-msg', '');
+  $('note-list').textContent = '';
+  $('list-count').textContent = '';
+  let rows;
+  try { rows = await api('GET', '/api/voice-notes'); }
+  catch (e) { setMsg('list-msg', e.message, 'error'); return; }
+  $('list-count').textContent = rows.length + '건';
+  if (!rows.length) {
+    const d = document.createElement('div');
+    d.className = 'empty-state';
+    d.innerHTML = '아직 저장한 자료가 없습니다.<br>"새로 녹음"으로 시작해 보세요.';
+    $('note-list').appendChild(d);
+    return;
+  }
+  for (const r of rows) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'note-item';
+    const t = document.createElement('div');
+    t.className = 'note-title' + (r.title ? '' : ' empty');
+    t.textContent = r.title || '(제목 없음)';
+    b.appendChild(t);
+    if (r.summary) {
+      const s = document.createElement('div'); s.className = 'note-sum'; s.textContent = r.summary; b.appendChild(s);
+    }
+    const d = document.createElement('div'); d.className = 'note-date'; d.textContent = fmtDate(r.created_at); b.appendChild(d);
+    b.addEventListener('click', () => openDetail(r.id));
+    $('note-list').appendChild(b);
+  }
+}
+
+// ── ② 녹음 ──
+let recState = 'idle';          // idle | recording | stopped
+let recorder = null, stream = null, chunks = [], recStart = 0, recTimer = null, wakeLock = null, recMime = '';
+let interrupted = false;
+
+function pickMime() {
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+  for (const m of MIME_CANDIDATES) { if (MediaRecorder.isTypeSupported(m)) return m; }
+  return '';
+}
+function discardRecorder() {
+  clearInterval(recTimer); recTimer = null;
+  if (recorder) { recorder.ondataavailable = null; recorder.onstop = null; recorder.onerror = null; try { if (recorder.state !== 'inactive') recorder.stop(); } catch (e) {} }
+  recorder = null;
+  releaseStream();
+  releaseWakeLock();
+  chunks = [];
+  interrupted = false;
+}
+function releaseStream() {
+  if (stream) { stream.getTracks().forEach(t => { t.onended = null; try { t.stop(); } catch (e) {} }); }
+  stream = null;
+}
+async function acquireWakeLock() {
+  if (!navigator.wakeLock || !navigator.wakeLock.request) return false;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+    return true;
+  } catch (e) { wakeLock = null; return false; }
+}
+function releaseWakeLock() {
+  if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && recState === 'recording') {
+    if (!wakeLock) acquireWakeLock();
+    // 화면 이탈 중 마이크가 끊겼다면 그때까지의 분량으로 마무리
+    const live = stream && stream.getAudioTracks().some(t => t.readyState === 'live');
+    if (!live) finishRecording(true);
+  }
+});
+
+async function startRecording() {
+  setMsg('rec-msg', '');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+    setMsg('rec-msg', '이 브라우저는 녹음을 지원하지 않습니다. 최신 Safari 또는 Chrome에서 열어 주세요.', 'error');
+    return;
+  }
+  $('rec-toggle').disabled = true;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    $('rec-toggle').disabled = false;
+    const n = e && e.name;
+    if (n === 'NotAllowedError' || n === 'SecurityError') {
+      setMsg('rec-msg', '마이크 사용이 허용되지 않았습니다. 브라우저(또는 기기) 설정에서 이 사이트의 마이크를 허용한 뒤 다시 시도해 주세요.', 'error');
+    } else if (n === 'NotFoundError' || n === 'OverconstrainedError') {
+      setMsg('rec-msg', '사용할 수 있는 마이크를 찾지 못했습니다. 마이크가 연결되어 있는지 확인해 주세요.', 'error');
+    } else if (n === 'NotReadableError') {
+      setMsg('rec-msg', '마이크를 사용할 수 없습니다. 다른 앱이 마이크를 쓰고 있지 않은지 확인해 주세요.', 'error');
+    } else {
+      setMsg('rec-msg', '마이크를 켜지 못했습니다. 잠시 후 다시 시도해 주세요.', 'error');
+    }
+    return;
+  }
+
+  const mime = pickMime();
+  try {
+    recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+  } catch (e) {
+    releaseStream();
+    $('rec-toggle').disabled = false;
+    setMsg('rec-msg', '이 기기에서는 녹음을 시작할 수 없습니다.', 'error');
+    return;
+  }
+  recMime = recorder.mimeType || mime || '';
+  chunks = [];
+  interrupted = false;
+  recorder.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+  recorder.onstop = () => onRecorderStopped();
+  recorder.onerror = () => finishRecording(true);
+  // 트랙이 외부 요인(통화·권한 회수 등)으로 끝나면 그때까지 분량을 유지
+  stream.getAudioTracks().forEach(t => { t.onended = () => finishRecording(true); });
+
+  const wl = await acquireWakeLock();
+  $('rec-hint').style.display = wl ? 'none' : '';
+
+  recorder.start(1000);   // 1초마다 조각을 받아 두어 중단돼도 분량이 남게 함
+  recState = 'recording';
+  recStart = Date.now();
+  $('rec-toggle').textContent = '중지';
+  $('rec-toggle').className = 'rec-btn stop';
+  $('rec-toggle').disabled = false;
+  $('rec-sub').innerHTML = '<span class="rec-dot"></span>녹음 중';
+  recTimer = setInterval(tickRecording, 250);
+}
+function tickRecording() {
+  const sec = (Date.now() - recStart) / 1000;
+  $('rec-time').textContent = fmtTime(sec);
+  if (sec >= MAX_REC_SEC) finishRecording(false, true);
+}
+// 사용자 중지/자동 종료/중단 모두 여기로 모인다
+function finishRecording(wasInterrupted, hitLimit) {
+  if (recState !== 'recording') return;
+  interrupted = !!wasInterrupted;
+  clearInterval(recTimer); recTimer = null;
+  recState = 'stopped';
+  $('rec-toggle').disabled = true;
+  if (hitLimit) setMsg('rec-msg', '최대 10분에 도달해 녹음을 자동으로 종료했습니다.', 'info');
+  if (recorder && recorder.state !== 'inactive') {
+    try { recorder.stop(); return; } catch (e) { /* 아래로 진행 */ }
+  }
+  onRecorderStopped();
+}
+function onRecorderStopped() {
+  const seconds = Math.min(MAX_REC_SEC, Math.round((Date.now() - recStart) / 1000));
+  releaseStream();
+  releaseWakeLock();
+  if (!chunks.length) {
+    recState = 'idle';
+    $('rec-toggle').textContent = '시작'; $('rec-toggle').className = 'rec-btn'; $('rec-toggle').disabled = false;
+    $('rec-sub').textContent = '최대 10분까지 녹음할 수 있습니다';
+    setMsg('rec-msg', interrupted ? '녹음이 중단되었고 저장된 분량이 없습니다. 다시 녹음해 주세요.' : '녹음된 소리가 없습니다. 다시 시도해 주세요.', 'error');
+    return;
+  }
+  const type = (chunks[0] && chunks[0].type) || recMime || 'audio/webm';
+  const blob = new Blob(chunks, { type });
+  chunks = [];
+  pending = { blob, seconds, mime: type };
+  $('rec-time').textContent = fmtTime(seconds);
+  $('rec-sub').textContent = '녹음 완료 · ' + (blob.size / 1024 / 1024).toFixed(1) + 'MB';
+  $('rec-toggle').textContent = '완료';
+  $('rec-done').style.display = '';
+  $('rec-convert').disabled = false;
+  if (interrupted) {
+    setMsg('rec-msg', '녹음이 중간에 중단되어, 그때까지의 ' + fmtTime(seconds) + ' 분량을 유지했습니다. 이대로 변환하거나 다시 녹음할 수 있습니다.', 'warn');
+  }
+}
+$('rec-toggle').addEventListener('click', () => {
+  if (recState === 'idle') startRecording();
+  else if (recState === 'recording') finishRecording(false);
+});
+$('rec-redo').addEventListener('click', () => {
+  if (pending && !confirm('이 녹음을 버리고 다시 녹음할까요?')) return;
+  resetRecording();
+});
+$('new-rec-btn').addEventListener('click', () => {
+  resetRecording();
+  $('rec-hint').style.display = (navigator.wakeLock && navigator.wakeLock.request) ? 'none' : '';
+  go('record');
+});
+
+// ── 변환 ──
+async function convertPending() {
+  if (!pending) return;
+  setMsg('rec-msg', '');
+  if (pending.blob.size > MAX_UPLOAD_BYTES) { setMsg('rec-msg', apiErrorText(413), 'error'); return; }
+  $('rec-convert').disabled = true; $('rec-redo').disabled = true;
+  $('convert-status').style.display = '';
+  let res;
+  try {
+    res = await fetch('/api/voice-notes/transcribe', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': pending.mime, 'X-Audio-Seconds': String(pending.seconds) }),
+      body: pending.blob,
+    });
+  } catch (e) {
+    return convertFailed('네트워크 연결을 확인한 뒤 다시 시도해 주세요.');
+  }
+  let data = null;
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) return convertFailed(apiErrorText(res.status, data && data.error), res.status);
+  $('convert-status').style.display = 'none';
+  $('rec-redo').disabled = false;
+  openEditNew((data && data.text) || '');
+}
+// 실패해도 녹음(Blob)은 메모리에 남겨 "다시 시도"할 수 있다. 429·415·413은 재시도해도 같으므로 안내만.
+function convertFailed(text, status) {
+  $('convert-status').style.display = 'none';
+  $('rec-redo').disabled = false;
+  $('rec-convert').disabled = false;
+  $('rec-convert').textContent = (status === 429 || status === 415 || status === 413) ? '글로 변환' : '다시 시도';
+  setMsg('rec-msg', text, 'error');
+}
+$('rec-convert').addEventListener('click', convertPending);
+
+// ── ③ 변환 결과 편집 / ④ 자료 상세 ──
+function updateCounter() {
+  $('edit-counter').textContent = Array.from($('edit-text').value).length + ' / ' + TEXT_MAX;
+}
+function openEditNew(text) {
+  editMode = 'new'; editNoteId = null;
+  $('edit-title').value = '';
+  $('edit-text').value = text;
+  $('edit-meta').textContent = text.trim() ? '' : '인식된 글이 없습니다. 직접 입력하거나 다시 녹음해 주세요.';
+  $('edit-delete').style.display = 'none';
+  $('edit-save').textContent = '저장';
+  setMsg('edit-msg', '');
+  updateCounter();
+  editDirty = true;
+  // 녹음 화면은 history에서 교체해, 저장 전 뒤로가기가 목록으로 가도록 한다
+  history.replaceState({ v: 'edit' }, '');
+  pending = null;
+  showView('edit');
+}
+async function openDetail(id) {
+  setMsg('list-msg', '');
+  let n;
+  try { n = await api('GET', '/api/voice-notes/' + id); }
+  catch (e) { setMsg('list-msg', e.message, 'error'); return; }
+  editMode = 'detail'; editNoteId = n.id;
+  $('edit-title').value = n.title || '';
+  $('edit-text').value = n.transcript || '';
+  $('edit-meta').textContent = '저장 ' + fmtDate(n.created_at) + (n.updated_at && n.updated_at !== n.created_at ? ' · 수정 ' + fmtDate(n.updated_at) : '');
+  $('edit-delete').style.display = '';
+  $('edit-save').textContent = '수정 저장';
+  setMsg('edit-msg', '');
+  updateCounter();
+  editDirty = false;
+  go('edit');
+}
+$('edit-title').addEventListener('input', () => { editDirty = true; });
+$('edit-text').addEventListener('input', () => { editDirty = true; updateCounter(); });
+$('edit-cancel').addEventListener('click', requestBack);
+
+$('edit-save').addEventListener('click', async () => {
+  const title = $('edit-title').value.trim();
+  const transcript = $('edit-text').value;
+  setMsg('edit-msg', '');
+  if (!transcript.trim()) { setMsg('edit-msg', '원문이 비어 있습니다. 내용을 입력해 주세요.', 'error'); return; }
+  $('edit-save').disabled = true;
+  try {
+    if (editMode === 'new') await api('POST', '/api/voice-notes', { title, transcript, summary: '' });
+    else await api('PATCH', '/api/voice-notes/' + editNoteId, { title, transcript });
+  } catch (e) {
+    $('edit-save').disabled = false;
+    setMsg('edit-msg', e.message, 'error');
+    return;
+  }
+  $('edit-save').disabled = false;
+  editDirty = false;
+  history.back();   // popstate → 목록
+});
+$('edit-delete').addEventListener('click', async () => {
+  if (!confirm('이 자료를 삭제할까요? 삭제하면 되돌릴 수 없습니다.')) return;
+  $('edit-delete').disabled = true;
+  try { await api('DELETE', '/api/voice-notes/' + editNoteId); }
+  catch (e) {
+    $('edit-delete').disabled = false;
+    setMsg('edit-msg', e.message, 'error');
+    return;
+  }
+  $('edit-delete').disabled = false;
+  editDirty = false;
+  history.back();
+});
+
+// ── Init (작업180: 권한 게이트) ──
+(async function init() {
+  const allowed = await checkPermission();
+  $('loading').style.display = 'none';
+  if (!allowed) { $('access-denied').style.display = 'flex'; return; }
+  $('app').style.display = '';
+  history.replaceState({ v: 'list' }, '');
+  showView('list');
+  loadList();
+})();
+</script>
+</body>
+</html>

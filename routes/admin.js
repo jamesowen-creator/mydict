@@ -99,6 +99,7 @@ router.get('/api/admin/stats', requireAdmin, async (req, res) => {
     // Cost estimation
     // claude-haiku-4-5: $1.00/MTok input, $5.00/MTok output
     // tts-1-hd: $0.030/1000 chars
+    // stt: char_count 칼럼에 오디오 초를 기록. 모델 gpt-4o-mini-transcribe 기준 $0.003/분
     function calcCost(rows) {
       let anthropic = 0, openai = 0;
       for (const r of rows) {
@@ -108,6 +109,9 @@ router.get('/api/admin/stats', requireAdmin, async (req, res) => {
         }
         if (r.event_type === 'tts') {
           openai += (Number(r.char_count) / 1000) * 0.030;
+        }
+        if (r.event_type === 'stt') {
+          openai += (Number(r.char_count) / 60) * 0.003;
         }
       }
       return { anthropic: +anthropic.toFixed(4), openai: +openai.toFixed(4) };

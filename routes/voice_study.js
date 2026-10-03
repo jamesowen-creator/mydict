@@ -1,5 +1,5 @@
 const express = require('express');
-const { pool } = require('../lib/db');
+const { pool, trackUsage } = require('../lib/db');
 const { requireAuth, checkPermission } = require('../middleware/auth');
 
 const router = express.Router();
@@ -146,6 +146,97 @@ router.delete('/api/voice-notes/:id', guard, async (req, res) => {
   } catch (err) {
     console.error('voice-notes delete error:', err.message);
     res.status(500).json(SERVER_ERROR);
+  }
+});
+
+// ─── 작업180: 음성 → 글 변환(STT) ─────────────────────────────────────────────
+// 음성은 메모리(req.body Buffer)에서만 다루고 OpenAI로 보낸 뒤 버린다.
+// 디스크·DB·로그에는 남기지 않는다(로그에는 상태코드만).
+const STT_MAX_BYTES = '12mb';
+const STT_DAILY_LIMIT = 20;
+const STT_TIMEOUT_MS = 150000;
+const STT_MAX_SECONDS = 600;
+const STT_TYPES = {
+  'audio/webm': 'webm',
+  'audio/mp4': 'm4a',
+  'audio/mpeg': 'mp3',
+  'audio/wav': 'wav',
+};
+
+function audioBaseType(req) {
+  return String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+}
+
+function requireAudioType(req, res, next) {
+  if (!STT_TYPES[audioBaseType(req)]) {
+    return res.status(415).json({ error: '지원하지 않는 오디오 형식입니다.' });
+  }
+  next();
+}
+
+// 12MB 초과(PayloadTooLargeError 등)를 JSON 응답으로 바꿔 준다
+function audioBody(req, res, next) {
+  express.raw({ type: 'audio/*', limit: STT_MAX_BYTES })(req, res, err => {
+    if (!err) return next();
+    const status = err.status === 413 ? 413 : 400;
+    res.status(status).json({ error: status === 413 ? '녹음 파일이 너무 큽니다.' : '요청을 읽을 수 없습니다.' });
+  });
+}
+
+router.post('/api/voice-notes/transcribe', guard, requireAudioType, audioBody, async (req, res) => {
+  const audio = req.body;
+  if (!Buffer.isBuffer(audio) || audio.length === 0) {
+    return res.status(400).json({ error: '녹음 데이터가 비어 있습니다.' });
+  }
+
+  // 오늘(Asia/Seoul 0시 이후) 본인의 stt 건수. api_usage.created_at은 TIMESTAMP(DB 세션 시간대 기준)
+  try {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM api_usage
+       WHERE user_id = $1 AND event_type = 'stt'
+         AND created_at >= (date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul')`,
+      [req.user.id]
+    );
+    if (rows[0].n >= STT_DAILY_LIMIT) {
+      return res.status(429).json({ error: `하루 ${STT_DAILY_LIMIT}건까지 변환할 수 있습니다.` });
+    }
+  } catch (err) {
+    console.error('voice-notes stt limit check error:', err.message);
+    return res.status(500).json(SERVER_ERROR);
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(503).json({ error: '음성 변환 기능을 사용할 수 없습니다.' });
+  }
+
+  const model = process.env.VOICE_STT_MODEL || 'gpt-4o-mini-transcribe';
+  const type = audioBaseType(req);
+  const secondsRaw = parseFloat(req.headers['x-audio-seconds']);
+  const seconds = Number.isFinite(secondsRaw) ? Math.min(STT_MAX_SECONDS, Math.max(0, Math.round(secondsRaw))) : 0;
+
+  try {
+    const form = new FormData();
+    form.append('file', new Blob([audio], { type }), 'audio.' + STT_TYPES[type]);
+    form.append('model', model);
+    form.append('language', 'ko');
+    const openaiRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: form,
+      signal: AbortSignal.timeout(STT_TIMEOUT_MS),
+    });
+    if (!openaiRes.ok) {
+      console.error('voice-notes stt upstream status:', openaiRes.status);
+      return res.status(502).json({ error: '음성 변환에 실패했습니다. 잠시 후 다시 시도해주세요.' });
+    }
+    const data = await openaiRes.json();
+    const text = typeof data.text === 'string' ? data.text : '';
+    trackUsage(req.user.id, 'stt', model, 0, 0, seconds);
+    res.json({ text });
+  } catch (err) {
+    // 오류 이름(TimeoutError 등)만 남기고 메시지·본문은 남기지 않는다
+    console.error('voice-notes stt error:', err.name);
+    res.status(502).json({ error: '음성 변환에 실패했습니다. 잠시 후 다시 시도해주세요.' });
   }
 });
 
