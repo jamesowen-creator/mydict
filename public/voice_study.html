@@ -8,10 +8,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- 작업13: 전 화면 공통 상단 헤더(로고+로그인상태) -->
+<link rel="stylesheet" href="/css/common/appHeader.css">
 <style>
-  /* 작업180: 음성 학습 - 녹음 → 글로 변환 → 원문 수정 → 저장.
-     science_reading.html의 색·글꼴 톤과 권한 확인(checkPermission) 패턴을 따른다.
-     음성은 서버에 저장되지 않는다. 작업181: 원문 아래 요약 영역 추가. 작업182: 요약 읽어주기(브라우저 내장 음성, 퀴즈·원문 읽기 없음). */
+  /* 작업180: 음성 학습 - 녹음 → 글로 변환 → 원문 수정 → 저장. 음성은 서버에 저장되지 않는다.
+     작업181: 원문 아래 요약 영역. 작업182: 요약 읽어주기(브라우저 내장 음성).
+     작업184: 겉모양을 science_reading.html과 통일 - 색·글꼴·버튼·카드·안내 스타일은
+     그 화면의 값을 그대로 쓰고 새 색·새 글꼴은 도입하지 않는다. 상단은 공통 헤더(appHeader). */
   :root {
     --primary: #1D9E75;
     --primary-light: #E1F5EE;
@@ -23,8 +26,6 @@
     --border: rgba(0,0,0,0.08);
     --error: #E24B4A;
     --error-light: #FCEBEB;
-    --warn-bg: #FFF7E0;
-    --warn-text: #7a5b00;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -40,6 +41,7 @@
     overflow-x: hidden;
   }
 
+  /* ── Loading ── */
   #loading {
     position: fixed; inset: 0;
     display: flex; flex-direction: column;
@@ -57,71 +59,87 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   #loading p { color: var(--text2); font-size: 14px; }
 
-  /* 상단 고정: 헤더 + 외부 전송 안내 */
-  .top {
-    position: sticky; top: 0; z-index: 50;
+  /* ── 상단 고정 영역: 공통 헤더 바로 아래에 (하위 화면의 top-bar +) 개인정보 안내 ── */
+  .sticky-zone {
+    position: sticky; top: var(--hdr-h, 0px); z-index: 100;
     background: var(--bg);
-    border-bottom: 1px solid var(--border);
   }
   .top-bar {
-    display: flex; align-items: center; gap: 8px;
-    padding: 10px 12px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
   }
-  .top-bar a, .top-bar button.back {
-    width: 36px; height: 36px; flex: none;
-    display: inline-flex; align-items: center; justify-content: center;
-    border: none; background: transparent; border-radius: 10px;
-    font-size: 20px; color: var(--text1); text-decoration: none; cursor: pointer;
+  .back-btn {
+    background: none; border: none; cursor: pointer;
+    padding: 6px; border-radius: 8px;
+    color: var(--text2); display: flex; align-items: center;
+    min-width: 44px; min-height: 44px; justify-content: center;
+    transition: background 0.15s;
   }
-  .top-bar h1 { font-size: 17px; font-weight: 700; flex: 1; min-width: 0; }
-  .privacy-note {
-    background: var(--primary-light); color: var(--primary-dark);
-    font-size: 12px; line-height: 1.5; padding: 8px 14px;
-  }
+  .back-btn:hover { background: var(--primary-light); color: var(--primary); }
+  .back-btn svg { width: 20px; height: 20px; }
+  .bar-title { font-size: 17px; font-weight: 700; color: var(--text1); }
+  .notice-wrap { padding: 10px 16px; border-bottom: 1px solid var(--border); }
 
-  .view { display: none; padding: 16px 16px 40px; }
+  .view { display: none; padding: 20px 16px 40px; }
   .view.active { display: block; }
+  .view-title { font-size: 20px; font-weight: 700; color: var(--text1); margin-bottom: 4px; }
+  .view-sub { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
 
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    min-height: 48px; padding: 0 20px;
-    border: none; border-radius: 14px;
-    font-family: inherit; font-size: 15px; font-weight: 700;
-    cursor: pointer; background: var(--primary); color: #fff;
-  }
-  .btn:disabled { opacity: 0.5; cursor: default; }
-  .btn.secondary { background: var(--card); color: var(--text1); border: 1px solid var(--border); }
-  .btn.danger { background: var(--error-light); color: var(--error); }
-  .btn.block { display: flex; width: 100%; }
-  .btn-row { display: flex; gap: 8px; margin-top: 12px; }
-  .btn-row .btn { flex: 1; }
-
-  .msg { font-size: 13px; line-height: 1.6; padding: 10px 12px; border-radius: 10px; margin-top: 12px; }
+  /* ── 안내/오류 메시지 (science_reading.html의 .ox-feedback 모양) ── */
+  .msg { margin-top: 12px; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 500; line-height: 1.6; }
   .msg.error { background: var(--error-light); color: var(--error); }
-  .msg.warn { background: var(--warn-bg); color: var(--warn-text); }
+  .msg.warn { background: var(--bg); color: var(--text1); border: 1px solid var(--border); }
   .msg.info { background: var(--primary-light); color: var(--primary-dark); }
   .msg:empty { display: none; }
+  .notice { margin: 0; background: var(--primary-light); color: var(--primary-dark); }
+
+  /* ── 버튼 (science_reading.html의 .result-btn / .quiz-next-btn 모양) ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 15px 20px;
+    border: none; border-radius: 14px;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 700;
+    cursor: pointer; background: var(--primary); color: #fff;
+    transition: all 0.15s;
+  }
+  .btn:hover:not(:disabled) { background: var(--primary-dark); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn.secondary { background: var(--card); color: var(--text1); border: 1.5px solid var(--border); }
+  .btn.secondary:hover:not(:disabled) { background: var(--bg); }
+  .btn.danger { background: var(--error-light); color: var(--error); }
+  .btn.danger:hover:not(:disabled) { background: var(--error-light); }
+  .btn.block { display: flex; width: 100%; }
+  .btn.small { padding: 10px 14px; border-radius: 12px; font-size: 13px; }
+  .btn-row { display: flex; gap: 10px; margin-top: 12px; }
+  .btn-row .btn { flex: 1; }
+
+  /* ── 카드 (science_reading.html의 .science-section 모양) ── */
+  .note-item, .rec-box {
+    background: var(--card);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
 
   /* 목록 */
-  .list-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-  .list-head h2 { font-size: 15px; font-weight: 700; }
+  .list-head { display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px; }
+  .list-head h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #3A3A40; }
   .note-item {
     display: block; width: 100%; text-align: left;
-    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-    padding: 14px; margin-bottom: 8px; cursor: pointer; font-family: inherit; color: inherit;
+    padding: 18px 20px; margin-bottom: 12px;
+    cursor: pointer; font-family: inherit; color: inherit;
   }
-  .note-title { font-size: 15px; font-weight: 600; word-break: break-all; }
+  .note-title { font-size: 17px; font-weight: 700; word-break: break-all; }
   .note-title.empty { color: var(--text2); font-weight: 400; }
   .note-sum { font-size: 13px; color: var(--text2); margin-top: 4px; line-height: 1.5; word-break: break-all; }
   .note-date { font-size: 12px; color: var(--text2); margin-top: 6px; }
   .empty-state { text-align: center; color: var(--text2); font-size: 14px; line-height: 1.7; padding: 40px 0; }
 
   /* 녹음 */
-  .rec-box {
-    background: var(--card); border: 1px solid var(--border); border-radius: 18px;
-    padding: 28px 16px; text-align: center;
-  }
-  .rec-time { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+  .rec-box { padding: 20px; text-align: center; }
+  .rec-time { font-size: 42px; font-weight: 700; color: var(--primary); font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; }
   .rec-sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
   .rec-dot {
     display: inline-block; width: 10px; height: 10px; border-radius: 50%;
@@ -131,35 +149,40 @@
   @keyframes blink { 50% { opacity: 0.25; } }
   .rec-btn {
     width: 84px; height: 84px; border-radius: 50%; border: none; margin-top: 20px;
-    background: var(--error); color: #fff; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer;
+    background: var(--error); color: #fff; font-size: 14px; font-weight: 700; font-family: 'Noto Sans KR', sans-serif; cursor: pointer;
   }
   .rec-btn.stop { background: var(--text1); }
   .rec-btn:disabled { opacity: 0.5; }
   .convert-status { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14px; color: var(--text2); margin-top: 16px; }
 
   /* 편집 */
-  .field-label { display: block; font-size: 13px; font-weight: 600; color: var(--text2); margin: 14px 0 6px; }
+  .field-label { display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #3A3A40; margin: 14px 0 8px; }
   .field-label:first-child { margin-top: 0; }
   input[type=text], textarea {
-    width: 100%; font-family: inherit; font-size: 16px; color: var(--text1);
-    background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px;
+    width: 100%; font-family: 'Noto Sans KR', sans-serif; font-size: 16px; color: var(--text1);
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
   }
   textarea { min-height: 280px; line-height: 1.7; resize: vertical; }
+  textarea.summary { min-height: 150px; }
   input[type=text]:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
   .counter { font-size: 12px; color: var(--text2); text-align: right; margin-top: 4px; }
-  .sum-head { display: flex; align-items: center; justify-content: space-between; margin: 18px 0 6px; }
+  .meta { font-size: 12px; color: var(--text2); margin-top: 10px; line-height: 1.6; }
+  .sum-head { display: flex; align-items: center; justify-content: space-between; margin: 20px 0 8px; }
   .sum-head .field-label { margin: 0; }
-  .btn.small { min-height: 36px; padding: 0 14px; font-size: 13px; border-radius: 10px; }
-  textarea.summary { min-height: 150px; }
+
+  /* 요약 읽어주기 */
   .tts-box { margin-top: 10px; }
   .tts-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .tts-row .btn.small { flex: none; }
   .tts-rate { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text2); margin-left: auto; }
-  .tts-rate select { font-family: inherit; font-size: 14px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text1); }
-  .meta { font-size: 12px; color: var(--text2); margin-top: 10px; line-height: 1.6; }
+  .tts-rate select { font-family: 'Noto Sans KR', sans-serif; font-size: 14px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text1); }
 </style>
 </head>
 <body>
+
+<!-- 작업13: 전 화면 공통 상단 헤더 -->
+<script src="/js/common/appHeader.js"></script>
+<script>MetisAppHeader.inject();</script>
 
 <div id="loading">
   <div class="spinner"></div>
@@ -175,19 +198,26 @@
 </div>
 
 <div id="app" style="display:none">
-  <div class="top">
-    <div class="top-bar">
-      <a id="home-link" href="/" aria-label="홈으로">←</a>
-      <button id="back-btn" class="back" type="button" aria-label="목록으로" style="display:none">←</button>
-      <h1 id="page-title">음성 학습</h1>
+  <div class="sticky-zone">
+    <div class="top-bar" id="subbar" style="display:none">
+      <button id="back-btn" class="back-btn" type="button" aria-label="목록으로">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+      <span id="page-title" class="bar-title">음성 학습</span>
     </div>
-    <div class="privacy-note">녹음은 글로 바꾸기 위해 외부 서비스(OpenAI)로 전송되며 서버에는 저장되지 않습니다.</div>
+    <div class="notice-wrap">
+      <div class="msg notice">녹음은 글로 바꾸기 위해 외부 서비스(OpenAI)로 전송되며 서버에는 저장되지 않습니다.</div>
+    </div>
   </div>
 
   <!-- ① 자료 목록 -->
   <div id="view-list" class="view active">
+    <div class="view-title">음성 학습</div>
+    <div class="view-sub">소리 내어 읽은 공부를 글과 요약으로</div>
     <button id="new-rec-btn" class="btn block" type="button">🎙 새로 녹음</button>
-    <div class="list-head" style="margin-top:20px">
+    <div class="list-head">
       <h2>내 자료</h2>
       <span id="list-count" style="font-size:12px;color:var(--text2)"></span>
     </div>
@@ -345,8 +375,7 @@ function showView(name) {
   currentView = name;
   for (const v of ['list', 'record', 'edit']) $('view-' + v).classList.toggle('active', v === name);
   $('page-title').textContent = TITLES[name];
-  $('home-link').style.display = name === 'list' ? '' : 'none';
-  $('back-btn').style.display = name === 'list' ? 'none' : '';
+  $('subbar').style.display = name === 'list' ? 'none' : '';
   window.scrollTo(0, 0);
 }
 function go(name) {
@@ -912,6 +941,18 @@ $('edit-delete').addEventListener('click', async () => {
   editDirty = false;
   history.back();
 });
+
+// 공통 헤더 실제 높이를 --hdr-h로 두어 고정 영역이 헤더 바로 아래에 붙게 한다(science_reading.html과 같은 방식)
+function applyHeaderHeight() {
+  const hdr = document.querySelector('.metis-app-header');
+  document.documentElement.style.setProperty('--hdr-h', (hdr ? hdr.offsetHeight : 0) + 'px');
+}
+window.addEventListener('resize', applyHeaderHeight);
+(function watchHeader() {
+  const hdr = document.querySelector('.metis-app-header');
+  if (hdr && window.ResizeObserver) { try { new ResizeObserver(applyHeaderHeight).observe(hdr); } catch (e) {} }
+  applyHeaderHeight();
+})();
 
 // ── Init (작업180: 권한 게이트) ──
 (async function init() {
