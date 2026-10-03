@@ -370,13 +370,13 @@
         "마찰·공기저항이 없다고 가정한 닫힌계에서는 에너지가 보존된다",
         "물체가 떨어질 때 위치 에너지가 운동 에너지로 바뀐다"
       ],
-      "example": "롤러코스터가 높은 곳에서 내려올 때 위치 에너지가 운동 에너지로 바뀌어 속도가 빨라지고, 다시 올라갈 때는 운동 에너지가 위치 에너지로 바뀌어 속도가 느려진다",
+      "example": "마찰을 무시하면, 롤러코스터가 높은 곳에서 내려올 때 위치 에너지가 운동 에너지로 바뀌어 속도가 빨라지고, 다시 올라갈 때는 운동 에너지가 위치 에너지로 바뀌어 속도가 느려진다",
       "related": [
         { "id": "science_018", "relation": "전류·전압과 함께 보면 좋은 물리 에너지 개념이다" }
       ],
       "sources": [
         { "name": "5.1 Energy Basics", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/5-1-energy-basics", "tier": "1차", "note": "직접열람 — \"energy can be neither created nor destroyed, although it can be changed in form\" 확인" },
-        { "name": "9.2 Mechanical Energy and Conservation of Energy", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/9-2-mechanical-energy-and-conservation-of-energy", "tier": "1차", "note": "직접열람 — \"in a closed system, total energy is conserved—that is, it is constant\"/\"KE₁ + PE₁ = KE₂ + PE₂\"/낙하하는 물체의 위치 에너지가 운동 에너지로 전환됨(\"its energy is converted to kinetic energy\") 확인. 작업163 — \"The phrase in a closed system means we are assuming no energy is lost to the surroundings due to friction and air resistance.\" 확인(닫힌계 조건의 원문 근거) — summary의 '외부에서 힘이 작용하지 않는'을 이 정의에 맞춰 '마찰이나 공기저항으로 에너지를 잃지 않는다고 가정'으로 교정. science_009와의 related는 '보존 원리로 연결된다'는 직접 인용이 없어 작업163에서 제거(둘 다 science_018 related로 대체)" }
+        { "name": "9.2 Mechanical Energy and Conservation of Energy", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/9-2-mechanical-energy-and-conservation-of-energy", "tier": "1차", "note": "직접열람 — \"in a closed system, total energy is conserved—that is, it is constant\"/\"KE₁ + PE₁ = KE₂ + PE₂\"/낙하하는 물체의 위치 에너지가 운동 에너지로 전환됨(\"its energy is converted to kinetic energy\") 확인. 작업163 — \"The phrase in a closed system means we are assuming no energy is lost to the surroundings due to friction and air resistance.\" 확인(닫힌계 조건의 원문 근거) — summary의 '외부에서 힘이 작용하지 않는'을 이 정의에 맞춰 '마찰이나 공기저항으로 에너지를 잃지 않는다고 가정'으로 교정. science_009와의 related는 '보존 원리로 연결된다'는 직접 인용이 없어 작업163에서 제거(둘 다 science_018 related로 대체) 작업164 — example의 '마찰을 무시하면'은 \"in a closed system means we are assuming no energy is lost to the surroundings due to friction and air resistance\"에 맞춘 조건(원리 대입: OpenStax Physics 9.2 KE₁+PE₁=KE₂+PE₂ 인용)" }
       ]
     },
     {
@@ -391,13 +391,13 @@
         "전압(전위)은 단위 전하당 전기 퍼텐셜 에너지다",
         "전류는 전압에 비례한다는 것이 옴의 법칙(V=IR)이다"
       ],
-      "example": "물이 파이프를 흐르듯 전류는 도선을 흐르며, 파이프에 막힌 곳이 있으면 물의 흐름이 느려지듯 저항이 크면 전류의 흐름도 느려진다",
+      "example": "물이 파이프를 흐르듯 전류는 도선을 흐르며, 파이프의 막힌 곳이 물의 흐름을 늦추듯 도선의 불순물이나 전하 간 충돌도 전류를 늦출 수 있다",
       "misconception": "초등 과학영재 9명 중 8명(88.9%)이 전구에서 전류가 소모된다는 전류 소모 모델을 가지고 있었고, 7명(77.8%)은 전지 역할에 대해 비과학적 개념을 보였다",
       "related": [
         { "id": "science_017", "relation": "에너지 보존과 함께 보면 좋은 물리 개념이다" }
       ],
       "sources": [
-        { "name": "19.1 Ohm's Law", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/19-1-ohms-law", "tier": "1차", "note": "직접열람 — \"Electric current is the rate at which electric charge moves.\"/\"I= ΔQ Δt\"/\"This relationship is called Ohm's law\"(V=IR)/\"current through a conductor is proportional to the voltage drop across a current-carrying conductor\"/전압이 원인, 전류가 결과라는 인과관계(\"voltage being the cause and the current being the effect\") 확인. 작업163 — \"Electric current moving through a wire is in many ways similar to water current moving through a pipe.\"/\"The water current that can flow through a pipe is affected by obstacles in the pipe, such as clogs and narrow sections...These obstacles slow down the flow of current through the pipe.\" 확인 — example을 이 물-파이프 장애물 비유로 교체(기존 '물탱크 높이' 비유는 인용 없어 삭제)" },
+        { "name": "19.1 Ohm's Law", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/19-1-ohms-law", "tier": "1차", "note": "직접열람 — \"Electric current is the rate at which electric charge moves.\"/\"I= ΔQ Δt\"/\"This relationship is called Ohm's law\"(V=IR)/\"current through a conductor is proportional to the voltage drop across a current-carrying conductor\"/전압이 원인, 전류가 결과라는 인과관계(\"voltage being the cause and the current being the effect\") 확인. 작업163 — \"Electric current moving through a wire is in many ways similar to water current moving through a pipe.\"/\"The water current that can flow through a pipe is affected by obstacles in the pipe, such as clogs and narrow sections...These obstacles slow down the flow of current through the pipe.\" 확인 — example을 이 물-파이프 장애물 비유로 교체(기존 '물탱크 높이' 비유는 인용 없어 삭제) 작업164 — \"Similarly, electrical current in a wire can be slowed down by many factors, including impurities in the metal of the wire or collisions between the charges in the material.\"/\"Resistance is a description of how much a wire or other electrical component opposes the flow of charge through it.\" 확인 — example을 이 원문 범위('불순물·충돌로 전류가 느려질 수 있다')로 교정. '저항이 크면 전류가 느려진다'는 일반화 문장은 직접 인용이 없어(원문에 'the greater the resistance, the smaller the current' 류 문장 없음) 삭제" },
         { "name": "18.4 Electric Potential", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/18-4-electric-potential", "tier": "1차", "note": "직접열람 — \"Normally, the electric potential is simply called the potential or voltage.\"/\"V= U E q\"/\"The units for the potential are J/C, which are given the name volt (V)\" 확인. 작업163 — \"We now define the electric potential V, which is the electric potential energy per unit charge.\" 확인(key_points·summary의 '단위 전하당 전기 퍼텐셜 에너지' 근거). 또한 \"a positive charge in a region with high potential will experience a force pushing it toward regions of lower potential\" 확인 — 기존 '전압이 전하를 밀어내는 힘 역할을 한다'는 일반화된 인과 서술 대신 이 문장 범위로 교정" },
         { "name": "초등 과학영재의 전류·전지 개념(전기회로 역학적 운동 비유 학습)", "publisher": "새물리(한국물리학회), Jiseon Kim·Hyejung Kwak·Jung Bog Kim, 2021, 71(4), 364-382", "url": "https://www.npsm-kps.org/journal/view.html?doi=10.3938/NPSM.71.364", "tier": "1차", "note": "직접열람(본문 Results III.1) — \"8명의 학생들 (88.9%)\"이 전류 소모 모델을 가졌고 \"7명의 학생들(77.8%)\"은 전지 역할에 대해 비과학적 개념을 가짐을 확인" }
       ]
@@ -408,18 +408,18 @@
       "field": "화학",
       "level": "고등",
       "one_line": "원소는 화학 변화로 더는 분해할 수 없는 물질이다",
-      "summary": "물질은 혼합물과 순물질로 나뉘고, 순물질은 다시 원소와 화합물로 나뉜다. OpenStax 화학 교재는 '물질은 여러 범주로 나뉠 수 있는데, 두 가지 큰 범주는 혼합물과 순물질이다'라고 설명하고, '순물질은 원소와 화합물 두 부류로 나뉠 수 있다'고 설명한다. 같은 교재는 '화학 변화로 더 간단한 물질로 쪼갤 수 없는 순물질을 원소라 한다'고 정의하고, '두 가지 이상의 원소로 이루어진 순물질을 화합물이라 한다'고 설명한다. 화합물은 구성 원소의 비율이 항상 일정한데, 같은 교재는 설탕(자당) 시료가 항상 질량 기준 탄소 42.1%, 수소 6.5%, 산소 51.4%로 이루어진다는 예를 든다. 물 분자도 마찬가지로, 교재는 '물 분자 하나는 수소 원자 두 개와 산소 원자 한 개를 포함하는 단위다'라고 설명한다. 위키백과에 따르면 현재까지 알려진 원소는 118종이다.",
+      "summary": "물질은 혼합물과 순물질로 나뉘고, 순물질은 다시 원소와 화합물로 나뉜다. OpenStax 화학 교재는 '물질은 여러 범주로 나뉠 수 있는데, 두 가지 큰 범주는 혼합물과 순물질이다'라고 설명하고, '순물질은 원소와 화합물 두 부류로 나뉠 수 있다'고 설명한다. 같은 교재는 '화학 변화로 더 간단한 물질로 쪼갤 수 없는 순물질을 원소라 한다'고 정의하고, '두 가지 이상의 원소로 이루어진 순물질을 화합물이라 한다'고 설명한다. 같은 교재는 '순물질은 일정한 조성을 가진다'고 설명하며, 예를 들어 설탕(자당) 시료는 질량 기준 탄소 42.1%, 수소 6.5%, 산소 51.4%로 이루어진다는 예를 든다. 물 분자도 마찬가지로, 교재는 '물 분자 하나는 수소 원자 두 개와 산소 원자 한 개를 포함하는 단위다'라고 설명한다. 위키백과에 따르면 현재까지 알려진 원소는 118종이다.",
       "key_points": [
         "원소는 화학 변화로 더 간단한 물질로 쪼갤 수 없다",
-        "화합물은 두 가지 이상의 원소가 일정한 비율로 결합한 물질이다",
+        "화합물은 두 가지 이상의 원소로 이루어진 순물질이다",
         "물 분자는 수소 원자 2개와 산소 원자 1개로 이루어진다"
       ],
-      "example": "물(H₂O) 분자 하나는 수소 원자 두 개와 산소 원자 한 개로 이루어져 있으며, 이 비율은 모든 물 분자에서 항상 똑같다",
+      "example": "물(H₂O) 분자 하나는 수소 원자 두 개와 산소 원자 한 개를 포함하는 단위로, 물 분자는 각각 이 구성을 가진다",
       "related": [
         { "id": "science_003", "relation": "화합물이 생성되는 반응에서도 질량 보존 법칙이 똑같이 성립한다" }
       ],
       "sources": [
-        { "name": "1.2 Phases and Classification of Matter", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/1-2-phases-and-classification-of-matter", "tier": "1차", "note": "직접열람 — \"Pure substances that cannot be broken down into simpler substances by chemical changes are called elements.\"/\"Pure substances that are comprised of two or more elements are called compounds.\"/\"Any sample of sucrose (table sugar) consists of 42.1% carbon, 6.5% hydrogen, and 51.4% oxygen by mass.\"/\"Each water molecule is a unit that contains two hydrogen atoms and one oxygen atom.\" 확인. 작업163 — \"Matter can be classified into several categories. Two broad categories are mixtures and pure substances.\"/\"Pure substances may be divided into two classes: elements and compounds.\" 확인(순물질·혼합물 분류 문장의 근거). 자연발생/인공원소 구분 서술은 위키백과에 없어 summary에서 삭제. example의 '혼합물과는 다르다' 비교 서술은 직접 인용이 없어 삭제하고 물 분자 구성 비율 범위로 재작성" },
+        { "name": "1.2 Phases and Classification of Matter", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/1-2-phases-and-classification-of-matter", "tier": "1차", "note": "직접열람 — \"Pure substances that cannot be broken down into simpler substances by chemical changes are called elements.\"/\"Pure substances that are comprised of two or more elements are called compounds.\"/\"Any sample of sucrose (table sugar) consists of 42.1% carbon, 6.5% hydrogen, and 51.4% oxygen by mass.\"/\"Each water molecule is a unit that contains two hydrogen atoms and one oxygen atom.\" 확인. 작업163 — \"Matter can be classified into several categories. Two broad categories are mixtures and pure substances.\"/\"Pure substances may be divided into two classes: elements and compounds.\" 확인(순물질·혼합물 분류 문장의 근거). 자연발생/인공원소 구분 서술은 위키백과에 없어 summary에서 삭제. example의 '혼합물과는 다르다' 비교 서술은 직접 인용이 없어 삭제하고 물 분자 구성 비율 범위로 재작성 작업164 — \"A pure substance has a constant composition.\" 확인(순물질=원소·화합물이므로 화합물에도 해당). 원문에 '항상 일정한 비율로 결합'이라는 문장은 없어 summary의 '비율이 항상 일정하다' 일반화를 삭제하고 '일정한 조성' 인용+설탕 예시 범위로 좁힘, key_points 2는 '두 가지 이상의 원소로 이루어진 순물질'(원문 정의)로 교체, example의 '항상 똑같다'도 '각각 이 구성을 가진다'로 좁힘" },
         { "name": "원소 (화학)", "publisher": "위키백과", "url": "https://ko.wikipedia.org/wiki/원소_(화학)", "tier": "보조", "note": "직접열람 — \"현재까지 118종이 알려져 있다\" 확인" }
       ]
     },
@@ -494,17 +494,18 @@
       "field": "지구과학",
       "level": "고등",
       "one_line": "별은 질량에 따라 백색왜성이나 중성자별, 블랙홀로 일생을 마친다",
-      "summary": "별은 먼지와 기체로 이루어진 거대한 구름에서 태어난다. NASA는 '별 일생의 대부분 동안 내부 열과 복사는 별의 핵에서 일어나는 핵반응이 공급한다'고 설명하며, 이 안정된 시기를 주계열이라 부른다. 별의 마지막 모습은 처음 질량에 따라 달라진다. NASA 자료에 따르면 태양 질량의 약 0.4~3.4배인 저·중질량 별은 결국 백색왜성이 된다. 태양 질량의 5배 이상인 무거운 별은 초신성 폭발로 일생을 마치는데, 폭발 후 남은 중심핵이 가벼우면 중성자별이 되고, 무거우면 '중력이 중성자를 압도해 블랙홀로 완전히 붕괴한다.' 처음 질량이 태양의 15배가 넘을 만큼 매우 무거운 별이면 중성자조차 버티지 못해 '핵이 무너지고 블랙홀이 형성된다.'",
+      "summary": "별은 먼지와 기체로 이루어진 거대한 구름에서 태어난다. NASA는 '별 일생의 대부분 동안 내부 열과 복사는 별의 핵에서 일어나는 핵반응이 공급한다'고 설명하며, 이 안정된 시기를 주계열이라 부른다. NASA는 '별에게는 모든 것이 질량에 달려 있다'고 설명하며, 별이 일생을 어떻게 마치는지도 질량에 달려 있다고 말한다. 태양보다 훨씬 무거운 별은 초신성 폭발로 일생을 마치는데, 폭발 후 남은 중심핵이 덜 무거우면 중성자별이 되고, 더 무거우면 '중력이 중성자를 압도해 블랙홀로 완전히 붕괴한다.' 블랙홀은 그 안의 물질이 매우 압축되고 중력이 매우 강해 빛조차 빠져나갈 수 없어 그렇게 불린다. 반면 질량이 작은 별은 생애 동안 충분한 질량을 잃어 백색왜성으로 일생을 마칠 수 있다고 OpenStax 천문학 교재는 설명한다.",
       "key_points": [
         "별은 질량에 따라 백색왜성·중성자별·블랙홀로 일생을 마친다",
-        "태양 질량의 0.4~3.4배인 별은 결국 백색왜성이 된다",
-        "태양 질량 15배가 넘는 별은 핵이 무너져 블랙홀이 된다"
+        "태양보다 훨씬 무거운 별은 초신성 폭발로 일생을 마친다",
+        "초신성 뒤 남은 핵의 질량에 따라 중성자별 또는 블랙홀이 된다"
       ],
-      "example": "태양처럼 가벼운 별은 결국 백색왜성이 되지만, 태양 질량 5배가 넘는 무거운 별은 초신성 폭발 뒤 중성자별이나 블랙홀이 된다",
+      "example": "질량이 작은 별은 백색왜성으로 끝날 수 있지만, 태양보다 훨씬 무거운 별은 초신성 폭발 뒤 남은 핵의 질량에 따라 중성자별이나 블랙홀이 된다",
       "related": [],
       "sources": [
         { "name": "Star Lifecycle", "publisher": "NASA Science", "url": "https://science.nasa.gov/mission/webb/star-lifecycle/", "tier": "1차", "note": "직접열람 — \"Stars are born in massive clouds of dust and gas...\"/\"This phase of the star's life is called the main sequence.\"/\"How a star ends its life depends on its mass.\"/\"Stars much more massive than our Sun end their lives in a supernova explosion.\"/\"If the remnant core of the star is less massive, it will collapse into a neutron star. If the remnant is more massive, gravity overwhelms the neutrons and the star collapses completely into a black hole.\" 확인. 작업163 — \"During most of a star's lifetime, the interior heat and radiation is provided by nuclear reactions in the star's core.\" 확인(summary의 '중심핵 핵반응' 근거)" },
-        { "name": "The Life Cycles of Stars", "publisher": "NASA(Goddard Space Flight Center, imagine.gsfc.nasa.gov)", "url": "https://imagine.gsfc.nasa.gov/educators/lifecycles/LC_main3.html", "tier": "1차", "note": "직접열람 — \"a 'low or medium mass' star (about 0.4 to 3.4 times the mass of our Sun)\"/\"a 'massive' star (some 5 or more times the mass of our Sun)\"/\"diagonal region of the Hertzsprung-Russell diagram in which most stars are located; generally these are stable stars during the bulk of their lives\"(주계열 정의) 확인. 작업163 — \"if the original star was very massive (say 15 or more times the mass of our Sun), even the neutrons will not be able to survive\" 바로 다음 문장 \"the core collapse and a black hole will form!\"을 재확인해 15배 이상→블랙홀 서술의 직접 근거로 추가. \"stars with more than 1.44 times the mass of the Sun (now known as the Chandrasekhar limit) would not become white dwarfs\"(찬드라세카 한계) 문장은 앞뒤 문단을 재열람해도 이 1.44배가 '원래 별의 질량'인지 '백색왜성(남은 핵)의 질량'인지 명시하지 않아(바로 앞 문장도 \"stars of a certain mass should not become white dwarfs when they died\"처럼 모호함) — 0.4~3.4배(원래 별 질량 기준, 저·중질량)와 같은 기준(원래 별 질량)인지 확인 불가해 충돌 해소 안 됨 → summary·key_points에서 찬드라세카 한계 서술 삭제, sources에는 인용만 남김. 수치(0.4~3.4배/5배/15배)는 모두 \"about\"/\"some\"/\"say\" 같은 예시·근사 표현을 동반함(정확한 경계값이 아니라 교육용 근사치). astro.kasi.re.kr/learning/pageView/6374(항성의 죽음) 페이지는 3회 재시도 모두 500 오류로 미열람·sources 미포함" }
+        { "name": "The Life Cycles of Stars", "publisher": "NASA(Goddard Space Flight Center, imagine.gsfc.nasa.gov)", "url": "https://imagine.gsfc.nasa.gov/educators/lifecycles/LC_main3.html", "tier": "1차", "note": "직접열람 — \"a 'low or medium mass' star (about 0.4 to 3.4 times the mass of our Sun)\"/\"a 'massive' star (some 5 or more times the mass of our Sun)\"/\"diagonal region of the Hertzsprung-Russell diagram in which most stars are located; generally these are stable stars during the bulk of their lives\"(주계열 정의) 확인. 작업163 — \"if the original star was very massive (say 15 or more times the mass of our Sun), even the neutrons will not be able to survive\" 바로 다음 문장 \"the core collapse and a black hole will form!\"을 재확인해 15배 이상→블랙홀 서술의 직접 근거로 추가. \"stars with more than 1.44 times the mass of the Sun (now known as the Chandrasekhar limit) would not become white dwarfs\"(찬드라세카 한계) 문장은 앞뒤 문단을 재열람해도 이 1.44배가 '원래 별의 질량'인지 '백색왜성(남은 핵)의 질량'인지 명시하지 않아(바로 앞 문장도 \"stars of a certain mass should not become white dwarfs when they died\"처럼 모호함) — 0.4~3.4배(원래 별 질량 기준, 저·중질량)와 같은 기준(원래 별 질량)인지 확인 불가해 충돌 해소 안 됨 → summary·key_points에서 찬드라세카 한계 서술 삭제, sources에는 인용만 남김. 수치(0.4~3.4배/5배/15배)는 모두 \"about\"/\"some\"/\"say\" 같은 예시·근사 표현을 동반함(정확한 경계값이 아니라 교육용 근사치). astro.kasi.re.kr/learning/pageView/6374(항성의 죽음) 페이지는 3회 재시도 모두 500 오류로 미열람·sources 미포함 작업164 — OpenStax Astronomy 2e와 교차검증한 결과 수치가 불일치(NASA 교육 페이지: 백색왜성 0.4~3.4배·massive 5배 이상·블랙홀 15배 이상 / OpenStax: 백색왜성 시작 질량 약 8배까지, 초신성 8배 이상, 핵 질량 약 3배 초과 시 블랙홀)하고 같은 페이지 안에서도 1.44배 서술과 충돌해, 이 페이지의 수치(0.4~3.4·5·15배)를 summary·key_points·example에서 전부 삭제. 이 출처는 주계열 정의 근거로만 유지" },
+        { "name": "23.1 The Death of Low-Mass Stars", "publisher": "OpenStax Astronomy 2e", "url": "https://openstax.org/books/astronomy-2e/pages/23-1-the-death-of-low-mass-stars", "tier": "1차", "note": "직접열람(작업164) — \"the evidence so far suggests that stars with masses up to about 8 M_Sun can shed enough mass to end their lives as white dwarfs.\" 확인(summary의 '질량이 작은 별은 질량을 잃어 백색왜성이 될 수 있다' 근거, 수치는 쓰지 않음). 23.2·24.5 교차검증 인용: \"the upper mass limit of a body made of neutrons might only be about 3 M_Sun\"/\"if the core's mass is greater than about 3 M_Sun, theory says that nothing can stop the core from collapsing forever.\" — NASA 교육 페이지 수치와 달라 수치 비채택" }
       ]
     },
     {
@@ -513,7 +514,7 @@
       "field": "지구과학",
       "level": "고등",
       "one_line": "고기압에서는 대체로 맑고, 저기압에서는 대개 흐리거나 비가 온다",
-      "summary": "기압은 공기가 누르는 힘이다. 미국 국립기상청(NWS)은 기압을 '특정 지점에서 그 지점의 중력가속도와 그 위에 쌓인 단위 면적 공기 기둥의 질량을 곱한 값으로 정해지는, 지구 대기가 미치는 압력'이라 정의한다. 주위보다 기압이 높은 곳을 고기압, 낮은 곳을 저기압이라 한다. 미국 해양대기청(NOAA)은 '고기압 시스템은 주위보다 기압이 높다'고 설명하며, 고기압은 '흔히 맑고 파란 하늘과 함께' 나타난다고 설명한다. 또 다른 NOAA 자료는 그 이유를 '고기압 지역은 대체로 건조한 날씨와 관련이 있는데, 공기가 가라앉으면서 데워지고 수분이 증발하기 때문'이라고 설명한다. 반대로 '저기압 지역은 대체로 강수를 몰고 오는데, 공기가 상승하면서 식고 수증기가 응결하기 때문'이라고 같은 자료는 설명한다.",
+      "summary": "기압은 지구 대기가 어떤 지점에 미치는 압력이다. 미국 국립기상청(NWS)은 기압을 '특정 지점에서 그 지점의 중력가속도와 그 위에 쌓인 단위 면적 공기 기둥의 질량을 곱한 값으로 정해지는, 지구 대기가 미치는 압력'이라 정의한다. 주위보다 기압이 높은 곳을 고기압, 낮은 곳을 저기압이라 한다. 미국 해양대기청(NOAA)은 '고기압 시스템은 주위보다 기압이 높다'고 설명하며, 고기압은 '흔히 맑고 파란 하늘과 함께' 나타난다고 설명한다. 또 다른 NOAA 자료는 그 이유를 '고기압 지역은 대체로 건조한 날씨와 관련이 있는데, 공기가 가라앉으면서 데워지고 수분이 증발하기 때문'이라고 설명한다. 반대로 '저기압 지역은 대체로 강수를 몰고 오는데, 공기가 상승하면서 식고 수증기가 응결하기 때문'이라고 같은 자료는 설명한다.",
       "key_points": [
         "기압은 지구 대기가 특정 지점에 미치는 압력이다",
         "고기압에서는 공기가 가라앉으며 데워져 대체로 날씨가 맑다",
