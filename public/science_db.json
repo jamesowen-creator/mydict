@@ -17,7 +17,7 @@
       "example": "집에서 동전과 종이를 같은 높이에서 떨어뜨리면 공기저항 때문에 종이가 더 늦게 떨어지는데, 아폴로 15호의 망치·깃털 실험처럼 공기가 없는 곳이라면 이런 차이가 사라진다",
       "misconception": "비물리 전공 중학교 과학교사 중에도 무거운 물체가 가벼운 물체보다 더 빨리 떨어진다고 답한 사례가 있었지만, 공기저항이 없다면 두 물체는 똑같은 속도로 떨어진다",
       "related": [
-        { "id": "science_002", "relation": "둘 다 뉴턴 역학의 기초가 되는 개념이다" }
+        { "id": "science_002", "relation": "중력과 낙하, 관성을 함께 보면 좋은 물리 개념이다" }
       ],
       "sources": [
         { "name": "표준 중력/중력 가속도", "publisher": "위키백과", "url": "https://ko.wikipedia.org/wiki/표준_중력", "tier": "보조", "note": "부분확인 — 9.8/9.80665 수치 교차확인" },
@@ -41,15 +41,16 @@
         "1687년 뉴턴이 프린키피아에서 운동법칙을 제시했다"
       ],
       "example": "급정거하는 버스 안에서 서 있던 몸이 앞으로 쏠리는 것은, 몸이 버스가 멈추기 전의 운동 상태를 그대로 유지하려 하기 때문이다",
-      "misconception": "비물리 전공 중학교 과학교사 중에도 등속직선운동에 별도의 힘(관성력)이 필요하다고 답한 사례가 있었지만, 알짜힘이 0이어도 이미 움직이던 물체는 계속 움직인다",
+      "misconception": "비물리 전공 중학교 과학교사 중에도 등속 직선 운동에서도 관성력을 느낀다는 잘못된 개념을 보인 사례가 있었지만, 알짜힘이 0이어도 이미 움직이던 물체는 계속 움직인다",
       "related": [
-        { "id": "science_001", "relation": "둘 다 뉴턴 역학의 기초가 되는 개념이다" }
+        { "id": "science_001", "relation": "중력과 낙하, 관성을 함께 보면 좋은 물리 개념이다" },
+        { "id": "science_009", "relation": "관성은 뉴턴의 제1법칙이고, 작용·반작용은 제3법칙이다" }
       ],
       "sources": [
         { "name": "[어제의 오늘] 1687년 뉴턴 프린키피아 출간", "publisher": "경향신문", "url": "https://www.khan.co.kr/article/201007041740165", "tier": "보조", "note": "부분확인 — 출판년도" },
         { "name": "[MT교육 오늘의 역사] 1687년 뉴턴 자연철학의 수학적 원리 발간", "publisher": "머니투데이", "url": "https://www.mt.co.kr/society/2013/07/05/2013070423183112207", "tier": "보조", "note": "부분확인 — 출판년도 2건째 일치" },
-        { "name": "5.2 Newton's First Law", "publisher": "OpenStax University Physics Volume 1", "url": "https://openstax.org/books/university-physics-volume-1/pages/5-2-newtons-first-law", "tier": "1차", "note": "직접열람 — \"A net force of zero implies that the velocity of the object is constant\"/\"the inertia of an object is measured by its mass\" 확인" },
-        { "name": "물리 전공이 아닌 중학교 과학교사들의 '힘과 운동' 내용 지식 영역의 전문성", "publisher": "한국과학교육학회지(KCI), 박경영·김영민, 2009, 29(8), 910-922", "url": "https://koreascience.kr/article/JAKO200914035210749.pdf", "tier": "1차", "note": "직접열람(PDF 본문) — 교사 인터뷰로 '등속운동에도 관성력이 필요하다'는 오개념 확인" }
+        { "name": "5.2 Newton's First Law", "publisher": "OpenStax University Physics Volume 1", "url": "https://openstax.org/books/university-physics-volume-1/pages/5-2-newtons-first-law", "tier": "1차", "note": "직접열람 — \"a net force of zero implies that the velocity v of the object is constant\"/\"the inertia of an object is measured by its mass\" 확인 작업166 — 위 첫 인용은 원문이 \"This equation says that a net force of zero implies that the velocity v of the object is constant.\"(수식 기호 v 포함, 문장 중간 소문자 a)이어서 원문 표기로 교정. \"Newton’s first law is often called the law of inertia.\" 확인(관성=제1법칙 관계의 근거)" },
+        { "name": "물리 전공이 아닌 중학교 과학교사들의 '힘과 운동' 내용 지식 영역의 전문성", "publisher": "한국과학교육학회지(KCI), 박경영·김영민, 2009, 29(8), 910-922", "url": "https://koreascience.kr/article/JAKO200914035210749.pdf", "tier": "1차", "note": "직접열람(PDF 본문) — 교사 인터뷰 후 저자 서술 \"또한 등속 직선 운동하는 경우에도 관성력을 느낀다는 잘못된 개념을 가지고 있음도 보이고 있다\" 확인(작업166 — 이전 note의 표기는 원문 표현이 아니어서 원문 문장으로 교체, misconception도 이 범위로 교정)" }
       ]
     },
     {
@@ -91,7 +92,7 @@
       "sources": [
         { "name": "Søren Sørensen", "publisher": "Science History Institute", "url": "https://www.sciencehistory.org/education/scientific-biographies/soren-sorensen/", "tier": "1차", "note": "직접열람 — 1909년/칼스버그 연구소/배경 확인" },
         { "name": "Five ideas in chemical education that must die: pH 7 is neutral", "publisher": "Royal Society of Chemistry", "url": "https://edu.rsc.org/opinion/five-ideas-in-chemical-education-that-must-die-ph-7-is-neutral/2010031.article", "tier": "1차", "note": "직접열람 — pH 7 중성의 온도 조건성 확인" },
-        { "name": "14.2 pH and pOH", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/14-2-ph-and-poh", "tier": "1차", "note": "직접열람 — \"At 25 °C, the value of Kw is 1.0×10⁻¹⁴\"/\"pH=−log[H3O+]=−log(1.0×10⁻⁷)=7.00\" 확인. 작업161 — Figure 14.2 pH 척도 그림에서 \"Gastric juices are listed at a pH of about 1.5\"/\"Household ammonia is listed just before a pH of 12\" 확인. 기존 example·summary의 레몬즙·비눗물은 이 그림을 포함해 004의 어느 출처에도 없어 위액·가정용 암모니아로 교체(근거: 이 그림). 작업162-A — \"Gastric juices\"는 위산이 아니라 위액으로 옮기는 것이 정확해 summary·example·note의 '위산' 표기를 '위액'으로 통일. example의 '강한 산성'/'염기성이 강한'은 원문에 없는 평가 표현이라 삭제하고 '산성 쪽'/'염기성 쪽'으로 완화, pH 수치는 인용 범위 그대로 유지" }
+        { "name": "14.2 pH and pOH", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/14-2-ph-and-poh", "tier": "1차", "note": "직접열람 — \"At 25 °C, the value of Kw is 1.0×10⁻¹⁴\"/\"pH=−log[H3O+]=−log(1.0×10⁻⁷)=7.00\" 확인. 작업161 — Figure 14.2 pH 척도 그림에서 \"Gastric juices are listed at a p H of about 1.5\"/\"Household ammonia is listed just before a pH of 12\" 확인. 기존 example·summary의 레몬즙·비눗물은 이 그림을 포함해 004의 어느 출처에도 없어 위액·가정용 암모니아로 교체(근거: 이 그림). 작업162-A — \"Gastric juices\"는 위산이 아니라 위액으로 옮기는 것이 정확해 summary·example·note의 '위산' 표기를 '위액'으로 통일. example의 '강한 산성'/'염기성이 강한'은 원문에 없는 평가 표현이라 삭제하고 '산성 쪽'/'염기성 쪽'으로 완화, pH 수치는 인용 범위 그대로 유지 작업166 — 위 두 인용은 그림 대체텍스트(alt)를 직접 읽어 확인한 것이며, 원문 표기는 \"p H\"(띄어쓰기 포함)임" }
       ]
     },
     {
@@ -133,7 +134,8 @@
       "example": "화분에 식물을 심어 물만 주며 길러도 흙의 무게는 거의 줄지 않고 식물만 크게 자라는 것은, 식물의 몸을 이루는 물질 대부분이 흙이 아니라 이산화탄소와 물에서 오기 때문이다",
       "misconception": "5학년 학생들은 광합성 수업 후에도 '흙'을 필요한 물질로 꼽는 경우가 있었지만, 실제로는 이산화탄소와 물로 식물이 스스로 양분을 만들어 낸다",
       "related": [
-        { "id": "science_022", "relation": "광합성으로 고정된 탄소는 생태계의 물질 순환을 거쳐 되돌아간다" }
+        { "id": "science_022", "relation": "광합성으로 고정된 탄소는 생태계의 물질 순환을 거쳐 되돌아간다" },
+        { "id": "science_014", "relation": "광합성은 에너지를 축적시키는 과정이고, 호흡은 에너지를 소모하는 과정이다" }
       ],
       "sources": [
         { "name": "생태 지위적 접근을 통한 5학년의 광합성 개념 분석", "publisher": "한국과학교육학회지(KCI), 정재훈·김영신, 2011, 31(4), 513-527", "url": "https://koreascience.kr/article/JAKO201125247233142.pdf", "tier": "1차", "note": "직접열람(PDF 본문) — 학습 후에도 '흙' 개념 언급이 5% 미만 수준에서나마 잔존함을 확인" },
@@ -156,7 +158,7 @@
       "example": "(북반구 기준) 여름에는 해가 높이 떠서 낮이 길고 뜨겁고, 겨울에는 해가 낮게 떠서 낮이 짧고 추운 것을 체감으로 알 수 있다",
       "misconception": "Science in School 기사에 따르면 하버드 졸업생들도 여름이 더운 까닭을 태양이 가까워졌기 때문이라고 생각하는 경우가 확인되지만, 실제로는 자전축의 기울기 때문에 계절이 바뀐다",
       "related": [
-        { "id": "science_008", "relation": "둘 다 천체의 상대적 위치 변화로 생기는 현상이다" }
+        { "id": "science_008", "relation": "계절 변화와 달의 위상을 함께 보면 좋은 지구과학 개념이다" }
       ],
       "sources": [
         { "name": "An Epic View of the Seasons", "publisher": "NASA Science", "url": "https://science.nasa.gov/earth/earth-observatory/an-epic-view-of-the-seasons/", "tier": "1차", "note": "직접열람 — \"The substantial tilt, about 23.5 degrees\"/여름·겨울 원인 설명 확인" },
@@ -180,7 +182,7 @@
       "example": "매일 밤 하늘의 달 모양이 초승달에서 반달, 보름달을 거쳐 다시 그믐달로 한 달에 걸쳐 서서히 바뀌는 것을 눈으로 직접 확인할 수 있다",
       "misconception": "인지 수준이 높은 학생 중에도 위상변화를 월식(지구 그림자)과 혼동하는 경우가 있었지만, 이는 곧 스스로 바로잡는 일시적인 혼동이었다",
       "related": [
-        { "id": "science_007", "relation": "둘 다 천체의 상대적 위치 변화로 생기는 현상이다" }
+        { "id": "science_007", "relation": "계절 변화와 달의 위상을 함께 보면 좋은 지구과학 개념이다" }
       ],
       "sources": [
         { "name": "달의 위상", "publisher": "한국천문연구원(KASI)", "url": "https://www.kasi.re.kr/kor/publication/post/photoGallery/4378", "tier": "1차", "note": "직접열람 — 정의/삭망월 29.53089일 확인" },
@@ -203,10 +205,10 @@
       "example": "줄다리기에서 내가 상대를 당기는 힘만큼 상대도 나를 당기는 힘으로 끌어당기며, 이 두 힘은 나와 상대라는 서로 다른 두 사람에게 작용한다",
       "misconception": "서울대학교 과학교육연구소 자료의 용수철저울 문항(양쪽에 각 2N으로 표시된 추)에서, 무게를 합쳐 4N이라고 답하거나 힘이 상쇄되어 0N이라고 답한 학생 사례가 있었지만, 문항의 정답은 2N이다",
       "related": [
-        { "id": "science_002", "relation": "관성은 제1법칙, 작용·반작용은 제3법칙으로 둘 다 뉴턴 역학의 기초다" }
+        { "id": "science_002", "relation": "관성은 뉴턴의 제1법칙이고, 작용·반작용은 제3법칙이다" }
       ],
       "sources": [
-        { "name": "5.5 Newton's Third Law", "publisher": "OpenStax University Physics Volume 1", "url": "https://openstax.org/books/university-physics-volume-1/pages/5-5-newtons-third-law", "tier": "1차", "note": "직접열람(재확인) — \"Whenever one body exerts a force on a second body, the first body experiences a force that is equal in magnitude and opposite in direction to the force that it exerts\"/\"these forces are acting on different bodies or systems: A's force acts on B and B's force acts on A\"/\"Thus, they do not cancel each other\" 확인" },
+        { "name": "5.5 Newton's Third Law", "publisher": "OpenStax University Physics Volume 1", "url": "https://openstax.org/books/university-physics-volume-1/pages/5-5-newtons-third-law", "tier": "1차", "note": "직접열람(재확인) — \"Whenever one body exerts a force on a second body, the first body experiences a force that is equal in magnitude and opposite in direction to the force that it exerts\"/\"these forces are acting on different bodies or systems: A's force acts on B and B's force acts on A\"/\"Thus, they do not cancel each other\" 확인 작업166 — \"State Newton’s third law of motion\"/\"Identify the action and reaction forces in different situations\" 확인(제3법칙=작용·반작용 관계의 근거)" },
         { "name": "작용, 반작용에 대한 학생들의 개념", "publisher": "서울대학교 과학교육연구소", "url": "https://serc.snu.ac.kr/wp-content/uploads/sites/80/2022/a/작용반작용에대한학생들의개념(전체).pdf", "tier": "1차", "note": "직접열람(PDF 재다운로드 후 PyMuPDF로 페이지 PNG 렌더링, 작업159 재확인) — 용수철저울 문항 그림에 양쪽 추가 각각 '2N'으로 라벨링되어 있음을 이미지로 확인. '과학적 개념으로... 용수철이 2N을 가리킨다고 답하는 학생도 있으나 많은 학생들이... 0N 혹은 4N을 가리킬 것이라고 응답하는 경향이 있다' 확인. 원출처 차영·서상오·권재술(2001), 한국과학교육학회지 21(2), 411-421(서지만 확인, 본문 미열람)" }
       ]
     },
@@ -229,7 +231,7 @@
       ],
       "sources": [
         { "name": "11.1 Temperature and Thermal Energy", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/11-1-temperature-and-thermal-energy", "tier": "1차", "note": "직접열람(재확인) — \"Heat is often confused with temperature. For example, we may say that the heat was unbearable, when we actually mean that the temperature was high\"/\"thermal energy—the energy associated with heat—is the average kinetic energy of the particles (molecules or atoms) in a substance\"/\"Faster moving molecules have greater kinetic energies, and so the substance has greater thermal energy, and thus a higher temperature\" 확인. 온도 자체를 '평균 운동 에너지'로 정의하는 문장은 이 페이지에 없어(온도는 '무엇을 측정하는가'로 정의) summary·key_point에서 '열에너지=평균 운동 에너지' 구도로 교정" },
-        { "name": "열의 전도 및 상태 변화에 대한 중등학생들의 선개념이 교과서의 삽화 이해에 미치는 영향", "publisher": "새물리(한국물리학회, KCI), 오원근·강지영·박은정, 2005, 50(6), 363-374", "url": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART000964740", "tier": "1차", "note": "직접열람(KCI 초록, 영문 전문, 재확인) — \"Most students thought of heat as some particles or substance, which kept them from understanding the figures\" 확인(삽화 이해 어려움과의 인과관계가 초록 원문에 직접 명시됨), 중등학생 6명 면담 질적 연구" }
+        { "name": "열의 전도 및 상태 변화에 대한 중등학생들의 선개념이 교과서의 삽화 이해에 미치는 영향", "publisher": "새물리(한국물리학회, KCI), 오원근·강지영·박은정, 2005, 50(6), 363-374", "url": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART000964740", "tier": "1차", "note": "직접열람(KCI 초록, 영문 전문, 재확인) — \"most students thought of heat as some particles or substance, which kept them from understanding the figures\" 확인(삽화 이해 어려움과의 인과관계가 초록 원문에 직접 명시됨), 중등학생 6명 면담 질적 연구" }
       ]
     },
     {
@@ -250,8 +252,8 @@
         { "id": "science_010", "relation": "물질의 상태가 변할 때 열(에너지)의 출입이 함께 일어난다" }
       ],
       "sources": [
-        { "name": "10.3 Phase Transitions", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/10-3-phase-transitions", "tier": "1차", "note": "직접열람(재확인) — \"While a substance is undergoing a change in state, its temperature remains constant\"/\"Vaporization is an endothermic process\"/\"further gain or loss of heat is a result of diminishing or enhancing intermolecular attractions, instead of increasing or decreasing molecular kinetic energies\" 확인. ΔHvap=44.01 kJ/mol 수치는 \"the vaporization of water at standard temperature\"라고만 되어 있어 25℃/298K 같은 명시적 수치 조건이 본문에 확인되지 않고, 끓는 물 example(끓는점≈100℃)과 온도 조건이 달라 혼동을 줄 수 있어 작업159에서 summary에서 삭제함" },
-        { "name": "중학생들의 물질의 상태변화에 대한 오개념 분석", "publisher": "교육방법연구(한국교육방법학회, KCI), 신동로·이강님, 2005, 17(2), 223-242", "url": "https://www.kci.go.kr/kciportal/landing/article.kci?arti_id=ART000972730", "tier": "1차", "note": "직접열람(KCI 초록, 재확인) — 전주시 중학생 648명, 4가지 오개념 유형 원문 확인(열 출입 미인식/질량 오인식/성질 오인식/기체-액체-고체 변화 오인식). '성질' 오인식 유형은 초록에 구체적 근거(색·맛·냄새 등) 없이 포괄적으로만 언급되어 작업159에서 summary·misconception에서는 제외하고 이 note에만 원문 그대로 남김. F=7.358(p<.01)은 '학년별 개념 형성 차이'에 대한 통계로 확인되었으나 본문에는 사용하지 않음" }
+        { "name": "10.3 Phase Transitions", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/10-3-phase-transitions", "tier": "1차", "note": "직접열람(재확인) — \"While a substance is undergoing a change in state, its temperature remains constant\"/\"Vaporization is an endothermic process\"/\"further gain or loss of heat is a result of diminishing or enhancing intermolecular attractions, instead of increasing or decreasing molecular kinetic energies\" 확인. ΔHvap=44.01 kJ/mol 수치는 \"the vaporization of water at standard temperature\"라고만 되어 있어 25℃/298K 같은 명시적 수치 조건이 본문에 확인되지 않고, 끓는 물 example(끓는점≈100℃)과 온도 조건이 달라 혼동을 줄 수 있어 작업159에서 summary에서 삭제함 작업166 — \"the condensation of a gas releases heat\"/\"freezing, is an exothermic process\" 확인(상태 변화에 열의 출입이 따른다는 010↔011 관련 문장의 근거)" },
+        { "name": "중학생들의 물질의 상태변화에 대한 오개념 분석", "publisher": "교육방법연구(한국교육방법학회, KCI), 신동로·이강님, 2005, 17(2), 223-242", "url": "https://www.kci.go.kr/kciportal/landing/article.kci?arti_id=ART000972730", "tier": "1차", "note": "직접열람(KCI 초록, 재확인) — 전주시 중학생 648명, 4가지 오개념 유형 원문 확인(열 출입 미인식/질량 오인식/성질 오인식/기체-액체-고체 변화 오인식). '성질' 오인식 유형은 초록에 구체적 근거(색·맛·냄새 등) 없이 포괄적으로만 언급되어 작업159에서 summary·misconception에서는 제외하고 이 note에만 원문 그대로 남김. F=7.358(p<.01)은 \"학년별 물질의 상태변화 개념의 형성에 차이\"에 대한 통계로 확인되었으나 본문에는 사용하지 않음" }
       ]
     },
     {
@@ -271,8 +273,8 @@
         { "id": "science_020", "relation": "화학 반응에서의 에너지와 함께 보면 좋은 화학 개념이다" }
       ],
       "sources": [
-        { "name": "4.2 Classifying Chemical Reactions", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/4-2-classifying-chemical-reactions", "tier": "1차", "note": "직접열람(재확인) — \"oxidation-reduction (redox) reactions are those in which one or more elements involved undergo a change in oxidation number\"/\"Some redox reactions involve the transfer of electrons between reactant entities to yield ionic products, such as the reaction between sodium and chlorine to yield sodium chloride\"(2Na(s)+Cl2(g)→2NaCl(s))/\"The product of this reaction is a covalent compound, so transfer of electrons in the explicit sense is not involved\"(산화수 정의로 확장하는 이유) 확인" },
-        { "name": "산화·환원 정의의 확장에 대한 교과서 분석 및 고등학생, 화학교사, 예비화학교사의 이해 조사", "publisher": "현장과학교육(한국현장과학교육학회, KCI), 윤희숙·박하나, 2012, 6(2), 103-108", "url": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART001673959", "tier": "1차", "note": "직접열람(KCI 초록, 재확인) — \"7종의 교과서 분석 결과, 역사적 발달의 맥락으로 개념의 확장을 기술한 교과서는 1종에 불과하였으며\"/\"고등학생의 경우, 전자의 이동으로 산화·환원 개념을 설명하는 경우가 가장 많았고, 산화수의 변화 개념으로 확장된 비율은 낮았다\"/\"예비교사와 교사의 경우, 대부분이 산화수의 변화에 의한 정의를 적용하였으나, 연소나 금속의 반응성 비교 같은 상황에서 산소 또는 전자의 이동에 의한 정의를 혼용해서 적용하는 양상을 보였다\" 확인. 초록에 \"오개념\" 용어는 사용되지 않아 misconception 필드는 생략함" }
+        { "name": "4.2 Classifying Chemical Reactions", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/4-2-classifying-chemical-reactions", "tier": "1차", "note": "직접열람(재확인) — \"Oxidation-reduction (redox) reactions are those in which one or more elements involved undergo a change in oxidation number\"/\"Some redox reactions involve the transfer of electrons between reactant entities to yield ionic products, such as the reaction between sodium and chlorine to yield sodium chloride\"(2Na(s)+Cl2(g)→2NaCl(s))/\"The product of this reaction is a covalent compound, so transfer of electrons in the explicit sense is not involved\"(산화수 정의로 확장하는 이유) 확인" },
+        { "name": "산화·환원 정의의 확장에 대한 교과서 분석 및 고등학생, 화학교사, 예비화학교사의 이해 조사", "publisher": "현장과학교육(한국현장과학교육학회, KCI), 윤희숙·박하나, 2012, 6(2), 103-108", "url": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART001673959", "tier": "1차", "note": "직접열람(KCI 초록, 재확인) — \"7종의 교과서 분석 결과, 역사적 발달의 맥락으로 개념의 확장을 기술한 교과서는 1종에 불과하였으며\"/\"고등학생의 경우, 전자의 이동으로 산화 ․ 환원 개념을 설명하는 경우가 가장 많았고, 산화수의 변화 개념으로 확장된 비율은 낮았다\"/\"예비교사와 교사의 경우, 대부분이 산화수의 변화에 의한 정의를 적용하였으나, 연소나 금속의 반응성 비교 같은 상황에서 산소 또는 전자의 이동에 의한 정의를 혼용해서 적용하는 양상을 보였다\" 확인. 초록에 \"오개념\" 용어는 사용되지 않아 misconception 필드는 생략함" }
       ]
     },
     {
@@ -293,7 +295,7 @@
       "sources": [
         { "name": "14 Introduction", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/14-introduction", "tier": "1차", "note": "직접열람 — \"A gene is defined as a sequence of DNA that codes for a functional product\" 확인" },
         { "name": "12.1 Mendel's Experiments and the Laws of Probability", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/12-1-mendels-experiments-and-the-laws-of-probability", "tier": "1차", "note": "직접열람(재확인) — \"Dominant traits are those that are inherited unchanged in a hybridization\"/\"Recessive traits become latent, or disappear, in the offspring of a hybridization. The recessive trait does, however, reappear in the progeny of the hybrid offspring\"/\"Mendel found that 100 percent of the F1 hybrid generation had violet flowers\"/\"of F2-generation plants, 705 had violet flowers and 224 had white flowers... approximately 3:1\" 확인" },
-        { "name": "유전의 우성과 열성에 대한 중-고등학생과 교사의 오개념 분석", "publisher": "교원교육(한국교원대학교 교육연구원, KCI), 박시호·권영식·이길재, 2009, 25(3), 73-91", "url": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART001377761", "tier": "1차", "note": "직접열람(KCI 초록, 재확인) — \"특히, 학생과 교사 모두 우성은 '열성을 억제하고 표현되는 형질이다.' 열성에 대해 학생들은 '부모로부터 유전자를 전달받지 못하여 나타난다.'라는 오개념 비율이 높게 나타났다\"(정확한 수치는 제시되지 않음, '높게 나타났다'로만 서술)/\"중학생의 24.4%, 고등학생의 19.4%가 '교배 결과 많이 출현하는 형질이 우성이다'라는 오개념을\"/\"중학생의 48.1%, 고등학생의 36.9%가 '열성은 생활에 불리하거나 우성이 우수한 형질이다'라는 오개념을\"/\"'우성이 열성을 지배한다' '억제한다' '누른다' 등의 표현은 사용하지 않는 것이 타당할 것\" 확인" }
+        { "name": "유전의 우성과 열성에 대한 중-고등학생과 교사의 오개념 분석", "publisher": "교원교육(한국교원대학교 교육연구원, KCI), 박시호·권영식·이길재, 2009, 25(3), 73-91", "url": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART001377761", "tier": "1차", "note": "직접열람(KCI 초록, 재확인) — \"특히, 학생과 교사 모두 우성은 '열성을 억제하고 표현되는 형질이다.' 열성에 대해 학생들은 '부모로부터 유전자를 전달받지 못하여 나타난다.'라는 오개념 비율이 높게 나타났다\"(정확한 수치는 제시되지 않음, '높게 나타났다'로만 서술)/\"중학생의 24.4%, 고등학생의 19.4%가 ‘교배 결과 많이 출현하는 형질이 우성이다.’라는 오개념을 가지고 있었다\"/\"중학생의 48.1%, 고등학생의 36.9%가 ‘열성은 생활에 불리하거나 우성이 우수한 형질이다.’라는 오개념을 가지고 있었다\"/\"'우성이 열성을 지배한다' '억제한다' '누른다' 등의 표현은 사용하지 않는 것이 타당할 것\" 확인" }
       ]
     },
     {
@@ -311,7 +313,7 @@
       "example": "식물이든 동물이든, 몸속에서 일어나는 세포호흡은 포도당의 결합에 저장된 에너지를 꺼내어 모든 생물이 쓸 수 있는 공통된 형태로 바꾸는 과정이다",
       "misconception": "이 문항에서 '광합성은 이산화탄소를 발생시키며 호흡은 산소를 발생시키는 과정이다'라는 보기(기체 발생 관계를 거꾸로 설명)를 고른 학생이 중학생 24.24%(88명), 고등학생 4.36%(17명), 전체 13.94%(105명)였다",
       "related": [
-        { "id": "science_006", "relation": "광합성과 세포호흡은 에너지 흐름에서 서로 반대 방향이다" },
+        { "id": "science_006", "relation": "광합성은 에너지를 축적시키는 과정이고, 호흡은 에너지를 소모하는 과정이다" },
         { "id": "science_022", "relation": "세포호흡으로 방출된 이산화탄소는 생태계의 물질 순환으로 되돌아간다" }
       ],
       "sources": [
@@ -335,7 +337,7 @@
       "misconception": "서울대학교 자료에 따르면, 우리나라 학생 중에는 '오존층의 파괴로 인해 지구의 온도가 상승한다'고 생각하는 오개념 사례가 있었다(원 연구: 곽영순, 2004)",
       "related": [],
       "sources": [
-        { "name": "What is the greenhouse effect?", "publisher": "NASA Science", "url": "https://science.nasa.gov/climate-change/faq/what-is-the-greenhouse-effect/", "tier": "1차", "note": "직접열람(재확인, 작업159 근거표 재수록) — \"The greenhouse effect is the process through which heat is trapped near Earth's surface by substances known as 'greenhouse gases'\"/\"approximately 33°C\" 기온 하강/\"an average temperature of 15°C\"/\"Imagine these gases as a cozy blanket enveloping our planet, helping to maintain a warmer temperature\"/\"human activities, primarily from burning fossil fuels... have disrupted Earth's energy balance\" 확인(작업158에서 확인된 동일 인용문, 변경 없음)" },
+        { "name": "What is the greenhouse effect?", "publisher": "NASA Science", "url": "https://science.nasa.gov/climate-change/faq/what-is-the-greenhouse-effect/", "tier": "1차", "note": "직접열람(재확인, 작업159 근거표 재수록) — \"The greenhouse effect is the process through which heat is trapped near Earth's surface by substances known as 'greenhouse gases.'\"/\"approximately 33°C\" 기온 하강/\"an average temperature of 15 °C\"/\"Imagine these gases as a cozy blanket enveloping our planet, helping to maintain a warmer temperature\"/\"human activities, primarily from burning fossil fuels... have disrupted Earth's energy balance\" 확인(작업158에서 확인된 동일 인용문, 변경 없음)" },
         { "name": "온실효과에 대한 우리나라 학생들의 오개념", "publisher": "서울대학교 과학교육연구소", "url": "https://serc.snu.ac.kr/wp-content/uploads/sites/80/2022/a/온실효과에대한우리나라학생들의오개념(전체).pdf", "tier": "1차", "note": "직접열람(PDF 본문 추출) — 오개념 4유형(오존층 파괴/폐열·인공구조물/환경오염/산소도 온실기체) 확인. 원출처 곽영순(2004), 한국과학교육학회지 24(3), 668-674는 2차 인용" }
       ]
     },
@@ -354,7 +356,7 @@
       "example": "대서양이 매년 조금씩 넓어지는 것은 대서양 중앙 해령이라는 발산형 경계에서 새로운 지각이 계속 만들어지고 있기 때문이다",
       "related": [],
       "sources": [
-        { "name": "This Dynamic Earth: Understanding Plate Motions", "publisher": "USGS", "url": "https://pubs.usgs.gov/gip/dynamic/understanding.html", "tier": "1차", "note": "직접열람(재확인, 작업159) — \"where new crust is generated as the plates pull away from each other\"/\"where crust is destroyed as one plate dives under another\"/\"where crust is neither produced nor destroyed as the plates slide horizontally past each other\"/\"The rate of spreading along the Mid-Atlantic Ridge averages about 2.5 centimeters per year (cm/yr), or 25 km in a million years\"/\"Trenches are the deepest parts of the ocean floor and are created by subduction\"(해양-대륙 수렴 경계 절에 위치)/\"Oceanic-continental convergence also sustains many of the Earth's active volcanoes, such as those in the Andes and the Cascade Range\"(해양-대륙 수렴 경계 절에 위치)/\"the descending plate also provides a source of stress as the two plates interact, leading to frequent moderate to strong earthquakes\"(해양-해양 수렴 경계 절에 위치)/\"a few occur on land, for example the San Andreas fault zone in California\" 확인. 작업159에서 해구·화산은 해양-대륙 수렴, 지진은 해양-해양 수렴 경계로 범위를 좁혀 summary를 원문 절 구분에 맞게 수정함" },
+        { "name": "This Dynamic Earth: Understanding Plate Motions", "publisher": "USGS", "url": "https://pubs.usgs.gov/gip/dynamic/understanding.html", "tier": "1차", "note": "직접열람(재확인, 작업159) — \"where new crust is generated as the plates pull away from each other\"/\"where crust is destroyed as one plate dives under another\"/\"where crust is neither produced nor destroyed as the plates slide horizontally past each other\"/\"The rate of spreading along the Mid-Atlantic Ridge averages about 2.5 centimeters per year (cm/yr), or 25 km in a million years\"/\"Trenches are the deepest parts of the ocean floor and are created by subduction\"(해양-대륙 수렴 경계 절에 위치)/\"Oceanic-continental convergence also sustains many of the Earth's active volcanoes, such as those in the Andes and the Cascade Range\"(해양-대륙 수렴 경계 절에 위치)/\"The descending plate also provides a source of stress as the two plates interact, leading to frequent moderate to strong earthquakes\"(해양-해양 수렴 경계 절에 위치)/\"a few occur on land, for example the San Andreas fault zone in California\" 확인. 작업159에서 해구·화산은 해양-대륙 수렴, 지진은 해양-해양 수렴 경계로 범위를 좁혀 summary를 원문 절 구분에 맞게 수정함" },
         { "name": "판 구조론", "publisher": "위키백과", "url": "https://ko.wikipedia.org/wiki/판_구조론", "tier": "보조", "note": "직접열람 — 발산/수렴/보존(변환) 경계 구분, 대서양 중앙 해령/샌안드레아스 단층 예시 교차확인" }
       ]
     },
@@ -503,8 +505,8 @@
       "example": "질량이 작은 별은 백색왜성으로 끝날 수 있지만, 태양보다 훨씬 무거운 별은 초신성 폭발 뒤 남은 핵의 질량에 따라 중성자별이나 블랙홀이 된다",
       "related": [],
       "sources": [
-        { "name": "Star Lifecycle", "publisher": "NASA Science", "url": "https://science.nasa.gov/mission/webb/star-lifecycle/", "tier": "1차", "note": "직접열람 — \"Stars are born in massive clouds of dust and gas...\"/\"This phase of the star's life is called the main sequence.\"/\"How a star ends its life depends on its mass.\"/\"Stars much more massive than our Sun end their lives in a supernova explosion.\"/\"If the remnant core of the star is less massive, it will collapse into a neutron star. If the remnant is more massive, gravity overwhelms the neutrons and the star collapses completely into a black hole.\" 확인. 작업163 — \"During most of a star's lifetime, the interior heat and radiation is provided by nuclear reactions in the star's core.\" 확인(summary의 '중심핵 핵반응' 근거) 작업165 — \"If the remnant is more massive, gravity overwhelms the neutrons and the star collapses completely into a black hole — so-called because the matter within it is so compressed and gravity is so intense that not even light can escape.\" 재확인(summary '블랙홀은 … 빛조차 빠져나갈 수 없어 그렇게 불린다'의 이름 유래 서술 근거)" },
-        { "name": "23.1 The Death of Low-Mass Stars", "publisher": "OpenStax Astronomy 2e", "url": "https://openstax.org/books/astronomy-2e/pages/23-1-the-death-of-low-mass-stars", "tier": "1차", "note": "직접열람(작업164) — \"the evidence so far suggests that stars with masses up to about 8 M_Sun can shed enough mass to end their lives as white dwarfs.\" 확인(summary의 '질량이 작은 별은 질량을 잃어 백색왜성이 될 수 있다' 근거, 수치는 쓰지 않음). 23.2·24.5 교차검증 인용: \"the upper mass limit of a body made of neutrons might only be about 3 M_Sun\"/\"if the core's mass is greater than about 3 M_Sun, theory says that nothing can stop the core from collapsing forever.\" — 수치는 본문에 쓰지 않음" }
+        { "name": "Star Lifecycle", "publisher": "NASA Science", "url": "https://science.nasa.gov/mission/webb/star-lifecycle/", "tier": "1차", "note": "직접열람 — \"Stars are born in massive clouds of dust and gas...\"/\"This phase of the star's life is called the main sequence.\"/\"How a star ends its life depends on its mass.\"/\"Stars much more massive than our Sun end their lives in a supernova explosion.\"/\"If the remnant core of the star is less massive, it will collapse into a very small, very dense core of neutrons called a neutron star. If the remnant is more massive, gravity overwhelms the neutrons and the star collapses completely into a black hole\" 확인. 작업163 — \"During most of a star's lifetime, the interior heat and radiation is provided by nuclear reactions in the star's core.\" 확인(summary의 '중심핵 핵반응' 근거) 작업165 — \"If the remnant is more massive, gravity overwhelms the neutrons and the star collapses completely into a black hole — so-called because the matter within it is so compressed and gravity is so intense that not even light can escape.\" 재확인(summary '블랙홀은 … 빛조차 빠져나갈 수 없어 그렇게 불린다'의 이름 유래 서술 근거) 작업166 — 위 첫 인용은 원문에서 \"…core of neutrons called a neutron star.\"로 이어지고 마지막 문장은 \"black hole — so-called because…\"로 계속되어, 생략돼 있던 단어를 복원하고 문장 끝 마침표를 제거해 원문과 일치시킴" },
+        { "name": "23.1 The Death of Low-Mass Stars", "publisher": "OpenStax Astronomy 2e", "url": "https://openstax.org/books/astronomy-2e/pages/23-1-the-death-of-low-mass-stars", "tier": "1차", "note": "직접열람(작업164) — \"the evidence so far suggests that stars with masses up to about 8 MSun can shed enough mass to end their lives as white dwarfs.\" 확인(summary의 '질량이 작은 별은 질량을 잃어 백색왜성이 될 수 있다' 근거, 수치는 쓰지 않음). 작업166 — 원문 표기는 M 아래첨자 Sun이 \"MSun\"으로 추출됨. 이전에 이 note에 적었던 23.2·24.5 교차검증 인용 두 건은 이 페이지(23.1) 본문에 없어(다른 페이지 인용) 삭제" }
       ]
     },
     {
@@ -523,7 +525,7 @@
       "related": [],
       "sources": [
         { "name": "Glossary: Pressure", "publisher": "NOAA National Weather Service", "url": "https://forecast.weather.gov/glossary.php?word=PRES", "tier": "1차", "note": "직접열람 — \"The pressure exerted by the earth's atmosphere at any given point, determined by taking the product of the gravitational acceleration at the point and the mass of the unit area column of air above the point.\" 확인" },
-        { "name": "What Are High and Low Pressure Systems?", "publisher": "NOAA NESDIS", "url": "https://www.nesdis.noaa.gov/about/k-12-education/weather-forecasting/what-are-high-and-low-pressure-systems", "tier": "1차", "note": "직접열람 — \"High-pressure systems...have more air pressure than their surroundings.\"/고기압이 \"often times associated with clear blue skies\" 확인. 작업163 — one_line·key_points·summary를 \"often times\"/\"usually\"(대체로/대개) 빈도 표현에 맞춰 교정, key_points[0]을 NWS 정의(\"pressure exerted by the earth's atmosphere\")에 맞춰 '지구 대기가 특정 지점에 미치는 압력'으로 교정. example의 H/L 기호는 이 페이지의 이미지 캡션 \"a black arrow pointing down with the letter H\"(고기압)/\"a black arrow point up with the letter L\"(저기압)로 확인" },
+        { "name": "What Are High and Low Pressure Systems?", "publisher": "NOAA NESDIS", "url": "https://www.nesdis.noaa.gov/about/k-12-education/weather-forecasting/what-are-high-and-low-pressure-systems", "tier": "1차", "note": "직접열람 — \"High-pressure systems...have more air pressure than their surroundings.\"/고기압이 \"often times associated with clear blue skies\" 확인. 작업163 — one_line·key_points·summary를 \"often times\"(대체로)와 NOAA JetStream 출처의 usually(대개) 빈도 표현에 맞춰 교정, key_points[0]을 NWS Glossary 정의에 맞춰 '지구 대기가 특정 지점에 미치는 압력'으로 교정. example의 H/L 기호는 이 페이지의 이미지 대체텍스트(alt) \"A black arrow pointing down with the letter H underneath it.\"(고기압)/\"A black arrow point up with the letter L.\"(저기압)로 확인" },
         { "name": "Learning Lesson: Drawing Conclusions - Surface Air Pressure Map", "publisher": "NOAA JetStream", "url": "https://www.noaa.gov/jetstream/analyze-appair-pressure-map", "tier": "1차", "note": "직접열람 — \"High pressure regions are usually associated with dry weather because as the air sinks, it warms and the moisture evaporates.\"/\"Low pressure regions usually bring precipitation because when the air rises, it cools, and the water vapor condenses.\" 확인" }
       ]
     }
