@@ -57,6 +57,7 @@ app.use(require('./routes/wordbook'));
 app.use(require('./routes/tts'));
 app.use(require('./routes/admin'));
 app.use('/api/metacong', require('./routes/metacong'));
+app.use(require('./routes/voice_study'));
 
 app.listen(PORT, () => {
   console.log(`사전 서버 실행 중: http://localhost:${PORT}`);
