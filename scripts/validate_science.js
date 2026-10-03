@@ -38,8 +38,8 @@ const path = require('path');
 const SCI_PATH = process.argv.slice(2).find(a => !a.startsWith('--')) ||
   path.join(__dirname, '..', 'public', 'science_db.json');
 
-// 분야별 기대 개수(작업162: 물리/화학/생물/지구과학 각 6개, 총 24개로 확장)
-const EXPECTED_FIELD_COUNTS = { '물리': 6, '화학': 6, '생물': 6, '지구과학': 6 };
+// 분야별 기대 개수(작업168: 물리/화학/생물/지구과학 각 8개, 총 32개로 확장)
+const EXPECTED_FIELD_COUNTS = { '물리': 8, '화학': 8, '생물': 8, '지구과학': 8 };
 const EXPECTED_TOTAL = Object.values(EXPECTED_FIELD_COUNTS).reduce((a, b) => a + b, 0);
 const FIELD_WHITELIST = Object.keys(EXPECTED_FIELD_COUNTS);
 const TIER_WHITELIST = ['1차', '보조'];

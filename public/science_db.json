@@ -354,7 +354,9 @@
         "변환형 경계에서는 지각이 생기지도 사라지지도 않는다"
       ],
       "example": "대서양이 매년 조금씩 넓어지는 것은 대서양 중앙 해령이라는 발산형 경계에서 새로운 지각이 계속 만들어지고 있기 때문이다",
-      "related": [],
+      "related": [
+        { "id": "science_031", "relation": "지진과 지진파, 판구조론을 함께 보면 좋은 지구과학 개념이다" }
+      ],
       "sources": [
         { "name": "This Dynamic Earth: Understanding Plate Motions", "publisher": "USGS", "url": "https://pubs.usgs.gov/gip/dynamic/understanding.html", "tier": "1차", "note": "직접열람(재확인, 작업159) — \"where new crust is generated as the plates pull away from each other\"/\"where crust is destroyed as one plate dives under another\"/\"where crust is neither produced nor destroyed as the plates slide horizontally past each other\"/\"The rate of spreading along the Mid-Atlantic Ridge averages about 2.5 centimeters per year (cm/yr), or 25 km in a million years\"/\"Trenches are the deepest parts of the ocean floor and are created by subduction\"(해양-대륙 수렴 경계 절에 위치)/\"Oceanic-continental convergence also sustains many of the Earth's active volcanoes, such as those in the Andes and the Cascade Range\"(해양-대륙 수렴 경계 절에 위치)/\"The descending plate also provides a source of stress as the two plates interact, leading to frequent moderate to strong earthquakes\"(해양-해양 수렴 경계 절에 위치)/\"a few occur on land, for example the San Andreas fault zone in California\" 확인. 작업159에서 해구·화산은 해양-대륙 수렴, 지진은 해양-해양 수렴 경계로 범위를 좁혀 summary를 원문 절 구분에 맞게 수정함" },
         { "name": "판 구조론", "publisher": "위키백과", "url": "https://ko.wikipedia.org/wiki/판_구조론", "tier": "보조", "note": "직접열람 — 발산/수렴/보존(변환) 경계 구분, 대서양 중앙 해령/샌안드레아스 단층 예시 교차확인" }
@@ -503,7 +505,9 @@
         "초신성 뒤 남은 핵의 질량에 따라 중성자별 또는 블랙홀이 된다"
       ],
       "example": "질량이 작은 별은 백색왜성으로 끝날 수 있지만, 태양보다 훨씬 무거운 별은 초신성 폭발 뒤 남은 핵의 질량에 따라 중성자별이나 블랙홀이 된다",
-      "related": [],
+      "related": [
+        { "id": "science_032", "relation": "빅뱅과 별의 진화를 함께 보면 좋은 지구과학 개념이다" }
+      ],
       "sources": [
         { "name": "Star Lifecycle", "publisher": "NASA Science", "url": "https://science.nasa.gov/mission/webb/star-lifecycle/", "tier": "1차", "note": "직접열람 — \"Stars are born in massive clouds of dust and gas...\"/\"This phase of the star's life is called the main sequence.\"/\"How a star ends its life depends on its mass.\"/\"Stars much more massive than our Sun end their lives in a supernova explosion.\"/\"If the remnant core of the star is less massive, it will collapse into a very small, very dense core of neutrons called a neutron star. If the remnant is more massive, gravity overwhelms the neutrons and the star collapses completely into a black hole\" 확인. 작업163 — \"During most of a star's lifetime, the interior heat and radiation is provided by nuclear reactions in the star's core.\" 확인(summary의 '중심핵 핵반응' 근거) 작업165 — \"If the remnant is more massive, gravity overwhelms the neutrons and the star collapses completely into a black hole — so-called because the matter within it is so compressed and gravity is so intense that not even light can escape.\" 재확인(summary '블랙홀은 … 빛조차 빠져나갈 수 없어 그렇게 불린다'의 이름 유래 서술 근거) 작업166 — 위 첫 인용은 원문에서 \"…core of neutrons called a neutron star.\"로 이어지고 마지막 문장은 \"black hole — so-called because…\"로 계속되어, 생략돼 있던 단어를 복원하고 문장 끝 마침표를 제거해 원문과 일치시킴" },
         { "name": "23.1 The Death of Low-Mass Stars", "publisher": "OpenStax Astronomy 2e", "url": "https://openstax.org/books/astronomy-2e/pages/23-1-the-death-of-low-mass-stars", "tier": "1차", "note": "직접열람(작업164) — \"the evidence so far suggests that stars with masses up to about 8 MSun can shed enough mass to end their lives as white dwarfs.\" 확인(summary의 '질량이 작은 별은 질량을 잃어 백색왜성이 될 수 있다' 근거, 수치는 쓰지 않음). 작업166 — 원문 표기는 M 아래첨자 Sun이 \"MSun\"으로 추출됨. 이전에 이 note에 적었던 23.2·24.5 교차검증 인용 두 건은 이 페이지(23.1) 본문에 없어(다른 페이지 인용) 삭제" }
@@ -527,6 +531,176 @@
         { "name": "Glossary: Pressure", "publisher": "NOAA National Weather Service", "url": "https://forecast.weather.gov/glossary.php?word=PRES", "tier": "1차", "note": "직접열람 — \"The pressure exerted by the earth's atmosphere at any given point, determined by taking the product of the gravitational acceleration at the point and the mass of the unit area column of air above the point.\" 확인" },
         { "name": "What Are High and Low Pressure Systems?", "publisher": "NOAA NESDIS", "url": "https://www.nesdis.noaa.gov/about/k-12-education/weather-forecasting/what-are-high-and-low-pressure-systems", "tier": "1차", "note": "직접열람 — \"High-pressure systems...have more air pressure than their surroundings.\"/고기압이 \"often times associated with clear blue skies\" 확인. 작업163 — one_line·key_points·summary를 \"often times\"(대체로)와 NOAA JetStream 출처의 usually(대개) 빈도 표현에 맞춰 교정, key_points[0]을 NWS Glossary 정의에 맞춰 '지구 대기가 특정 지점에 미치는 압력'으로 교정. example의 H/L 기호는 이 페이지의 이미지 대체텍스트(alt) \"A black arrow pointing down with the letter H underneath it.\"(고기압)/\"A black arrow point up with the letter L.\"(저기압)로 확인" },
         { "name": "Learning Lesson: Drawing Conclusions - Surface Air Pressure Map", "publisher": "NOAA JetStream", "url": "https://www.noaa.gov/jetstream/analyze-appair-pressure-map", "tier": "1차", "note": "직접열람 — \"High pressure regions are usually associated with dry weather because as the air sinks, it warms and the moisture evaporates.\"/\"Low pressure regions usually bring precipitation because when the air rises, it cools, and the water vapor condenses.\" 확인" }
+      ]
+    },
+    {
+      "id": "science_025",
+      "title": "빛의 굴절",
+      "field": "물리",
+      "level": "고등",
+      "one_line": "빛은 속력이 달라지는 물질의 경계를 지날 때 진행 방향이 바뀐다",
+      "summary": "빛줄기가 서로 다른 물질의 경계를 지나거나 온도와 밀도가 달라지는 층을 지날 때 방향이 바뀌는 현상을 굴절이라 한다. OpenStax 물리 교재는 이를 '빛줄기의 방향 바뀜(느슨하게 휘어짐이라 부른다)'으로 설명하고, 방향이 바뀌는 정도는 '빛의 속력이 어떻게 변하는가에 달려 있다'고 설명한다. 같은 교재는 물질의 굴절률 n을 n=c/v로 정의하며, v는 그 물질 안에서 관측된 빛의 속력이다. 또 '물질 안에서 빛의 속력은 항상 c보다 작고 진공에서만 c와 같으므로' 굴절률은 항상 1 이상이라고 설명한다. 광선이 느려지면 경로가 법선에 가까워지고, 빨라지면 법선에서 멀어진다. 굴절의 법칙, 곧 스넬의 법칙은 방정식 n₁ sin θ₁ = n₂ sin θ₂로 나타낸다. 대학 물리 교재도 같은 정의와 법칙을 서술한다.",
+      "key_points": [
+        "굴절은 물질의 경계에서 빛의 진행 방향이 바뀌는 현상이다",
+        "굴절률은 n=c/v로 정의되며 항상 1 이상이다",
+        "빛이 느려지면 법선 쪽으로, 빨라지면 법선에서 멀어지는 쪽으로 꺾인다"
+      ],
+      "example": "수족관 밖에서 물고기를 보면 같은 물고기가 두 곳에 있는 것처럼 보이는데, 교재는 빛이 물에서 공기로 나올 때 방향이 바뀌기 때문이라고 설명한다",
+      "related": [
+        { "id": "science_026", "relation": "빛의 굴절과 소리의 전달을 함께 보면 좋은 물리 개념이다" }
+      ],
+      "sources": [
+        { "name": "16.2 Refraction", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/16-2-refraction", "tier": "1차", "note": "직접열람 — \"The changing of a light ray’s direction (loosely called bending) when it passes a boundary between materials of different composition, or between layers in single material where there are changes in temperature and density, is called refraction.\"/\"The change in direction of the light ray depends on how the speed of light changes.\"/\"We define the index of refraction, n, of a material to be 𝑛=𝑐𝑣,n=cv,n=cv, where v is the observed speed of light in the material.\"/\"Because the speed of light is always less than c in matter and equals c only in a vacuum, the index of refraction (plural: indices of refraction) is always greater than or equal to one.\"/\"the path of the ray moves closer to the perpendicular when the ray slows down\"/\"the path of the ray moves away from the perpendicular when the ray speeds up\"/\"The exact mathematical relationship is the law of refraction, or Snell’s law, which is stated in equation form as 𝑛1⁢sin⁡𝜃1=𝑛2⁢sin⁡𝜃2 or 𝑛1𝑛2=sin⁡𝜃2sin⁡𝜃1.n1⁢sin⁡θ1=n2⁢sin⁡θ2 or n1n2=sin⁡θ2sin⁡θ1.n1sinθ1=n2sinθ2 or n1n2=sinθ2sinθ1.\"/\"Looking at the fish tank as shown, we can see the same fish in two different locations, because light changes directions when it passes from water to air.\" 확인. 수식은 텍스트 추출 시 기호가 중복(n1⁢sin⁡θ1=n2⁢sin⁡θ2 형태)되어 나타나므로 식 자체는 인용하지 않고 \"stated in equation form as\" 문장까지만 인용. 고등학교 물리 교재로 인용 범위가 고등 수준" },
+        { "name": "25.3 The Law of Refraction", "publisher": "OpenStax College Physics 2e", "url": "https://openstax.org/books/college-physics-2e/pages/25-3-the-law-of-refraction", "tier": "1차", "note": "직접열람 — \"The changing of a light ray’s direction (loosely called bending) when it passes through variations in matter is called refraction.\"/\"the direction of the ray moves closer to the perpendicular when it slows down\"/\"the direction of the ray moves away from the perpendicular when it speeds up\"/\"The exact mathematical relationship is the law of refraction, or “Snell’s Law,” which is stated in equation form as𝑛1⁢sin⁡𝜃1=𝑛2⁢sin⁡𝜃2.n1⁢sin⁡θ1=n2⁢sin⁡θ2.n1sinθ1=n2sinθ2. 25.7 Here 𝑛1n1n1 and 𝑛2n2n2 are the indices of refraction for medium 1 and 2, and 𝜃1θ1θ1 and 𝜃2θ2θ2 are the angles between the rays and the perpendicular in medium 1 and 2, as shown in Figure 25.12.\" 확인. 교차검증 — 굴절 정의(방향 바뀜)와 법선 쪽/바깥쪽 이동, 스넬 법칙 서술이 물리 교재(16.2)와 일치(식은 수식 중복 추출이라 인용하지 않음). 대학 교재이나 정의·원리 서술만 인용해 고등 수준에 적합" }
+      ]
+    },
+    {
+      "id": "science_026",
+      "title": "소리의 전달",
+      "field": "물리",
+      "level": "고등",
+      "one_line": "소리는 물질의 교란이 음원에서 바깥으로 전달되는 파동이다",
+      "summary": "OpenStax 고등학교 물리 교재는 소리를 '음원에서 바깥으로 전달되는 물질의 교란'으로 정의한다. 예를 들어 진동하는 줄이 오른쪽으로 움직이면 줄 앞의 공기는 압축되고 뒤의 공기는 팽창하며, 교재는 이 압력 교란이 '줄과 같은 진동수의 종파로 공기 속을 이동한다'고 설명한다. 대학 물리 교재도 소리를 '음원에서 바깥으로 전달되는 물질의 교란'이라 하고, '공기와 대부분의 유체에서 소리파는 종파인데, 유체에는 전단 강도가 거의 없기 때문'이라고 설명한다. 소리의 속력은 지나가는 매질에 따라 크게 달라진다. 교재는 '매질 안에서의 소리 속력은 매질의 강성(기체에서는 압축성)과 밀도의 조합으로 정해진다'고 하며, 더 단단하면 소리가 빠르고 밀도가 크면 느리다고 설명한다.",
+      "key_points": [
+        "소리는 음원에서 바깥으로 전달되는 물질의 교란이며 파동이다",
+        "공기와 대부분의 유체에서 소리파는 종파다",
+        "매질이 단단할수록 소리가 빠르고 밀도가 클수록 느리다"
+      ],
+      "example": "기타 줄이 진동하면 줄 앞의 공기는 압축되고 뒤의 공기는 팽창하며, 이 압력 교란이 줄과 같은 진동수의 종파로 공기 속을 이동한다",
+      "related": [
+        { "id": "science_025", "relation": "빛의 굴절과 소리의 전달을 함께 보면 좋은 물리 개념이다" }
+      ],
+      "sources": [
+        { "name": "14.1 Speed of Sound, Frequency, and Wavelength", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/14-1-speed-of-sound-frequency-and-wavelength", "tier": "1차", "note": "직접열람 — \"Sound is a wave.\"/\"sound is defined to be a disturbance of matter that is transmitted from its source outward.\"/\"A vibrating string moving to the right compresses the air in front of it and expands the air behind it.\"/\"The pressure disturbance moves through the air as longitudinal waves with the same frequency as the string.\"/\"The speed of sound in a medium is determined by a combination of the medium’s rigidity (or compressibility in gases) and its density.\"/\"The more rigid (or less compressible) the medium, the faster the speed of sound.\"/\"The greater the density of a medium, the slower the speed of sound.\" 확인. 고등학교 물리 교재로 인용 범위가 고등 수준. 소리의 속력 수치는 이 개념에 쓰지 않음" },
+        { "name": "17.1 Sound Waves", "publisher": "OpenStax University Physics Volume 1", "url": "https://openstax.org/books/university-physics-volume-1/pages/17-1-sound-waves", "tier": "1차", "note": "직접열람 — \"The physical phenomenon of sound is a disturbance of matter that is transmitted from its source outward.\"/\"Sound waves in air and most fluids are longitudinal, because fluids have almost no shear strength.\" 확인. 교차검증 — 소리의 정의와 종파 서술이 물리 교재(14.1)와 일치. 대학 교재이나 정의 수준 서술만 인용해 고등 수준에 적합" }
+      ]
+    },
+    {
+      "id": "science_027",
+      "title": "몰(mol)",
+      "field": "화학",
+      "level": "고등",
+      "one_line": "몰은 물질 속 입자의 수를 세는 화학의 묶음 단위다",
+      "summary": "OpenStax 화학 교재는 몰을 '쌍, 다스, 그로스 같은 익숙한 단위와 비슷한 양의 단위'로 소개하고, 몰은 '물질 시료 안의 원자나 분자의 수를 구체적으로 나타내는 척도'라고 설명한다. 같은 교재는 '물질 1몰은 6.02214076×10²³개의 개별 입자(원자 또는 분자)가 들어 있는 양'이라고 정의하며, 이 큰 수는 '아보가드로 수(NA) 또는 아보가드로 상수'로 불리는 기본 상수라고 설명한다. 미국 국립표준기술연구소(NIST)의 기본 물리 상수 목록도 아보가드로 상수를 6.022 140 76×10²³ mol⁻¹, 불확도 '(exact)'로 싣는다. 교재는 어떤 원소 1몰이든 다른 원소 1몰과 같은 수의 원자를 담지만, 원자 하나하나의 질량이 크게 다르므로 원소마다 1몰의 질량은 다르다고 설명한다.",
+      "key_points": [
+        "몰은 쌍·다스처럼 입자의 수를 나타내는 양의 단위다",
+        "물질 1몰에는 6.02214076×10²³개의 입자가 들어 있다",
+        "어떤 원소든 1몰에는 같은 수의 원자가 있지만 질량은 다르다"
+      ],
+      "example": "교재의 그림 3.5는 탄소, 구리 등 서로 질량이 다른 원소 시료가 저마다 6.022×10²³개의 원자, 곧 1.00몰을 담고 있음을 보여 준다",
+      "related": [
+        { "id": "science_028", "relation": "몰과 화학 결합을 함께 보면 좋은 화학 개념이다" }
+      ],
+      "sources": [
+        { "name": "3.1 Formula Mass and the Mole Concept", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/3-1-formula-mass-and-the-mole-concept", "tier": "1차", "note": "직접열람 — \"The mole is an amount unit similar to familiar units like pair, dozen, gross, etc.\"/\"It provides a specific measure of the number of atoms or molecules in a sample of matter.\"/\"A mole of substance is that amount in which there are 6.02214076 ××× 1023 discrete entities (atoms or molecules).\"/\"This large number is a fundamental constant known as Avogadro’s number (NA) or the Avogadro constant in honor of Italian scientist Amedeo Avogadro.\"/\"Consistent with its definition as an amount unit, 1 mole of any element contains the same number of atoms as 1 mole of any other element.\"/\"The masses of 1 mole of different elements, however, are different, since the masses of the individual atoms are drastically different.\"/\"Each sample contains 6.022 ××× 1023 atoms —1.00 mol of atoms. From left to right (top row): 65.4 g zinc, 12.0 g carbon, 24.3 g magnesium, and 63.5 g copper.\" 확인. 원문 추출 텍스트는 곱셈 기호를 \"×××\", 거듭제곱을 \"1023\"(=10²³)으로 표기하므로 추출된 표기 그대로 인용. 일반화학 대학 교재이나 인용 범위가 몰의 정의·상수 서술로 고등 수준에 적합. 아보가드로 수 값은 NIST 값과 교차검증(일치: 6.02214076 vs 6.022 140 76)" },
+        { "name": "Avogadro constant (Fundamental Physical Constants)", "publisher": "NIST(미국 국립표준기술연구소) The NIST Reference on Constants, Units and Uncertainty, 2022 CODATA", "url": "https://physics.nist.gov/cgi-bin/cuu/Value?na", "tier": "1차", "note": "직접열람 — \"Avogadro constant\"/\"Numerical value 6.022 140 76 x 1023 mol-1\"/\"Standard uncertainty (exact)\" 확인. 추출 텍스트의 \"1023\"은 10²³을 뜻하는 표기(상첨자 소실). OpenStax 6.02214076×10²³과 숫자열이 일치해 이 값을 채택" }
+      ]
+    },
+    {
+      "id": "science_028",
+      "title": "화학 결합",
+      "field": "화학",
+      "level": "고등",
+      "one_line": "이온 결합은 이온 사이의 정전기적 인력, 공유 결합은 전자쌍 공유다",
+      "summary": "OpenStax 화학 교재는 이온 결합을 '전하가 반대인 양이온과 음이온 사이의 정전기적 인력'이라 설명하고, 이온 결합이 '반대 전하 이온의 정전기적 인력'에서 생기며 이 이온은 '대체로 금속 원자와 비금속 원자 사이의 전자 이동으로 만들어진다'고 설명한다. 또 이온성 고체는 '결정 구조를 이루고 단단하며 부서지기 쉽고, 녹는점과 끓는점이 높은 경향이 있어' 이온 결합이 매우 강하다는 것을 시사한다고 설명한다. 다른 형태의 결합은 '전자 한 쌍을 공유한 원자들의 상호 인력'에서 생기며 이를 공유 결합이라 한다. 공유 결합은 '두 원자가 전자를 끌어당기는 경향이 비슷할 때' 형성된다. 전자를 끌어당기는 경향의 척도가 전기음성도이며, 전자가 고르지 않게 분포하면 '부분 양전하와 부분 음전하를 띠는 극성 공유 결합'이다.",
+      "key_points": [
+        "이온 결합은 반대 전하의 양이온과 음이온 사이의 정전기적 인력이다",
+        "공유 결합은 원자들이 공유한 전자 한 쌍에 대한 상호 인력으로 생긴다",
+        "전기음성도는 원자가 전자를 끌어당기는 경향의 척도다"
+      ],
+      "example": "고체 염화나트륨에서는 Na⁺와 Cl⁻ 이온 사이의 강한 정전기적 인력이 이온들을 단단히 붙잡고, 수소 원자 두 개는 공유 결합으로 H₂ 분자를 이룬다",
+      "related": [
+        { "id": "science_027", "relation": "몰과 화학 결합을 함께 보면 좋은 화학 개념이다" }
+      ],
+      "sources": [
+        { "name": "7.1 Ionic Bonding", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/7-1-ionic-bonding", "tier": "1차", "note": "직접열람 — \"ionic bonds: electrostatic forces of attraction between oppositely charged cations and anions.\"/\"Ionic solids exhibit a crystalline structure and tend to be rigid and brittle; they also tend to have high melting and boiling points, which suggests that ionic bonds are very strong.\"/\"The strong electrostatic attraction between Na+ and Cl– ions holds them tightly together in solid NaCl.\" 확인. 일반화학 대학 교재이나 정의·성질 서술만 인용해 고등 수준에 적합" },
+        { "name": "7.2 Covalent Bonding", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/7-2-covalent-bonding", "tier": "1차", "note": "직접열람 — \"Ionic bonding results from the electrostatic attraction of oppositely charged ions that are typically produced by the transfer of electrons between metallic and nonmetallic atoms.\"/\"A different type of bonding results from the mutual attraction of atoms for a “shared” pair of electrons.\"/\"Such bonds are called covalent bonds.\"/\"Covalent bonds are formed between two atoms when both have similar tendencies to attract electrons to themselves (i.e., when both atoms have identical or fairly similar ionization energies and electron affinities).\"/\"Electronegativity is a measure of the tendency of an atom to attract electrons (or electron density) towards itself.\"/\"This unequal distribution of electrons is known as a polar covalent bond, characterized by a partial positive charge on one atom and a partial negative charge on the other.\"/\"For example, two hydrogen atoms bond covalently to form an H2 molecule; each hydrogen atom in the H2 molecule has two electrons stabilizing it, giving each atom the same number of valence electrons as the noble gas He.\" 확인. 일반화학 대학 교재이나 정의 서술만 인용해 고등 수준에 적합" },
+        { "name": "4.2 Covalent Bonding", "publisher": "OpenStax Chemistry: Atoms First 2e", "url": "https://openstax.org/books/chemistry-atoms-first-2e/pages/4-2-covalent-bonding", "tier": "1차", "note": "직접열람 — \"A different type of bonding results from the mutual attraction of atoms for a “shared” pair of electrons.\"/\"Electronegativity is a measure of the tendency of an atom to attract electrons (or electron density) towards itself.\" 확인. 교차검증 — 같은 출판사의 다른 교재(Atoms First)에서 공유 결합·전기음성도 정의가 7.2와 같은 문구로 확인됨(독립 출처는 아니며 같은 출판사 교재 간 일치)" }
+      ]
+    },
+    {
+      "id": "science_029",
+      "title": "면역과 백신",
+      "field": "생물",
+      "level": "고등",
+      "one_line": "백신은 감염을 겪지 않고도 면역 기억을 만들어 내는 것을 목표로 한다",
+      "summary": "OpenStax 생물학 교재는 적응 면역을 '병원체나 백신에서 온 항원에 노출된 뒤 생기는 면역'이라 설명한다. 기억 세포는 '일차 면역 반응 동안 효과 세포로 분화하지 않지만 같은 병원체에 다시 노출되면 곧바로 효과 세포가 될 수 있는 항원 특이적 B 또는 T 림프구'다. 같은 교재는 백신 접종이 '알려진 병원체에서 유래한 비감염성 항원에 노출되면 약한 일차 면역 반응이 생긴다는 지식'에 바탕을 두며, 백신에 대한 면역 반응은 숙주가 질병으로 느끼지 못해도 면역 기억을 부여한다고 설명한다. 미생물학 교재는 백신이 적응 면역 방어를 인위적으로 자극해 일차 반응 때와 비슷한 기억 세포 생성을 일으키므로, 먼저 감염을 겪지 않고도 병원체에 노출될 때 강한 이차 반응을 일으킬 수 있다고 설명한다. 백신 유형으로 약화된 병원체를 쓰는 약독화 생백신과 죽였거나 불활성화한 병원체를 쓰는 불활화 백신을 든다.",
+      "key_points": [
+        "기억 세포는 같은 병원체에 다시 노출되면 곧바로 효과 세포가 된다",
+        "백신은 병원체 유래 항원으로 약한 일차 면역 반응을 일으킨다",
+        "백신의 목표는 감염을 겪지 않고 면역 기억을 만드는 것이다"
+      ],
+      "example": "일부 백신 접종에는 추가 접종이 포함되는데, 재감염마다 기억 세포가 늘고 저항성이 커지므로 반복 노출을 흉내 내기 위해서다",
+      "related": [
+        { "id": "science_030", "relation": "면역과 백신, 항상성을 함께 보면 좋은 생물 개념이다" }
+      ],
+      "sources": [
+        { "name": "42.2 Adaptive Immune Response", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/42-2-adaptive-immune-response", "tier": "1차", "note": "직접열람 — \"Adaptive immunity is an immunity that occurs after exposure to an antigen either from a pathogen or a vaccination.\"/\"A memory cell is an antigen-specific B or T lymphocyte that does not differentiate into effector cells during the primary immune response, but that can immediately become effector cells upon reexposure to the same pathogen.\"/\"Vaccination is based on the knowledge that exposure to noninfectious antigens, derived from known pathogens, generates a mild primary immune response.\"/\"The immune response to vaccination may not be perceived by the host as illness but still confers immune memory.\"/\"When exposed to the corresponding pathogen to which an individual was vaccinated, the reaction is similar to a secondary exposure.\"/\"Ideally, the effect of vaccination is to elicit immunological memory, and thus resistance to specific pathogens without the individual having to experience an infection.\"/\"Because each reinfection generates more memory cells and increased resistance to the pathogen, and because some memory cells die, certain vaccine courses involve one or more booster vaccinations to mimic repeat exposures\" 확인. 대학 생물학 교재이나 정의·기전 서술만 인용해 고등 수준에 적합. 이 개념은 기전 설명으로 한정하며 특정 질병·백신의 효능·안전성 수치는 쓰지 않음(인용한 부스터 문장에서 파상풍 기간 수치는 제외)" },
+        { "name": "18.5 Vaccines", "publisher": "OpenStax Microbiology", "url": "https://openstax.org/books/microbiology/pages/18-5-vaccines", "tier": "1차", "note": "직접열람 — \"Vaccination is a form of artificial immunity.\"/\"By artificially stimulating the adaptive immune defenses, a vaccine triggers memory cell production similar to that which would occur during a primary response.\"/\"In so doing, the patient is able to mount a strong secondary response upon exposure to the pathogen—but without having to first suffer through an initial infection.\"/\"Live attenuated vaccines expose an individual to a weakened strain of a pathogen with the goal of establishing a subclinical infection that will activate the adaptive immune defenses.\"/\"Inactivated vaccines contain whole pathogens that have been killed or inactivated with heat, chemicals, or radiation.\" 확인. 출처 간 표현 차이 — 생물학 교재는 백신을 비감염성 항원(noninfectious antigens)의 전달로 서술하고, 미생물학 교재는 약독화 생백신(약화된 균주로 무증상 감염을 일으키는 목적)과 불활화 백신(죽이거나 불활성화한 병원체)의 두 유형을 구분해 서술함. 두 서술을 각 출처의 범위로만 인용하고 하나로 합치지 않음. 미생물학 교재는 보건 계열 대학 교재이나 기전 서술만 인용해 고등 수준에 적합" }
+      ]
+    },
+    {
+      "id": "science_030",
+      "title": "항상성",
+      "field": "생물",
+      "level": "고등",
+      "one_line": "항상성은 몸의 내부 상태를 설정값 근처로 유지하는 조절이다",
+      "summary": "OpenStax 생물학 교재는 동물의 기관과 기관계가 '내부와 외부의 변화에 맞춰 계속 조정하는 과정'을 항상성(homeostasis, '정상 상태')이라 하며, 항상성은 '몸에서 동적 평형을 유지하는 것'이라고 설명한다. 내부나 외부 환경의 변화를 자극이라 하고 수용기가 이를 감지하며, 계는 편차를 설정값 쪽으로 조정하는 방향으로 반응한다. 예를 들어 몸이 너무 따뜻해지면 동물을 식히는 조정이 일어난다. 해부생리학 교재는 설정값을 '정상 범위가 그 주위에서 변동하는 생리적 값'으로 정의하고, 음성 되먹임을 '설정값에서 벗어난 편차를 되돌리는 기전'이라 설명한다. 반대로 양성 되먹임은 '신체의 생리 상태 변화를 되돌리는 대신 강화한다'고 한다.",
+      "key_points": [
+        "항상성은 몸에서 동적 평형을 유지하는 것이다",
+        "음성 되먹임은 설정값에서 벗어난 편차를 되돌리는 기전이다",
+        "양성 되먹임은 몸의 생리 상태 변화를 되돌리지 않고 강화한다"
+      ],
+      "example": "몸이 너무 따뜻해지면 동물을 식히는 조정이 일어나 편차가 설정값 쪽으로 되돌려진다(교재의 이 서술을 음성 되먹임 정의에 대입)",
+      "related": [
+        { "id": "science_029", "relation": "면역과 백신, 항상성을 함께 보면 좋은 생물 개념이다" }
+      ],
+      "sources": [
+        { "name": "33.3 Homeostasis", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/33-3-homeostasis", "tier": "1차", "note": "직접열람 — \"Animal organs and organ systems constantly adjust to internal and external changes through a process called homeostasis (“steady state”).\"/\"Homeostasis means to maintain dynamic equilibrium in the body.\"/\"Homeostasis is maintained by negative feedback loops.\"/\"A change in the internal or external environment is called a stimulus and is detected by a receptor; the response of the system is to adjust the deviation parameter toward the set point.\"/\"For instance, if the body becomes too warm, adjustments are made to cool the animal.\" 확인. 대학 생물학 교재이나 정의·기전 서술만 인용해 고등 수준에 적합. 예시는 이 교재 문장을 음성 되먹임 정의에 대입한 원리 대입" },
+        { "name": "1.5 Homeostasis", "publisher": "OpenStax Anatomy and Physiology 2e", "url": "https://openstax.org/books/anatomy-and-physiology-2e/pages/1-5-homeostasis", "tier": "1차", "note": "직접열람 — \"A set point is the physiological value around which the normal range fluctuates.\"/\"Negative feedback is a mechanism that reverses a deviation from the set point.\"/\"Positive feedback intensifies a change in the body’s physiological condition rather than reversing it.\" 확인. 교차검증 — 생물학 교재(33.3)의 음성 되먹임·설정값 서술과 같은 개념을 해부생리학 교재가 정의 문장으로 서술함. 대학 교재이나 정의 서술만 인용해 고등 수준에 적합" }
+      ]
+    },
+    {
+      "id": "science_031",
+      "title": "지진과 지진파",
+      "field": "지구과학",
+      "level": "고등",
+      "one_line": "지진이 일어나면 P파가 가장 먼저 도착하고 S파가 그 뒤에 도착한다",
+      "summary": "한국지질자원연구원(KIGAM)은 '단층의 갑작스러운 움직임이 두 가지 서로 다른 형태의 실체파인 P파와 S파를 발생시킨다'고 설명하며, 표면파는 '지구의 표면과 내부의 층에서 P파와 S파의 상호작용에 의해 발생한다'고 설명한다. 미국 지질조사국(USGS)은 지진으로 생겨 고체 암석을 통과하는 파를 두 종류로 설명한다. P파 또는 압축파에서는 '암석의 진동이 전파 방향과 같고', P파는 '가장 빠르게 이동해 지진에서 가장 먼저 도착한다'. S파 또는 전단파에서는 '암석이 파의 전파 방향에 수직으로 진동하며', S파는 '항상 P파 뒤에 도착한다'. KIGAM도 S파가 전달될 때 암석 속 입자가 '파의 진행 방향에 대해 수직으로 움직인다'고 설명한다. 가장 늦게 도착하는 것은 표면파이며, USGS는 표면파가 '지진에서 기록되는 파 중 일반적으로 가장 크다'고 설명한다.",
+      "key_points": [
+        "단층의 갑작스러운 움직임은 실체파인 P파와 S파를 만들어 낸다",
+        "P파는 암석의 진동이 전파 방향과 같고 가장 먼저 도착한다",
+        "S파는 전파 방향에 수직으로 진동하며 항상 P파 뒤에 도착한다"
+      ],
+      "example": "USGS는 한쪽이나 양쪽 끝을 묶은 줄을 흔드는 것을 S파의 예로, 들을 수 있는 높이의 진동수에서의 소리파를 P파의 예로 든다",
+      "related": [
+        { "id": "science_016", "relation": "지진과 지진파, 판구조론을 함께 보면 좋은 지구과학 개념이다" }
+      ],
+      "sources": [
+        { "name": "지진파", "publisher": "한국지질자원연구원(KIGAM) 지진연구센터", "url": "https://www.kigam.re.kr/menu.es?mid=a40302010000", "tier": "1차", "note": "직접열람 — \"단층의 갑작스런 움직임은 두 가지 서로 다른 형태의 실체파(Body wave)인 P파(Primary waves)와 S파(Secondary waves)를 발생시킨다.\"/\"지진파 중 표면파(Surface wave)는 지구의 표면과 내부의 층에서 P파와 S파의 상호작용에 의해 발생한다.\"/\"P파는 가장 빠르게 전파한다. 공기 중에서 소리가 전파하듯이 P파는 수축과 확장의 연속으로 전달된다.\"/\"공기 중에서 소리가 전파하듯이 P파는 수축과 확장의 연속으로 전달된다.\"/\"S파가 전달될 때 암석내의 입자들은 파의 진행방향에 대해 수직으로 움직인다.\" 확인. 국내 공공 연구기관 자료. KIGAM은 P파·S파 속도를 km/s로 제시하고 USGS는 S파가 P파의 약 60% 속도라고 서술해 표현이 달라, 속도 수치는 본문에 쓰지 않음. 원문 표기 \"갑작스런\"을 요약문에서는 갑작스러운으로 옮김" },
+        { "name": "Body waves inside the earth", "publisher": "USGS Earthquake Hazards Program (1906 San Francisco earthquake 해설 페이지)", "url": "https://earthquake.usgs.gov/earthquakes/events/1906calif/18april/earthwaves.php", "tier": "1차", "note": "직접열람 — \"Two kinds of waves are generated by earthquakes and travel through solid rock: In P or compressional waves, the vibration of the rock is in the direction of propagation.\"/\"P waves travel fastest and are the first to arrive from the earthquake.\"/\"In S or shear waves, rock oscillates perpendicular to the direction of wave propagation.\"/\"the S wave always arrives after the P wave\"/\"For example, sound waves are P waves at a high enough frequency to hear with your ear.\"/\"An example of an S wave is wiggling or shaking a rope which is tied down at one or both ends.\"/\"The slowest (and latest to arrive on seismograms) are surface waves, such as the L wave.\"/\"The surface waves are generally the largest recorded from an earthquake.\" 확인. 교차검증 — P파가 가장 빠르고 먼저 도착한다는 서술과 S파가 P파 뒤에 오며 진행 방향에 수직으로 진동한다는 서술이 KIGAM 자료와 일치. 예시는 이 페이지 문장을 그대로 옮긴 것(원리 대입 아님)" }
+      ]
+    },
+    {
+      "id": "science_032",
+      "title": "빅뱅과 우주 팽창",
+      "field": "지구과학",
+      "level": "고등",
+      "one_line": "우주는 팽창해 왔으며 멀리 있는 은하일수록 우리에게서 빨리 멀어진다",
+      "summary": "OpenStax 천문학 교재는 '우주가 팽창하고 있다는 사실'을 천문학에서 이루어진 가장 중요한 발견 중 하나로 소개한다. 허블이 자신의 거리 추정치를 후퇴 속도 측정값과 비교했더니 '은하가 멀수록 우리에게서 더 빠르게 멀어지는' 관계가 나타났다. 교재는 적색편이를 스펙트럼선이 '더 긴 파장 쪽으로 옮겨지는 것'이라 하고, 적색편이는 '파동의 근원이 우리에게서 멀어질 때' 나타난다고 설명한다. 또 우주 팽창은 '은하가 정지한 공간 속을 움직이는 것보다 공간 자체가 늘어나는 것으로 생각하는 편이 더 정확하다'고 설명한다. NASA는 빅뱅 이론이 '하나의 점에서 시작해 급격히 팽창하며 지금의 우주로 서서히 진화했다'는 것이며, '우주가 계속 팽창하면서 온도와 밀도가 낮아졌다'고 설명한다. 원자 형성 때 풀려난 에너지는 오늘날 우주 마이크로파 배경 복사로 관측된다.",
+      "key_points": [
+        "멀리 있는 은하일수록 더 빠르게 우리에게서 멀어진다",
+        "적색편이는 스펙트럼선이 더 긴 파장 쪽으로 옮겨지는 것이다",
+        "빅뱅 이후 우주가 팽창하면서 온도와 밀도가 낮아졌다"
+      ],
+      "example": "교재는 부푸는 건포도 빵에서 더 먼 건포도일수록 더 빠르게 멀어진다는 점을 우주 팽창의 비유로 들면서, 비유를 문자 그대로 받아들이면 안 된다고 덧붙인다",
+      "related": [
+        { "id": "science_023", "relation": "빅뱅과 별의 진화를 함께 보면 좋은 지구과학 개념이다" }
+      ],
+      "sources": [
+        { "name": "26.5 The Expanding Universe", "publisher": "OpenStax Astronomy 2e", "url": "https://openstax.org/books/astronomy-2e/pages/26-5-the-expanding-universe", "tier": "1차", "note": "직접열람 — \"We now come to one of the most important discoveries ever made in astronomy—the fact that the universe is expanding.\"/\"laid his own distance estimates next to measurements of the recession velocities (the speed with which the galaxies were moving away), he found something stunning: there was a relationship between distance and velocity for galaxies.\"/\"The more distant the galaxy, the faster it was receding from us.\"/\"By “redshift” we mean that the lines in the spectra are displaced toward longer wavelengths (toward the red end of the visible spectrum).\"/\"Recall from the chapter on Radiation and Spectra that a redshift is seen when the source of the waves is moving away from us.\"/\"For a three-dimensional analogy, let’s look at the loaf of raisin bread in Figure 26.17.\"/\"As the raisin bread rises, the raisins “see” other raisins moving away.\"/\"More distant raisins move away faster in a uniformly expanding bread.\"/\"Our two analogies are useful for clarifying our thinking, but you must not take them literally.\" 확인. 대학 교양 천문학 교재이나 발견·정의 서술만 인용해 고등 수준에 적합. 건포도 빵 예시는 이 교재의 그림 설명 문장" },
+        { "name": "29.2 A Model of the Universe", "publisher": "OpenStax Astronomy 2e", "url": "https://openstax.org/books/astronomy-2e/pages/29-2-a-model-of-the-universe", "tier": "1차", "note": "직접열람 — \"it is more correct to think of space itself stretching rather than of galaxies moving through static space.\" 확인. 출처 간 표현 차이 — 같은 교재의 29.1은 빅뱅을 농축된 우주의 폭발이라 부른다고 서술하지만(29.1 본문 확인, 이 note에는 인용하지 않음), 29.2와 NASA는 공간 자체가 늘어나는 팽창·급격한 팽창으로 서술해, 본문은 29.2·NASA 서술을 따르고 폭발 표현은 쓰지 않음. 우주의 나이는 NASA(약 138억 년)와 OpenStax 29.1(허블 상수 추정에 따라 약 140억 년, 불확실성 약 5%)의 수치가 일치하지 않아 본문에 쓰지 않음" },
+        { "name": "Hubble Big Bang", "publisher": "NASA Science", "url": "https://science.nasa.gov/mission/hubble/science/science-behind-the-discoveries/hubble-big-bang/", "tier": "1차", "note": "직접열람 — \"The big bang theory of the universe starts with a single point which rapidly expanded and slowly evolved into the cosmos we see today.\"/\"About one second after the big bang, the rapid expansion slowed.\"/\"As the universe continued to expand, its temperature and density decreased.\"/\"A few minutes after the big bang, the universe had cooled enough for subatomic particles to form atomic nuclei.\"/\"As they became part of atoms, the captured electrons slowed down, releasing some of their energy that we detect as cosmic microwave background radiation today.\" 확인. 교차검증 — OpenStax의 팽창 서술과 방향이 일치(팽창 → 온도·밀도 감소). 380,000년 같은 연대 수치는 NASA 한 페이지에만 있어 본문에 쓰지 않음" }
       ]
     }
   ]
