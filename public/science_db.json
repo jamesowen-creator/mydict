@@ -109,7 +109,7 @@
       "example": "항생제에 노출된 세균 집단에서 민감한 세균은 죽고 내성을 가진 세균만 살아남아 번식하는 것은, 자연선택이 지금도 일어나고 있음을 보여주는 예로 흔히 언급된다",
       "misconception": "생물교육 예비교사 중에도 환경에 적응할 필요가 있어서 진화가 일어난다고 생각하는 경우가 있었지만, 자연선택에는 목적이나 의도가 없다",
       "related": [
-        { "id": "science_021", "relation": "자연선택은 공통 조상에서 갈라진 종들이 달라지는 핵심 기작이다" }
+        { "id": "science_021", "relation": "공통 조상과 진화와 함께 보면 좋은 생물 개념이다" }
       ],
       "sources": [
         { "name": "On the Origin of Species", "publisher": "위키백과(영문)", "url": "https://en.wikipedia.org/wiki/On_the_Origin_of_Species", "tier": "보조", "note": "부분확인 — 1859년 출판 확인" },
@@ -203,8 +203,7 @@
       "example": "줄다리기에서 내가 상대를 당기는 힘만큼 상대도 나를 당기는 힘으로 끌어당기며, 이 두 힘은 나와 상대라는 서로 다른 두 사람에게 작용한다",
       "misconception": "서울대학교 과학교육연구소 자료의 용수철저울 문항(양쪽에 각 2N으로 표시된 추)에서, 무게를 합쳐 4N이라고 답하거나 힘이 상쇄되어 0N이라고 답한 학생 사례가 있었지만, 문항의 정답은 2N이다",
       "related": [
-        { "id": "science_002", "relation": "관성은 제1법칙, 작용·반작용은 제3법칙으로 둘 다 뉴턴 역학의 기초다" },
-        { "id": "science_017", "relation": "둘 다 뉴턴 역학에서 다루는 보존 원리와 연결된 핵심 개념이다" }
+        { "id": "science_002", "relation": "관성은 제1법칙, 작용·반작용은 제3법칙으로 둘 다 뉴턴 역학의 기초다" }
       ],
       "sources": [
         { "name": "5.5 Newton's Third Law", "publisher": "OpenStax University Physics Volume 1", "url": "https://openstax.org/books/university-physics-volume-1/pages/5-5-newtons-third-law", "tier": "1차", "note": "직접열람(재확인) — \"Whenever one body exerts a force on a second body, the first body experiences a force that is equal in magnitude and opposite in direction to the force that it exerts\"/\"these forces are acting on different bodies or systems: A's force acts on B and B's force acts on A\"/\"Thus, they do not cancel each other\" 확인" },
@@ -269,7 +268,7 @@
       ],
       "example": "나트륨과 염소가 반응해 염화나트륨을 만드는 2Na(s)+Cl₂(g)→2NaCl(s) 반응에서, 나트륨은 전자를 잃어 산화되고 염소는 전자를 얻어 환원된다",
       "related": [
-        { "id": "science_020", "relation": "많은 산화·환원 반응은 열을 내거나 흡수하는 반응이기도 하다" }
+        { "id": "science_020", "relation": "화학 반응에서의 에너지와 함께 보면 좋은 화학 개념이다" }
       ],
       "sources": [
         { "name": "4.2 Classifying Chemical Reactions", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/4-2-classifying-chemical-reactions", "tier": "1차", "note": "직접열람(재확인) — \"oxidation-reduction (redox) reactions are those in which one or more elements involved undergo a change in oxidation number\"/\"Some redox reactions involve the transfer of electrons between reactant entities to yield ionic products, such as the reaction between sodium and chlorine to yield sodium chloride\"(2Na(s)+Cl2(g)→2NaCl(s))/\"The product of this reaction is a covalent compound, so transfer of electrons in the explicit sense is not involved\"(산화수 정의로 확장하는 이유) 확인" },
@@ -365,20 +364,19 @@
       "field": "물리",
       "level": "고등",
       "one_line": "에너지는 새로 생기거나 사라지지 않고 형태만 바뀐다",
-      "summary": "에너지는 새로 생기거나 없어지지 않으며, 다만 한 형태에서 다른 형태로 바뀔 뿐이라는 것이 에너지 보존 법칙이다. OpenStax 화학 교재는 '에너지는 생성되거나 소멸될 수 없으며, 다만 형태가 바뀔 수 있을 뿐이다'라고 설명한다. 역학적 에너지(운동 에너지+위치 에너지)만 놓고 보면, 외부에서 힘이 작용하지 않는 닫힌계에서는 전체 역학적 에너지가 일정하게 유지된다. OpenStax 고등학교 물리 교재는 이를 '닫힌계에서는 전체 에너지가 보존된다—즉 일정하게 유지된다'고 설명하며, 물체가 떨어질 때 위치 에너지가 운동 에너지로 바뀌는 과정을 예로 든다. 위치 에너지가 줄어드는 만큼 운동 에너지가 늘어나므로, 떨어지기 전과 후의 운동 에너지와 위치 에너지의 합은 서로 같다.",
+      "summary": "에너지는 새로 생기거나 없어지지 않으며, 다만 한 형태에서 다른 형태로 바뀔 뿐이라는 것이 에너지 보존 법칙이다. OpenStax 화학 교재는 '에너지는 생성되거나 소멸될 수 없으며, 다만 형태가 바뀔 수 있을 뿐이다'라고 설명한다. OpenStax 고등학교 물리 교재는 '마찰이나 공기저항으로 주위에 에너지를 잃지 않는다고 가정'하는 닫힌계에서는 '전체 에너지가 보존된다—즉 일정하게 유지된다'고 설명하며, 물체가 떨어질 때 위치 에너지가 운동 에너지로 바뀌는 과정을 예로 든다. 위치 에너지가 줄어드는 만큼 운동 에너지가 늘어나므로, 떨어지기 전과 후의 운동 에너지와 위치 에너지의 합은 서로 같다. 이를 식으로 나타내면 KE₁+PE₁=KE₂+PE₂이다.",
       "key_points": [
         "에너지는 새로 생기거나 사라지지 않고 형태만 바뀐다",
-        "닫힌계에서는 전체 에너지가 일정하게 보존된다",
+        "마찰·공기저항이 없다고 가정한 닫힌계에서는 에너지가 보존된다",
         "물체가 떨어질 때 위치 에너지가 운동 에너지로 바뀐다"
       ],
       "example": "롤러코스터가 높은 곳에서 내려올 때 위치 에너지가 운동 에너지로 바뀌어 속도가 빨라지고, 다시 올라갈 때는 운동 에너지가 위치 에너지로 바뀌어 속도가 느려진다",
       "related": [
-        { "id": "science_009", "relation": "둘 다 뉴턴 역학에서 다루는 보존 원리와 연결된 핵심 개념이다" },
-        { "id": "science_018", "relation": "전기 회로에서 흐르는 전기 에너지도 에너지 보존 법칙을 따른다" }
+        { "id": "science_018", "relation": "전류·전압과 함께 보면 좋은 물리 에너지 개념이다" }
       ],
       "sources": [
         { "name": "5.1 Energy Basics", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/5-1-energy-basics", "tier": "1차", "note": "직접열람 — \"energy can be neither created nor destroyed, although it can be changed in form\" 확인" },
-        { "name": "9.2 Mechanical Energy and Conservation of Energy", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/9-2-mechanical-energy-and-conservation-of-energy", "tier": "1차", "note": "직접열람 — \"in a closed system, total energy is conserved—that is, it is constant\"/\"KE₁ + PE₁ = KE₂ + PE₂\"/낙하하는 물체의 위치 에너지가 운동 에너지로 전환됨(\"its energy is converted to kinetic energy\") 확인" }
+        { "name": "9.2 Mechanical Energy and Conservation of Energy", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/9-2-mechanical-energy-and-conservation-of-energy", "tier": "1차", "note": "직접열람 — \"in a closed system, total energy is conserved—that is, it is constant\"/\"KE₁ + PE₁ = KE₂ + PE₂\"/낙하하는 물체의 위치 에너지가 운동 에너지로 전환됨(\"its energy is converted to kinetic energy\") 확인. 작업163 — \"The phrase in a closed system means we are assuming no energy is lost to the surroundings due to friction and air resistance.\" 확인(닫힌계 조건의 원문 근거) — summary의 '외부에서 힘이 작용하지 않는'을 이 정의에 맞춰 '마찰이나 공기저항으로 에너지를 잃지 않는다고 가정'으로 교정. science_009와의 related는 '보존 원리로 연결된다'는 직접 인용이 없어 작업163에서 제거(둘 다 science_018 related로 대체)" }
       ]
     },
     {
@@ -387,20 +385,20 @@
       "field": "물리",
       "level": "고등",
       "one_line": "전류는 전하의 흐름, 전압은 그 흐름을 만드는 원인이다",
-      "summary": "전류는 전하가 이동하는 빠르기다. OpenStax 고등학교 물리 교재는 '전류는 전기 전하가 이동하는 속도다'라고 정의하고, 전류 I를 I=ΔQ/Δt(ΔQ는 이동한 전하량, Δt는 걸린 시간)로 나타낸다. 전압(전위)은 전하 하나가 가진 전기 퍼텐셜 에너지로, 같은 교재는 '전위는 보통 그냥 전위 또는 전압이라 부른다'고 설명하며 V=U_E/q(전기 퍼텐셜 에너지를 전하량으로 나눈 값)로 정의한다. 전류와 전압, 저항 사이에는 V=IR이라는 옴의 법칙이 성립하는데, 교재는 이를 '도선을 통과하는 전류는 전류가 흐르는 도체에 걸리는 전압 강하에 비례한다'고 설명한다. 전압이 원인이고 전류가 그 결과라는 인과관계로, 전압이 전하를 밀어내는 힘 역할을 한다.",
+      "summary": "전류는 전하가 이동하는 빠르기다. OpenStax 고등학교 물리 교재는 '전류는 전기 전하가 이동하는 속도다'라고 정의하고, 전류 I를 I=ΔQ/Δt(ΔQ는 이동한 전하량, Δt는 걸린 시간)로 나타낸다. 전압(전위)은 '단위 전하당 전기 퍼텐셜 에너지'로, 같은 교재는 V=U_E/q로 정의하고 '전위는 보통 그냥 전위 또는 전압이라 부른다'고 설명한다. 전위가 높은 영역의 양전하는 '전위가 낮은 영역 쪽으로 미는 힘을 받는다'고 교재는 설명한다. 전류와 전압, 저항 사이에는 V=IR이라는 옴의 법칙이 성립하는데, 교재는 이를 '도선을 통과하는 전류는 전류가 흐르는 도체에 걸리는 전압 강하에 비례한다'고 설명하며, 전위의 단위는 J/C이고 이를 볼트(V)라 부른다고 덧붙인다.",
       "key_points": [
         "전류는 전하가 이동하는 빠르기(I=ΔQ/Δt)다",
-        "전압(전위)은 전하가 가진 전기 퍼텐셜 에너지다",
+        "전압(전위)은 단위 전하당 전기 퍼텐셜 에너지다",
         "전류는 전압에 비례한다는 것이 옴의 법칙(V=IR)이다"
       ],
       "example": "전지의 전압이 높을수록 회로에 더 많은 전류가 흐르는 것을, 물탱크의 높이가 높을수록 물이 더 세게 흐르는 것에 비유할 수 있다",
       "misconception": "초등 과학영재 9명 중 8명(88.9%)이 전구에서 전류가 소모된다는 전류 소모 모델을 가지고 있었고, 7명(77.8%)은 전지 역할에 대해 비과학적 개념을 보였다",
       "related": [
-        { "id": "science_017", "relation": "전기 에너지가 다른 에너지로 바뀌는 과정도 에너지 보존 법칙을 따른다" }
+        { "id": "science_017", "relation": "에너지 보존과 함께 보면 좋은 물리 개념이다" }
       ],
       "sources": [
         { "name": "19.1 Ohm's Law", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/19-1-ohms-law", "tier": "1차", "note": "직접열람 — \"Electric current is the rate at which electric charge moves.\"/\"I= ΔQ Δt\"/\"This relationship is called Ohm's law\"(V=IR)/\"current through a conductor is proportional to the voltage drop across a current-carrying conductor\"/전압이 원인, 전류가 결과라는 인과관계(\"voltage being the cause and the current being the effect\") 확인" },
-        { "name": "18.4 Electric Potential", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/18-4-electric-potential", "tier": "1차", "note": "직접열람 — \"Normally, the electric potential is simply called the potential or voltage.\"/\"V= U E q\"/\"The units for the potential are J/C, which are given the name volt (V)\" 확인" },
+        { "name": "18.4 Electric Potential", "publisher": "OpenStax Physics", "url": "https://openstax.org/books/physics/pages/18-4-electric-potential", "tier": "1차", "note": "직접열람 — \"Normally, the electric potential is simply called the potential or voltage.\"/\"V= U E q\"/\"The units for the potential are J/C, which are given the name volt (V)\" 확인. 작업163 — \"We now define the electric potential V, which is the electric potential energy per unit charge.\" 확인(key_points·summary의 '단위 전하당 전기 퍼텐셜 에너지' 근거). 또한 \"a positive charge in a region with high potential will experience a force pushing it toward regions of lower potential\" 확인 — 기존 '전압이 전하를 밀어내는 힘 역할을 한다'는 일반화된 인과 서술 대신 이 문장 범위로 교정" },
         { "name": "초등 과학영재의 전류·전지 개념(전기회로 역학적 운동 비유 학습)", "publisher": "새물리(한국물리학회), Jiseon Kim·Hyejung Kwak·Jung Bog Kim, 2021, 71(4), 364-382", "url": "https://www.npsm-kps.org/journal/view.html?doi=10.3938/NPSM.71.364", "tier": "1차", "note": "직접열람(본문 Results III.1) — \"8명의 학생들 (88.9%)\"이 전류 소모 모델을 가졌고 \"7명의 학생들(77.8%)\"은 전지 역할에 대해 비과학적 개념을 가짐을 확인" }
       ]
     },
@@ -409,19 +407,19 @@
       "title": "원소와 화합물",
       "field": "화학",
       "level": "고등",
-      "one_line": "원소는 더는 쪼갤 수 없는 물질, 화합물은 원소들이 결합한 물질이다",
-      "summary": "물질은 순물질과 혼합물로 나뉘고, 순물질은 다시 원소와 화합물로 나뉜다. OpenStax 화학 교재는 '화학 변화로 더 간단한 물질로 쪼갤 수 없는 순물질을 원소라 한다'고 정의하고, '두 가지 이상의 원소로 이루어진 순물질을 화합물이라 한다'고 설명한다. 화합물은 구성 원소의 비율이 항상 일정한데, 같은 교재는 설탕(자당) 시료가 항상 질량 기준 탄소 42.1%, 수소 6.5%, 산소 51.4%로 이루어진다는 예를 든다. 물 분자도 마찬가지로, 교재는 '물 분자 하나는 수소 원자 두 개와 산소 원자 한 개를 포함하는 단위다'라고 설명한다. 위키백과에 따르면 현재까지 알려진 원소는 118종이며, 이 중 자연에서 발견되는 것과 실험실에서 인공적으로 만들어진 것이 섞여 있다.",
+      "one_line": "원소는 화학 변화로 더는 분해할 수 없는 물질이다",
+      "summary": "물질은 혼합물과 순물질로 나뉘고, 순물질은 다시 원소와 화합물로 나뉜다. OpenStax 화학 교재는 '물질은 여러 범주로 나뉠 수 있는데, 두 가지 큰 범주는 혼합물과 순물질이다'라고 설명하고, '순물질은 원소와 화합물 두 부류로 나뉠 수 있다'고 설명한다. 같은 교재는 '화학 변화로 더 간단한 물질로 쪼갤 수 없는 순물질을 원소라 한다'고 정의하고, '두 가지 이상의 원소로 이루어진 순물질을 화합물이라 한다'고 설명한다. 화합물은 구성 원소의 비율이 항상 일정한데, 같은 교재는 설탕(자당) 시료가 항상 질량 기준 탄소 42.1%, 수소 6.5%, 산소 51.4%로 이루어진다는 예를 든다. 물 분자도 마찬가지로, 교재는 '물 분자 하나는 수소 원자 두 개와 산소 원자 한 개를 포함하는 단위다'라고 설명한다. 위키백과에 따르면 현재까지 알려진 원소는 118종이다.",
       "key_points": [
         "원소는 화학 변화로 더 간단한 물질로 쪼갤 수 없다",
         "화합물은 두 가지 이상의 원소가 일정한 비율로 결합한 물질이다",
         "물 분자는 수소 원자 2개와 산소 원자 1개로 이루어진다"
       ],
-      "example": "물(H₂O)은 항상 수소와 산소가 원자 개수비 2:1로 결합해 있어, 수소나 산소 기체를 따로 물에 섞은 혼합물과는 다르다",
+      "example": "물(H₂O) 분자 하나는 수소 원자 두 개와 산소 원자 한 개로 이루어져 있으며, 이 비율은 모든 물 분자에서 항상 똑같다",
       "related": [
-        { "id": "science_003", "relation": "질량 보존 법칙은 원소가 화합물을 이루는 반응에도 똑같이 적용된다" }
+        { "id": "science_003", "relation": "화합물이 생성되는 반응에서도 질량 보존 법칙이 똑같이 성립한다" }
       ],
       "sources": [
-        { "name": "1.2 Phases and Classification of Matter", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/1-2-phases-and-classification-of-matter", "tier": "1차", "note": "직접열람 — \"Pure substances that cannot be broken down into simpler substances by chemical changes are called elements.\"/\"Pure substances that are comprised of two or more elements are called compounds.\"/\"Any sample of sucrose (table sugar) consists of 42.1% carbon, 6.5% hydrogen, and 51.4% oxygen by mass.\"/\"Each water molecule is a unit that contains two hydrogen atoms and one oxygen atom.\" 확인" },
+        { "name": "1.2 Phases and Classification of Matter", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/1-2-phases-and-classification-of-matter", "tier": "1차", "note": "직접열람 — \"Pure substances that cannot be broken down into simpler substances by chemical changes are called elements.\"/\"Pure substances that are comprised of two or more elements are called compounds.\"/\"Any sample of sucrose (table sugar) consists of 42.1% carbon, 6.5% hydrogen, and 51.4% oxygen by mass.\"/\"Each water molecule is a unit that contains two hydrogen atoms and one oxygen atom.\" 확인. 작업163 — \"Matter can be classified into several categories. Two broad categories are mixtures and pure substances.\"/\"Pure substances may be divided into two classes: elements and compounds.\" 확인(순물질·혼합물 분류 문장의 근거). 자연발생/인공원소 구분 서술은 위키백과에 없어 summary에서 삭제. example의 '혼합물과는 다르다' 비교 서술은 직접 인용이 없어 삭제하고 물 분자 구성 비율 범위로 재작성" },
         { "name": "원소 (화학)", "publisher": "위키백과", "url": "https://ko.wikipedia.org/wiki/원소_(화학)", "tier": "보조", "note": "직접열람 — \"현재까지 118종이 알려져 있다\" 확인" }
       ]
     },
@@ -431,20 +429,19 @@
       "field": "화학",
       "level": "고등",
       "one_line": "화학 반응은 열을 내거나(발열) 흡수한다(흡열)",
-      "summary": "화학 반응이 일어날 때는 열의 형태로 에너지가 드나든다. OpenStax 화학 교재는 '열을 방출하는 변화를 발열 과정이라 한다'고 정의하며, 산소-아세틸렌 토치의 연소 반응을 예로 들어 '이 과정은 빛의 형태로도 에너지를 방출하는 발열 과정'이라고 설명한다. 반대로 같은 교재는 '열을 흡수하는 반응이나 변화를 흡열 과정이라 한다'고 정의하고, 근육 손상 치료에 쓰는 냉찜질팩을 예로 든다. 물과 질산암모늄 같은 염을 섞으면 '그 과정이 열을 흡수해 차가운 느낌이 든다'고 설명한다. 2012년 이화여자대학교 교육대학원 석사논문은 예비 화학교사의 71.0%가 발열 반응을, 66.7%가 흡열 반응을 단순히 에너지의 방출과 흡수로만 설명했다고 조사했다.",
+      "summary": "화학 반응이 일어날 때는 열의 형태로 에너지가 드나든다. OpenStax 화학 교재는 '열을 방출하는 변화를 발열 과정이라 한다'고 정의하며, 산소-아세틸렌 토치의 연소 반응을 예로 들어 '이 과정은 빛의 형태로도 에너지를 방출하는 발열 과정'이라고 설명한다. 반대로 같은 교재는 '열을 흡수하는 반응이나 변화를 흡열 과정이라 한다'고 정의하고, 근육 손상 치료에 쓰는 냉찜질팩을 예로 든다. 물과 질산암모늄 같은 염을 섞으면 '그 과정이 열을 흡수해 차가운 느낌이 든다'고 설명한다. 이런 반응이 내거나 흡수하는 열의 양은 엔탈피 변화(ΔH)로도 나타내는데, 같은 교재는 '엔탈피 변화가 음수(ΔH<0)이면 발열 반응을, 양수(ΔH>0)이면 흡열 반응을 나타낸다'고 설명한다.",
       "key_points": [
         "열을 방출하는 반응을 발열 반응이라 한다",
         "열을 흡수하는 반응을 흡열 반응이라 한다",
         "냉찜질팩은 흡열 반응을 이용한 대표적인 예다"
       ],
       "example": "산소-아세틸렌 토치의 연소처럼 열과 빛을 함께 내는 반응은 발열 반응이고, 질산암모늄을 물에 녹이는 냉찜질팩 반응은 흡열 반응이다",
-      "misconception": "2012년 조사에서 예비 화학교사의 71.0%가 발열 반응을, 66.7%가 흡열 반응을 단순히 에너지의 방출·흡수로만 설명해 더 깊은 이해로 나아가지 못했다",
       "related": [
-        { "id": "science_012", "relation": "산화·환원 반응이 일어날 때도 열의 형태로 에너지가 드나든다" }
+        { "id": "science_012", "relation": "산화·환원과 함께 보면 좋은 화학 반응 개념이다" }
       ],
       "sources": [
         { "name": "5.1 Energy Basics", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/5-1-energy-basics", "tier": "1차", "note": "직접열람 — \"A change that releases heat is called an exothermic process.\"/산소-아세틸렌 토치 연소(\"this process also releases energy in the form of light as evidenced by the torch's flame\")/\"A reaction or change that absorbs heat is an endothermic process.\"/냉찜질팩 예시(\"the resulting process absorbs heat, leading to the sensation of cold\") 확인" },
-        { "name": "발열 반응과 흡열 반응에 대한 교과서 분석과 예비 화학 교사들의 이해도 조사", "publisher": "이화여자대학교 교육대학원 석사학위논문, 노예진, 2012", "url": "https://scienceon.kisti.re.kr/srch/selectPORSrchArticle.do?cn=DIKO0012648116&dbt=DIKO", "tier": "보조", "note": "부분확인(초록, 학위논문이라 1차 미해당) — \"71.0% of the teachers in this study responded that they explained simply exothermic reaction as energy releasing and 66.7% of them described endothermic reaction as energy absorption\" 확인. 서울 소재 교대 화학교육전공 3·4학년 및 대학원생 대상" }
+        { "name": "5.3 Enthalpy", "publisher": "OpenStax Chemistry 2e", "url": "https://openstax.org/books/chemistry-2e/pages/5-3-enthalpy", "tier": "1차", "note": "직접열람(작업163, 노예진(2012) 학위논문 대체 — 오개념 통계는 '설명의 깊이' 문제이지 오개념이 아니라고 판단해 misconception 필드 자체를 삭제하고, 해당 출처도 sources에서 제거) — \"A negative value of an enthalpy change, ΔH < 0, indicates an exothermic reaction; a positive value, ΔH > 0, indicates an endothermic reaction.\" 확인" }
       ]
     },
     {
@@ -459,10 +456,10 @@
         "날지 못하는 새의 날개 같은 흔적 기관도 진화의 증거다",
         "유연관계가 가까운 생물일수록 DNA 서열이 더 비슷하다"
       ],
-      "example": "고래는 뒷다리가 퇴화한 흔적 골반뼈를 가지고 있는데, 이는 고래의 조상이 한때 육상에서 다리로 걸어다녔음을 보여주는 증거다",
-      "misconception": "9학년, 12학년, 대학교 1학년 학생을 조사한 2006년 연구에서, 학년과 관계없이 진화·적응·변이 개념을 구분하지 못하고 라마르크식 사고에 머물러 있었다",
+      "example": "고래는 기능이 거의 없는 흔적 골반뼈를 가지고 있는데, 이는 겉모습은 달라도 기원이 같은 흔적 기관의 한 예로 꼽힌다",
+      "misconception": "9학년, 12학년, 대학교 1학년 학생을 조사한 2006년 연구에서, 학년과 관계없이 진화·적응·변이 개념이 라마르크적 사고 단계에 고착되어 있었다",
       "related": [
-        { "id": "science_005", "relation": "자연선택이 쌓이면 공통 조상에서 여러 종으로 갈라지는 진화가 된다" }
+        { "id": "science_005", "relation": "자연선택과 함께 보면 좋은 생물 진화 개념이다" }
       ],
       "sources": [
         { "name": "11.3 Evidence of Evolution", "publisher": "OpenStax Concepts of Biology", "url": "https://openstax.org/books/concepts-biology/pages/11-3-evidence-of-evolution", "tier": "1차", "note": "직접열람 — \"the bones in the appendages of a human, dog, bird, and whale all share the same overall construction\"/\"Scientists call these synonymous parts homologous structures.\"/\"wings on flightless birds...leaves on some cacti, traces of pelvic bones in whales, and the sightless eyes of cave animals\"/\"Evidence of a common ancestor for all of life is reflected in the universality of DNA...\"/\"the relatedness of groups of organisms is reflected in the similarity of their DNA sequences—exactly the pattern that would be expected from descent and diversification from a common ancestor\" 확인" },
@@ -475,7 +472,7 @@
       "field": "생물",
       "level": "고등",
       "one_line": "생태계에서 물질은 순환하지만 에너지는 한 방향으로 흐른다",
-      "summary": "생물과 환경 사이에서 무기물이 되풀이해 순환하는 것을 생물지구화학적 순환이라 한다. OpenStax 생물학 교재는 '에너지는 생태계를 거쳐 한 방향으로 흐르며... 그러나 생물을 이루는 물질은 보존되어 순환한다'고 설명해, 에너지의 흐름과 물질의 순환을 구분한다. 탄소 순환이 대표적인 예다. NASA는 '식물성 플랑크톤과 식물은 이산화탄소를 세포 안으로 흡수해 대기로부터 받아들인다'고 설명하며, 광합성 반응(CO₂+H₂O+에너지=CH₂O+O₂)으로 탄소가 생물의 몸속으로 들어간다고 설명한다. 반대로 식물과 동물이 당을 분해해 에너지를 얻거나 식물과 플랑크톤이 죽어 분해되거나 불에 타면, 호흡 반응(CH₂O+O₂=CO₂+H₂O+에너지)이 일어나 '이 반응에서 나온 이산화탄소는 대개 다시 대기로 돌아간다'고 NASA는 설명한다.",
+      "summary": "생물과 환경 사이에서 무기물이 되풀이해 순환하는 것을 생물지구화학적 순환이라 한다. OpenStax 생물학 교재는 '에너지는 생태계를 거쳐 한 방향으로 흐르며... 그러나 생물을 이루는 물질은 보존되어 순환한다'고 설명해, 에너지의 흐름과 물질의 순환을 구분한다. 탄소 순환이 대표적인 예다. 같은 교재는 소비자가 '생산자로부터 고에너지 탄소화합물을 섭취해 호흡으로 분해하여 세포 에너지를 얻는다'고 설명한다. NASA는 '식물성 플랑크톤과 식물은 이산화탄소를 세포 안으로 흡수해 대기로부터 받아들인다'고 설명하며, 광합성 반응(CO₂+H₂O+에너지=CH₂O+O₂)으로 탄소가 생물의 몸속으로 들어간다고 설명한다. 반대로 식물과 동물이 당을 분해해 에너지를 얻거나 식물과 플랑크톤이 죽어 분해되거나 불에 타면, '산소가 당과 결합해 물과 이산화탄소, 에너지를 내놓는다'(CH₂O+O₂=CO₂+H₂O+에너지)고 NASA는 설명하며, '이 반응에서 나온 이산화탄소는 대개 다시 대기로 돌아간다'고 덧붙인다.",
       "key_points": [
         "생태계에서 에너지는 한 방향으로 흐르고 물질은 순환한다",
         "광합성은 대기의 이산화탄소를 생물의 몸속으로 들여온다",
@@ -483,12 +480,12 @@
       ],
       "example": "숲에서 나무가 광합성으로 흡수한 이산화탄소는 나중에 낙엽이 썩거나 동물이 호흡할 때 다시 대기로 돌아가는 식으로 탄소가 순환한다",
       "related": [
-        { "id": "science_006", "relation": "광합성은 물질 순환에서 탄소가 생물권으로 들어오는 첫 단계다" },
+        { "id": "science_006", "relation": "광합성은 생태계의 물질 순환에서 탄소가 생물의 몸속으로 들어오는 과정이다" },
         { "id": "science_014", "relation": "세포호흡은 물질 순환에서 탄소를 다시 대기로 돌려보내는 과정이다" }
       ],
       "sources": [
-        { "name": "46.3 Biogeochemical Cycles", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/46-3-biogeochemical-cycles", "tier": "1차", "note": "직접열람 — \"the recycling of inorganic matter between living organisms and their environment is called a biogeochemical cycle\"/\"Energy flows directionally through ecosystems, entering as sunlight...and leaving as heat...However, the matter that makes up living organisms is conserved and recycled.\" 확인" },
-        { "name": "The Carbon Cycle", "publisher": "NASA Science", "url": "https://science.nasa.gov/earth/earth-observatory/the-carbon-cycle/", "tier": "1차", "note": "직접열람 — \"Phytoplankton...and plants take carbon dioxide from the atmosphere by absorbing it into their cells.\"/\"CO2 + H2O + energy = CH2O + O2\"/\"Plants break down the sugar to get the energy they need to grow...Plants and plankton die and decay...Or fire consumes plants.\"/\"CH2O + O2 = CO2 + H2O + energy\"/\"the carbon dioxide released in the reaction usually ends up in the atmosphere\" 확인" }
+        { "name": "46.3 Biogeochemical Cycles", "publisher": "OpenStax Biology 2e", "url": "https://openstax.org/books/biology-2e/pages/46-3-biogeochemical-cycles", "tier": "1차", "note": "직접열람 — \"the recycling of inorganic matter between living organisms and their environment is called a biogeochemical cycle\"/\"Energy flows directionally through ecosystems, entering as sunlight...and leaving as heat...However, the matter that makes up living organisms is conserved and recycled.\" 확인. 작업163 — \"Heterotrophs acquire the high-energy carbon compounds from the autotrophs by consuming them, and breaking them down by respiration to obtain cellular energy, such as ATP.\" 확인(summary의 '호흡으로 분해' 근거)" },
+        { "name": "The Carbon Cycle", "publisher": "NASA Science", "url": "https://science.nasa.gov/earth/earth-observatory/the-carbon-cycle/", "tier": "1차", "note": "직접열람 — \"Phytoplankton...and plants take carbon dioxide from the atmosphere by absorbing it into their cells.\"/\"CO2 + H2O + energy = CH2O + O2\"/\"Plants break down the sugar to get the energy they need to grow...Plants and plankton die and decay...Or fire consumes plants.\"/\"CH2O + O2 = CO2 + H2O + energy\"/\"the carbon dioxide released in the reaction usually ends up in the atmosphere\" 확인. 작업163 재확인 — 이 페이지 자체는 \"respiration\"이라는 단어를 쓰지 않고 \"oxygen combines with sugar to release water, carbon dioxide, and energy\"라고만 설명해, summary에서 이 부분을 'NASA가 호흡 반응이라 불렀다'는 식으로 쓰지 않고 원문 그대로의 서술로 교정(related의 '첫 단계다'도 같은 이유로 삭제)" }
       ]
     },
     {
@@ -497,17 +494,17 @@
       "field": "지구과학",
       "level": "고등",
       "one_line": "별은 질량에 따라 백색왜성이나 중성자별, 블랙홀로 일생을 마친다",
-      "summary": "별은 먼지와 기체로 이루어진 거대한 구름에서 태어나, 중심핵에서 핵융합 반응이 일어나는 안정된 시기를 오래 거친다. NASA는 이 시기를 '주계열'이라 부르며, 이 단계의 별은 '헤르츠스프룽-러셀 도표에서 대각선 영역에 있으며, 일생의 대부분 동안 안정적인 별들'이라고 설명한다. 별의 마지막 모습은 처음 질량에 따라 달라진다. NASA 자료에 따르면 태양 질량의 약 0.4~3.4배인 저·중질량 별은 결국 백색왜성이 되는데, 다만 '태양 질량의 1.44배(찬드라세카 한계)보다 무거운 별은 백색왜성이 되지 못한다.' 태양보다 훨씬 무거운 별은 초신성 폭발로 일생을 마치는데, 폭발 후 남은 중심핵이 가벼우면 중성자별이 되고, 무거우면 '중력이 중성자를 압도해 블랙홀로 완전히 붕괴한다.' 처음 질량이 태양의 15배가 넘을 만큼 매우 무거운 별이면 '중성자조차 버티지 못한다'고 NASA는 설명한다.",
+      "summary": "별은 먼지와 기체로 이루어진 거대한 구름에서 태어난다. NASA는 '별 일생의 대부분 동안 내부 열과 복사는 별의 핵에서 일어나는 핵반응이 공급한다'고 설명하며, 이 안정된 시기를 주계열이라 부른다. 별의 마지막 모습은 처음 질량에 따라 달라진다. NASA 자료에 따르면 태양 질량의 약 0.4~3.4배인 저·중질량 별은 결국 백색왜성이 된다. 태양 질량의 5배 이상인 무거운 별은 초신성 폭발로 일생을 마치는데, 폭발 후 남은 중심핵이 가벼우면 중성자별이 되고, 무거우면 '중력이 중성자를 압도해 블랙홀로 완전히 붕괴한다.' 처음 질량이 태양의 15배가 넘을 만큼 매우 무거운 별이면 중성자조차 버티지 못해 '핵이 무너지고 블랙홀이 형성된다.'",
       "key_points": [
         "별은 질량에 따라 백색왜성·중성자별·블랙홀로 일생을 마친다",
-        "태양 질량의 1.44배(찬드라세카 한계)를 넘으면 백색왜성이 될 수 없다",
-        "태양 질량 15배가 넘는 별은 결국 블랙홀이 된다"
+        "태양 질량의 0.4~3.4배인 별은 결국 백색왜성이 된다",
+        "태양 질량 15배가 넘는 별은 핵이 무너져 블랙홀이 된다"
       ],
-      "example": "태양처럼 가벼운 별은 결국 백색왜성이 되지만, 태양보다 훨씬 무거운 별은 초신성 폭발 뒤 중성자별이나 블랙홀이 된다",
+      "example": "태양처럼 가벼운 별은 결국 백색왜성이 되지만, 태양 질량 5배가 넘는 무거운 별은 초신성 폭발 뒤 중성자별이나 블랙홀이 된다",
       "related": [],
       "sources": [
-        { "name": "Star Lifecycle", "publisher": "NASA Science", "url": "https://science.nasa.gov/mission/webb/star-lifecycle/", "tier": "1차", "note": "직접열람 — \"Stars are born in massive clouds of dust and gas...\"/\"This phase of the star's life is called the main sequence.\"/\"How a star ends its life depends on its mass.\"/\"Stars much more massive than our Sun end their lives in a supernova explosion.\"/\"If the remnant core of the star is less massive, it will collapse into a neutron star. If the remnant is more massive, gravity overwhelms the neutrons and the star collapses completely into a black hole.\" 확인" },
-        { "name": "The Life Cycles of Stars", "publisher": "NASA(Goddard Space Flight Center, imagine.gsfc.nasa.gov)", "url": "https://imagine.gsfc.nasa.gov/educators/lifecycles/LC_main3.html", "tier": "1차", "note": "직접열람 — \"a 'low or medium mass' star (about 0.4 to 3.4 times the mass of our Sun)\"/\"a 'massive' star (some 5 or more times the mass of our Sun)\"/\"stars with more than 1.44 times the mass of the Sun (now known as the Chandrasekhar limit) would not become white dwarfs\"/\"if the original star was very massive (say 15 or more times the mass of our Sun), even the neutrons will not be able to survive\"/\"diagonal region of the Hertzsprung-Russell diagram in which most stars are located; generally these are stable stars during the bulk of their lives\"(주계열 정의) 확인. astro.kasi.re.kr/learning/pageView/6374(항성의 죽음) 페이지는 3회 재시도 모두 500 오류로 미열람·sources 미포함" }
+        { "name": "Star Lifecycle", "publisher": "NASA Science", "url": "https://science.nasa.gov/mission/webb/star-lifecycle/", "tier": "1차", "note": "직접열람 — \"Stars are born in massive clouds of dust and gas...\"/\"This phase of the star's life is called the main sequence.\"/\"How a star ends its life depends on its mass.\"/\"Stars much more massive than our Sun end their lives in a supernova explosion.\"/\"If the remnant core of the star is less massive, it will collapse into a neutron star. If the remnant is more massive, gravity overwhelms the neutrons and the star collapses completely into a black hole.\" 확인. 작업163 — \"During most of a star's lifetime, the interior heat and radiation is provided by nuclear reactions in the star's core.\" 확인(summary의 '중심핵 핵반응' 근거)" },
+        { "name": "The Life Cycles of Stars", "publisher": "NASA(Goddard Space Flight Center, imagine.gsfc.nasa.gov)", "url": "https://imagine.gsfc.nasa.gov/educators/lifecycles/LC_main3.html", "tier": "1차", "note": "직접열람 — \"a 'low or medium mass' star (about 0.4 to 3.4 times the mass of our Sun)\"/\"a 'massive' star (some 5 or more times the mass of our Sun)\"/\"diagonal region of the Hertzsprung-Russell diagram in which most stars are located; generally these are stable stars during the bulk of their lives\"(주계열 정의) 확인. 작업163 — \"if the original star was very massive (say 15 or more times the mass of our Sun), even the neutrons will not be able to survive\" 바로 다음 문장 \"the core collapse and a black hole will form!\"을 재확인해 15배 이상→블랙홀 서술의 직접 근거로 추가. \"stars with more than 1.44 times the mass of the Sun (now known as the Chandrasekhar limit) would not become white dwarfs\"(찬드라세카 한계) 문장은 앞뒤 문단을 재열람해도 이 1.44배가 '원래 별의 질량'인지 '백색왜성(남은 핵)의 질량'인지 명시하지 않아(바로 앞 문장도 \"stars of a certain mass should not become white dwarfs when they died\"처럼 모호함) — 0.4~3.4배(원래 별 질량 기준, 저·중질량)와 같은 기준(원래 별 질량)인지 확인 불가해 충돌 해소 안 됨 → summary·key_points에서 찬드라세카 한계 서술 삭제, sources에는 인용만 남김. 수치(0.4~3.4배/5배/15배)는 모두 \"about\"/\"some\"/\"say\" 같은 예시·근사 표현을 동반함(정확한 경계값이 아니라 교육용 근사치). astro.kasi.re.kr/learning/pageView/6374(항성의 죽음) 페이지는 3회 재시도 모두 500 오류로 미열람·sources 미포함" }
       ]
     },
     {
@@ -515,18 +512,18 @@
       "title": "날씨와 기압",
       "field": "지구과학",
       "level": "고등",
-      "one_line": "고기압에서는 맑고, 저기압에서는 흐리거나 비가 온다",
-      "summary": "기압은 공기가 누르는 힘이다. 미국 국립기상청(NWS)은 기압을 '특정 지점에서 그 지점의 중력가속도와 그 위에 쌓인 단위 면적 공기 기둥의 질량을 곱한 값으로 정해지는, 지구 대기가 미치는 압력'이라 정의한다. 주위보다 기압이 높은 곳을 고기압, 낮은 곳을 저기압이라 한다. 미국 해양대기청(NOAA)은 '고기압 시스템은 주위보다 기압이 높다'고 설명하며, 고기압은 흔히 맑고 파란 하늘과 함께 나타난다고 설명한다. 또 다른 NOAA 자료는 그 이유를 '고기압 지역은 대체로 건조한 날씨와 관련이 있는데, 공기가 가라앉으면서 데워지고 수분이 증발하기 때문'이라고 설명한다. 반대로 '저기압 지역은 대체로 강수를 몰고 오는데, 공기가 상승하면서 식고 수증기가 응결하기 때문'이라고 같은 자료는 설명한다.",
+      "one_line": "고기압에서는 대체로 맑고, 저기압에서는 대개 흐리거나 비가 온다",
+      "summary": "기압은 공기가 누르는 힘이다. 미국 국립기상청(NWS)은 기압을 '특정 지점에서 그 지점의 중력가속도와 그 위에 쌓인 단위 면적 공기 기둥의 질량을 곱한 값으로 정해지는, 지구 대기가 미치는 압력'이라 정의한다. 주위보다 기압이 높은 곳을 고기압, 낮은 곳을 저기압이라 한다. 미국 해양대기청(NOAA)은 '고기압 시스템은 주위보다 기압이 높다'고 설명하며, 고기압은 '흔히 맑고 파란 하늘과 함께' 나타난다고 설명한다. 또 다른 NOAA 자료는 그 이유를 '고기압 지역은 대체로 건조한 날씨와 관련이 있는데, 공기가 가라앉으면서 데워지고 수분이 증발하기 때문'이라고 설명한다. 반대로 '저기압 지역은 대체로 강수를 몰고 오는데, 공기가 상승하면서 식고 수증기가 응결하기 때문'이라고 같은 자료는 설명한다.",
       "key_points": [
-        "기압은 공기가 누르는 힘으로, 단위 면적 위 공기 기둥의 무게에서 비롯된다",
-        "고기압에서는 공기가 가라앉으며 데워져 날씨가 맑아진다",
-        "저기압에서는 공기가 상승하며 식어 구름과 비가 생긴다"
+        "기압은 지구 대기가 특정 지점에 미치는 압력이다",
+        "고기압에서는 공기가 가라앉으며 데워져 대체로 날씨가 맑다",
+        "저기압에서는 공기가 상승하며 식어 대개 구름과 비가 생긴다"
       ],
       "example": "일기예보에서 H로 표시된 고기압이 다가오면 날씨가 맑아지고, L로 표시된 저기압이 다가오면 구름이 끼거나 비가 올 가능성이 높아진다",
       "related": [],
       "sources": [
         { "name": "Glossary: Pressure", "publisher": "NOAA National Weather Service", "url": "https://forecast.weather.gov/glossary.php?word=PRES", "tier": "1차", "note": "직접열람 — \"The pressure exerted by the earth's atmosphere at any given point, determined by taking the product of the gravitational acceleration at the point and the mass of the unit area column of air above the point.\" 확인" },
-        { "name": "What Are High and Low Pressure Systems?", "publisher": "NOAA NESDIS", "url": "https://www.nesdis.noaa.gov/about/k-12-education/weather-forecasting/what-are-high-and-low-pressure-systems", "tier": "1차", "note": "직접열람 — \"High-pressure systems...have more air pressure than their surroundings.\"/고기압이 \"often times associated with clear blue skies\" 확인" },
+        { "name": "What Are High and Low Pressure Systems?", "publisher": "NOAA NESDIS", "url": "https://www.nesdis.noaa.gov/about/k-12-education/weather-forecasting/what-are-high-and-low-pressure-systems", "tier": "1차", "note": "직접열람 — \"High-pressure systems...have more air pressure than their surroundings.\"/고기압이 \"often times associated with clear blue skies\" 확인. 작업163 — one_line·key_points·summary를 \"often times\"/\"usually\"(대체로/대개) 빈도 표현에 맞춰 교정, key_points[0]을 NWS 정의(\"pressure exerted by the earth's atmosphere\")에 맞춰 '지구 대기가 특정 지점에 미치는 압력'으로 교정" },
         { "name": "Learning Lesson: Drawing Conclusions - Surface Air Pressure Map", "publisher": "NOAA JetStream", "url": "https://www.noaa.gov/jetstream/analyze-appair-pressure-map", "tier": "1차", "note": "직접열람 — \"High pressure regions are usually associated with dry weather because as the air sinks, it warms and the moisture evaporates.\"/\"Low pressure regions usually bring precipitation because when the air rises, it cools, and the water vapor condenses.\" 확인" }
       ]
     }
