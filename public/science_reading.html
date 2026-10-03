@@ -348,6 +348,125 @@
     color: var(--coral-ink);
   }
   .conquest-btn svg { width: 18px; height: 18px; }
+
+  /* ── View 3: Quiz (작업174: digest_reading.html 368-481과 같은 모양) ── */
+  .top-bar h1 { font-size: 16px; font-weight: 700; color: var(--text1); }
+  #view-quiz .content { padding: 20px 16px; }
+
+  .quiz-progress-bar-wrap {
+    height: 6px; background: var(--primary-light);
+    border-radius: 3px; margin-bottom: 20px; overflow: hidden;
+  }
+  .quiz-progress-bar {
+    height: 100%; background: var(--primary);
+    border-radius: 3px; transition: width 0.3s ease;
+  }
+  .quiz-round-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--primary); margin-bottom: 6px;
+  }
+  .quiz-question-counter { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
+  .quiz-card {
+    background: var(--card); border-radius: 16px;
+    border: 1px solid var(--border); padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .quiz-question {
+    font-size: 16px; font-weight: 600; line-height: 1.6;
+    margin-bottom: 20px; color: var(--text1);
+    white-space: pre-line; word-break: keep-all;
+  }
+  .mcq-options { display: flex; flex-direction: column; gap: 10px; }
+  .mcq-option {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    padding: 12px 14px;
+    background: var(--bg); border: 1.5px solid var(--border);
+    border-radius: 12px; cursor: pointer; transition: all 0.15s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .mcq-option:hover:not(.answered) { border-color: var(--primary); background: var(--primary-light); }
+  .mcq-option.answered { cursor: default; }
+  .mcq-option.correct { background: var(--primary-light); border-color: var(--primary); }
+  .mcq-option.wrong { background: var(--error-light); border-color: var(--error); }
+  .mcq-option.correct-hint { background: var(--primary-light); border-color: var(--primary); }
+  .mcq-num {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; flex-shrink: 0; color: var(--text2);
+    transition: all 0.15s;
+  }
+  .mcq-option.correct .mcq-num { background: var(--primary); color: #fff; }
+  .mcq-option.wrong .mcq-num { background: var(--error); color: #fff; }
+  .mcq-option.correct-hint .mcq-num { background: var(--primary); color: #fff; }
+  .mcq-text { font-size: 14px; line-height: 1.5; color: var(--text1); word-break: keep-all; }
+
+  .ox-buttons { display: flex; gap: 12px; margin-top: 4px; }
+  .ox-btn {
+    flex: 1; height: 80px;
+    border-radius: 14px; border: 2px solid var(--border);
+    background: var(--bg); cursor: pointer;
+    font-size: 32px; font-weight: 700;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ox-btn:hover:not(:disabled) { border-color: var(--primary); background: var(--primary-light); }
+  .ox-btn.correct { background: var(--primary-light); border-color: var(--primary); }
+  .ox-btn.wrong { background: var(--error-light); border-color: var(--error); }
+  .ox-btn:disabled { cursor: default; }
+  .ox-feedback {
+    margin-top: 12px; padding: 10px 14px;
+    border-radius: 10px; font-size: 13px; font-weight: 500; display: none;
+  }
+  .ox-feedback.show { display: block; }
+  .ox-feedback.correct-fb { background: var(--primary-light); color: var(--primary-dark); }
+  .ox-feedback.wrong-fb { background: var(--error-light); color: var(--error); }
+
+  .quiz-next-btn {
+    margin-top: 20px;
+    background: var(--primary); color: #fff;
+    border: none; border-radius: 12px;
+    padding: 14px; width: 100%;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    display: none; font-family: 'Noto Sans KR', sans-serif;
+    transition: background 0.15s;
+  }
+  .quiz-next-btn.visible { display: block; }
+  .quiz-next-btn:hover { background: var(--primary-dark); }
+
+  /* ── View 4: Result ── */
+  #view-result .content { padding: 24px 16px; }
+  .result-score-wrap {
+    text-align: center; margin-bottom: 28px;
+    padding: 28px; background: var(--card);
+    border-radius: 20px; border: 1px solid var(--border);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .result-emoji { font-size: 48px; margin-bottom: 12px; }
+  .result-score { font-size: 42px; font-weight: 700; color: var(--primary); font-family: 'Inter', sans-serif; }
+  .result-score span { font-size: 20px; color: var(--text2); }
+  .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
+  .result-submsg { font-size: 13px; color: var(--text2); margin-top: 4px; }
+  .result-section-label { font-size: 13px; font-weight: 700; color: var(--text2); margin-bottom: 12px; letter-spacing: 0.03em; }
+  .result-wrong-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .result-wrong-item {
+    background: var(--card); border-radius: 12px;
+    border: 1px solid var(--border); padding: 12px 14px;
+  }
+  .result-wrong-q { font-size: 13px; color: var(--text2); margin-bottom: 4px; white-space: pre-line; word-break: keep-all; }
+  .result-wrong-a { font-size: 14px; font-weight: 600; color: var(--primary); word-break: keep-all; }
+  .result-wrong-a::before { content: '정답: '; color: var(--text2); font-weight: 400; }
+  .result-actions { display: flex; flex-direction: column; gap: 10px; }
+  .result-btn {
+    border-radius: 14px; padding: 15px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    border: none; transition: all 0.15s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .result-btn-primary { background: var(--primary); color: #fff; }
+  .result-btn-primary:hover { background: var(--primary-dark); }
+  .result-btn-secondary { background: var(--card); color: var(--text1); border: 1.5px solid var(--border); }
+  .result-btn-secondary:hover { background: var(--bg); }
 </style>
 </head>
 <body>
@@ -414,6 +533,25 @@
   </div>
 </div>
 
+<!-- View 3: Quiz (작업174) -->
+<div id="view-quiz" class="view">
+  <div class="top-bar">
+    <button class="back-btn" onclick="leaveQuiz()" aria-label="퀴즈에서 나가기">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <h1>개념 퀴즈</h1>
+  </div>
+  <div class="content" id="quiz-content"></div>
+</div>
+
+<!-- View 4: Result (작업174) -->
+<div id="view-result" class="view">
+  <div class="top-bar"><h1>퀴즈 결과</h1></div>
+  <div class="content" id="result-content"></div>
+</div>
+
 <!-- Tab Bar (작업173) -->
 <div class="tab-bar">
   <button class="tab-btn active" id="tab-concepts" onclick="goConceptsTab()">
@@ -453,14 +591,19 @@ const FIELD_ORDER = ['물리', '화학', '생물', '지구과학'];
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  // 작업174: 퀴즈·결과 화면에서는 "퀴즈" 탭, 그 외에는 "개념" 탭이 활성
+  const inQuiz = id === 'view-quiz' || id === 'view-result';
+  document.getElementById('tab-concepts').classList.toggle('active', !inQuiz);
+  document.getElementById('tab-quiz').classList.toggle('active', inQuiz);
 }
 
 // ── Conquest (작업173) ──
-// 정복 기록은 브라우저 localStorage에만 저장(서버·DB 없음). localStorage가
-// 막혀 있어도(프라이빗 모드 등) 오류 없이 동작하도록 메모리 객체를 함께 쓴다:
-// 이 세션에서 바꾼 값은 메모리가 우선하고, 없으면 localStorage를 읽는다.
+// 정복 기록은 브라우저 localStorage에만 저장(서버·DB 없음). 기본은 항상
+// localStorage를 읽는다(다른 탭의 변경도 반영). 쓰기(setItem)가 예외를 던진
+// 항목만 메모리 객체에 기록해 그 id에 한해 메모리 값을 우선한다. 읽기까지
+// 막힌 환경이면 false로 처리한다. (작업174: 작업173의 "메모리 우선"을 보정)
 const CONQUEST_PREFIX = 'science_conquest_';
-const _memConquest = {};
+const _memConquest = {}; // setItem 실패한 id만
 
 function isConquered(id) {
   if (Object.prototype.hasOwnProperty.call(_memConquest, id)) return _memConquest[id];
@@ -468,8 +611,12 @@ function isConquered(id) {
 }
 
 function setConquered(id, val) {
-  _memConquest[id] = !!val;
-  try { localStorage.setItem(CONQUEST_PREFIX + id, val ? 'true' : 'false'); } catch (e) { /* 메모리 폴백 */ }
+  try {
+    localStorage.setItem(CONQUEST_PREFIX + id, val ? 'true' : 'false');
+    delete _memConquest[id];
+  } catch (e) {
+    _memConquest[id] = !!val;
+  }
 }
 
 function getConqueredConcepts() {
@@ -501,13 +648,329 @@ function updateTabQuizState() {
   document.getElementById('tab-quiz').classList.toggle('disabled', getConqueredConcepts().length === 0);
 }
 
-// 작업173 임시 처리: 퀴즈 엔진은 작업174에서 이 함수를 교체한다
+// ── Quiz (작업174) ──
+// 문항은 저장하지 않고, 정복한 개념의 DB 필드(title, one_line, key_points)를
+// 고정 문구와 조합해 매번 새로 만든다(API·비용 없음). 새 문장은 만들지 않는다.
+// 한입 독서 퀴즈와 달리: 오답 재료를 무작위로 고르고(고정 첫 항목 아님),
+// 관련(related) 개념과 정답을 드러내는 문장을 제외하며, 선지 중복을 검사한다.
+let quizState = { questions: [], currentIdx: 0, score: 0, wrong: [], answered: false };
+const QUIZ_MAX_PER_TYPE = 3;
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const _qNorm = t => String(t).replace(/\s+/g, '').toLowerCase();
+// 제목 표기 후보: 전체, 괄호를 뺀 형태, 괄호 안 표기(예: "몰(mol)" → 몰(mol)/몰/mol)
+function titleForms(title) {
+  const forms = new Set();
+  const full = _qNorm(title);
+  if (full) forms.add(full);
+  const outer = _qNorm(title.replace(/\([^)]*\)/g, ''));
+  if (outer) forms.add(outer);
+  const m = title.match(/\(([^)]*)\)/);
+  if (m && _qNorm(m[1])) forms.add(_qNorm(m[1]));
+  return [...forms];
+}
+function mentionsTitle(text, title) {
+  const t = _qNorm(text);
+  return titleForms(title).some(f => t.includes(f));
+}
+// 양방향 related 맵: 한쪽에만 적혀 있어도 서로 관련으로 본다
+function buildRelatedMap() {
+  const m = {};
+  DB.concepts.forEach(c => { m[c.id] = new Set(); });
+  DB.concepts.forEach(c => (c.related || []).forEach(r => {
+    m[c.id].add(r.id);
+    if (m[r.id]) m[r.id].add(c.id);
+  }));
+  return m;
+}
+// 그 개념의 key_point 중 자기 제목이 문자열에 들어 있지 않은 것만 사용 가능
+function usableKeyPoints(c) {
+  return c.key_points.filter(k => !mentionsTitle(k, c.title));
+}
+function otherConcepts(c, rel) {
+  return DB.concepts.filter(o => o.id !== c.id && !rel[c.id].has(o.id));
+}
+
+// T1 개념 맞추기: one_line → 제목 4지선다
+function buildConceptQuestions(conquered, rel) {
+  const out = [];
+  const cands = shuffle(conquered.filter(c => !mentionsTitle(c.one_line, c.title)));
+  for (const c of cands) {
+    if (out.length >= QUIZ_MAX_PER_TYPE) break;
+    const wrong = [];
+    const seen = new Set([c.title]);
+    for (const o of shuffle(otherConcepts(c, rel))) {
+      if (wrong.length >= 3) break;
+      if (seen.has(o.title) || mentionsTitle(c.one_line, o.title)) continue;
+      seen.add(o.title);
+      wrong.push(o);
+    }
+    if (wrong.length < 3) continue;
+    out.push({
+      type: 'mcq', roundLabel: '개념 맞추기',
+      question: '다음 설명에 해당하는 개념은 무엇인가요?\n\n"' + c.one_line + '"',
+      options: shuffle([c.title, ...wrong.map(o => o.title)]),
+      answer: c.title,
+      meta: { kind: 'T1', concept: c.id, others: wrong.map(o => o.id) },
+    });
+  }
+  return out;
+}
+
+// T2 핵심 포인트 확인: 제목 → key_point 4지선다 (오답은 다른 개념, 가능하면 다른 분야)
+function buildKeyPointQuestions(conquered, rel) {
+  const out = [];
+  const cands = shuffle(conquered.filter(c => usableKeyPoints(c).length > 0));
+  for (const c of cands) {
+    if (out.length >= QUIZ_MAX_PER_TYPE) break;
+    const answerKp = shuffle(usableKeyPoints(c))[0];
+    const pool = otherConcepts(c, rel);
+    const ordered = [...shuffle(pool.filter(o => o.field !== c.field)), ...shuffle(pool.filter(o => o.field === c.field))];
+    const wrong = [];
+    const seen = new Set([answerKp]);
+    for (const o of ordered) {
+      if (wrong.length >= 3) break;
+      const kps = shuffle(usableKeyPoints(o).filter(k => !seen.has(k) && !mentionsTitle(k, c.title)));
+      if (!kps.length) continue;
+      seen.add(kps[0]);
+      wrong.push({ o, kp: kps[0] });
+    }
+    if (wrong.length < 3) continue;
+    out.push({
+      type: 'mcq', roundLabel: '핵심 포인트 확인',
+      question: '다음 중 「' + c.title + '」에 대한 설명으로 옳은 것은?',
+      options: shuffle([answerKp, ...wrong.map(w => w.kp)]),
+      answer: answerKp,
+      meta: { kind: 'T2', concept: c.id, others: wrong.map(w => w.o.id) },
+    });
+  }
+  return out;
+}
+
+// T3 OX: 「제목」: key_point — 참은 그 개념의 것, 거짓은 다른 개념의 것을 붙인 것
+function buildOXQuestions(conquered, rel) {
+  const out = [];
+  const cands = shuffle(conquered.filter(c => usableKeyPoints(c).length > 0));
+  for (const c of cands) {
+    if (out.length >= QUIZ_MAX_PER_TYPE) break;
+    let isTrue = Math.random() < 0.5;
+    let kp, from = c;
+    if (!isTrue) {
+      const pool = otherConcepts(c, rel).filter(o => usableKeyPoints(o).some(k => !mentionsTitle(k, c.title)));
+      if (pool.length === 0) isTrue = true;
+      else {
+        from = shuffle(pool)[0];
+        kp = shuffle(usableKeyPoints(from).filter(k => !mentionsTitle(k, c.title)))[0];
+      }
+    }
+    if (isTrue) kp = shuffle(usableKeyPoints(c))[0];
+    out.push({
+      type: 'ox', roundLabel: 'OX 퀴즈',
+      statement: '「' + c.title + '」: ' + kp,
+      answer: isTrue,
+      explanation: isTrue
+        ? '정답! 이 설명은 「' + c.title + '」의 핵심 포인트입니다.'
+        : '아닙니다. 이 설명은 「' + from.title + '」에 대한 것입니다.',
+      meta: { kind: 'T3', concept: c.id, from: from.id, isTrue },
+    });
+  }
+  return out;
+}
+
+// 정복 개념 전체에서 유형별 최대 3문항(최대 9문항), 문항 순서는 섞는다
+function buildQuestions(conquered) {
+  const rel = buildRelatedMap();
+  return shuffle([
+    ...buildConceptQuestions(conquered, rel),
+    ...buildKeyPointQuestions(conquered, rel),
+    ...buildOXQuestions(conquered, rel),
+  ]);
+}
+
 function startQuizFlow() {
-  if (getConqueredConcepts().length === 0) {
+  const conquered = getConqueredConcepts();
+  if (conquered.length === 0) {
     alert('먼저 개념을 정복해 주세요');
     return;
   }
-  alert('퀴즈는 준비 중입니다');
+  const questions = buildQuestions(conquered);
+  if (questions.length === 0) {
+    alert('퀴즈를 만들 수 없습니다. 다른 개념도 정복해 보세요');
+    return;
+  }
+  quizState = { questions, currentIdx: 0, score: 0, wrong: [], answered: false };
+  showView('view-quiz');
+  renderQuestion();
+  window.scrollTo(0, 0);
+  navQuizState({ view: 'quiz' });
+}
+
+// 퀴즈·결과 화면의 history: 과목 선택/목록 위에는 한 칸 push, 이미 그 위
+// (상세·퀴즈·결과)면 replace. 그래서 뒤로가기 한 번이면 아래 화면으로 돌아간다.
+function navQuizState(state) {
+  if (_navFromPop) return;
+  const cur = history.state && history.state.view;
+  if (!cur || cur === 'list' || cur === 'subjects') history.pushState(state, '');
+  else history.replaceState(state, '');
+}
+
+function leaveQuiz() {
+  const v = history.state && history.state.view;
+  if (v === 'quiz' || v === 'result') { history.back(); return; }
+  renderAndShowSubjects();
+}
+
+function renderQuestion() {
+  const q = quizState.questions[quizState.currentIdx];
+  if (!q) { showResult(); return; }
+  quizState.answered = false;
+
+  const total = quizState.questions.length;
+  const pct = (quizState.currentIdx / total) * 100;
+  const container = document.getElementById('quiz-content');
+  container.innerHTML = `
+    <div class="quiz-progress-bar-wrap"><div class="quiz-progress-bar" id="qpb"></div></div>
+    <div class="quiz-round-label"></div>
+    <div class="quiz-question-counter"></div>
+    <div class="quiz-card">
+      <div class="quiz-question"></div>
+      <div class="quiz-answer-area"></div>
+    </div>
+    <button class="quiz-next-btn" id="quiz-next" onclick="nextQuestion()"></button>`;
+  document.getElementById('qpb').style.width = pct + '%';
+  container.querySelector('.quiz-round-label').textContent = q.roundLabel;
+  container.querySelector('.quiz-question-counter').textContent = (quizState.currentIdx + 1) + ' / ' + total;
+  container.querySelector('.quiz-question').textContent = q.type === 'mcq' ? q.question : q.statement;
+  document.getElementById('quiz-next').textContent = quizState.currentIdx + 1 >= total ? '결과 보기' : '다음';
+
+  const area = container.querySelector('.quiz-answer-area');
+  if (q.type === 'mcq') {
+    const list = document.createElement('div');
+    list.className = 'mcq-options';
+    q.options.forEach((opt, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mcq-option';
+      btn.dataset.opt = opt;
+      const num = document.createElement('span'); num.className = 'mcq-num'; num.textContent = String(i + 1);
+      const txt = document.createElement('span'); txt.className = 'mcq-text'; txt.textContent = opt;
+      btn.append(num, txt);
+      btn.addEventListener('click', () => answerMCQ(btn, opt));
+      list.appendChild(btn);
+    });
+    area.appendChild(list);
+  } else {
+    area.innerHTML = `
+      <div class="ox-buttons">
+        <button type="button" class="ox-btn" id="ox-o">O</button>
+        <button type="button" class="ox-btn" id="ox-x">X</button>
+      </div>
+      <div class="ox-feedback" id="ox-fb"></div>`;
+    document.getElementById('ox-o').addEventListener('click', () => answerOX(true));
+    document.getElementById('ox-x').addEventListener('click', () => answerOX(false));
+  }
+}
+
+function answerMCQ(el, chosen) {
+  if (quizState.answered) return;
+  quizState.answered = true;
+  const q = quizState.questions[quizState.currentIdx];
+  document.querySelectorAll('.mcq-option').forEach(opt => opt.classList.add('answered'));
+  if (chosen === q.answer) {
+    el.classList.add('correct');
+    quizState.score++;
+  } else {
+    el.classList.add('wrong');
+    document.querySelectorAll('.mcq-option').forEach(opt => {
+      if (opt.dataset.opt === q.answer) opt.classList.add('correct-hint');
+    });
+    quizState.wrong.push({ q: q.question, a: q.answer });
+  }
+  document.getElementById('quiz-next').classList.add('visible');
+}
+
+function answerOX(answer) {
+  if (quizState.answered) return;
+  quizState.answered = true;
+  const q = quizState.questions[quizState.currentIdx];
+  const oBtn = document.getElementById('ox-o');
+  const xBtn = document.getElementById('ox-x');
+  const fb = document.getElementById('ox-fb');
+  oBtn.disabled = true; xBtn.disabled = true;
+  if (answer === q.answer) {
+    (answer ? oBtn : xBtn).classList.add('correct');
+    quizState.score++;
+    fb.textContent = q.explanation;
+    fb.className = 'ox-feedback show correct-fb';
+  } else {
+    (answer ? oBtn : xBtn).classList.add('wrong');
+    (!answer ? oBtn : xBtn).classList.add('correct');
+    fb.textContent = '오답. ' + q.explanation.replace(/^정답! /, '');
+    fb.className = 'ox-feedback show wrong-fb';
+    quizState.wrong.push({ q: q.statement, a: q.answer ? 'O (참)' : 'X (거짓)' });
+  }
+  document.getElementById('quiz-next').classList.add('visible');
+}
+
+function nextQuestion() {
+  quizState.currentIdx++;
+  renderQuestion();
+  window.scrollTo(0, 0);
+}
+
+function showResult() {
+  const total = quizState.questions.length;
+  const score = quizState.score;
+  const pct = total > 0 ? Math.round((score / total) * 100) : 0;
+
+  let emoji = '🎉', msg = '완벽해요!', sub = '모든 문항을 맞혔습니다.';
+  if (pct < 100) { emoji = '👍'; msg = '잘했어요!'; sub = '조금만 더 연습하면 완벽합니다.'; }
+  if (pct < 60) { emoji = '📚'; msg = '다시 도전해봐요!'; sub = '개념을 다시 읽고 퀴즈에 도전하세요.'; }
+
+  const root = document.getElementById('result-content');
+  root.innerHTML = `
+    <div class="result-score-wrap">
+      <div class="result-emoji"></div>
+      <div class="result-score"></div>
+      <div class="result-msg"></div>
+      <div class="result-submsg"></div>
+    </div>
+    <div id="result-wrong"></div>
+    <div class="result-actions">
+      <button class="result-btn result-btn-primary" onclick="startQuizFlow()">다시 풀기</button>
+      <button class="result-btn result-btn-secondary" onclick="leaveQuiz()">개념 목록으로</button>
+    </div>`;
+  root.querySelector('.result-emoji').textContent = emoji;
+  const scoreEl = root.querySelector('.result-score');
+  scoreEl.textContent = String(score);
+  const tot = document.createElement('span'); tot.textContent = ' / ' + total; scoreEl.appendChild(tot);
+  root.querySelector('.result-msg').textContent = msg;
+  root.querySelector('.result-submsg').textContent = sub;
+
+  if (quizState.wrong.length > 0) {
+    const wrap = document.getElementById('result-wrong');
+    const label = document.createElement('div'); label.className = 'result-section-label'; label.textContent = '틀린 문항';
+    const list = document.createElement('div'); list.className = 'result-wrong-list';
+    quizState.wrong.forEach(w => {
+      const item = document.createElement('div'); item.className = 'result-wrong-item';
+      const qq = document.createElement('div'); qq.className = 'result-wrong-q'; qq.textContent = w.q;
+      const aa = document.createElement('div'); aa.className = 'result-wrong-a'; aa.textContent = w.a;
+      item.append(qq, aa); list.appendChild(item);
+    });
+    wrap.append(label, list);
+  }
+
+  showView('view-result');
+  window.scrollTo(0, 0);
+  navQuizState({ view: 'result' });
 }
 
 // "개념" 탭: 과목 선택 화면으로. 이미 과목 선택 화면이면 아무것도 하지 않아
@@ -586,6 +1049,13 @@ window.addEventListener('popstate', e => {
       currentField = (st.field && FIELD_ORDER.includes(st.field)) ? st.field : concept.field;
       renderFieldCarousel(currentField);
       showScience(st.id);
+    } else if (st.view === 'quiz' && quizState.questions.length && quizState.currentIdx < quizState.questions.length) {
+      // 작업174: 메모리의 퀴즈 상태가 남아 있을 때만 복원(새로고침 후에는 과목 선택으로)
+      showView('view-quiz');
+      renderQuestion();
+      window.scrollTo(0, 0);
+    } else if (st.view === 'result' && quizState.questions.length) {
+      showResult();
     } else if (st.view === 'list' && st.field && fieldHasConcepts(st.field)) {
       renderAndShowFieldList(st.field);
     } else {
