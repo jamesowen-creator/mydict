@@ -10,6 +10,7 @@ const OPTIONS = [
   { id: 'literature', name: '문학 나침반', description: '시대별 문학 사조 타임라인', url: '/literature_compass.html' },
   { id: 'digest', name: '한입 독서', description: '한 입 크기로 읽는 작품 요약', url: '/digest_reading.html' },
   { id: 'science', name: '과학', description: '오해를 바로잡는 과학 상식', url: '/science_reading.html' },
+  { id: 'voice', name: '음성 학습', description: '소리 내어 읽은 공부를 글과 요약으로', url: '/voice_study.html' },
   { id: 'metacong', name: 'MetaCong', description: '한국사·세계사 음성 학습 퀴즈', url: '/metacong/' },
 ];
 
