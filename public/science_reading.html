@@ -561,7 +561,7 @@
     </svg>
     개념
   </button>
-  <button class="tab-btn disabled" id="tab-quiz" onclick="startQuizFlow()">
+  <button class="tab-btn disabled" id="tab-quiz" onclick="onQuizTab()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="10"></circle>
       <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
@@ -795,6 +795,20 @@ function buildQuestions(conquered) {
   ]);
 }
 
+// "퀴즈" 탭 (작업175 F2): 이미 퀴즈·결과 화면이면 아무 동작도 하지 않는다
+// (진행 중인 퀴즈가 새 문항으로 바뀌어 버리는 것을 막음). 그 외 화면은 새로 시작.
+function onQuizTab() {
+  const active = document.querySelector('.view.active');
+  if (active && (active.id === 'view-quiz' || active.id === 'view-result')) return;
+  startQuizFlow();
+}
+
+// 작업175 F3: 퀴즈 상태를 빈 상태로 되돌린다(이후 뒤로/앞으로가기로 quiz·result
+// history 항목에 와도 복원할 퀴즈가 없어 과목 선택 화면으로 간다)
+function resetQuizState() {
+  quizState = { questions: [], currentIdx: 0, score: 0, wrong: [], answered: false };
+}
+
 function startQuizFlow() {
   const conquered = getConqueredConcepts();
   if (conquered.length === 0) {
@@ -822,7 +836,8 @@ function navQuizState(state) {
   else history.replaceState(state, '');
 }
 
-function leaveQuiz() {
+function leaveQuiz(reset) {
+  if (reset) resetQuizState();
   const v = history.state && history.state.view;
   if (v === 'quiz' || v === 'result') { history.back(); return; }
   renderAndShowSubjects();
@@ -880,9 +895,10 @@ function renderQuestion() {
 }
 
 function answerMCQ(el, chosen) {
-  if (quizState.answered) return;
-  quizState.answered = true;
   const q = quizState.questions[quizState.currentIdx];
+  if (!q || quizState.answered || q.graded) return;
+  quizState.answered = true;
+  q.graded = true; // 작업175 F1: 같은 문항은 두 번 채점하지 않는다
   document.querySelectorAll('.mcq-option').forEach(opt => opt.classList.add('answered'));
   if (chosen === q.answer) {
     el.classList.add('correct');
@@ -898,9 +914,10 @@ function answerMCQ(el, chosen) {
 }
 
 function answerOX(answer) {
-  if (quizState.answered) return;
-  quizState.answered = true;
   const q = quizState.questions[quizState.currentIdx];
+  if (!q || quizState.answered || q.graded) return;
+  quizState.answered = true;
+  q.graded = true; // 작업175 F1
   const oBtn = document.getElementById('ox-o');
   const xBtn = document.getElementById('ox-x');
   const fb = document.getElementById('ox-fb');
@@ -913,7 +930,8 @@ function answerOX(answer) {
   } else {
     (answer ? oBtn : xBtn).classList.add('wrong');
     (!answer ? oBtn : xBtn).classList.add('correct');
-    fb.textContent = '오답. ' + q.explanation.replace(/^정답! /, '');
+    // 작업175 F4: 틀렸을 때는 해설 앞의 "정답! "(참 문항)·"아닙니다. "(거짓 문항)을 떼고 "오답. "을 붙인다
+    fb.textContent = '오답. ' + q.explanation.replace(/^(정답! |아닙니다\. )/, '');
     fb.className = 'ox-feedback show wrong-fb';
     quizState.wrong.push({ q: q.statement, a: q.answer ? 'O (참)' : 'X (거짓)' });
   }
@@ -946,7 +964,7 @@ function showResult() {
     <div id="result-wrong"></div>
     <div class="result-actions">
       <button class="result-btn result-btn-primary" onclick="startQuizFlow()">다시 풀기</button>
-      <button class="result-btn result-btn-secondary" onclick="leaveQuiz()">개념 목록으로</button>
+      <button class="result-btn result-btn-secondary" onclick="leaveQuiz(true)">개념 목록으로</button>
     </div>`;
   root.querySelector('.result-emoji').textContent = emoji;
   const scoreEl = root.querySelector('.result-score');
@@ -976,6 +994,7 @@ function showResult() {
 // "개념" 탭: 과목 선택 화면으로. 이미 과목 선택 화면이면 아무것도 하지 않아
 // 같은 상태가 history에 쌓이지 않는다(그 외에는 "과목 선택" 버튼과 같은 goSubjects)
 function goConceptsTab() {
+  resetQuizState(); // 작업175 F3
   if (document.getElementById('view-subjects').classList.contains('active')) {
     window.scrollTo(0, 0);
     return;
@@ -1051,9 +1070,15 @@ window.addEventListener('popstate', e => {
       showScience(st.id);
     } else if (st.view === 'quiz' && quizState.questions.length && quizState.currentIdx < quizState.questions.length) {
       // 작업174: 메모리의 퀴즈 상태가 남아 있을 때만 복원(새로고침 후에는 과목 선택으로)
-      showView('view-quiz');
-      renderQuestion();
-      window.scrollTo(0, 0);
+      // 작업175 F1: 이미 채점된 문항이면 다음 문항(없으면 결과 화면)으로 복원해 중복 채점을 막는다
+      if (quizState.answered || quizState.questions[quizState.currentIdx].graded) quizState.currentIdx++;
+      if (quizState.currentIdx >= quizState.questions.length) {
+        showResult();
+      } else {
+        showView('view-quiz');
+        renderQuestion();
+        window.scrollTo(0, 0);
+      }
     } else if (st.view === 'result' && quizState.questions.length) {
       showResult();
     } else if (st.view === 'list' && st.field && fieldHasConcepts(st.field)) {
