@@ -707,52 +707,73 @@ function buildRelatedMap() {
   }));
   return m;
 }
-// 그 개념의 key_point 중 G2 제외 대상이 아니고 자기 제목 토큰과 겹치지 않는 것만 사용 가능
+// 작업177 H1: 수동 제외 key_point(id#번호, key_points의 1부터 센 순번). T1·T2·T3 모든 재료에서 제외
+const QUIZ_KEYPOINT_MANUAL_EXCLUDE = new Set(['science_009#3', 'science_013#2', 'science_014#2']);
+
+// 그 개념의 key_point 중 수동 제외(H1)·G2 제외 대상이 아니고 자기 제목 토큰과 겹치지 않는 것만 사용 가능
 function usableKeyPoints(c) {
-  return c.key_points.filter(k => keyPointExcludeReason(k) === null && !titleOverlaps(k, c.title));
+  return c.key_points.filter((k, i) =>
+    !QUIZ_KEYPOINT_MANUAL_EXCLUDE.has(c.id + '#' + (i + 1)) &&
+    keyPointExcludeReason(k) === null &&
+    !titleOverlaps(k, c.title));
 }
 function otherConcepts(c, rel) {
   return DB.concepts.filter(o => o.id !== c.id && !rel[c.id].has(o.id));
 }
-
-// T1 개념 맞추기: one_line → 제목 4지선다
-function buildConceptQuestions(conquered, rel) {
+// 작업177 H2: T2 오답·T3 거짓의 "다른 개념"은 정답 개념과 다른 분야에서만 고른다(같은 분야 보충 없음)
+function otherFieldConcepts(c, rel) {
+  return otherConcepts(c, rel).filter(o => o.field !== c.field);
+}
+// 작업177 H3: T1 단서 후보 = one_line(제목 토큰 겹침 없을 때) + 사용 가능한 key_point들
+function conceptClues(c) {
   const out = [];
-  const cands = shuffle(conquered.filter(c => !titleOverlaps(c.one_line, c.title)));
+  if (!titleOverlaps(c.one_line, c.title)) out.push(c.one_line);
+  return out.concat(usableKeyPoints(c));
+}
+
+// 아래 세 빌더는 한 번의 퀴즈 안에서 쓴 문장(T1 단서·T2 정답·T3 진술)을 used 집합으로
+// 공유해 같은 문장이 유형 사이에서 중복 출제되지 않게 한다(작업177 H3).
+
+// T1 개념 맞추기: 단서 문장(one_line 또는 key_point) → 제목 4지선다
+function buildConceptQuestions(conquered, rel, used) {
+  const out = [];
+  const cands = shuffle(conquered.filter(c => conceptClues(c).length > 0));
   for (const c of cands) {
     if (out.length >= QUIZ_MAX_PER_TYPE) break;
+    const clues = shuffle(conceptClues(c).filter(k => !used.has(k)));
+    if (!clues.length) continue;
+    const clue = clues[0];
     const wrong = [];
     const seen = new Set([c.title]);
     for (const o of shuffle(otherConcepts(c, rel))) {
       if (wrong.length >= 3) break;
-      if (seen.has(o.title) || titleOverlaps(c.one_line, o.title)) continue;
+      if (seen.has(o.title) || titleOverlaps(clue, o.title)) continue;
       seen.add(o.title);
       wrong.push(o);
     }
     if (wrong.length < 3) continue;
+    used.add(clue);
     out.push({
       type: 'mcq', roundLabel: '개념 맞추기',
-      question: '다음 설명에 해당하는 개념은 무엇인가요?\n\n"' + c.one_line + '"',
+      question: '다음 설명에 해당하는 개념은 무엇인가요?\n\n"' + clue + '"',
       options: shuffle([c.title, ...wrong.map(o => o.title)]),
       answer: c.title,
-      meta: { kind: 'T1', concept: c.id, others: wrong.map(o => o.id) },
+      meta: { kind: 'T1', concept: c.id, others: wrong.map(o => o.id), clue },
     });
   }
   return out;
 }
 
-// T2 핵심 포인트 확인: 제목 → key_point 4지선다 (오답은 다른 개념, 가능하면 다른 분야)
-function buildKeyPointQuestions(conquered, rel) {
+// T2 핵심 포인트 확인: 제목 → key_point 4지선다 (오답은 다른 분야의 서로 다른 개념 3개)
+function buildKeyPointQuestions(conquered, rel, used) {
   const out = [];
-  const cands = shuffle(conquered.filter(c => usableKeyPoints(c).length > 0));
+  const cands = shuffle(conquered.filter(c => usableKeyPoints(c).some(k => !used.has(k))));
   for (const c of cands) {
     if (out.length >= QUIZ_MAX_PER_TYPE) break;
-    const answerKp = shuffle(usableKeyPoints(c))[0];
-    const pool = otherConcepts(c, rel);
-    const ordered = [...shuffle(pool.filter(o => o.field !== c.field)), ...shuffle(pool.filter(o => o.field === c.field))];
+    const answerKp = shuffle(usableKeyPoints(c).filter(k => !used.has(k)))[0];
     const wrong = [];
     const seen = new Set([answerKp]);
-    for (const o of ordered) {
+    for (const o of shuffle(otherFieldConcepts(c, rel))) {
       if (wrong.length >= 3) break;
       const kps = shuffle(usableKeyPoints(o).filter(k => !seen.has(k) && !titleOverlaps(k, c.title)));
       if (!kps.length) continue;
@@ -760,6 +781,7 @@ function buildKeyPointQuestions(conquered, rel) {
       wrong.push({ o, kp: kps[0] });
     }
     if (wrong.length < 3) continue;
+    used.add(answerKp);
     out.push({
       type: 'mcq', roundLabel: '핵심 포인트 확인',
       question: '다음 중 「' + c.title + '」에 대한 설명으로 옳은 것은?',
@@ -771,23 +793,26 @@ function buildKeyPointQuestions(conquered, rel) {
   return out;
 }
 
-// T3 OX: "다음 설명은 「제목」에 대한 설명일까요?" + key_point 원문 — 참은 그 개념의 것, 거짓은 다른 개념의 것을 붙인 것
-function buildOXQuestions(conquered, rel) {
+// T3 OX: "다음 설명은 「제목」에 대한 설명일까요?" + key_point 원문 — 참은 그 개념의 것, 거짓은 다른 분야 개념의 것을 붙인 것
+function buildOXQuestions(conquered, rel, used) {
   const out = [];
   const cands = shuffle(conquered.filter(c => usableKeyPoints(c).length > 0));
   for (const c of cands) {
     if (out.length >= QUIZ_MAX_PER_TYPE) break;
+    const own = usableKeyPoints(c).filter(k => !used.has(k));
+    const pool = otherFieldConcepts(c, rel).filter(o => usableKeyPoints(o).some(k => !used.has(k) && !titleOverlaps(k, c.title)));
     let isTrue = Math.random() < 0.5;
+    if (isTrue && own.length === 0) isTrue = false;
+    if (!isTrue && pool.length === 0) isTrue = true; // 작업177 H2: 다른 분야 재료가 없으면 참 문항
+    if (isTrue && own.length === 0) continue;
     let kp, from = c;
-    if (!isTrue) {
-      const pool = otherConcepts(c, rel).filter(o => usableKeyPoints(o).some(k => !titleOverlaps(k, c.title)));
-      if (pool.length === 0) isTrue = true;
-      else {
-        from = shuffle(pool)[0];
-        kp = shuffle(usableKeyPoints(from).filter(k => !titleOverlaps(k, c.title)))[0];
-      }
+    if (isTrue) {
+      kp = shuffle(own)[0];
+    } else {
+      from = shuffle(pool)[0];
+      kp = shuffle(usableKeyPoints(from).filter(k => !used.has(k) && !titleOverlaps(k, c.title)))[0];
     }
-    if (isTrue) kp = shuffle(usableKeyPoints(c))[0];
+    used.add(kp);
     out.push({
       type: 'ox', roundLabel: 'OX 퀴즈',
       statement: '다음 설명은 「' + c.title + '」에 대한 설명일까요?\n\n"' + kp + '"',
@@ -795,7 +820,7 @@ function buildOXQuestions(conquered, rel) {
       explanation: isTrue
         ? '정답! 이 설명은 「' + c.title + '」의 핵심 포인트입니다.'
         : '아닙니다. 이 설명은 「' + from.title + '」에 대한 것입니다.',
-      meta: { kind: 'T3', concept: c.id, from: from.id, isTrue },
+      meta: { kind: 'T3', concept: c.id, from: from.id, isTrue, kp },
     });
   }
   return out;
@@ -804,10 +829,11 @@ function buildOXQuestions(conquered, rel) {
 // 정복 개념 전체에서 유형별 최대 3문항(최대 9문항), 문항 순서는 섞는다
 function buildQuestions(conquered) {
   const rel = buildRelatedMap();
+  const used = new Set(); // 작업177 H3: 유형 사이에서 같은 문장 중복 출제 방지
   return shuffle([
-    ...buildConceptQuestions(conquered, rel),
-    ...buildKeyPointQuestions(conquered, rel),
-    ...buildOXQuestions(conquered, rel),
+    ...buildConceptQuestions(conquered, rel, used),
+    ...buildKeyPointQuestions(conquered, rel, used),
+    ...buildOXQuestions(conquered, rel, used),
   ]);
 }
 
