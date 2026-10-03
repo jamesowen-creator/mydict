@@ -665,21 +665,37 @@ function shuffle(arr) {
   return a;
 }
 
-const _qNorm = t => String(t).replace(/\s+/g, '').toLowerCase();
-// 제목 표기 후보: 전체, 괄호를 뺀 형태, 괄호 안 표기(예: "몰(mol)" → 몰(mol)/몰/mol)
-function titleForms(title) {
-  const forms = new Set();
-  const full = _qNorm(title);
-  if (full) forms.add(full);
-  const outer = _qNorm(title.replace(/\([^)]*\)/g, ''));
-  if (outer) forms.add(outer);
-  const m = title.match(/\(([^)]*)\)/);
-  if (m && _qNorm(m[1])) forms.add(_qNorm(m[1]));
-  return [...forms];
+// 작업176 G2: 퀴즈 재료에서 제외하는 key_point 패턴(나중에 조정하기 쉽게 상수 하나로 둠)
+// - 연도 표기(예: "1909년") 또는 자료·연구 서술형 표현이 들어 있는 문장은 개념 설명이 아님
+const QUIZ_KEYPOINT_EXCLUDE = {
+  pattern: /\d{4}\s*년/,
+  words: ['문항', '다큐', '연구', '조사', '설문', '논문', '교재', '학생', '교사', '졸업생', 'SERC', '하버드', '제시되었', '정답으로', '나온다', '발표', '보고서'],
+};
+// 제외 사유 문자열(제외 대상이 아니면 null)
+function keyPointExcludeReason(k) {
+  const hits = [];
+  if (QUIZ_KEYPOINT_EXCLUDE.pattern.test(k)) hits.push(String(QUIZ_KEYPOINT_EXCLUDE.pattern));
+  QUIZ_KEYPOINT_EXCLUDE.words.forEach(w => { if (k.includes(w)) hits.push(w); });
+  return hits.length ? hits.join(', ') : null;
 }
-function mentionsTitle(text, title) {
-  const t = _qNorm(text);
-  return titleForms(title).some(f => t.includes(f));
+
+// 작업176 G3: 제목 토큰 겹침 검사(기존 "제목 전체 포함" 검사를 대체)
+// 제목을 공백·"·"·","·괄호로 나누고, 토큰 끝의 조사 "와/과/의"를 떼고 소문자로 만든다.
+// 괄호 안 표기(예: "몰(mol)"의 mol)도 토큰이다.
+function titleTokens(title) {
+  const toks = String(title).split(/[\s·,()（）]+/).map(t => {
+    t = t.trim().toLowerCase();
+    if (t.length >= 2 && /[와과의]$/.test(t)) t = t.slice(0, -1);
+    return t;
+  }).filter(Boolean);
+  return [...new Set(toks)];
+}
+// 토큰이 2글자 이상이면 부분 문자열로, 1글자면 단어 첫 글자(문두 또는 공백 뒤)로 나타날 때 겹침.
+// 공백은 유지하고 대소문자는 무시한다.
+function titleOverlaps(text, title) {
+  const t = String(text).toLowerCase();
+  return titleTokens(title).some(tok =>
+    tok.length >= 2 ? t.includes(tok) : (t.startsWith(tok) || t.includes(' ' + tok)));
 }
 // 양방향 related 맵: 한쪽에만 적혀 있어도 서로 관련으로 본다
 function buildRelatedMap() {
@@ -691,9 +707,9 @@ function buildRelatedMap() {
   }));
   return m;
 }
-// 그 개념의 key_point 중 자기 제목이 문자열에 들어 있지 않은 것만 사용 가능
+// 그 개념의 key_point 중 G2 제외 대상이 아니고 자기 제목 토큰과 겹치지 않는 것만 사용 가능
 function usableKeyPoints(c) {
-  return c.key_points.filter(k => !mentionsTitle(k, c.title));
+  return c.key_points.filter(k => keyPointExcludeReason(k) === null && !titleOverlaps(k, c.title));
 }
 function otherConcepts(c, rel) {
   return DB.concepts.filter(o => o.id !== c.id && !rel[c.id].has(o.id));
@@ -702,14 +718,14 @@ function otherConcepts(c, rel) {
 // T1 개념 맞추기: one_line → 제목 4지선다
 function buildConceptQuestions(conquered, rel) {
   const out = [];
-  const cands = shuffle(conquered.filter(c => !mentionsTitle(c.one_line, c.title)));
+  const cands = shuffle(conquered.filter(c => !titleOverlaps(c.one_line, c.title)));
   for (const c of cands) {
     if (out.length >= QUIZ_MAX_PER_TYPE) break;
     const wrong = [];
     const seen = new Set([c.title]);
     for (const o of shuffle(otherConcepts(c, rel))) {
       if (wrong.length >= 3) break;
-      if (seen.has(o.title) || mentionsTitle(c.one_line, o.title)) continue;
+      if (seen.has(o.title) || titleOverlaps(c.one_line, o.title)) continue;
       seen.add(o.title);
       wrong.push(o);
     }
@@ -738,7 +754,7 @@ function buildKeyPointQuestions(conquered, rel) {
     const seen = new Set([answerKp]);
     for (const o of ordered) {
       if (wrong.length >= 3) break;
-      const kps = shuffle(usableKeyPoints(o).filter(k => !seen.has(k) && !mentionsTitle(k, c.title)));
+      const kps = shuffle(usableKeyPoints(o).filter(k => !seen.has(k) && !titleOverlaps(k, c.title)));
       if (!kps.length) continue;
       seen.add(kps[0]);
       wrong.push({ o, kp: kps[0] });
@@ -755,7 +771,7 @@ function buildKeyPointQuestions(conquered, rel) {
   return out;
 }
 
-// T3 OX: 「제목」: key_point — 참은 그 개념의 것, 거짓은 다른 개념의 것을 붙인 것
+// T3 OX: "다음 설명은 「제목」에 대한 설명일까요?" + key_point 원문 — 참은 그 개념의 것, 거짓은 다른 개념의 것을 붙인 것
 function buildOXQuestions(conquered, rel) {
   const out = [];
   const cands = shuffle(conquered.filter(c => usableKeyPoints(c).length > 0));
@@ -764,17 +780,17 @@ function buildOXQuestions(conquered, rel) {
     let isTrue = Math.random() < 0.5;
     let kp, from = c;
     if (!isTrue) {
-      const pool = otherConcepts(c, rel).filter(o => usableKeyPoints(o).some(k => !mentionsTitle(k, c.title)));
+      const pool = otherConcepts(c, rel).filter(o => usableKeyPoints(o).some(k => !titleOverlaps(k, c.title)));
       if (pool.length === 0) isTrue = true;
       else {
         from = shuffle(pool)[0];
-        kp = shuffle(usableKeyPoints(from).filter(k => !mentionsTitle(k, c.title)))[0];
+        kp = shuffle(usableKeyPoints(from).filter(k => !titleOverlaps(k, c.title)))[0];
       }
     }
     if (isTrue) kp = shuffle(usableKeyPoints(c))[0];
     out.push({
       type: 'ox', roundLabel: 'OX 퀴즈',
-      statement: '「' + c.title + '」: ' + kp,
+      statement: '다음 설명은 「' + c.title + '」에 대한 설명일까요?\n\n"' + kp + '"',
       answer: isTrue,
       explanation: isTrue
         ? '정답! 이 설명은 「' + c.title + '」의 핵심 포인트입니다.'
