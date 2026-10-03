@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="/css/common/appHeader.css">
 <style>
   /* 작업180: 음성 학습 - 녹음 → 글로 변환 → 원문 수정 → 저장. 음성은 서버에 저장되지 않는다.
-     작업181: 원문 아래 요약 영역. 작업182: 요약 읽어주기(브라우저 내장 음성).
+     작업181: 원문 아래 요약 영역. 작업182: 요약 읽어주기(브라우저 내장 음성). 작업185: 퀴즈(원문 근거 검증, 점수는 저장하지 않음).
      작업184: 겉모양을 science_reading.html과 통일 - 색·글꼴·버튼·카드·안내 스타일은
      그 화면의 값을 그대로 쓰고 새 색·새 글꼴은 도입하지 않는다. 상단은 공통 헤더(appHeader). */
   :root {
@@ -170,6 +170,56 @@
   .sum-head { display: flex; align-items: center; justify-content: space-between; margin: 20px 0 8px; }
   .sum-head .field-label { margin: 0; }
 
+  /* 퀴즈 (science_reading.html의 퀴즈·결과 화면과 같은 모양) */
+  .quiz-section { margin-top: 24px; }
+  .quiz-question-counter { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
+  .quiz-card {
+    background: var(--card); border-radius: 16px;
+    border: 1px solid var(--border); padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .quiz-question {
+    font-size: 16px; font-weight: 600; line-height: 1.6;
+    margin-bottom: 20px; color: var(--text1);
+    white-space: pre-line; word-break: keep-all;
+  }
+  .mcq-options { display: flex; flex-direction: column; gap: 10px; }
+  .mcq-option {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    padding: 12px 14px;
+    background: var(--bg); border: 1.5px solid var(--border);
+    border-radius: 12px; cursor: pointer; transition: all 0.15s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .mcq-option:hover:not(.answered) { border-color: var(--primary); background: var(--primary-light); }
+  .mcq-option.answered { cursor: default; }
+  .mcq-option.correct { background: var(--primary-light); border-color: var(--primary); }
+  .mcq-option.wrong { background: var(--error-light); border-color: var(--error); }
+  .mcq-option.correct-hint { background: var(--primary-light); border-color: var(--primary); }
+  .mcq-num {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; flex-shrink: 0; color: var(--text2);
+    transition: all 0.15s;
+  }
+  .mcq-option.correct .mcq-num { background: var(--primary); color: #fff; }
+  .mcq-option.wrong .mcq-num { background: var(--error); color: #fff; }
+  .mcq-option.correct-hint .mcq-num { background: var(--primary); color: #fff; }
+  .mcq-text { font-size: 14px; line-height: 1.5; color: var(--text1); word-break: keep-all; }
+  .quiz-feedback .fb-line { font-weight: 700; }
+  .quiz-feedback .fb-sub { font-weight: 500; margin-top: 6px; word-break: keep-all; }
+  .result-score-wrap {
+    text-align: center; margin-bottom: 20px;
+    padding: 28px; background: var(--card);
+    border-radius: 20px; border: 1px solid var(--border);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .result-score { font-size: 42px; font-weight: 700; color: var(--primary); font-family: 'Inter', sans-serif; }
+  .result-score span { font-size: 20px; color: var(--text2); }
+  .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
+  .result-actions { display: flex; flex-direction: column; gap: 10px; }
+
   /* 요약 읽어주기 */
   .tts-box { margin-top: 10px; }
   .tts-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -275,12 +325,45 @@
       <div id="tts-msg" class="msg"></div>
     </div>
     <div id="sum-msg" class="msg"></div>
+    <div id="quiz-section" class="quiz-section">
+      <div class="sum-head"><span class="field-label">퀴즈</span></div>
+      <div id="quiz-note" class="msg warn" style="display:none"></div>
+      <div id="quiz-status" class="convert-status" style="display:none;margin-top:8px"><div class="spinner small"></div><span>퀴즈를 만드는 중… (최대 몇십 초 걸릴 수 있습니다)</span></div>
+      <div id="quiz-actions" class="btn-row" style="display:none">
+        <button id="quiz-play" class="btn small" type="button" style="display:none">퀴즈 풀기</button>
+        <button id="quiz-make" class="btn small" type="button">퀴즈 만들기</button>
+      </div>
+      <div id="quiz-msg" class="msg"></div>
+    </div>
     <div id="edit-meta" class="meta"></div>
     <div id="edit-msg" class="msg"></div>
     <div class="btn-row">
       <button id="edit-delete" class="btn danger" type="button" style="display:none">삭제</button>
       <button id="edit-cancel" class="btn secondary" type="button">취소</button>
       <button id="edit-save" class="btn" type="button">저장</button>
+    </div>
+  </div>
+
+  <!-- ⑤ 퀴즈 풀이 / 결과 (점수·답은 저장하지 않는다) -->
+  <div id="view-quiz" class="view">
+    <div id="quiz-run">
+      <div id="quiz-progress" class="quiz-question-counter">1 / 5</div>
+      <div class="quiz-card">
+        <div id="quiz-q" class="quiz-question"></div>
+        <div id="quiz-options" class="mcq-options"></div>
+        <div id="quiz-feedback" class="msg quiz-feedback" style="display:none"></div>
+      </div>
+      <button id="quiz-next" class="btn block" type="button" style="display:none;margin-top:16px">다음</button>
+    </div>
+    <div id="quiz-result" style="display:none">
+      <div class="result-score-wrap">
+        <div class="result-score"><span id="quiz-score-num" style="font-size:42px;color:var(--primary)">0</span><span> / <span id="quiz-score-total" style="font-size:20px">5</span></span></div>
+        <div id="quiz-result-msg" class="result-msg"></div>
+      </div>
+      <div class="result-actions">
+        <button id="quiz-retry" class="btn block" type="button">다시 풀기</button>
+        <button id="quiz-back" class="btn secondary block" type="button">자료로 돌아가기</button>
+      </div>
     </div>
   </div>
 </div>
@@ -369,11 +452,11 @@ let editNoteId = null;
 let editDirty = false;
 let pending = null;       // { blob, seconds, mime } - 변환 전/실패 시 메모리에만 유지
 
-const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료' };
+const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료', quiz: '퀴즈' };
 function showView(name) {
   stopSpeech();   // 작업182: 화면 이동 시 읽어주기 즉시 정지
   currentView = name;
-  for (const v of ['list', 'record', 'edit']) $('view-' + v).classList.toggle('active', v === name);
+  for (const v of ['list', 'record', 'edit', 'quiz']) $('view-' + v).classList.toggle('active', v === name);
   $('page-title').textContent = TITLES[name];
   $('subbar').style.display = name === 'list' ? 'none' : '';
   window.scrollTo(0, 0);
@@ -423,6 +506,7 @@ function requestBack() {
 }
 window.addEventListener('popstate', () => {
   if (currentView === 'list') return;
+  if (currentView === 'quiz') { showView('edit'); return; }   // 작업185: 퀴즈에서 뒤로가기 → 자료 상세로 복귀
   if (!leaveConfirmed()) {
     history.pushState({ v: currentView }, '');   // 방금 pop된 항목을 되돌려 현재 화면 유지
     return;
@@ -655,6 +739,7 @@ function updateCounter() {
   $('edit-counter').textContent = Array.from($('edit-text').value).length + ' / ' + TEXT_MAX;
   $('sum-counter').textContent = Array.from($('edit-summary').value).length + ' / ' + SUMMARY_MAX;
   refreshTtsUi();
+  refreshQuizUi();
 }
 let editSession = 0;   // 편집 화면을 새로 열 때마다 증가 - 늦게 도착한 요약 응답이 다른 자료에 들어가지 않게 함
 function resetSummaryUi() {
@@ -668,6 +753,7 @@ function resetSummaryUi() {
 function openEditNew(text) {
   editMode = 'new'; editNoteId = null;
   resetSummaryUi();
+  resetQuizState('');
   $('edit-title').value = '';
   $('edit-text').value = text;
   $('edit-meta').textContent = text.trim() ? '' : '인식된 글이 없습니다. 직접 입력하거나 다시 녹음해 주세요.';
@@ -688,6 +774,8 @@ async function openDetail(id) {
   catch (e) { setMsg('list-msg', e.message, 'error'); return; }
   editMode = 'detail'; editNoteId = n.id;
   resetSummaryUi();
+  resetQuizState(n.transcript || '');
+  loadQuiz(n.id, editSession);
   $('edit-summary').value = n.summary || '';
   $('edit-title').value = n.title || '';
   $('edit-text').value = n.transcript || '';
@@ -908,6 +996,150 @@ if (ttsSupported()) {
   try { v = localStorage.getItem(TTS_RATE_KEY); } catch (e) { /* 읽기 실패해도 기본값 */ }
   if (v && TTS_RATES.indexOf(v) >= 0) $('tts-rate').value = v;
 })();
+
+// ── 퀴즈 (작업185): 서버가 원문 근거를 검증해 저장한 4지선다를 풀어 본다. 점수·답은 저장하지 않는다 ──
+let quizData = null;           // 저장된 퀴즈 문제 배열(없으면 null)
+let quizChecking = false;      // 저장된 퀴즈가 있는지 확인 중
+let quizBusy = false;          // 퀴즈 생성 중
+let quizLoadedText = '';       // 서버에 저장된 원문(저장 전 수정 여부 비교용)
+const normNl = t => String(t).replace(/\r\n?/g, '\n');   // textarea는 줄바꿈을 LF로 돌려주므로 맞춰 비교
+let quizState = { i: 0, score: 0, answered: false };
+
+function resetQuizState(savedText) {
+  quizData = null; quizChecking = editMode === 'detail'; quizBusy = false;
+  quizLoadedText = normNl(savedText);
+  $('quiz-status').style.display = 'none';
+  setMsg('quiz-msg', '');
+}
+async function loadQuiz(noteId, session) {
+  let data = null;
+  try { data = await api('GET', '/api/voice-notes/' + noteId + '/quiz'); } catch (e) { data = null; }
+  if (session !== editSession) return;
+  quizData = data && Array.isArray(data.questions) && data.questions.length ? data.questions : null;
+  quizChecking = false;
+  refreshQuizUi();
+}
+function refreshQuizUi() {
+  const note = $('quiz-note'), actions = $('quiz-actions');
+  if (editMode === 'new') {
+    note.style.display = ''; note.textContent = '저장 후 퀴즈를 만들 수 있습니다.';
+    actions.style.display = 'none';
+    return;
+  }
+  const dirty = normNl($('edit-text').value) !== quizLoadedText;
+  if (quizChecking) { note.style.display = ''; note.textContent = '퀴즈 확인 중…'; actions.style.display = 'none'; return; }
+  actions.style.display = '';
+  if (dirty) { note.style.display = ''; note.textContent = '수정 내용을 저장한 뒤 퀴즈를 만들 수 있습니다.'; }
+  else { note.style.display = 'none'; note.textContent = ''; }
+  const disabled = dirty || quizBusy;
+  $('quiz-play').style.display = quizData ? '' : 'none';
+  $('quiz-play').disabled = disabled;
+  $('quiz-make').disabled = disabled;
+  $('quiz-make').textContent = quizData ? '퀴즈 새로 만들기' : '퀴즈 만들기';
+  $('quiz-make').className = 'btn small' + (quizData ? ' secondary' : '');
+}
+function quizErrorText(e) {
+  if (e.status === 429) return '오늘 만들 수 있는 퀴즈(하루 10건)를 모두 사용했습니다. 내일 다시 이용해 주세요.';
+  if (e.status === 422) return '이 원문으로는 퀴즈를 만들 수 없습니다. 내용을 더 길고 구체적으로 보강한 뒤 다시 시도해 주세요.';
+  if (e.status === 400) return '원문이 너무 짧아 퀴즈를 만들 수 없습니다. 내용을 더 보강한 뒤 다시 시도해 주세요.';
+  if (e.status === 502) return '퀴즈를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  return e.message;
+}
+$('quiz-make').addEventListener('click', async () => {
+  if (quizBusy || editMode !== 'detail') return;
+  setMsg('quiz-msg', '');
+  if (quizData && !confirm('퀴즈를 새로 만들면 오늘 만들 수 있는 횟수(하루 10건)가 1건 차감되고 기존 퀴즈는 새 퀴즈로 바뀝니다. 계속할까요?')) return;
+  const session = editSession, noteId = editNoteId;
+  quizBusy = true;
+  $('quiz-status').style.display = '';
+  refreshQuizUi();
+  let data;
+  try {
+    data = await api('POST', '/api/voice-notes/' + noteId + '/quiz');
+  } catch (e) {
+    if (session !== editSession) return;
+    quizBusy = false;
+    $('quiz-status').style.display = 'none';
+    setMsg('quiz-msg', quizErrorText(e), 'error');
+    refreshQuizUi();
+    return;
+  }
+  if (session !== editSession) return;
+  quizBusy = false;
+  $('quiz-status').style.display = 'none';
+  quizData = data && Array.isArray(data.questions) && data.questions.length ? data.questions : null;
+  if (!quizData) setMsg('quiz-msg', '퀴즈를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.', 'error');
+  refreshQuizUi();
+});
+$('quiz-play').addEventListener('click', () => {
+  if (!quizData || normNl($('edit-text').value) !== quizLoadedText) return;
+  quizState = { i: 0, score: 0, answered: false };
+  go('quiz');                                   // history에 쌓아 뒤로가기로 상세 복귀 (showView가 읽어주기를 정지)
+  $('quiz-result').style.display = 'none';
+  $('quiz-run').style.display = '';
+  renderQuizQuestion();
+});
+function renderQuizQuestion() {
+  const q = quizData[quizState.i];
+  quizState.answered = false;
+  $('quiz-progress').textContent = (quizState.i + 1) + ' / ' + quizData.length;
+  $('quiz-q').textContent = q.question;
+  const box = $('quiz-options');
+  box.textContent = '';
+  q.choices.forEach((text, idx) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'mcq-option';
+    const num = document.createElement('span'); num.className = 'mcq-num'; num.textContent = String(idx + 1);
+    const t = document.createElement('span'); t.className = 'mcq-text'; t.textContent = text;
+    b.appendChild(num); b.appendChild(t);
+    b.addEventListener('click', () => answerQuiz(idx));
+    box.appendChild(b);
+  });
+  $('quiz-feedback').style.display = 'none';
+  $('quiz-next').style.display = 'none';
+}
+function answerQuiz(idx) {
+  if (quizState.answered) return;               // 한 문제에 한 번만 채점
+  quizState.answered = true;
+  const q = quizData[quizState.i];
+  const correct = idx === q.answer_index;
+  if (correct) quizState.score++;
+  const opts = $('quiz-options').children;
+  for (let k = 0; k < opts.length; k++) {
+    opts[k].classList.add('answered');
+    if (k === idx) opts[k].classList.add(correct ? 'correct' : 'wrong');
+    else if (k === q.answer_index) opts[k].classList.add('correct-hint');
+  }
+  const fb = $('quiz-feedback');
+  fb.textContent = '';
+  fb.className = 'msg quiz-feedback ' + (correct ? 'info' : 'error');
+  const line = document.createElement('div'); line.className = 'fb-line';
+  line.textContent = correct ? '정답입니다!' : '오답입니다. 정답: ' + (q.answer_index + 1) + '번';
+  const ex = document.createElement('div'); ex.className = 'fb-sub'; ex.textContent = q.explanation;
+  const qt = document.createElement('div'); qt.className = 'fb-sub'; qt.textContent = '근거: 「' + q.quote + '」';
+  fb.appendChild(line); fb.appendChild(ex); fb.appendChild(qt);
+  fb.style.display = '';
+  $('quiz-next').textContent = quizState.i < quizData.length - 1 ? '다음' : '결과 보기';
+  $('quiz-next').style.display = '';
+}
+$('quiz-next').addEventListener('click', () => {
+  if (!quizState.answered) return;
+  if (quizState.i < quizData.length - 1) { quizState.i++; renderQuizQuestion(); return; }
+  $('quiz-run').style.display = 'none';
+  $('quiz-score-num').textContent = String(quizState.score);
+  $('quiz-score-total').textContent = String(quizData.length);
+  $('quiz-result-msg').textContent = quizState.score === quizData.length ? '모두 맞혔어요!' : '다시 풀어 보면 더 잘 기억돼요.';
+  $('quiz-result').style.display = '';
+  window.scrollTo(0, 0);
+});
+$('quiz-retry').addEventListener('click', () => {
+  quizState = { i: 0, score: 0, answered: false };
+  $('quiz-result').style.display = 'none';
+  $('quiz-run').style.display = '';
+  renderQuizQuestion();
+  window.scrollTo(0, 0);
+});
+$('quiz-back').addEventListener('click', () => { history.back(); });
 
 $('edit-save').addEventListener('click', async () => {
   const title = $('edit-title').value.trim();
