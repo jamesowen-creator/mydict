@@ -244,6 +244,19 @@
   .sum-type { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; color: var(--text2); }
   .sum-type .sel { flex: 1; min-width: 0; }
 
+  /* 작업188: 연결된 자료 · 연상 키워드 */
+  .link-card { margin-bottom: 10px; padding: 14px 16px; }
+  .link-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .link-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--primary-light); color: var(--primary-dark); }
+  .link-badge.bg { background: var(--bg); color: var(--text2); border: 1px solid var(--border); }
+  .link-title { font-size: 15px; font-weight: 700; word-break: break-all; }
+  .link-rel { font-size: 13px; color: var(--text1); margin-top: 8px; line-height: 1.6; word-break: break-all; }
+  .link-quote { font-size: 12px; color: var(--text2); margin-top: 6px; line-height: 1.5; word-break: break-all; }
+  .link-check { font-size: 12px; font-weight: 500; color: var(--text2); margin-top: 8px; }
+  .kw-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .kw-chip { font-family: 'Noto Sans KR', sans-serif; font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 999px; background: var(--card); color: var(--text1); border: 1px solid var(--border); cursor: pointer; }
+  .kw-chip.on { background: var(--primary-light); color: var(--primary-dark); border-color: var(--primary); }
+
   /* 요약 읽어주기 */
   .tts-box { margin-top: 10px; }
   .tts-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -380,6 +393,21 @@
       <div id="chat-actions" class="btn-row" style="display:none">
         <button id="chat-open" class="btn small" type="button">질문하기</button>
       </div>
+    </div>
+    <div id="link-section" class="quiz-section" style="display:none">
+      <div class="sum-head"><span class="field-label">연결된 자료</span></div>
+      <div id="link-note" class="msg warn" style="display:none"></div>
+      <div id="link-status" class="convert-status" style="display:none;margin-top:8px"><div class="spinner small"></div><span>연결 분석 중…</span></div>
+      <div id="link-list"></div>
+      <div id="kw-wrap" style="display:none">
+        <div class="field-label">연상 키워드 ◇</div>
+        <div id="kw-chips" class="kw-chips"></div>
+        <div id="kw-hint" class="msg info"></div>
+      </div>
+      <div id="link-actions" class="btn-row" style="display:none">
+        <button id="link-refresh" class="btn small secondary" type="button">연결 다시 찾기</button>
+      </div>
+      <div id="link-msg" class="msg"></div>
     </div>
     <div id="edit-meta" class="meta"></div>
     <div id="edit-msg" class="msg"></div>
@@ -872,6 +900,7 @@ let editSession = 0;   // 편집 화면을 새로 열 때마다 증가 - 늦게 
 function resetSummaryUi() {
   stopSpeech();
   editSession++;
+  hideLinks();
   $('edit-summary').value = '';
   $('sum-type').value = '';
   setMsg('sum-warn', '');
@@ -897,11 +926,11 @@ function openEditNew(text) {
   pending = null;
   showView('edit');
 }
-async function openDetail(id) {
+async function openDetail(id, fromLink) {
   setMsg('list-msg', '');
   let n;
   try { n = await api('GET', '/api/voice-notes/' + id); }
-  catch (e) { setMsg('list-msg', e.message, 'error'); return; }
+  catch (e) { setMsg(fromLink ? 'link-msg' : 'list-msg', e.message, 'error'); return; }
   editMode = 'detail'; editNoteId = n.id;
   resetSummaryUi();
   resetQuizState(n.transcript || '');
@@ -916,7 +945,9 @@ async function openDetail(id) {
   setMsg('edit-msg', '');
   updateCounter();
   editDirty = false;
-  go('edit');
+  if (fromLink) { history.replaceState({ v: 'edit' }, ''); showView('edit'); }   // 연결로 이동할 때는 기록을 쌓지 않아 뒤로가기가 목록으로 간다
+  else go('edit');
+  startLinks(n.id, editSession);
 }
 $('edit-title').addEventListener('input', () => { editDirty = true; });
 $('edit-text').addEventListener('input', () => { editDirty = true; updateCounter(); });
@@ -961,6 +992,131 @@ $('sum-make').addEventListener('click', async () => {
   if (data && data.unverified_count >= 1) setMsg('sum-warn', '⚠ 표시는 원문에서 근거를 확인하지 못한 항목입니다. 원문과 대조해 보세요.', 'warn');
   editDirty = true;
   updateCounter();
+});
+
+// ── 연결된 자료 (작업188): 서버가 같은 과목 자료와의 연결·연상 키워드를 백그라운드로 만든다 ──
+const LINK_POLL_MS = 5000, LINK_POLL_MAX = 3;
+let linkTimer = null;
+function hideLinks() {
+  clearTimeout(linkTimer); linkTimer = null;
+  $('link-section').style.display = 'none';
+  $('link-list').textContent = '';
+  $('kw-chips').textContent = '';
+  $('kw-wrap').style.display = 'none';
+  $('link-actions').style.display = 'none';
+  $('link-status').style.display = 'none';
+  setMsg('link-note', '');
+  setMsg('kw-hint', '');
+  setMsg('link-msg', '');
+  $('link-note').style.display = 'none';
+}
+function startLinks(noteId, session) {
+  hideLinks();
+  $('link-section').style.display = '';
+  fetchLinks(noteId, session, 0, null, false);
+}
+// polling: 'pending'이면 5초 간격 최대 3회 다시 조회. 새로 찾기(force)는 결과가 바뀌거나 3회가 끝날 때까지 조회
+async function fetchLinks(noteId, session, attempt, prevSnap, force) {
+  if (session !== editSession || currentView !== 'edit') return;
+  let data;
+  try { data = await api('GET', '/api/voice-notes/' + noteId + '/links'); }
+  catch (e) {
+    if (session !== editSession) return;
+    $('link-status').style.display = 'none';
+    setMsg('link-msg', e.message, 'error');
+    $('link-actions').style.display = '';
+    return;
+  }
+  if (session !== editSession) return;
+  const snap = JSON.stringify(data);
+  const waiting = force ? (snap === prevSnap) : data.status === 'pending';
+  if (waiting && attempt < LINK_POLL_MAX) {
+    $('link-status').style.display = '';
+    renderLinks(data, true);
+    linkTimer = setTimeout(() => fetchLinks(noteId, session, attempt + 1, force ? prevSnap : snap, force), LINK_POLL_MS);
+    return;
+  }
+  $('link-status').style.display = 'none';
+  renderLinks(data, false);
+}
+function renderLinks(data, analyzing) {
+  const note = $('link-note');
+  $('link-list').textContent = '';
+  $('kw-chips').textContent = '';
+  setMsg('kw-hint', '');
+  note.style.display = 'none';
+  $('kw-wrap').style.display = 'none';
+  $('link-actions').style.display = 'none';
+  if (data.status === 'none') {
+    setMsg('link-note', '요약과 과목을 저장하면 같은 과목의 자료와 연결해 줍니다.', 'warn');
+    note.style.display = '';
+    return;
+  }
+  for (const l of data.links || []) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'note-item link-card';
+    const head = document.createElement('div'); head.className = 'link-head';
+    const badge = document.createElement('span');
+    const grounded = l.kind === 'grounded';
+    badge.className = 'link-badge' + (grounded ? '' : ' bg');
+    badge.textContent = grounded ? '✔ 근거 확인' : '◇ 배경지식 연결';
+    const title = document.createElement('span'); title.className = 'link-title'; title.textContent = l.title || '(제목 없음)';
+    head.appendChild(badge); head.appendChild(title); b.appendChild(head);
+    const rel = document.createElement('div'); rel.className = 'link-rel'; rel.textContent = l.relation; b.appendChild(rel);
+    if (grounded) {
+      const q1 = document.createElement('div'); q1.className = 'link-quote'; q1.textContent = '이 자료: “' + l.quote_self + '”'; b.appendChild(q1);
+      const q2 = document.createElement('div'); q2.className = 'link-quote'; q2.textContent = '연결된 자료: “' + l.quote_other + '”'; b.appendChild(q2);
+    } else {
+      const c = document.createElement('div'); c.className = 'link-check'; c.textContent = '사실 확인 필요'; b.appendChild(c);
+    }
+    b.addEventListener('click', () => {
+      if (editDirty && !confirm('저장하지 않은 내용이 있습니다. 이동할까요?')) return;
+      openDetail(l.note_id, true);
+    });
+    $('link-list').appendChild(b);
+  }
+  const hasKw = (data.keywords || []).length > 0;
+  if (!analyzing) {
+    if (data.status === 'pending') setMsg('link-note', '연결 분석이 아직 끝나지 않았습니다. 잠시 뒤 "연결 다시 찾기"를 눌러 주세요.', 'warn');
+    else if (!(data.links || []).length) setMsg('link-note', '아직 연결된 자료가 없습니다.', 'warn');
+    note.style.display = note.textContent ? '' : 'none';
+    $('link-actions').style.display = '';
+  }
+  if (hasKw) {
+    $('kw-wrap').style.display = '';
+    for (const k of data.keywords) {
+      const chip = document.createElement('button');
+      chip.type = 'button'; chip.className = 'kw-chip'; chip.textContent = '◇ ' + k.word;
+      chip.addEventListener('click', () => {
+        const on = chip.classList.contains('on');
+        for (const c of $('kw-chips').children) c.classList.remove('on');
+        if (on) { setMsg('kw-hint', ''); return; }
+        chip.classList.add('on');
+        setMsg('kw-hint', k.hint ? k.word + ': ' + k.hint + ' (사실 확인 필요)' : k.word + ' (사실 확인 필요)', 'info');
+      });
+      $('kw-chips').appendChild(chip);
+    }
+  }
+}
+$('link-refresh').addEventListener('click', async () => {
+  if (editNoteId === null) return;
+  const noteId = editNoteId, session = editSession;
+  setMsg('link-msg', '');
+  $('link-refresh').disabled = true;
+  let prev = null;
+  try { prev = JSON.stringify(await api('GET', '/api/voice-notes/' + noteId + '/links')); } catch (e) { /* 아래 요청에서 처리 */ }
+  try { await api('POST', '/api/voice-notes/' + noteId + '/links/refresh'); }
+  catch (e) {
+    $('link-refresh').disabled = false;
+    setMsg('link-msg', e.status === 429 ? '오늘 연결을 찾을 수 있는 횟수(하루 30건)를 모두 사용했습니다.' : e.message, 'error');
+    return;
+  }
+  $('link-refresh').disabled = false;
+  if (session !== editSession) return;
+  $('link-actions').style.display = 'none';
+  $('link-status').style.display = '';
+  clearTimeout(linkTimer);
+  linkTimer = setTimeout(() => fetchLinks(noteId, session, 1, prev, true), LINK_POLL_MS);
 });
 
 // ── 요약 읽어주기 (작업182): 브라우저 내장 speechSynthesis만 사용(외부 API·비용 없음) ──
