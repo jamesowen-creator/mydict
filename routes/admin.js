@@ -103,10 +103,11 @@ router.get('/api/admin/stats', requireAdmin, async (req, res) => {
     function calcCost(rows) {
       let anthropic = 0, openai = 0;
       for (const r of rows) {
-        if (r.event_type === 'search' || r.event_type === 'ai' || r.event_type === 'summary' || r.event_type === 'quiz' || r.event_type === 'chat' || r.event_type === 'link') {
+        if (r.event_type === 'search' || r.event_type === 'ai' || r.event_type === 'summary' || r.event_type === 'quiz' || r.event_type === 'chat' || r.event_type === 'link' || r.event_type === 'image_aux') {
           anthropic += (Number(r.input_tokens) / 1_000_000) * 1.00;
           anthropic += (Number(r.output_tokens) / 1_000_000) * 5.00;
         }
+        if (r.event_type === 'image') openai += Number(r.count) * (Number(process.env.VOICE_IMAGE_COST_USD) || 0);   // 장당 단가는 환경변수(미설정이면 0)
         if (r.event_type === 'tts') {
           openai += (Number(r.char_count) / 1000) * 0.030;
         }

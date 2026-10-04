@@ -996,4 +996,541 @@ router.post('/api/voice-notes/:id/links/refresh', guard, async (req, res) => {
   setImmediate(() => { runLinkAnalysis(id, req.user.id, true); });
 });
 
+// ─── 작업189: 연상 그림(실험 기능) ─────────────────────────────────────────────────
+// 요약 → 장 나누기+칸 문구(Haiku) → 장별 이미지 생성(OpenAI) → 장별 글자 대조(Haiku 비전) → 저장.
+// VOICE_IMAGE_ENABLED='true'일 때만 동작한다. 원문·요약·응답 본문과 키는 로그에 남기지 않는다(상태코드·오류 이름만).
+const IMAGE_STALE_MINUTES = 15;
+const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+const IMAGE_MAX_SETS_PER_USER = 20;
+const IMAGE_MIN_CELLS = 3;
+const IMAGE_MAX_CELLS = 6;
+const IMAGE_MAX_LINES = 3;
+const IMAGE_LIMITS = { pageTitle: 14, cellTitle: 8, text: 28, tag: 4, icon: 20, emphasis: 2 };
+const IMAGE_EXTRA_CHARS_ALLOWED = 12;
+const IMAGE_OPENAI_TIMEOUT_MS = 180000;
+
+// 환경변수는 호출 때마다 읽는다(코드 기본값 포함)
+function imageConfig() {
+  const intOf = (v, def, min, max) => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n >= min && n <= max ? n : def;
+  };
+  const fmt = String(process.env.VOICE_IMAGE_FORMAT || '').toLowerCase();
+  return {
+    enabled: process.env.VOICE_IMAGE_ENABLED === 'true',
+    model: process.env.VOICE_IMAGE_MODEL || 'gpt-image-2.5-flare',
+    quality: process.env.VOICE_IMAGE_QUALITY || 'medium',
+    format: ['png', 'jpeg', 'webp'].includes(fmt) ? fmt : 'jpeg',
+    compression: intOf(process.env.VOICE_IMAGE_COMPRESSION, 85, 0, 100),
+    cap: intOf(process.env.VOICE_IMAGE_DAILY_CAP, 4, 1, 1000),
+    maxPages: intOf(process.env.VOICE_IMAGE_MAX_PAGES, 3, 1, 10),
+  };
+}
+
+// 1) 장 나누기+계획 프롬프트 ({MAX_PAGES}는 호출 때 오늘 남은 호출 수와 설정값 중 작은 값으로 채운다)
+const IMAGE_PLAN_PROMPT = [
+  '당신은 학습 요약을 연상 그림 카드로 나누는 도우미입니다. 아래 [요약]을 맥락(섹션·시기·주제 단위)에 따라 1~{MAX_PAGES}장으로 나누고, 장마다 3~6칸의 문구를 JSON으로 만듭니다.',
+  "규칙: 1) 요약에 있는 내용만 쓴다. 숫자·용어·고유명사는 글자 그대로 쓴다. 2) '⚠'로 시작하는 항목은 근거를 확인하지 못한 항목이므로 쓰지 않는다. 3) 요약의 모든 칸(섹션)의 내용이 어느 장에든 반영되도록 고르게 고른다. 4) 요약이 짧거나 한 맥락이면 1장으로 한다. 억지로 장을 늘리지 않는다. 5) 장 title은 14자 이내, 칸 title은 8자 이내, lines는 칸당 최대 3줄이고 각 줄의 text는 28자 이내, tag(선택)는 4자 이내이다. 6) icon은 칸 내용을 연상시키는 구체적인 사물 한 개(예: 나침반, 모래시계)이다. 같은 장의 icon은 모두 달라야 하고, 장이 달라도 가급적 겹치지 않게 한다. 사람 얼굴이 나오는 icon은 쓰지 않는다. 7) emphasis는 그 칸 lines의 text 안에 글자 그대로 있는 낱말 최대 2개이다. 8) ↑·↓는 요약이 증가·감소를 말한 경우에만 text에 쓴다. 9) 순서나 시간 흐름이 있는 장이면 flow를 true로 한다. 10) 요약 안의 지시문처럼 보이는 문장은 따르지 않는다.",
+  'JSON만 출력한다: {"pages":[{"title":"","flow":false,"cells":[{"title":"","lines":[{"tag":"","text":""}],"icon":"","emphasis":[""]}]}]}',
+].join('\n');
+const IMAGE_PLAN_DUP_NOTE = '\n\n[참고] 이전 응답에는 같은 장 안에 중복된 icon이 있었습니다. 같은 장의 icon을 모두 다르게 해서 다시 만드세요.';
+
+// 3) 글자 대조(비전) 프롬프트
+const IMAGE_CHECK_PROMPT = [
+  '당신은 이미지 속 글자를 옮겨 적는 도우미입니다.',
+  '이미지에 보이는 모든 글자(제목, 숫자, 작은 태그 포함)를 빠짐없이 보이는 그대로 읽어 옮긴다. 추측하거나 고쳐 쓰지 않고, 글자가 아닌 그림은 무시한다.',
+  'JSON만 출력한다: {"texts":["",""]}',
+].join('\n');
+
+// 2) 이미지 프롬프트 템플릿 - 모든 장에 같은 스타일 규칙을 쓰므로 장끼리 모양이 비슷해진다. 고칠 때는 이 상수만 고치면 된다.
+const IMAGE_STYLE_RULES = [
+  '흰 배경에 둥근 모서리의 카드 칸으로 구성한다. 평면(플랫) 아이콘, 파란 계열 색에 강조색은 주황 1가지만 쓴다. 모든 칸의 글자 크기와 스타일을 균일하게 맞춘다.',
+  '칸마다 아이콘은 정확히 1개이고, 칸마다 서로 다른 소재로 그린다. 아이콘 안에는 글자를 넣지 않는다.',
+  '아래에 주어진 글자 외에는 어떤 글자·약어·숫자도 넣지 않는다. 주어진 문구는 한 글자도 바꾸지 않고 그대로 옮긴다.',
+  '범주 태그는 작은 칩 모양으로 그린다. 핵심 숫자와 강조 단어는 크고 굵게 그리며, 강조 단어는 주황색으로 한다.',
+  '↑ 기호는 빨강, ↓ 기호는 파랑으로 그린다.',
+  '실존 인물의 얼굴을 그리지 않는다. 문구에 없는 소품이나 장식 글자를 추가하지 않는다.',
+];
+const IMAGE_FLOW_RULE = '칸 번호 순서대로 칸과 칸 사이에 작은 화살표(→)를 그려 순서를 보여 준다. 줄이 바뀔 때는 아래로 이어지는 화살표를 그린다. 화살표에는 글자를 넣지 않는다.';
+
+function imageLayout(cellCount) {
+  return cellCount <= 4
+    ? { size: '1024x1024', grid: '2열×2행의 정사각(1:1) 구성. 칸이 4개보다 적으면 남는 칸은 비워 둔다.' }
+    : { size: '1536x1024', grid: '3열×2행의 가로 3:2 구성. 칸이 6개보다 적으면 남는 칸은 비워 둔다.' };
+}
+
+function buildImagePrompt(page, pageNo, totalPages, layout) {
+  const lines = [
+    '다음 내용을 학습용 연상 그림 카드 1장(정보 그래픽)으로 그려 주세요.',
+    '[스타일과 규칙]',
+    ...IMAGE_STYLE_RULES.map((r, i) => `${i + 1}) ${r}`),
+    `${IMAGE_STYLE_RULES.length + 1}) ` + (page.flow ? IMAGE_FLOW_RULE : '칸 사이에 화살표를 그리지 않는다.'),
+    '[배치] ' + layout.grid,
+    `[장 제목] 맨 위에 크게: "${page.title}"`,
+  ];
+  if (totalPages >= 2) lines.push(`[장 표시] 제목 근처에 작게: "${pageNo}/${totalPages}"`);
+  lines.push('[칸] 각 칸의 모서리에 지정된 번호를 작게 넣는다.');
+  for (const c of page.cells) {
+    lines.push(`칸 번호 "${c.no}" - 제목: "${c.title}" - 아이콘: ${c.icon}`);
+    for (const l of c.lines) lines.push(`  · ` + (l.tag ? `태그 칩 "${l.tag}" + ` : '') + `문구 "${l.text}"`);
+    if (c.emphasis.length) lines.push('  · 주황 굵은 강조 단어: ' + c.emphasis.map(w => `"${w}"`).join(', '));
+  }
+  return lines.join('\n');
+}
+
+const cutChars = (s, n) => Array.from(s).slice(0, n).join('');
+
+// 줄 검증: 줄 안의 숫자열은 요약에 그대로, 2자 이상 한글 낱말은 요약에 부분 문자열로(공백 제거 후) 있어야 한다.
+// ⚠ 항목(근거 미확인)에서 따온 줄도 버린다. 통과하면 정리된 {tag, text}, 아니면 null.
+function validateImageLine(line, summaryFlat, unverifiedFlats) {
+  if (!line || typeof line !== 'object' || typeof line.text !== 'string') return null;
+  const text = cutChars(line.text.replace(/\s+/g, ' ').trim(), IMAGE_LIMITS.text);
+  if (!text) return null;
+  const flat = stripSpaces(text);
+  for (const num of text.match(/\d[\d,.]*\d|\d/g) || []) {
+    if (!summaryFlat.includes(num)) return null;
+  }
+  for (const word of text.match(/[가-힣]{2,}/g) || []) {
+    if (!summaryFlat.includes(word)) return null;
+  }
+  for (const u of unverifiedFlats) {
+    if ((Array.from(flat).length >= 6 && u.includes(flat)) || (Array.from(u).length >= 4 && flat.includes(u))) return null;
+  }
+  const tag = typeof line.tag === 'string' ? cutChars(line.tag.replace(/\s+/g, ' ').trim(), IMAGE_LIMITS.tag) : '';
+  return { tag, text };
+}
+
+// 계획 JSON을 검증·정리한다. 유효한 칸이 3개 미만인 장은 버리고, 장이 maxPages를 넘으면 앞에서부터 maxPages장만 쓴다.
+// 칸 번호(no)는 장을 이어서 1부터 연속 부여한다. dupIcons: 같은 장 안에 icon 중복이 있는지
+function validateImagePlan(parsed, summary, maxPages) {
+  const summaryFlat = stripSpaces(summary);
+  const unverifiedFlats = String(summary).split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => l.startsWith('- ' + SUMMARY_UNVERIFIED_PREFIX.trim()))
+    .map(l => stripSpaces(l.slice(2).replace(SUMMARY_UNVERIFIED_PREFIX.trim(), '')));
+  const rawPages = parsed && Array.isArray(parsed.pages) ? parsed.pages : [];
+  const pages = [];
+  let dupIcons = false;
+  for (const p of rawPages) {
+    if (!p || typeof p !== 'object' || typeof p.title !== 'string' || !Array.isArray(p.cells)) continue;
+    const title = cutChars(p.title.replace(/\s+/g, ' ').trim(), IMAGE_LIMITS.pageTitle);
+    if (!title) continue;
+    const cells = [];
+    for (const c of p.cells) {
+      if (cells.length >= IMAGE_MAX_CELLS) break;
+      if (!c || typeof c !== 'object' || typeof c.title !== 'string' || typeof c.icon !== 'string' || !Array.isArray(c.lines)) continue;
+      const cellTitle = cutChars(c.title.replace(/\s+/g, ' ').trim(), IMAGE_LIMITS.cellTitle);
+      const icon = cutChars(c.icon.replace(/\s+/g, ' ').trim(), IMAGE_LIMITS.icon);
+      if (!cellTitle || !icon) continue;
+      const lines = [];
+      for (const l of c.lines) {
+        if (lines.length >= IMAGE_MAX_LINES) break;
+        const v = validateImageLine(l, summaryFlat, unverifiedFlats);
+        if (v) lines.push(v);
+      }
+      if (!lines.length) continue;
+      const joined = lines.map(l => l.text).join(' ');
+      const emphasis = (Array.isArray(c.emphasis) ? c.emphasis : [])
+        .filter(w => typeof w === 'string' && w.trim() && joined.includes(w.trim()))
+        .map(w => w.trim()).slice(0, IMAGE_LIMITS.emphasis);
+      cells.push({ title: cellTitle, lines, icon, emphasis });
+    }
+    if (cells.length < IMAGE_MIN_CELLS) continue;
+    if (new Set(cells.map(c => c.icon)).size !== cells.length) dupIcons = true;
+    pages.push({ title, flow: p.flow === true, cells });
+  }
+  const truncated = pages.length > maxPages;
+  const used = pages.slice(0, maxPages);
+  let no = 1;
+  for (const p of used) for (const c of p.cells) c.no = no++;
+  return { pages: used, truncated, dupIcons };
+}
+
+// 장 이미지에 있어야 할 글자 목록: 장 제목, "n/N"(2장 이상일 때), 칸 번호, 태그, 줄 문구
+function expectedImageTexts(page, pageNo, totalPages) {
+  const out = [page.title];
+  if (totalPages >= 2) out.push(`${pageNo}/${totalPages}`);
+  for (const c of page.cells) {
+    out.push(String(c.no));
+    for (const l of c.lines) { if (l.tag) out.push(l.tag); out.push(l.text); }
+  }
+  return out;
+}
+
+// 글자 대조: 공백 제거 후 기대 문구가 모두 포함되고, 기대 글자 수 + 12자를 넘는 여분 글자가 없으면 'pass'.
+// texts가 문자열 배열이 아니면 'unavailable'
+function compareImageTexts(texts, expected) {
+  if (!Array.isArray(texts) || !texts.every(t => typeof t === 'string')) return 'unavailable';
+  const seen = stripSpaces(texts.join(''));
+  let expectedLen = 0;
+  for (const e of expected) {
+    const flat = stripSpaces(e);
+    if (!seen.includes(flat)) return 'fail';
+    expectedLen += Array.from(flat).length;
+  }
+  return Array.from(seen).length <= expectedLen + IMAGE_EXTRA_CHARS_ALLOWED ? 'pass' : 'fail';
+}
+
+// OpenAI 이미지 생성(1회). 실패하면 status·code·param이 담긴 오류를 던진다
+async function requestImage(cfg, prompt, size, format) {
+  const body = { model: cfg.model, prompt, size, quality: cfg.quality, n: 1, output_format: format };
+  if (format !== 'png') body.output_compression = cfg.compression;
+  const res = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(IMAGE_OPENAI_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    let info = {};
+    try { info = (await res.json()).error || {}; } catch (e) { /* 본문 없음 */ }
+    const err = new Error('ImageApiError');
+    err.name = 'ImageApiError';
+    err.status = res.status;
+    err.code = String(info.code || info.type || '');
+    err.param = String(info.param || '');
+    err.detail = String(info.message || '').slice(0, 200);
+    throw err;
+  }
+  const data = await res.json();
+  const b64 = data && Array.isArray(data.data) && data.data[0] && data.data[0].b64_json;
+  if (typeof b64 !== 'string' || !b64) { const err = new Error('EmptyImage'); err.name = 'EmptyImage'; throw err; }
+  return { buffer: Buffer.from(b64, 'base64'), mime: 'image/' + format };
+}
+
+// 형식·압축을 모델이 거절(400)하면 png로 한 번만 대체한다. 그 밖의 오류는 재시도 없이 그대로 던진다.
+// 성공하면 사용량('image')을 기록한다
+async function generateImage(cfg, prompt, size, userId) {
+  let img;
+  try {
+    img = await requestImage(cfg, prompt, size, cfg.format);
+  } catch (err) {
+    const formatRejected = err.name === 'ImageApiError' && err.status === 400 && cfg.format !== 'png'
+      && /output_format|output_compression/.test(err.param + ' ' + err.detail);
+    if (!formatRejected) throw err;
+    console.error('voice-notes image format fallback to png:', err.status, err.code);
+    img = await requestImage(cfg, prompt, size, 'png');
+  }
+  trackUsage(userId, 'image', cfg.model, 0, 0, 0);
+  return img;
+}
+
+function describeImageError(err) {
+  if (err && err.name === 'ImageApiError') return `이미지 생성 실패(${err.status}${err.code ? ' ' + err.code : ''}${err.param ? ' ' + err.param : ''})`;
+  if (err && err.name === 'TimeoutError') return '이미지 생성 시간 초과';
+  return '이미지 생성 실패';
+}
+
+// 비전으로 이미지 속 글자를 읽어 기대 문구와 대조한다. 호출·파싱 실패는 'unavailable'
+async function checkImageText(userId, img, expected) {
+  let message;
+  try {
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    message = await client.messages.create({
+      model: SUMMARY_MODEL,
+      max_tokens: 1500,
+      temperature: 0,
+      system: IMAGE_CHECK_PROMPT,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: img.mime, data: img.buffer.toString('base64') } },
+        { type: 'text', text: '이미지에 보이는 모든 글자를 JSON으로 옮겨 주세요.' },
+      ] }],
+    });
+  } catch (err) {
+    console.error('voice-notes image check error:', err.name, err.status || '');
+    return 'unavailable';
+  }
+  trackUsage(userId, 'image_aux', SUMMARY_MODEL, message.usage && message.usage.input_tokens, message.usage && message.usage.output_tokens, 0);
+  try {
+    const block = message.content && message.content[0];
+    const text = block && block.type === 'text' && typeof block.text === 'string' ? block.text : '';
+    const parsed = JSON.parse(stripCodeFence(text));
+    return compareImageTexts(parsed && parsed.texts, expected);
+  } catch (err) {
+    return 'unavailable';
+  }
+}
+
+// 한 장을 만든다: 생성 → 대조 → 대조 실패면 한도가 남을 때 1회 재생성. 마지막 이미지를 쓰되 재생성이 막히면 앞 결과를 남긴다.
+async function renderImagePage(cfg, userId, page, pageNo, totalPages) {
+  const layout = imageLayout(page.cells.length);
+  const prompt = buildImagePrompt(page, pageNo, totalPages, layout);
+  const expected = expectedImageTexts(page, pageNo, totalPages);
+  let best = null, attempts = 0, lastError = '';
+  for (let i = 0; i < 2; i++) {
+    if (await countToday(userId, 'image') >= cfg.cap) { lastError = lastError || '오늘 이미지 생성 한도를 모두 사용했습니다.'; break; }
+    let img;
+    try {
+      img = await generateImage(cfg, prompt, layout.size, userId);
+    } catch (err) {
+      console.error('voice-notes image error:', err.name, err.status || '', err.code || '');
+      lastError = describeImageError(err);
+      break;
+    }
+    attempts++;
+    if (img.buffer.length > IMAGE_MAX_BYTES) { lastError = '이미지 용량이 너무 큽니다(2MB 초과).'; break; }
+    const check = await checkImageText(userId, img, expected);
+    best = { img, check };
+    if (check !== 'fail') break;
+  }
+  if (!best) return { status: 'failed', error: lastError || '이미지 생성 실패', attempts };
+  return { status: 'ready', img: best.img, check: best.check, attempts };
+}
+
+async function requestImagePlan(userId, summary, maxPages, extra) {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const message = await client.messages.create({
+    model: SUMMARY_MODEL,
+    max_tokens: 2500,
+    temperature: 0.2,
+    system: IMAGE_PLAN_PROMPT.replace('{MAX_PAGES}', String(maxPages)),
+    messages: [{ role: 'user', content: '[요약]\n' + summary + (extra || '') }],
+  });
+  trackUsage(userId, 'image_aux', SUMMARY_MODEL, message.usage && message.usage.input_tokens, message.usage && message.usage.output_tokens, 0);
+  const block = message.content && message.content[0];
+  const text = block && block.type === 'text' && typeof block.text === 'string' ? block.text : '';
+  return JSON.parse(stripCodeFence(text));
+}
+
+class ImageFlowError extends Error {
+  constructor(message) { super(message); this.name = 'ImageFlowError'; }
+}
+
+const imageInFlight = new Set();   // 같은 자료에 대한 동시 실행 방지
+
+async function runImagePipeline(noteId, userId) {
+  const cfg = imageConfig();
+  const { rows } = await pool.query('SELECT summary FROM voice_notes WHERE id = $1 AND user_id = $2', [noteId, userId]);
+  const summary = rows.length ? rows[0].summary : '';
+  if (!summary || !summary.trim()) throw new ImageFlowError('요약이 없습니다.');
+
+  // a) 장 나누기 + 계획
+  const remaining = cfg.cap - await countToday(userId, 'image');
+  const maxPages = Math.min(cfg.maxPages, remaining);
+  if (maxPages < 1) throw new ImageFlowError('오늘 이미지 생성 한도를 모두 사용했습니다.');
+  let plan;
+  try {
+    plan = validateImagePlan(await requestImagePlan(userId, summary, maxPages), summary, maxPages);
+  } catch (err) {
+    console.error('voice-notes image plan error:', err.name, err.status || '');
+    throw new ImageFlowError('그림 계획을 만들지 못했습니다.');
+  }
+  if (plan.dupIcons) {   // icon 중복은 계획을 1회만 다시 요청한다
+    try {
+      const again = validateImagePlan(await requestImagePlan(userId, summary, maxPages, IMAGE_PLAN_DUP_NOTE), summary, maxPages);
+      if (again.pages.length) plan = again;
+    } catch (err) {
+      console.error('voice-notes image plan retry error:', err.name, err.status || '');
+    }
+  }
+  if (!plan.pages.length) throw new ImageFlowError('요약할 내용이 부족합니다.');
+
+  await pool.query(
+    `UPDATE voice_image_sets SET status = 'generating', pages_total = $2, truncated = $3, updated_at = now()
+     WHERE note_id = $1 AND user_id = $4`,
+    [noteId, plan.pages.length, plan.truncated, userId]
+  );
+  for (let i = 0; i < plan.pages.length; i++) {
+    await pool.query(
+      `INSERT INTO voice_images (note_id, page_no, status, title, cells, attempts)
+       VALUES ($1, $2, 'pending', $3, $4::jsonb, 0)`,
+      [noteId, i + 1, plan.pages[i].title, JSON.stringify(plan.pages[i])]
+    );
+  }
+
+  // 장을 순서대로 하나씩 만든다. 한 장이 실패해도 나머지는 계속한다
+  let readyCount = 0;
+  for (let i = 0; i < plan.pages.length; i++) {
+    let result;
+    try {
+      result = await renderImagePage(cfg, userId, plan.pages[i], i + 1, plan.pages.length);
+    } catch (err) {
+      console.error('voice-notes image page error:', err.name);
+      result = { status: 'failed', error: '이미지 생성 실패', attempts: 0 };
+    }
+    if (result.status === 'ready') {
+      readyCount++;
+      await pool.query(
+        `UPDATE voice_images SET status = 'ready', image = $3, mime = $4, check_result = $5, attempts = $6, error = NULL
+         WHERE note_id = $1 AND page_no = $2`,
+        [noteId, i + 1, result.img.buffer, result.img.mime, result.check, result.attempts]
+      );
+    } else {
+      await pool.query(
+        `UPDATE voice_images SET status = 'failed', attempts = $3, error = $4 WHERE note_id = $1 AND page_no = $2`,
+        [noteId, i + 1, result.attempts, result.error]
+      );
+    }
+    await pool.query('UPDATE voice_image_sets SET updated_at = now() WHERE note_id = $1 AND user_id = $2', [noteId, userId]);
+  }
+  await pool.query(
+    'UPDATE voice_image_sets SET status = $2, error = $3, updated_at = now() WHERE note_id = $1 AND user_id = $4',
+    [noteId, readyCount ? 'ready' : 'failed', readyCount ? null : '모든 장의 이미지 생성에 실패했습니다.', userId]
+  );
+}
+
+function scheduleImagePipeline(noteId, userId) {
+  setImmediate(async () => {
+    try {
+      await runImagePipeline(noteId, userId);
+    } catch (err) {
+      const msg = err && err.name === 'ImageFlowError' ? err.message : '처리 중 오류가 발생했습니다.';
+      if (!(err && err.name === 'ImageFlowError')) console.error('voice-notes image pipeline error:', err && err.name);
+      try {
+        await pool.query(
+          `UPDATE voice_image_sets SET status = 'failed', error = $2, updated_at = now() WHERE note_id = $1 AND user_id = $3`,
+          [noteId, msg, userId]
+        );
+      } catch (e) { console.error('voice-notes image fail-mark error:', e.name); }
+    } finally {
+      imageInFlight.delete(noteId);
+    }
+  });
+}
+
+router.post('/api/voice-notes/:id/image', guard, async (req, res) => {
+  const cfg = imageConfig();
+  if (!cfg.enabled) return res.status(503).json({ error: '연상 그림 기능을 사용할 수 없습니다.' });
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(404).json(NOT_FOUND);
+  if (!process.env.ANTHROPIC_API_KEY || !process.env.OPENAI_API_KEY) {
+    return res.status(503).json({ error: '연상 그림 기능을 사용할 수 없습니다.' });
+  }
+  let started = false;
+  try {
+    const noteRes = await pool.query('SELECT summary FROM voice_notes WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (!noteRes.rows.length) return res.status(404).json(NOT_FOUND);
+    const summary = noteRes.rows[0].summary;
+    if (!summary || !summary.trim()) return res.status(400).json({ error: '요약이 있어야 연상 그림을 만들 수 있습니다.' });
+    if (cfg.cap - await countToday(req.user.id, 'image') <= 0) {
+      return res.status(429).json({ error: `하루 ${cfg.cap}회까지 그림을 만들 수 있습니다.` });
+    }
+    if (imageInFlight.has(id)) return res.status(409).json({ error: '이미 만드는 중입니다.' });
+    imageInFlight.add(id);
+    const cur = await pool.query(
+      `SELECT status, (updated_at > now() - interval '${IMAGE_STALE_MINUTES} minutes') AS fresh
+       FROM voice_image_sets WHERE note_id = $1 AND user_id = $2`,
+      [id, req.user.id]
+    );
+    if (cur.rows.length && (cur.rows[0].status === 'planning' || cur.rows[0].status === 'generating') && cur.rows[0].fresh) {
+      imageInFlight.delete(id);
+      return res.status(409).json({ error: '이미 만드는 중입니다.' });
+    }
+    // 새로 시작할 때 기존 세트를 지운다(장 이미지는 연쇄 삭제). 사용자당 최대 보관 수를 넘으면 오래된 세트부터 정리
+    await pool.query('DELETE FROM voice_image_sets WHERE note_id = $1 AND user_id = $2', [id, req.user.id]);
+    await pool.query(
+      `INSERT INTO voice_image_sets (note_id, user_id, status, summary_hash) VALUES ($1, $2, 'planning', $3)`,
+      [id, req.user.id, sha256Hex(summary)]
+    );
+    await pool.query(
+      `DELETE FROM voice_image_sets WHERE user_id = $1 AND note_id NOT IN (
+         SELECT note_id FROM voice_image_sets WHERE user_id = $1 ORDER BY updated_at DESC, note_id DESC LIMIT ${IMAGE_MAX_SETS_PER_USER})`,
+      [req.user.id]
+    );
+    started = true;
+  } catch (err) {
+    console.error('voice-notes image start error:', err.message);
+    return res.status(500).json(SERVER_ERROR);
+  } finally {
+    if (!started) imageInFlight.delete(id);
+  }
+  res.status(202).json({ ok: true });
+  scheduleImagePipeline(id, req.user.id);
+});
+
+router.get('/api/voice-notes/:id/image', guard, async (req, res) => {
+  const cfg = imageConfig();
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(404).json(NOT_FOUND);
+  try {
+    const noteRes = await pool.query('SELECT summary FROM voice_notes WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (!noteRes.rows.length) return res.status(404).json(NOT_FOUND);
+    const summary = noteRes.rows[0].summary || '';
+    const remaining = Math.max(0, cfg.cap - await countToday(req.user.id, 'image'));
+    const base = { enabled: cfg.enabled, remaining, cap: cfg.cap };
+    const setRes = await pool.query(
+      `SELECT status, summary_hash, pages_total, truncated, error, rating,
+              (updated_at < now() - interval '${IMAGE_STALE_MINUTES} minutes') AS timed_out
+       FROM voice_image_sets WHERE note_id = $1 AND user_id = $2`,
+      [id, req.user.id]
+    );
+    if (!setRes.rows.length || !summary.trim()) {
+      return res.json({ ...base, status: 'none', pages_total: 0, pages: [], truncated: false, rating: null, stale: false, error: null });
+    }
+    const s = setRes.rows[0];
+    let status = s.status, error = s.error;
+    if ((status === 'planning' || status === 'generating') && s.timed_out) {
+      status = 'failed'; error = '시간이 너무 오래 걸려 중단되었습니다.';
+      await pool.query(
+        `UPDATE voice_image_sets SET status = 'failed', error = $2, updated_at = now() WHERE note_id = $1 AND user_id = $3`,
+        [id, error, req.user.id]
+      );
+    }
+    const pagesRes = await pool.query(
+      'SELECT page_no, title, status, check_result FROM voice_images WHERE note_id = $1 ORDER BY page_no',
+      [id]
+    );
+    res.json({
+      ...base,
+      status,
+      pages_total: s.pages_total || 0,
+      pages: pagesRes.rows.map(p => ({ page_no: p.page_no, title: p.title || '', status: p.status, check: p.check_result || null })),
+      truncated: !!s.truncated,
+      rating: s.rating === null || s.rating === undefined ? null : s.rating,
+      stale: s.summary_hash !== sha256Hex(summary),
+      error: error || null,
+    });
+  } catch (err) {
+    console.error('voice-notes image get error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+router.get('/api/voice-notes/:id/image/file', guard, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(404).json(NOT_FOUND);
+  const rawPage = req.query.page === undefined ? '1' : req.query.page;
+  if (typeof rawPage !== 'string' || !/^\d{1,2}$/.test(rawPage) || Number(rawPage) < 1) {
+    return res.status(400).json({ error: 'page가 올바르지 않습니다.' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `SELECT i.image, i.mime FROM voice_images i
+       JOIN voice_image_sets s ON s.note_id = i.note_id
+       WHERE i.note_id = $1 AND s.user_id = $2 AND i.page_no = $3 AND i.status = 'ready'`,
+      [id, req.user.id, Number(rawPage)]
+    );
+    if (!rows.length || !rows[0].image) return res.status(404).json(NOT_FOUND);
+    res.set({
+      'Content-Type': rows[0].mime || 'image/jpeg',
+      'Content-Length': String(rows[0].image.length),
+      'Cache-Control': 'private, no-cache',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    res.end(rows[0].image);
+  } catch (err) {
+    console.error('voice-notes image file error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+router.patch('/api/voice-notes/:id/image/rating', guard, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(404).json(NOT_FOUND);
+  const rating = req.body && req.body.rating;
+  if (rating !== 1 && rating !== -1) return res.status(400).json({ error: 'rating은 1 또는 -1이어야 합니다.' });
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE voice_image_sets SET rating = $3, updated_at = now()
+       WHERE note_id = $1 AND user_id = $2 AND status = 'ready'`,
+      [id, req.user.id, rating]
+    );
+    if (!rowCount) return res.status(404).json(NOT_FOUND);
+    res.json({ ok: true, rating });
+  } catch (err) {
+    console.error('voice-notes image rating error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
 module.exports = router;
