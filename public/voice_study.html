@@ -134,6 +134,7 @@
   .note-title { font-size: 17px; font-weight: 700; word-break: break-all; }
   .note-title.empty { color: var(--text2); font-weight: 400; }
   .note-sum { font-size: 13px; color: var(--text2); margin-top: 4px; line-height: 1.5; word-break: break-all; }
+  .note-subj { font-size: 12px; color: var(--primary-dark); margin-top: 6px; }
   .note-date { font-size: 12px; color: var(--text2); margin-top: 6px; }
   .empty-state { text-align: center; color: var(--text2); font-size: 14px; line-height: 1.7; padding: 40px 0; }
 
@@ -235,6 +236,14 @@
   .chat-input-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
   .chat-input-row .counter { margin: 0; }
 
+  /* 작업187: 과목 선택, 요약 유형 선택(select는 .tts-rate select와 같은 값) */
+  .subj-row { display: flex; gap: 10px; }
+  .subj-row > div { flex: 1; min-width: 0; }
+  .sel { font-family: 'Noto Sans KR', sans-serif; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text1); }
+  .subj-row .sel { width: 100%; }
+  .sum-type { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; color: var(--text2); }
+  .sum-type .sel { flex: 1; min-width: 0; }
+
   /* 요약 읽어주기 */
   .tts-box { margin-top: 10px; }
   .tts-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -312,6 +321,16 @@
   <div id="view-edit" class="view">
     <label class="field-label" for="edit-title">제목</label>
     <input id="edit-title" type="text" maxlength="100" placeholder="제목 (선택)">
+    <div class="subj-row">
+      <div>
+        <label class="field-label" for="edit-subject">과목</label>
+        <select id="edit-subject" class="sel"></select>
+      </div>
+      <div>
+        <label class="field-label" for="edit-subject-detail">세부 과목</label>
+        <select id="edit-subject-detail" class="sel"></select>
+      </div>
+    </div>
     <label class="field-label" for="edit-text">원문 (수정할 수 있습니다)</label>
     <textarea id="edit-text" maxlength="20000"></textarea>
     <div id="edit-counter" class="counter">0 / 20000</div>
@@ -319,9 +338,14 @@
       <label class="field-label" for="edit-summary">요약 (수정할 수 있습니다)</label>
       <button id="sum-make" class="btn small" type="button">요약 만들기</button>
     </div>
+    <div class="sum-type">
+      <label for="sum-type">요약 유형</label>
+      <select id="sum-type" class="sel"></select>
+    </div>
     <div id="sum-status" class="convert-status" style="display:none;margin-top:8px"><div class="spinner small"></div><span>요약하는 중…</span></div>
     <textarea id="edit-summary" class="summary" maxlength="5000" placeholder="요약이 여기에 표시됩니다. 직접 쓰거나 고칠 수도 있습니다."></textarea>
     <div id="sum-counter" class="counter">0 / 5000</div>
+    <div id="sum-warn" class="msg warn"></div>
     <div id="tts-box" class="tts-box">
       <div id="tts-unsupported" class="msg warn" style="display:none">이 브라우저는 읽어주기를 지원하지 않습니다.</div>
       <div id="tts-controls" class="tts-row">
@@ -561,6 +585,21 @@ window.addEventListener('popstate', () => {
 $('back-btn').addEventListener('click', requestBack);
 
 // ── ① 목록 ──
+// 구조화 요약이면 "■ 주제" 다음 첫 "- " 항목, 아니면(평문 등) 앞 100자. "⚠ " 접두는 지운다
+function summaryPreview(summary) {
+  const text = String(summary || '');
+  if (!text.trim()) return '';
+  const lines = text.split(/\r?\n/);
+  const at = lines.findIndex(l => l.trim() === '■ 주제');
+  if (at >= 0) {
+    for (let i = at + 1; i < lines.length; i++) {
+      const l = lines[i].trim();
+      if (l.startsWith('■')) break;
+      if (l.startsWith('- ')) return l.slice(2).replace(/^\u26A0\s*/, '').trim();
+    }
+  }
+  return Array.from(text.replace(/^\s*\u26A0\s*/, '')).slice(0, 100).join('');
+}
 async function loadList() {
   setMsg('list-msg', '');
   $('note-list').textContent = '';
@@ -583,8 +622,13 @@ async function loadList() {
     t.className = 'note-title' + (r.title ? '' : ' empty');
     t.textContent = r.title || '(제목 없음)';
     b.appendChild(t);
-    if (r.summary) {
-      const s = document.createElement('div'); s.className = 'note-sum'; s.textContent = r.summary; b.appendChild(s);
+    if (r.subject) {
+      const sj = document.createElement('div'); sj.className = 'note-subj';
+      sj.textContent = r.subject + (r.subject_detail ? ' · ' + r.subject_detail : ''); b.appendChild(sj);
+    }
+    const pv = summaryPreview(r.summary);
+    if (pv) {
+      const s = document.createElement('div'); s.className = 'note-sum'; s.textContent = pv; b.appendChild(s);
     }
     const d = document.createElement('div'); d.className = 'note-date'; d.textContent = fmtDate(r.created_at); b.appendChild(d);
     b.addEventListener('click', () => openDetail(r.id));
@@ -787,11 +831,51 @@ function updateCounter() {
   refreshQuizUi();
   refreshChatUi();
 }
+// ── 과목·요약 유형 (작업187): 서버 상수와 같은 목록 ──
+const SUBJECTS = {
+  '국어': ['문학', '독서(비문학)', '화법·작문', '언어(문법)'],
+  '영어': ['어휘', '문법', '독해'],
+  '수학': ['수와 식', '함수', '기하', '확률과 통계', '미적분'],
+  '과학': ['물리', '화학', '생물', '지구과학'],
+  '사회': ['지리', '윤리·사상', '정치·법', '경제', '사회·문화'],
+  '역사': ['한국사', '세계사'],
+  '기타': [],
+};
+const SUMMARY_TYPE_NAMES = ['개념 설명', '시간·사건', '원리·절차', '비교·분류', '주장·논증', '용어·어학'];
+function fillSelect(sel, items, firstLabel) {
+  sel.textContent = '';
+  const o0 = document.createElement('option'); o0.value = ''; o0.textContent = firstLabel; sel.appendChild(o0);
+  for (const it of items) { const o = document.createElement('option'); o.value = it; o.textContent = it; sel.appendChild(o); }
+}
+// 세부 과목 목록을 과목에 맞게 바꾸고, 맞지 않는 세부 값은 비운다
+function refreshDetailOptions() {
+  const subj = $('edit-subject').value;
+  const prev = $('edit-subject-detail').value;
+  const list = Object.prototype.hasOwnProperty.call(SUBJECTS, subj) ? SUBJECTS[subj] : [];
+  fillSelect($('edit-subject-detail'), list, '선택 안 함');
+  $('edit-subject-detail').value = list.indexOf(prev) >= 0 ? prev : '';
+  $('edit-subject-detail').disabled = !list.length;
+}
+function setSubject(subject, detail) {
+  $('edit-subject').value = Object.prototype.hasOwnProperty.call(SUBJECTS, subject) ? subject : '';
+  refreshDetailOptions();
+  const d = detail || '';
+  if ($('edit-subject').value && SUBJECTS[$('edit-subject').value].indexOf(d) >= 0) $('edit-subject-detail').value = d;
+}
+fillSelect($('edit-subject'), Object.keys(SUBJECTS), '선택 안 함');
+refreshDetailOptions();
+fillSelect($('sum-type'), SUMMARY_TYPE_NAMES, '자동');
+$('edit-subject').addEventListener('change', () => { refreshDetailOptions(); editDirty = true; });
+$('edit-subject-detail').addEventListener('change', () => { editDirty = true; });
+
 let editSession = 0;   // 편집 화면을 새로 열 때마다 증가 - 늦게 도착한 요약 응답이 다른 자료에 들어가지 않게 함
 function resetSummaryUi() {
   stopSpeech();
   editSession++;
   $('edit-summary').value = '';
+  $('sum-type').value = '';
+  setMsg('sum-warn', '');
+  setSubject('', '');
   $('sum-status').style.display = 'none';
   $('sum-make').disabled = false;
   setMsg('sum-msg', '');
@@ -823,6 +907,7 @@ async function openDetail(id) {
   resetQuizState(n.transcript || '');
   loadQuiz(n.id, editSession);
   $('edit-summary').value = n.summary || '';
+  setSubject(n.subject, n.subject_detail);
   $('edit-title').value = n.title || '';
   $('edit-text').value = n.transcript || '';
   $('edit-meta').textContent = '저장 ' + fmtDate(n.created_at) + (n.updated_at && n.updated_at !== n.created_at ? ' · 수정 ' + fmtDate(n.updated_at) : '');
@@ -855,7 +940,7 @@ $('sum-make').addEventListener('click', async () => {
   $('sum-status').style.display = '';
   let data;
   try {
-    data = await api('POST', '/api/voice-notes/summarize', { transcript });
+    data = await api('POST', '/api/voice-notes/summarize', { transcript, type: $('sum-type').value || 'auto' });
   } catch (e) {
     if (session !== editSession) return;
     $('sum-status').style.display = 'none';
@@ -867,6 +952,13 @@ $('sum-make').addEventListener('click', async () => {
   $('sum-status').style.display = 'none';
   $('sum-make').disabled = false;
   $('edit-summary').value = (data && data.summary) || '';
+  setMsg('sum-warn', '');
+  // 과목은 사용자가 아직 고르지 않았을 때만 채운다(이미 고른 값은 덮어쓰지 않음)
+  if (data && data.subject && !$('edit-subject').value) setSubject(data.subject, '');
+  if (data && data.subject && $('edit-subject').value === data.subject && !$('edit-subject-detail').value && data.subject_detail) {
+    setSubject(data.subject, data.subject_detail);
+  }
+  if (data && data.unverified_count >= 1) setMsg('sum-warn', '⚠ 표시는 원문에서 근거를 확인하지 못한 항목입니다. 원문과 대조해 보세요.', 'warn');
   editDirty = true;
   updateCounter();
 });
@@ -922,7 +1014,10 @@ function splitLong(text, max) {
 function prepareSpeech(text) {
   const chunks = [];
   for (const line of String(text).split(/\r?\n/)) {
-    const item = line.replace(/^\s*-\s+/, '').trim();
+    const trimmed = line.trim();
+    if (/^유형:/.test(trimmed)) continue;   // 작업187: "유형:" 줄은 읽지 않는다
+    // 칸 제목("■ 제목")은 제목으로 읽고, 항목은 "- "·"⚠ "를 지우고 읽는다
+    const item = trimmed.replace(/^■\s*/, '').replace(/^-\s+/, '').replace(/^\u26A0\s*/, '').trim();
     if (!item) continue;
     const parts = item.length > TTS_MAX_CHUNK ? splitLong(item, TTS_MAX_CHUNK) : [item];
     parts.forEach((p, i) => chunks.push({ text: p, itemEnd: i === parts.length - 1 }));
@@ -1305,12 +1400,14 @@ $('edit-save').addEventListener('click', async () => {
   const title = $('edit-title').value.trim();
   const transcript = $('edit-text').value;
   const summary = $('edit-summary').value;
+  const subject = $('edit-subject').value || null;
+  const subject_detail = $('edit-subject-detail').value || null;
   setMsg('edit-msg', '');
   if (!transcript.trim()) { setMsg('edit-msg', '원문이 비어 있습니다. 내용을 입력해 주세요.', 'error'); return; }
   $('edit-save').disabled = true;
   try {
-    if (editMode === 'new') await api('POST', '/api/voice-notes', { title, transcript, summary });
-    else await api('PATCH', '/api/voice-notes/' + editNoteId, { title, transcript, summary });
+    if (editMode === 'new') await api('POST', '/api/voice-notes', { title, transcript, summary, subject, subject_detail });
+    else await api('PATCH', '/api/voice-notes/' + editNoteId, { title, transcript, summary, subject, subject_detail });
   } catch (e) {
     $('edit-save').disabled = false;
     setMsg('edit-msg', e.message, 'error');
