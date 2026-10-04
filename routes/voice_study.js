@@ -1000,13 +1000,14 @@ router.post('/api/voice-notes/:id/links/refresh', guard, async (req, res) => {
 // 요약 → 장 나누기+칸 문구(Haiku) → 장별 이미지 생성(OpenAI) → 장별 글자 대조(Haiku 비전) → 저장.
 // VOICE_IMAGE_ENABLED='true'일 때만 동작한다. 원문·요약·응답 본문과 키는 로그에 남기지 않는다(상태코드·오류 이름만).
 const IMAGE_STALE_MINUTES = 15;
-const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+const IMAGE_DEFAULT_MAX_BYTES = 4 * 1024 * 1024;   // VOICE_IMAGE_MAX_BYTES로 바꿀 수 있다
 const IMAGE_MAX_SETS_PER_USER = 20;
 const IMAGE_MIN_CELLS = 3;
 const IMAGE_MAX_CELLS = 6;
 const IMAGE_MAX_LINES = 3;
 const IMAGE_LIMITS = { pageTitle: 14, cellTitle: 8, text: 28, tag: 4, icon: 20, emphasis: 2 };
 const IMAGE_EXTRA_CHARS_ALLOWED = 12;
+const IMAGE_FALLBACK_PAGE_TITLE = '핵심 정리';
 const IMAGE_OPENAI_TIMEOUT_MS = 180000;
 
 // 환경변수는 호출 때마다 읽는다(코드 기본값 포함)
@@ -1024,6 +1025,7 @@ function imageConfig() {
     compression: intOf(process.env.VOICE_IMAGE_COMPRESSION, 85, 0, 100),
     cap: intOf(process.env.VOICE_IMAGE_DAILY_CAP, 4, 1, 1000),
     maxPages: intOf(process.env.VOICE_IMAGE_MAX_PAGES, 3, 1, 10),
+    maxBytes: intOf(process.env.VOICE_IMAGE_MAX_BYTES, IMAGE_DEFAULT_MAX_BYTES, 1, 20 * 1024 * 1024),
   };
 }
 
@@ -1071,7 +1073,7 @@ function buildImagePrompt(page, pageNo, totalPages, layout) {
   if (totalPages >= 2) lines.push(`[장 표시] 제목 근처에 작게: "${pageNo}/${totalPages}"`);
   lines.push('[칸] 각 칸의 모서리에 지정된 번호를 작게 넣는다.');
   for (const c of page.cells) {
-    lines.push(`칸 번호 "${c.no}" - 제목: "${c.title}" - 아이콘: ${c.icon}`);
+    lines.push(`칸 번호 "${c.no}"` + (c.title ? ` - 제목: "${c.title}"` : '') + ` - 아이콘: ${c.icon}`);
     for (const l of c.lines) lines.push(`  · ` + (l.tag ? `태그 칩 "${l.tag}" + ` : '') + `문구 "${l.text}"`);
     if (c.emphasis.length) lines.push('  · 주황 굵은 강조 단어: ' + c.emphasis.map(w => `"${w}"`).join(', '));
   }
@@ -1080,19 +1082,29 @@ function buildImagePrompt(page, pageNo, totalPages, layout) {
 
 const cutChars = (s, n) => Array.from(s).slice(0, n).join('');
 
-// 줄 검증: 줄 안의 숫자열은 요약에 그대로, 2자 이상 한글 낱말은 요약에 부분 문자열로(공백 제거 후) 있어야 한다.
-// ⚠ 항목(근거 미확인)에서 따온 줄도 버린다. 통과하면 정리된 {tag, text}, 아니면 null.
+// 문구 검증(줄 문구·칸 제목·장 제목 공통): 숫자열, 2자 이상 한글 낱말, 2자 이상 영문 낱말(대소문자 무시)이
+// 모두 요약에 부분 문자열로(공백 제거 후) 있어야 한다. 하나라도 없으면 false
+function imageTextInSummary(text, summaryFlat) {
+  for (const num of text.match(/\d[\d,.]*\d|\d/g) || []) {
+    if (!summaryFlat.includes(num)) return false;
+  }
+  for (const word of text.match(/[가-힣]{2,}/g) || []) {
+    if (!summaryFlat.includes(word)) return false;
+  }
+  const lower = summaryFlat.toLowerCase();
+  for (const word of text.match(/[A-Za-z]{2,}/g) || []) {
+    if (!lower.includes(word.toLowerCase())) return false;
+  }
+  return true;
+}
+
+// 줄 검증: 위 문구 검증을 통과해야 한다. ⚠ 항목(근거 미확인)에서 따온 줄도 버린다. 통과하면 정리된 {tag, text}, 아니면 null.
 function validateImageLine(line, summaryFlat, unverifiedFlats) {
   if (!line || typeof line !== 'object' || typeof line.text !== 'string') return null;
   const text = cutChars(line.text.replace(/\s+/g, ' ').trim(), IMAGE_LIMITS.text);
   if (!text) return null;
   const flat = stripSpaces(text);
-  for (const num of text.match(/\d[\d,.]*\d|\d/g) || []) {
-    if (!summaryFlat.includes(num)) return null;
-  }
-  for (const word of text.match(/[가-힣]{2,}/g) || []) {
-    if (!summaryFlat.includes(word)) return null;
-  }
+  if (!imageTextInSummary(text, summaryFlat)) return null;
   for (const u of unverifiedFlats) {
     if ((Array.from(flat).length >= 6 && u.includes(flat)) || (Array.from(u).length >= 4 && flat.includes(u))) return null;
   }
@@ -1112,16 +1124,19 @@ function validateImagePlan(parsed, summary, maxPages) {
   const pages = [];
   let dupIcons = false;
   for (const p of rawPages) {
-    if (!p || typeof p !== 'object' || typeof p.title !== 'string' || !Array.isArray(p.cells)) continue;
-    const title = cutChars(p.title.replace(/\s+/g, ' ').trim(), IMAGE_LIMITS.pageTitle);
-    if (!title) continue;
+    if (!p || typeof p !== 'object' || !Array.isArray(p.cells)) continue;
+    // 장 제목도 줄 문구와 같은 검증을 거친다. 실패하거나 비어 있으면 IMAGE_FALLBACK_PAGE_TITLE로 대체
+    const rawTitle = typeof p.title === 'string' ? cutChars(p.title.replace(/\s+/g, ' ').trim(), IMAGE_LIMITS.pageTitle) : '';
+    const title = rawTitle && imageTextInSummary(rawTitle, summaryFlat) ? rawTitle : IMAGE_FALLBACK_PAGE_TITLE;
     const cells = [];
     for (const c of p.cells) {
       if (cells.length >= IMAGE_MAX_CELLS) break;
-      if (!c || typeof c !== 'object' || typeof c.title !== 'string' || typeof c.icon !== 'string' || !Array.isArray(c.lines)) continue;
-      const cellTitle = cutChars(c.title.replace(/\s+/g, ' ').trim(), IMAGE_LIMITS.cellTitle);
+      if (!c || typeof c !== 'object' || typeof c.icon !== 'string' || !Array.isArray(c.lines)) continue;
+      // 칸 제목도 같은 검증을 거친다. 실패하거나 비어 있으면 빈 문자열(프롬프트에서 제목 줄 생략, 대조 목록에서도 제외)
+      const rawCellTitle = typeof c.title === 'string' ? cutChars(c.title.replace(/\s+/g, ' ').trim(), IMAGE_LIMITS.cellTitle) : '';
+      const cellTitle = rawCellTitle && imageTextInSummary(rawCellTitle, summaryFlat) ? rawCellTitle : '';
       const icon = cutChars(c.icon.replace(/\s+/g, ' ').trim(), IMAGE_LIMITS.icon);
-      if (!cellTitle || !icon) continue;
+      if (!icon) continue;
       const lines = [];
       for (const l of c.lines) {
         if (lines.length >= IMAGE_MAX_LINES) break;
@@ -1146,29 +1161,32 @@ function validateImagePlan(parsed, summary, maxPages) {
   return { pages: used, truncated, dupIcons };
 }
 
-// 장 이미지에 있어야 할 글자 목록: 장 제목, "n/N"(2장 이상일 때), 칸 번호, 태그, 줄 문구
+// 장 이미지에 있어야 할 글자 목록: 장 제목, "n/N"(2장 이상일 때), 칸 번호, 칸 제목(비어 있으면 제외), 태그, 줄 문구
+// 이미지 프롬프트에 큰따옴표로 들어가는 문구와 반드시 같아야 한다(일관성 테스트가 확인한다)
 function expectedImageTexts(page, pageNo, totalPages) {
   const out = [page.title];
   if (totalPages >= 2) out.push(`${pageNo}/${totalPages}`);
   for (const c of page.cells) {
     out.push(String(c.no));
+    if (c.title) out.push(c.title);
     for (const l of c.lines) { if (l.tag) out.push(l.tag); out.push(l.text); }
   }
   return out;
 }
 
 // 글자 대조: 공백 제거 후 기대 문구가 모두 포함되고, 기대 글자 수 + 12자를 넘는 여분 글자가 없으면 'pass'.
-// texts가 문자열 배열이 아니면 'unavailable'
+// texts가 문자열 배열이 아니면 'unavailable'. missing은 빠진 기대 문구 개수, extra는 기대 글자 수를 넘는 글자 수(문구 내용은 담지 않는다)
 function compareImageTexts(texts, expected) {
-  if (!Array.isArray(texts) || !texts.every(t => typeof t === 'string')) return 'unavailable';
+  if (!Array.isArray(texts) || !texts.every(t => typeof t === 'string')) return { result: 'unavailable', missing: 0, extra: 0 };
   const seen = stripSpaces(texts.join(''));
-  let expectedLen = 0;
+  let expectedLen = 0, missing = 0;
   for (const e of expected) {
     const flat = stripSpaces(e);
-    if (!seen.includes(flat)) return 'fail';
+    if (!seen.includes(flat)) missing++;
     expectedLen += Array.from(flat).length;
   }
-  return Array.from(seen).length <= expectedLen + IMAGE_EXTRA_CHARS_ALLOWED ? 'pass' : 'fail';
+  const extra = Math.max(0, Array.from(seen).length - expectedLen);
+  return { result: missing === 0 && extra <= IMAGE_EXTRA_CHARS_ALLOWED ? 'pass' : 'fail', missing, extra };
 }
 
 // OpenAI 이미지 생성(1회). 실패하면 status·code·param이 담긴 오류를 던진다
@@ -1221,7 +1239,7 @@ function describeImageError(err) {
   return '이미지 생성 실패';
 }
 
-// 비전으로 이미지 속 글자를 읽어 기대 문구와 대조한다. 호출·파싱 실패는 'unavailable'
+// 비전으로 이미지 속 글자를 읽어 기대 문구와 대조한다. 호출·파싱 실패는 result 'unavailable'
 async function checkImageText(userId, img, expected) {
   let message;
   try {
@@ -1238,7 +1256,7 @@ async function checkImageText(userId, img, expected) {
     });
   } catch (err) {
     console.error('voice-notes image check error:', err.name, err.status || '');
-    return 'unavailable';
+    return { result: 'unavailable', missing: 0, extra: 0 };
   }
   trackUsage(userId, 'image_aux', SUMMARY_MODEL, message.usage && message.usage.input_tokens, message.usage && message.usage.output_tokens, 0);
   try {
@@ -1247,7 +1265,7 @@ async function checkImageText(userId, img, expected) {
     const parsed = JSON.parse(stripCodeFence(text));
     return compareImageTexts(parsed && parsed.texts, expected);
   } catch (err) {
-    return 'unavailable';
+    return { result: 'unavailable', missing: 0, extra: 0 };
   }
 }
 
@@ -1268,13 +1286,13 @@ async function renderImagePage(cfg, userId, page, pageNo, totalPages) {
       break;
     }
     attempts++;
-    if (img.buffer.length > IMAGE_MAX_BYTES) { lastError = '이미지 용량이 너무 큽니다(2MB 초과).'; break; }
-    const check = await checkImageText(userId, img, expected);
-    best = { img, check };
-    if (check !== 'fail') break;
+    if (img.buffer.length > cfg.maxBytes) { lastError = `이미지 용량이 너무 큽니다(${Math.round(cfg.maxBytes / 104857.6) / 10}MB 초과).`; break; }
+    const cmp = await checkImageText(userId, img, expected);
+    best = { img, check: cmp.result, note: cmp.result === 'fail' ? `누락 ${cmp.missing}, 여분 ${cmp.extra}` : null };
+    if (cmp.result !== 'fail') break;
   }
   if (!best) return { status: 'failed', error: lastError || '이미지 생성 실패', attempts };
-  return { status: 'ready', img: best.img, check: best.check, attempts };
+  return { status: 'ready', img: best.img, check: best.check, note: best.note, attempts };
 }
 
 async function requestImagePlan(userId, summary, maxPages, extra) {
@@ -1351,9 +1369,9 @@ async function runImagePipeline(noteId, userId) {
     if (result.status === 'ready') {
       readyCount++;
       await pool.query(
-        `UPDATE voice_images SET status = 'ready', image = $3, mime = $4, check_result = $5, attempts = $6, error = NULL
+        `UPDATE voice_images SET status = 'ready', image = $3, mime = $4, check_result = $5, attempts = $6, error = $7
          WHERE note_id = $1 AND page_no = $2`,
-        [noteId, i + 1, result.img.buffer, result.img.mime, result.check, result.attempts]
+        [noteId, i + 1, result.img.buffer, result.img.mime, result.check, result.attempts, result.note]
       );
     } else {
       await pool.query(
@@ -1467,14 +1485,14 @@ router.get('/api/voice-notes/:id/image', guard, async (req, res) => {
       );
     }
     const pagesRes = await pool.query(
-      'SELECT page_no, title, status, check_result FROM voice_images WHERE note_id = $1 ORDER BY page_no',
+      'SELECT page_no, title, status, check_result, error FROM voice_images WHERE note_id = $1 ORDER BY page_no',
       [id]
     );
     res.json({
       ...base,
       status,
       pages_total: s.pages_total || 0,
-      pages: pagesRes.rows.map(p => ({ page_no: p.page_no, title: p.title || '', status: p.status, check: p.check_result || null })),
+      pages: pagesRes.rows.map(p => ({ page_no: p.page_no, title: p.title || '', status: p.status, check: p.check_result || null, error: p.error || null })),
       truncated: !!s.truncated,
       rating: s.rating === null || s.rating === undefined ? null : s.rating,
       stale: s.summary_hash !== sha256Hex(summary),
