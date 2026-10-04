@@ -134,6 +134,9 @@ router.get('/api/voice-notes', guard, async (req, res) => {
   }
 });
 
+// 작업193-3: '/api/voice-notes/:id'보다 먼저 등록해야 'wrong-answers'가 :id로 잡히지 않는다
+router.get('/api/voice-notes/wrong-answers', guard, wrongAnswersHandler);
+
 router.get('/api/voice-notes/:id', guard, async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) return res.status(404).json(NOT_FOUND);
@@ -1673,6 +1676,125 @@ router.patch('/api/voice-notes/:id/image/rating', guard, async (req, res) => {
     res.json({ ok: true, rating });
   } catch (err) {
     console.error('voice-notes image rating error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+// ─── 작업193-3: 퀴즈 결과 저장 + 오답 노트 ──────────────────────────────────────
+// 채점은 저장된 퀴즈의 정답으로 서버가 한다(클라이언트가 보낸 정오·점수는 받지 않는다). 문제 스냅샷을 함께 저장해
+// 이후 퀴즈를 다시 만들어도 오답 기록이 남는다. 원문·문제 본문은 로그에 남기지 않는다.
+const QUIZ_ATTEMPTS_KEEP = 50;
+const WRONG_MAX_ITEMS = 200;
+const WRONG_SCAN_ATTEMPTS = 500;
+
+const quizHash = questions => sha256Hex(JSON.stringify(questions));
+
+// 문제 키 = sha256(문제 문장 + 정답 보기 문장). 같은 문제는 보기 순서가 바뀌어도 같은 키다
+function wrongKey(question, answerText) {
+  return sha256Hex(String(question).trim() + '\n' + String(answerText).trim());
+}
+
+// 서버 채점: answers = [{q, chosen}] → { score, total, items }. 문제 번호 q는 저장된 퀴즈의 순서. 답하지 않은 문제는 오답
+function gradeQuizAnswers(questions, answers) {
+  const chosenBy = new Map(answers.map(a => [a.q, a.chosen]));
+  const items = questions.map((qq, q) => {
+    const chosen = chosenBy.has(q) ? chosenBy.get(q) : null;
+    return { q, question: qq.question, choices: qq.choices, answer_index: qq.answer_index, chosen, correct: chosen === qq.answer_index, quote: qq.quote || '' };
+  });
+  return { score: items.filter(i => i.correct).length, total: items.length, items };
+}
+
+// 미해결 오답: 시도를 오래된 순으로 훑으며, 같은 문제 키를 틀리면 목록에 넣고 이후 시도에서 맞히면 뺀다
+function unresolvedWrongAnswers(attempts) {
+  const sorted = attempts.slice().sort((a, b) => (new Date(a.created_at) - new Date(b.created_at)) || (a.id - b.id));
+  const open = new Map();
+  for (const at of sorted) {
+    for (const it of Array.isArray(at.items) ? at.items : []) {
+      if (!it || !Array.isArray(it.choices) || !Number.isInteger(it.answer_index) || !it.choices[it.answer_index]) continue;
+      const key = at.note_id + ':' + wrongKey(it.question, it.choices[it.answer_index]);
+      if (it.correct) open.delete(key);
+      else open.set(key, { note_id: at.note_id, title: at.title || '', subject: at.subject || null, question: it.question, choices: it.choices,
+        answer_index: it.answer_index, chosen: Number.isInteger(it.chosen) ? it.chosen : null, quote: it.quote || '', created_at: at.created_at });
+    }
+  }
+  return Array.from(open.values())
+    .sort((a, b) => (new Date(b.created_at) - new Date(a.created_at)))
+    .slice(0, WRONG_MAX_ITEMS);
+}
+
+// 'wrong-answers'는 '/api/voice-notes/:id'보다 먼저 등록되어야 한다(아래 등록 위치 참고)
+async function wrongAnswersHandler(req, res) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT a.id, a.note_id, a.items, a.created_at, n.title, n.subject
+       FROM voice_quiz_attempts a JOIN voice_notes n ON n.id = a.note_id
+       WHERE a.user_id = $1
+       ORDER BY a.created_at DESC, a.id DESC LIMIT ${WRONG_SCAN_ATTEMPTS}`,
+      [req.user.id]
+    );
+    res.json(unresolvedWrongAnswers(rows));
+  } catch (err) {
+    console.error('voice-notes wrong-answers error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+}
+
+router.post('/api/voice-notes/:id/quiz/attempts', guard, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(404).json(NOT_FOUND);
+  try {
+    const transcript = await loadOwnTranscript(id, req.user.id);
+    if (transcript === null) return res.status(404).json(NOT_FOUND);
+    const quizRes = await pool.query('SELECT questions, source_hash FROM voice_quizzes WHERE note_id = $1 AND user_id = $2', [id, req.user.id]);
+    // 저장된 퀴즈가 없거나 원문이 바뀌어 낡았으면 채점하지 않는다
+    if (!quizRes.rows.length || quizRes.rows[0].source_hash !== sha256Hex(transcript) || !Array.isArray(quizRes.rows[0].questions) || !quizRes.rows[0].questions.length) {
+      return res.status(409).json({ error: '퀴즈가 없거나 원문이 바뀌어 결과를 저장할 수 없습니다.' });
+    }
+    const questions = quizRes.rows[0].questions;
+    const answers = req.body && req.body.answers;
+    if (!Array.isArray(answers) || !answers.length || answers.length > questions.length) {
+      return res.status(400).json({ error: 'answers가 올바르지 않습니다.' });
+    }
+    const seenQ = new Set();
+    for (const a of answers) {
+      if (!a || typeof a !== 'object' || !Number.isInteger(a.q) || a.q < 0 || a.q >= questions.length || seenQ.has(a.q)
+        || !(a.chosen === null || (Number.isInteger(a.chosen) && a.chosen >= 0 && a.chosen < 4))) {
+        return res.status(400).json({ error: 'answers가 올바르지 않습니다.' });
+      }
+      seenQ.add(a.q);
+    }
+    const graded = gradeQuizAnswers(questions, answers);
+    const ins = await pool.query(
+      `INSERT INTO voice_quiz_attempts (user_id, note_id, quiz_hash, score, total, items)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb) RETURNING id, created_at`,
+      [req.user.id, id, quizHash(questions), graded.score, graded.total, JSON.stringify(graded.items)]
+    );
+    await pool.query(
+      `DELETE FROM voice_quiz_attempts WHERE user_id = $1 AND note_id = $2 AND id NOT IN (
+         SELECT id FROM voice_quiz_attempts WHERE user_id = $1 AND note_id = $2 ORDER BY created_at DESC, id DESC LIMIT ${QUIZ_ATTEMPTS_KEEP})`,
+      [req.user.id, id]
+    );
+    res.status(201).json({ id: ins.rows[0].id, created_at: ins.rows[0].created_at, score: graded.score, total: graded.total, items: graded.items });
+  } catch (err) {
+    console.error('voice-notes quiz attempt error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+router.get('/api/voice-notes/:id/quiz/attempts', guard, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(404).json(NOT_FOUND);
+  try {
+    const transcript = await loadOwnTranscript(id, req.user.id);
+    if (transcript === null) return res.status(404).json(NOT_FOUND);
+    const { rows } = await pool.query(
+      `SELECT id, score, total, created_at FROM voice_quiz_attempts WHERE note_id = $1 AND user_id = $2
+       ORDER BY created_at DESC, id DESC LIMIT ${QUIZ_ATTEMPTS_KEEP}`,
+      [id, req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('voice-notes quiz attempts list error:', err.message);
     res.status(500).json(SERVER_ERROR);
   }
 });

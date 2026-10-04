@@ -286,6 +286,17 @@
   .src-row:first-child { border-top: none; }
   .src-row .btn.small { max-width: 100%; text-align: left; word-break: break-all; }
 
+  /* 작업193-3: 퀴즈 기록·오답 노트 */
+  .hist-row { display: flex; justify-content: space-between; gap: 8px; padding: 10px 14px; margin-bottom: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; font-size: 14px; }
+  .hist-row span:last-child { color: var(--text2); font-size: 12px; }
+  .wrong-item { border-top: 1px solid var(--border); padding: 12px 0; }
+  .wrong-item:first-of-type { border-top: none; }
+  .wrong-q { font-size: 14px; font-weight: 700; line-height: 1.6; word-break: keep-all; }
+  .wrong-line { font-size: 13px; line-height: 1.6; margin-top: 4px; word-break: break-all; }
+  .wrong-line.mine { color: var(--error); }
+  .wrong-line.right { color: var(--primary-dark); }
+  .wrong-line.src { color: var(--text2); font-size: 12px; }
+
   /* 요약 읽어주기 */
   .tts-box { margin-top: 10px; }
   .tts-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -333,6 +344,7 @@
     <div class="view-title">음성 학습</div>
     <div class="view-sub">소리 내어 읽은 공부를 글과 요약으로</div>
     <button id="new-rec-btn" class="btn block" type="button">🎙 새로 녹음</button>
+    <button id="wrong-btn" class="btn secondary block" type="button" style="margin-top:10px">오답 노트</button>
     <div class="list-head">
       <h2>내 자료</h2>
       <span id="list-count" style="font-size:12px;color:var(--text2);margin-left:auto;margin-right:10px"></span>
@@ -546,11 +558,24 @@
         <div class="result-score"><span id="quiz-score-num" style="font-size:42px;color:var(--primary)">0</span><span> / <span id="quiz-score-total" style="font-size:20px">5</span></span></div>
         <div id="quiz-result-msg" class="result-msg"></div>
       </div>
+      <div id="quiz-saved" class="msg info" style="display:none"></div>
       <div class="result-actions">
         <button id="quiz-retry" class="btn block" type="button">다시 풀기</button>
         <button id="quiz-back" class="btn secondary block" type="button">자료로 돌아가기</button>
       </div>
     </div>
+    <div id="quiz-history" style="display:none;margin-top:20px">
+      <div class="field-label">최근 기록</div>
+      <div id="quiz-history-list"></div>
+    </div>
+  </div>
+
+  <!-- ⑧ 오답 노트 -->
+  <div id="view-wrong" class="view">
+    <div class="view-title">오답 노트</div>
+    <div class="view-sub">퀴즈에서 틀린 문제 중 아직 맞히지 못한 것만 모았어요.</div>
+    <div id="wrong-msg" class="msg"></div>
+    <div id="wrong-list"></div>
   </div>
 </div>
 
@@ -640,14 +665,14 @@ let editNoteId = null;
 let editDirty = false;
 let pending = null;       // { blob, seconds, mime } - 변환 전/실패 시 메모리에만 유지
 
-const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료', quiz: '퀴즈', chat: '질문하기', merge: '자료 합치기' };
+const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료', quiz: '퀴즈', chat: '질문하기', merge: '자료 합치기', wrong: '오답 노트' };
 function showView(name) {
   stopSpeech();   // 작업182: 화면 이동 시 읽어주기 즉시 정지
   if (name !== 'edit' && name !== 'quiz' && name !== 'chat') hideImage();   // 작업190: 상세를 떠나면 그림 조회 중단·blob 주소 해제
   if (name === 'edit') resumeImagePolling();
   if (name !== 'chat') chatSession++;   // 작업186: 대화 화면을 떠나면 늦게 오는 답변은 무시
   currentView = name;
-  for (const v of ['list', 'record', 'edit', 'quiz', 'chat', 'merge']) $('view-' + v).classList.toggle('active', v === name);
+  for (const v of ['list', 'record', 'edit', 'quiz', 'chat', 'merge', 'wrong']) $('view-' + v).classList.toggle('active', v === name);
   $('page-title').textContent = TITLES[name];
   $('subbar').style.display = name === 'list' ? 'none' : '';
   window.scrollTo(0, 0);
@@ -701,7 +726,7 @@ function requestBack() {
 window.addEventListener('popstate', () => {
   if (currentView === 'list') return;
   if (currentView === 'quiz' || currentView === 'chat') { showView('edit'); return; }   // 작업185·186: 퀴즈·대화에서 뒤로가기 → 자료 상세로 복귀
-  if (currentView === 'merge') { showView('list'); return; }   // 작업192: 합치기 창에서 뒤로가기 → 목록(선택 상태 유지)
+  if (currentView === 'merge' || currentView === 'wrong') { showView('list'); return; }   // 작업192·193: 합치기 창·오답 노트에서 뒤로가기 → 목록
   if (currentView === 'record' && recTarget === 'append') {   // 작업191: 이어서 녹음에서 뒤로가기 → 자료 상세로 복귀(입력 내용 유지)
     if (!leaveConfirmed()) { history.pushState({ v: currentView }, ''); return; }
     resetRecording();
@@ -831,6 +856,49 @@ $('sel-toggle').addEventListener('click', () => {
   if (!selectMode) selected = [];
   renderList();
 });
+
+// ── 오답 노트 (작업193-3) ──
+async function loadWrong() {
+  setMsg('wrong-msg', '');
+  $('wrong-list').textContent = '';
+  let rows;
+  try { rows = await api('GET', '/api/voice-notes/wrong-answers'); }
+  catch (e) { setMsg('wrong-msg', e.message, 'error'); return; }
+  if (currentView !== 'wrong') return;
+  if (!Array.isArray(rows) || !rows.length) {
+    const d = document.createElement('div'); d.className = 'empty-state'; d.textContent = '미해결 오답이 없습니다.';
+    $('wrong-list').appendChild(d);
+    return;
+  }
+  const groups = new Map();   // 자료별로 묶는다(최신 오답이 있는 자료 먼저)
+  for (const r of rows) {
+    if (!groups.has(r.note_id)) groups.set(r.note_id, { title: r.title, subject: r.subject, items: [] });
+    groups.get(r.note_id).items.push(r);
+  }
+  for (const [noteId, g] of groups) {
+    const card = document.createElement('div'); card.className = 'img-card';
+    const head = document.createElement('div'); head.className = 'img-card-head';
+    const t = document.createElement('span'); t.className = 'img-card-title'; t.textContent = g.title || '(제목 없음)';
+    head.appendChild(t);
+    if (g.subject) { const sj = document.createElement('span'); sj.className = 'img-card-no'; sj.textContent = g.subject; head.appendChild(sj); }
+    card.appendChild(head);
+    for (const it of g.items) {
+      const box = document.createElement('div'); box.className = 'wrong-item';
+      const q = document.createElement('div'); q.className = 'wrong-q'; q.textContent = it.question; box.appendChild(q);
+      const mine = document.createElement('div'); mine.className = 'wrong-line mine';
+      mine.textContent = '내가 고른 답: ' + (Number.isInteger(it.chosen) && it.choices[it.chosen] ? it.choices[it.chosen] : '답하지 않음'); box.appendChild(mine);
+      const right = document.createElement('div'); right.className = 'wrong-line right'; right.textContent = '정답: ' + it.choices[it.answer_index]; box.appendChild(right);
+      if (it.quote) { const src = document.createElement('div'); src.className = 'wrong-line src'; src.textContent = '근거: “' + it.quote + '”'; box.appendChild(src); }
+      card.appendChild(box);
+    }
+    const open = document.createElement('button'); open.type = 'button'; open.className = 'btn small secondary block'; open.style.marginTop = '10px';
+    open.textContent = '해당 자료 열기';
+    open.addEventListener('click', () => openDetail(noteId, 'wrong'));
+    card.appendChild(open);
+    $('wrong-list').appendChild(card);
+  }
+}
+$('wrong-btn').addEventListener('click', () => { go('wrong'); loadWrong(); });
 
 // ── 자료 합치기 창 ──
 let mergeOrder = [], mergeTitleTouched = false, mergeBusy = false;
@@ -1219,7 +1287,7 @@ async function openDetail(id, fromLink) {   // fromLink: true = 연결·원본�
   setMsg('list-msg', '');
   let n;
   try { n = await api('GET', '/api/voice-notes/' + id); }
-  catch (e) { setMsg(fromLink === 'merge' ? 'merge-msg' : fromLink ? 'link-msg' : 'list-msg', e.message, 'error'); return; }
+  catch (e) { setMsg(fromLink === 'merge' ? 'merge-msg' : fromLink === 'wrong' ? 'wrong-msg' : fromLink ? 'link-msg' : 'list-msg', e.message, 'error'); return; }
   editMode = 'detail'; editNoteId = n.id;
   resetSummaryUi();
   resetQuizState(n.transcript || '');
@@ -1780,7 +1848,7 @@ let quizChecking = false;      // 저장된 퀴즈가 있는지 확인 중
 let quizBusy = false;          // 퀴즈 생성 중
 let quizLoadedText = '';       // 서버에 저장된 원문(저장 전 수정 여부 비교용)
 const normNl = t => String(t).replace(/\r\n?/g, '\n');   // textarea는 줄바꿈을 LF로 돌려주므로 맞춰 비교
-let quizState = { i: 0, score: 0, answered: false };
+let quizState = { i: 0, score: 0, answered: false, answers: [], saved: false };
 
 function resetQuizState(savedText) {
   quizData = null; quizChecking = editMode === 'detail'; quizBusy = false;
@@ -1850,7 +1918,9 @@ $('quiz-make').addEventListener('click', async () => {
 });
 $('quiz-play').addEventListener('click', () => {
   if (!quizData || normNl($('edit-text').value) !== quizLoadedText) return;
-  quizState = { i: 0, score: 0, answered: false };
+  quizState = { i: 0, score: 0, answered: false, answers: [], saved: false };
+  $('quiz-saved').style.display = 'none';
+  loadQuizHistory(editNoteId, editSession);
   go('quiz');                                   // history에 쌓아 뒤로가기로 상세 복귀 (showView가 읽어주기를 정지)
   $('quiz-result').style.display = 'none';
   $('quiz-run').style.display = '';
@@ -1878,6 +1948,7 @@ function renderQuizQuestion() {
 function answerQuiz(idx) {
   if (quizState.answered) return;               // 한 문제에 한 번만 채점
   quizState.answered = true;
+  quizState.answers.push({ q: quizState.i, chosen: idx });   // 서버가 저장된 퀴즈의 정답으로 다시 채점한다
   const q = quizData[quizState.i];
   const correct = idx === q.answer_index;
   if (correct) quizState.score++;
@@ -1908,9 +1979,47 @@ $('quiz-next').addEventListener('click', () => {
   $('quiz-result-msg').textContent = quizState.score === quizData.length ? '모두 맞혔어요!' : '다시 풀어 보면 더 잘 기억돼요.';
   $('quiz-result').style.display = '';
   window.scrollTo(0, 0);
+  saveQuizAttempt();
 });
+// 채점이 끝나면 결과를 자동 저장한다(점수는 서버가 다시 계산해 돌려준다)
+async function saveQuizAttempt() {
+  if (quizState.saved || editMode !== 'detail') return;
+  quizState.saved = true;
+  const noteId = editNoteId, session = editSession;
+  const saved = $('quiz-saved');
+  saved.style.display = ''; saved.className = 'msg info'; saved.textContent = '결과를 저장하는 중…';
+  let r;
+  try { r = await api('POST', '/api/voice-notes/' + noteId + '/quiz/attempts', { answers: quizState.answers }); }
+  catch (e) {
+    if (session !== editSession) return;
+    saved.className = 'msg error';
+    saved.textContent = e.status === 409 ? '퀴즈가 바뀌어 결과를 저장하지 못했습니다.' : '결과를 저장하지 못했습니다. ' + e.message;
+    return;
+  }
+  if (session !== editSession) return;
+  if (r && Number.isInteger(r.score)) $('quiz-score-num').textContent = String(r.score);
+  saved.textContent = '결과가 저장되었습니다';
+  loadQuizHistory(noteId, session);
+}
+// 최근 기록(점수와 날짜, 최대 5개)
+async function loadQuizHistory(noteId, session) {
+  const box = $('quiz-history');
+  let rows = [];
+  try { rows = await api('GET', '/api/voice-notes/' + noteId + '/quiz/attempts'); } catch (e) { rows = []; }
+  if (session !== editSession || noteId !== editNoteId) return;
+  const list = $('quiz-history-list');
+  list.textContent = '';
+  const recent = (Array.isArray(rows) ? rows : []).slice(0, 5);
+  box.style.display = recent.length ? '' : 'none';
+  for (const r of recent) {
+    const row = document.createElement('div'); row.className = 'hist-row';
+    const a = document.createElement('span'); a.textContent = r.score + ' / ' + r.total;
+    const b = document.createElement('span'); b.textContent = fmtDate(r.created_at);
+    row.appendChild(a); row.appendChild(b); list.appendChild(row);
+  }
+}
 $('quiz-retry').addEventListener('click', () => {
-  quizState = { i: 0, score: 0, answered: false };
+  quizState = { i: 0, score: 0, answered: false, answers: [], saved: false };
   $('quiz-result').style.display = 'none';
   $('quiz-run').style.display = '';
   renderQuizQuestion();
