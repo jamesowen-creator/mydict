@@ -7,7 +7,13 @@ const { requireAuth, checkPermission } = require('../middleware/auth');
 const router = express.Router();
 
 // 작업179: 음성 학습 자료(변환 글·요약본) CRUD. 오디오는 저장하지 않는다.
-const LIMITS = { title: 100, transcript: 20000, summary: 5000 };
+const LIMITS = { title: 100, summary: 5000 };
+// 작업192: 원문 최대 길이는 환경변수 VOICE_TRANSCRIPT_MAX(기본 30000자). 자료 저장·요약 입력 검증이 같은 값을 쓴다
+const TRANSCRIPT_MAX_DEFAULT = 30000;
+function transcriptMax() {
+  const n = parseInt(process.env.VOICE_TRANSCRIPT_MAX, 10);
+  return Number.isFinite(n) && n >= 1000 && n <= 200000 ? n : TRANSCRIPT_MAX_DEFAULT;
+}
 const MAX_NOTES_PER_USER = 200;
 const MAX_PG_INT = 2147483647;
 
@@ -52,7 +58,8 @@ function readFields(body, { requireTranscript }) {
   for (const f of ['title', 'transcript', 'summary']) {
     if (src[f] === undefined) continue;
     if (typeof src[f] !== 'string') return { error: `${f}은(는) 문자열이어야 합니다.` };
-    if (charLen(src[f]) > LIMITS[f]) return { error: `${f}은(는) ${LIMITS[f]}자 이하여야 합니다.` };
+    const max = f === 'transcript' ? transcriptMax() : LIMITS[f];
+    if (charLen(src[f]) > max) return { error: `${f}은(는) ${max}자 이하여야 합니다.` };
     out[f] = src[f];
   }
   for (const f of ['subject', 'subject_detail']) {
@@ -89,13 +96,27 @@ const SERVER_ERROR = { error: '서버 오류가 발생했습니다.' };
 // 작업191: 요약이 만들어진 뒤 원문이 바뀌었으면 summary_stale = true. 기존 자료(summary_source_hash NULL)는 false(알 수 없음)
 const LIST_STALE_SQL = `(summary IS NOT NULL AND btrim(summary) <> '' AND summary_source_hash IS NOT NULL
   AND summary_source_hash IS DISTINCT FROM encode(sha256(convert_to(COALESCE(transcript, ''), 'UTF8')), 'hex')) AS summary_stale`;
+// 작업192: 합본의 원본 목록을 [{id, title, status}]로. status: 'ok'(원본 원문 해시가 합칠 때와 같음) / 'changed' / 'deleted'. 일반 자료는 null
+async function mergedSources(mergedFrom, userId) {
+  if (!Array.isArray(mergedFrom) || !mergedFrom.length) return null;
+  const ids = mergedFrom.map(m => m && Number(m.id)).filter(n => Number.isInteger(n));
+  const { rows } = ids.length
+    ? await pool.query('SELECT id, title, transcript FROM voice_notes WHERE user_id = $1 AND id = ANY($2::int[])', [userId, ids])
+    : { rows: [] };
+  const byId = new Map(rows.map(r => [r.id, r]));
+  return mergedFrom.map(m => {
+    const cur = byId.get(Number(m && m.id));
+    if (!cur) return { id: m.id, title: m.title || '', status: 'deleted' };
+    return { id: cur.id, title: cur.title || '', status: sha256Hex(cur.transcript || '') === m.hash ? 'ok' : 'changed' };
+  });
+}
 function isSummaryStale(row) {
   return !!(row.summary && row.summary.trim() && row.summary_source_hash && row.summary_source_hash !== sha256Hex(row.transcript || ''));
 }
 
 router.get('/api/voice-notes', guard, async (req, res) => {
   try {
-    const listSql = stale => `SELECT id, title, subject, subject_detail, LEFT(summary, 300) AS summary, created_at${stale ? ', ' + LIST_STALE_SQL : ''}
+    const listSql = stale => `SELECT id, title, subject, subject_detail, LEFT(summary, 300) AS summary, char_length(COALESCE(transcript, '')) AS chars, created_at${stale ? ', ' + LIST_STALE_SQL : ''}
        FROM voice_notes WHERE user_id = $1
        ORDER BY created_at DESC, id DESC`;
     let rows;
@@ -106,7 +127,7 @@ router.get('/api/voice-notes', guard, async (req, res) => {
       ({ rows } = await pool.query(listSql(false), [req.user.id]));
       rows = rows.map(r => ({ ...r, summary_stale: false }));
     }
-    res.json(rows);
+    res.json({ notes: rows, limits: { transcript_max: transcriptMax() } });
   } catch (err) {
     console.error('voice-notes list error:', err.message);
     res.status(500).json(SERVER_ERROR);
@@ -118,13 +139,13 @@ router.get('/api/voice-notes/:id', guard, async (req, res) => {
   if (id === null) return res.status(404).json(NOT_FOUND);
   try {
     const { rows } = await pool.query(
-      `SELECT id, title, transcript, summary, summary_source_hash, subject, subject_detail, created_at, updated_at
+      `SELECT id, title, transcript, summary, summary_source_hash, subject, subject_detail, merged_from, created_at, updated_at
        FROM voice_notes WHERE id = $1 AND user_id = $2`,
       [id, req.user.id]
     );
     if (!rows.length) return res.status(404).json(NOT_FOUND);
-    const { summary_source_hash, ...note } = rows[0];
-    res.json({ ...note, summary_stale: isSummaryStale(rows[0]) });
+    const { summary_source_hash, merged_from, ...note } = rows[0];
+    res.json({ ...note, summary_stale: isSummaryStale(rows[0]), merged_from: await mergedSources(merged_from, req.user.id) });
   } catch (err) {
     console.error('voice-notes get error:', err.message);
     res.status(500).json(SERVER_ERROR);
@@ -199,6 +220,59 @@ router.patch('/api/voice-notes/:id', guard, async (req, res) => {
     res.status(500).json(SERVER_ERROR);
   } finally {
     if (conn) conn.release();
+  }
+});
+
+// ─── 작업192: 자료 합치기 ─────────────────────────────────────────────────────
+// 같은 사용자의 자료 2~6개를 순서대로 빈 줄 하나로 이어 붙인 새 자료(합본)를 만든다. 원본은 바꾸지 않고, 요약은 비워 둔다(자동 요약 없음).
+const MERGE_MIN = 2, MERGE_MAX = 6, MERGE_SEPARATOR = '\n\n';
+router.post('/api/voice-notes/merge', guard, async (req, res) => {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const raw = body.note_ids;
+  if (!Array.isArray(raw) || raw.length < MERGE_MIN || raw.length > MERGE_MAX) {
+    return res.status(400).json({ error: `합칠 자료는 ${MERGE_MIN}~${MERGE_MAX}개여야 합니다.` });
+  }
+  const ids = raw.map(v => (typeof v === 'number' || typeof v === 'string' ? parseId(String(v)) : null));
+  if (ids.some(v => v === null)) return res.status(400).json({ error: '자료 번호가 올바르지 않습니다.' });
+  if (new Set(ids).size !== ids.length) return res.status(400).json({ error: '같은 자료를 두 번 고를 수 없습니다.' });
+  let customTitle = '';
+  if (body.title !== undefined && body.title !== null) {
+    if (typeof body.title !== 'string') return res.status(400).json({ error: 'title은 문자열이어야 합니다.' });
+    customTitle = body.title.trim();
+    if (charLen(customTitle) > LIMITS.title) return res.status(400).json({ error: `title은 ${LIMITS.title}자 이하여야 합니다.` });
+  }
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, title, transcript, subject, subject_detail FROM voice_notes WHERE user_id = $1 AND id = ANY($2::int[])',
+      [req.user.id, ids]
+    );
+    if (rows.length !== ids.length) return res.status(404).json(NOT_FOUND);   // 없는 자료·남의 자료
+    const byId = new Map(rows.map(r => [r.id, r]));
+    const sources = ids.map(i => byId.get(i));
+    const max = transcriptMax();
+    const total = sources.reduce((sum, n) => sum + charLen(n.transcript || ''), 0) + MERGE_SEPARATOR.length * (sources.length - 1);
+    if (total > max) {
+      return res.status(400).json({ error: `합친 글자 수(${total}자)가 한도(${max}자)를 넘습니다. 합칠 자료를 줄여 주세요.` });
+    }
+    const transcript = sources.map(n => n.transcript || '').join(MERGE_SEPARATOR);
+    const title = customTitle || cutChars('합본: ' + sources.map(n => n.title || '(제목 없음)').join(', '), LIMITS.title);
+    // 과목·세부 과목은 원본이 모두 같을 때만 물려받는다
+    const same = key => (sources.every(n => n[key] && n[key] === sources[0][key]) ? sources[0][key] : null);
+    const subject = same('subject');
+    const subjectDetail = subject ? same('subject_detail') : null;
+    const mergedFrom = sources.map(n => ({ id: n.id, title: n.title || '', hash: sha256Hex(n.transcript || '') }));
+    const ins = await pool.query(
+      `INSERT INTO voice_notes (user_id, title, transcript, summary, subject, subject_detail, merged_from)
+       SELECT $1, $2, $3, '', $5, $6, $7::jsonb
+       WHERE (SELECT COUNT(*) FROM voice_notes WHERE user_id = $1) < $4
+       RETURNING id, title, transcript, summary, subject, subject_detail, created_at, updated_at`,
+      [req.user.id, title, transcript, MAX_NOTES_PER_USER, subject, subjectDetail, JSON.stringify(mergedFrom)]
+    );
+    if (!ins.rows.length) return res.status(400).json({ error: `자료는 최대 ${MAX_NOTES_PER_USER}건까지 저장할 수 있습니다.` });
+    res.status(201).json(ins.rows[0]);
+  } catch (err) {
+    console.error('voice-notes merge error:', err.message);
+    res.status(500).json(SERVER_ERROR);
   }
 });
 
@@ -393,8 +467,8 @@ router.post('/api/voice-notes/summarize', guard, async (req, res) => {
   if (typeof transcript !== 'string' || !transcript.trim()) {
     return res.status(400).json({ error: 'transcript가 필요합니다.' });
   }
-  if (charLen(transcript) > LIMITS.transcript) {
-    return res.status(400).json({ error: `transcript는 ${LIMITS.transcript}자 이하여야 합니다.` });
+  if (charLen(transcript) > transcriptMax()) {
+    return res.status(400).json({ error: `transcript는 ${transcriptMax()}자 이하여야 합니다.` });
   }
   const reqType = req.body.type === undefined ? 'auto' : req.body.type;
   if (reqType !== 'auto' && !(typeof reqType === 'string' && Object.prototype.hasOwnProperty.call(SUMMARY_TYPES, reqType))) {
@@ -874,7 +948,7 @@ function buildLinkUserContent(note, candidates) {
 
 async function analyzeLinks(noteId, userId, force) {
   const { rows } = await pool.query(
-    'SELECT id, title, transcript, summary, subject, link_hash FROM voice_notes WHERE id = $1 AND user_id = $2',
+    'SELECT id, title, transcript, summary, subject, link_hash, merged_from FROM voice_notes WHERE id = $1 AND user_id = $2',
     [noteId, userId]
   );
   const note = rows[0];
@@ -884,11 +958,13 @@ async function analyzeLinks(noteId, userId, force) {
   if (await countToday(userId, 'link') >= LINK_DAILY_LIMIT) return;  // 한도 초과는 조용히 건너뜀
   if (!process.env.ANTHROPIC_API_KEY) return;
 
+  // 합본과 그 원본은 서로 연결 후보에서 제외한다(어느 방향이든)
+  const mySources = new Set(Array.isArray(note.merged_from) ? note.merged_from.map(m => m && m.id) : []);
   const others = (await pool.query(
-    `SELECT id, title, transcript, summary FROM voice_notes
+    `SELECT id, title, transcript, summary, merged_from FROM voice_notes
      WHERE user_id = $1 AND subject = $2 AND id <> $3 AND summary IS NOT NULL AND btrim(summary) <> ''`,
     [userId, note.subject, noteId]
-  )).rows;
+  )).rows.filter(o => !mySources.has(o.id) && !(Array.isArray(o.merged_from) && o.merged_from.some(m => m && m.id === noteId)));
   const candidates = pickLinkCandidates(note.summary, others);
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });

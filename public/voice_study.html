@@ -271,6 +271,21 @@
   .img-rate { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 4px; font-size: 13px; color: var(--text2); }
   .img-rate .kw-chip { font-size: 16px; padding: 6px 14px; }
 
+  /* 작업192: 자료 합치기 */
+  .sel-item { display: flex; align-items: flex-start; gap: 12px; }
+  .sel-item input[type=checkbox] { width: 22px; height: 22px; margin-top: 2px; flex-shrink: 0; accent-color: var(--primary); }
+  .sel-body { min-width: 0; flex: 1; }
+  .sel-bar { margin-bottom: 12px; }
+  .merge-row { display: flex; align-items: center; gap: 8px; padding: 12px 14px; margin-bottom: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+  .merge-no { width: 24px; height: 24px; border-radius: 50%; background: var(--primary-light); color: var(--primary-dark); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .merge-text { flex: 1; min-width: 0; }
+  .merge-title { font-size: 14px; font-weight: 700; word-break: break-all; }
+  .merge-chars { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .merge-row .btn.small { padding: 8px 12px; flex: none; }
+  .src-row { padding: 10px 0; border-top: 1px solid var(--border); }
+  .src-row:first-child { border-top: none; }
+  .src-row .btn.small { max-width: 100%; text-align: left; word-break: break-all; }
+
   /* 요약 읽어주기 */
   .tts-box { margin-top: 10px; }
   .tts-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -320,7 +335,14 @@
     <button id="new-rec-btn" class="btn block" type="button">🎙 새로 녹음</button>
     <div class="list-head">
       <h2>내 자료</h2>
-      <span id="list-count" style="font-size:12px;color:var(--text2)"></span>
+      <span id="list-count" style="font-size:12px;color:var(--text2);margin-left:auto;margin-right:10px"></span>
+      <button id="sel-toggle" class="btn small secondary" type="button" style="display:none">선택</button>
+    </div>
+    <div id="sel-bar" class="sel-bar" style="display:none">
+      <div class="msg info" style="margin-top:0">같은 과목의 자료끼리 합치는 것을 권장합니다. (2~6개 선택)</div>
+      <div id="sel-count" class="meta"></div>
+      <div id="sel-warn" class="msg warn" style="display:none"></div>
+      <button id="sel-merge" class="btn small block" type="button" style="margin-top:10px" disabled>합치기</button>
     </div>
     <div id="list-msg" class="msg"></div>
     <div id="note-list"></div>
@@ -348,6 +370,10 @@
 
   <!-- ③ 변환 결과 편집 / ④ 자료 상세 (같은 편집 폼을 공유) -->
   <div id="view-edit" class="view">
+    <div id="merge-info" class="img-card" style="display:none">
+      <div class="img-card-head"><span class="link-badge">합본</span><span class="field-label" style="margin:0">원본 자료</span></div>
+      <div id="merge-sources"></div>
+    </div>
     <label class="field-label" for="edit-title">제목</label>
     <input id="edit-title" type="text" maxlength="100" placeholder="제목 (선택)">
     <div class="subj-row">
@@ -361,11 +387,11 @@
       </div>
     </div>
     <label class="field-label" for="edit-text">원문 (수정할 수 있습니다)</label>
-    <textarea id="edit-text" maxlength="20000"></textarea>
-    <div id="edit-counter" class="counter">0 / 20,000자</div>
+    <textarea id="edit-text"></textarea>
+    <div id="edit-counter" class="counter">0자</div>
     <div id="autosave" class="msg info" style="display:none"><span id="autosave-text"></span><button id="undo-append" class="btn small secondary" type="button" style="display:none;margin-left:8px">되돌리기</button></div>
     <div id="over-box" style="display:none">
-      <div class="msg warn">이어 붙이면 20,000자를 넘어 추가하지 않았습니다. 변환된 글을 복사해 두고 새 자료로 나누어 주세요.</div>
+      <div id="over-msg" class="msg warn">이어 붙이면 한도를 넘어 추가하지 않았습니다. 변환된 글을 복사해 두고 새 자료로 나누어 주세요.</div>
       <textarea id="over-text" class="summary" readonly aria-label="추가하지 못한 변환 결과"></textarea>
       <div class="btn-row"><button id="over-copy" class="btn small secondary" type="button">복사</button><button id="over-close" class="btn small secondary" type="button">닫기</button></div>
     </div>
@@ -466,6 +492,22 @@
     </div>
   </div>
 
+  <!-- ⑦ 자료 합치기 -->
+  <div id="view-merge" class="view">
+    <div class="view-title">자료 합치기</div>
+    <div class="view-sub">선택한 자료를 아래 순서대로 이어 붙입니다. 원본 자료는 그대로 남습니다.</div>
+    <div id="merge-list"></div>
+    <label class="field-label" for="merge-title">제목</label>
+    <input id="merge-title" type="text" maxlength="100">
+    <div id="merge-counter" class="counter"></div>
+    <div id="merge-warn" class="msg warn" style="display:none"></div>
+    <div id="merge-msg" class="msg"></div>
+    <div class="btn-row">
+      <button id="merge-cancel" class="btn secondary" type="button">취소</button>
+      <button id="merge-go" class="btn" type="button">합본 만들기</button>
+    </div>
+  </div>
+
   <!-- ⑥ 질문하기(대화) - 대화는 저장하지 않는다 -->
   <div id="view-chat" class="view">
     <div class="chat-top">
@@ -513,7 +555,7 @@
 </div>
 
 <script>
-const TITLE_MAX = 100, TEXT_MAX = 20000, SUMMARY_MAX = 5000, MAX_REC_SEC = 600, MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+const TITLE_MAX = 100, SUMMARY_MAX = 5000, MAX_REC_SEC = 600, MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'];
 
 const $ = id => document.getElementById(id);
@@ -569,7 +611,9 @@ async function api(method, url, body) {
   let data = null;
   try { data = await res.json(); } catch (e) { /* 본문 없음 */ }
   if (!res.ok) {
-    const err = new Error(apiErrorText(res.status, data && data.error)); err.status = res.status; throw err;
+    // JSON 요청이 서버의 본문 크기 한도를 넘으면 413(녹음 파일 안내 문구는 맞지 않는다)
+    const msg = res.status === 413 ? '저장할 내용이 너무 큽니다. 원문이나 요약을 줄여 주세요.' : apiErrorText(res.status, data && data.error);
+    const err = new Error(msg); err.status = res.status; throw err;
   }
   return data;
 }
@@ -596,14 +640,14 @@ let editNoteId = null;
 let editDirty = false;
 let pending = null;       // { blob, seconds, mime } - 변환 전/실패 시 메모리에만 유지
 
-const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료', quiz: '퀴즈', chat: '질문하기' };
+const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료', quiz: '퀴즈', chat: '질문하기', merge: '자료 합치기' };
 function showView(name) {
   stopSpeech();   // 작업182: 화면 이동 시 읽어주기 즉시 정지
   if (name !== 'edit' && name !== 'quiz' && name !== 'chat') hideImage();   // 작업190: 상세를 떠나면 그림 조회 중단·blob 주소 해제
   if (name === 'edit') resumeImagePolling();
   if (name !== 'chat') chatSession++;   // 작업186: 대화 화면을 떠나면 늦게 오는 답변은 무시
   currentView = name;
-  for (const v of ['list', 'record', 'edit', 'quiz', 'chat']) $('view-' + v).classList.toggle('active', v === name);
+  for (const v of ['list', 'record', 'edit', 'quiz', 'chat', 'merge']) $('view-' + v).classList.toggle('active', v === name);
   $('page-title').textContent = TITLES[name];
   $('subbar').style.display = name === 'list' ? 'none' : '';
   window.scrollTo(0, 0);
@@ -643,6 +687,7 @@ function resetRecording() {
 }
 function toList() {
   recTarget = 'new';
+  exitSelectMode();
   resetRecording();
   editDirty = false;
   showView('list');
@@ -656,6 +701,7 @@ function requestBack() {
 window.addEventListener('popstate', () => {
   if (currentView === 'list') return;
   if (currentView === 'quiz' || currentView === 'chat') { showView('edit'); return; }   // 작업185·186: 퀴즈·대화에서 뒤로가기 → 자료 상세로 복귀
+  if (currentView === 'merge') { showView('list'); return; }   // 작업192: 합치기 창에서 뒤로가기 → 목록(선택 상태 유지)
   if (currentView === 'record' && recTarget === 'append') {   // 작업191: 이어서 녹음에서 뒤로가기 → 자료 상세로 복귀(입력 내용 유지)
     if (!leaveConfirmed()) { history.pushState({ v: currentView }, ''); return; }
     resetRecording();
@@ -686,14 +732,32 @@ function summaryPreview(summary) {
   }
   return Array.from(text.replace(/^\s*\u26A0\s*/, '')).slice(0, 100).join('');
 }
+let listRows = [], selectMode = false, selected = [], textMax = 0;   // textMax: 서버가 목록과 함께 알려 주는 원문 최대 글자 수(화면에 숫자를 고정하지 않는다)
+const MERGE_MIN = 2, MERGE_MAX = 6, MERGE_SEP_CHARS = 2;
+const fmtN = n => Number(n).toLocaleString('en-US');
+function setTextMax(n) {
+  textMax = n;
+  $('edit-text').maxLength = n;
+}
 async function loadList() {
   setMsg('list-msg', '');
   $('note-list').textContent = '';
   $('list-count').textContent = '';
-  let rows;
-  try { rows = await api('GET', '/api/voice-notes'); }
+  let data;
+  try { data = await api('GET', '/api/voice-notes'); }
   catch (e) { setMsg('list-msg', e.message, 'error'); return; }
+  listRows = Array.isArray(data) ? data : ((data && data.notes) || []);
+  if (data && data.limits && data.limits.transcript_max > 0) setTextMax(data.limits.transcript_max);
+  selected = selected.filter(id => listRows.some(r => r.id === id));
+  renderList();
+}
+function renderList() {
+  const rows = listRows;
+  $('note-list').textContent = '';
   $('list-count').textContent = rows.length + '건';
+  $('sel-toggle').style.display = rows.length >= MERGE_MIN ? '' : 'none';
+  $('sel-toggle').textContent = selectMode ? '선택 취소' : '선택';
+  $('sel-bar').style.display = selectMode ? '' : 'none';
   if (!rows.length) {
     const d = document.createElement('div');
     d.className = 'empty-state';
@@ -702,30 +766,139 @@ async function loadList() {
     return;
   }
   for (const r of rows) {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'note-item';
+    const body = document.createElement('div'); body.className = 'sel-body';
     const t = document.createElement('div');
     t.className = 'note-title' + (r.title ? '' : ' empty');
     t.textContent = r.title || '(제목 없음)';
-    b.appendChild(t);
+    body.appendChild(t);
     if (r.summary_stale) {
       const bd = document.createElement('div');
       const sp = document.createElement('span'); sp.className = 'link-badge bg'; sp.textContent = '요약 갱신 필요';
-      bd.style.marginTop = '6px'; bd.appendChild(sp); b.appendChild(bd);
+      bd.style.marginTop = '6px'; bd.appendChild(sp); body.appendChild(bd);
     }
     if (r.subject) {
       const sj = document.createElement('div'); sj.className = 'note-subj';
-      sj.textContent = r.subject + (r.subject_detail ? ' · ' + r.subject_detail : ''); b.appendChild(sj);
+      sj.textContent = r.subject + (r.subject_detail ? ' · ' + r.subject_detail : ''); body.appendChild(sj);
     }
     const pv = summaryPreview(r.summary);
     if (pv) {
-      const s = document.createElement('div'); s.className = 'note-sum'; s.textContent = pv; b.appendChild(s);
+      const sm = document.createElement('div'); sm.className = 'note-sum'; sm.textContent = pv; body.appendChild(sm);
     }
-    const d = document.createElement('div'); d.className = 'note-date'; d.textContent = fmtDate(r.created_at); b.appendChild(d);
-    b.addEventListener('click', () => openDetail(r.id));
-    $('note-list').appendChild(b);
+    const d = document.createElement('div'); d.className = 'note-date';
+    d.textContent = fmtDate(r.created_at) + (typeof r.chars === 'number' ? ' · ' + fmtN(r.chars) + '자' : ''); body.appendChild(d);
+    let item;
+    if (selectMode) {
+      item = document.createElement('label'); item.className = 'note-item sel-item';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.id = String(r.id);
+      cb.checked = selected.includes(r.id);
+      cb.setAttribute('aria-label', (r.title || '(제목 없음)') + ' 선택');
+      cb.addEventListener('change', () => {
+        if (cb.checked) { if (selected.length < MERGE_MAX && !selected.includes(r.id)) selected.push(r.id); }
+        else selected = selected.filter(x => x !== r.id);
+        cb.checked = selected.includes(r.id);
+        updateSelUi();
+      });
+      item.appendChild(cb); item.appendChild(body);
+    } else {
+      item = document.createElement('button'); item.type = 'button'; item.className = 'note-item';
+      item.appendChild(body);
+      item.addEventListener('click', () => openDetail(r.id));
+    }
+    $('note-list').appendChild(item);
+  }
+  if (selectMode) updateSelUi();
+}
+const charsOf = id => { const r = listRows.find(x => x.id === id); return r && typeof r.chars === 'number' ? r.chars : 0; };
+// 합친 글자 수 = 원문 글자 수의 합 + 구분 빈 줄(자료 사이마다 2자). 서버의 검사와 같은 방식
+const mergedChars = ids => ids.reduce((sum, id) => sum + charsOf(id), 0) + MERGE_SEP_CHARS * Math.max(0, ids.length - 1);
+function updateSelUi() {
+  const total = mergedChars(selected);
+  const over = !!textMax && total > textMax;
+  $('sel-count').textContent = selected.length + '개 선택 · 합친 글자 수 ' + fmtN(total) + (textMax ? ' / ' + fmtN(textMax) : '') + '자';
+  $('sel-warn').style.display = over ? '' : 'none';
+  $('sel-warn').textContent = over ? '합친 글자 수가 한도를 넘습니다. 선택한 자료를 줄여 주세요.' : '';
+  $('sel-merge').disabled = selected.length < MERGE_MIN || selected.length > MERGE_MAX || over;
+  for (const cb of $('note-list').querySelectorAll('input[type=checkbox]')) {
+    cb.disabled = !cb.checked && selected.length >= MERGE_MAX;   // 최대 6개
   }
 }
+function exitSelectMode() {
+  selectMode = false; selected = [];
+  $('sel-bar').style.display = 'none';
+}
+$('sel-toggle').addEventListener('click', () => {
+  selectMode = !selectMode;
+  if (!selectMode) selected = [];
+  renderList();
+});
+
+// ── 자료 합치기 창 ──
+let mergeOrder = [], mergeTitleTouched = false, mergeBusy = false;
+const titleOf = id => { const r = listRows.find(x => x.id === id); return (r && r.title) || '(제목 없음)'; };
+// 서버의 기본 제목과 같은 규칙: "합본: " + 원본 제목들(100자까지)
+const defaultMergeTitle = () => Array.from('합본: ' + mergeOrder.map(titleOf).join(', ')).slice(0, TITLE_MAX).join('');
+function openMergeView() {
+  if (selected.length < MERGE_MIN) return;
+  mergeOrder = selected.slice();
+  mergeTitleTouched = false; mergeBusy = false;
+  $('merge-title').value = defaultMergeTitle();
+  setMsg('merge-msg', '');
+  renderMerge();
+  go('merge');
+}
+function renderMerge() {
+  const box = $('merge-list');
+  box.textContent = '';
+  mergeOrder.forEach((id, i) => {
+    const row = document.createElement('div'); row.className = 'merge-row';
+    const no = document.createElement('span'); no.className = 'merge-no'; no.textContent = String(i + 1);
+    const text = document.createElement('div'); text.className = 'merge-text';
+    const t = document.createElement('div'); t.className = 'merge-title'; t.textContent = titleOf(id);
+    const c = document.createElement('div'); c.className = 'merge-chars'; c.textContent = fmtN(charsOf(id)) + '자';
+    text.appendChild(t); text.appendChild(c);
+    const up = document.createElement('button'); up.type = 'button'; up.className = 'btn small secondary'; up.textContent = '▲'; up.setAttribute('aria-label', '위로');
+    up.disabled = i === 0 || mergeBusy;
+    up.addEventListener('click', () => moveMerge(i, -1));
+    const down = document.createElement('button'); down.type = 'button'; down.className = 'btn small secondary'; down.textContent = '▼'; down.setAttribute('aria-label', '아래로');
+    down.disabled = i === mergeOrder.length - 1 || mergeBusy;
+    down.addEventListener('click', () => moveMerge(i, 1));
+    row.appendChild(no); row.appendChild(text); row.appendChild(up); row.appendChild(down);
+    box.appendChild(row);
+  });
+  const total = mergedChars(mergeOrder);
+  const over = !!textMax && total > textMax;
+  $('merge-counter').textContent = '합친 글자 수 ' + fmtN(total) + (textMax ? ' / ' + fmtN(textMax) : '') + '자';
+  $('merge-warn').style.display = over ? '' : 'none';
+  $('merge-warn').textContent = over ? '합친 글자 수가 한도를 넘어 만들 수 없습니다. 뒤로 가서 자료를 줄여 주세요.' : '';
+  $('merge-go').disabled = over || mergeBusy || mergeOrder.length < MERGE_MIN;
+}
+function moveMerge(i, d) {
+  const j = i + d;
+  if (j < 0 || j >= mergeOrder.length || mergeBusy) return;
+  [mergeOrder[i], mergeOrder[j]] = [mergeOrder[j], mergeOrder[i]];
+  if (!mergeTitleTouched) $('merge-title').value = defaultMergeTitle();   // 제목을 직접 고치지 않았으면 기본 제목도 순서를 따른다
+  renderMerge();
+}
+$('sel-merge').addEventListener('click', openMergeView);
+$('merge-title').addEventListener('input', () => { mergeTitleTouched = true; });
+$('merge-cancel').addEventListener('click', requestBack);
+$('merge-go').addEventListener('click', async () => {
+  if (mergeBusy) return;
+  mergeBusy = true; renderMerge();
+  setMsg('merge-msg', '');
+  const body = { note_ids: mergeOrder.slice() };
+  if (mergeTitleTouched) body.title = $('merge-title').value.trim();   // 고치지 않았으면 서버 기본 제목을 쓴다
+  let row;
+  try { row = await api('POST', '/api/voice-notes/merge', body); }
+  catch (e) { mergeBusy = false; renderMerge(); setMsg('merge-msg', e.message, 'error'); return; }
+  mergeBusy = false;
+  exitSelectMode();
+  await openDetail(row.id, 'merge');   // 합본 상세로 이동(기록을 쌓지 않아 뒤로가기는 목록)
+  // "요약 만들기"가 바로 보이게 한다. 화면이 열린 직후 레이아웃이 바뀌며 맨 위로 되돌아가는 경우가 있어, 사용자가 아직 스크롤하지 않았다면 한 번 더 맞춘다
+  const showSumMake = () => { if (currentView === 'edit') $('sum-make').scrollIntoView({ block: 'center' }); };
+  showSumMake();
+  setTimeout(() => { if (window.scrollY === 0) showSumMake(); }, 300);
+});
 
 // ── ② 녹음 ──
 let recState = 'idle';          // idle | recording | stopped
@@ -966,7 +1139,7 @@ $('rec-convert').addEventListener('click', convertPending);
 
 // ── ③ 변환 결과 편집 / ④ 자료 상세 ──
 function updateCounter() {
-  $('edit-counter').textContent = Array.from($('edit-text').value).length.toLocaleString('en-US') + ' / ' + TEXT_MAX.toLocaleString('en-US') + '자';
+  $('edit-counter').textContent = fmtN(Array.from($('edit-text').value).length) + (textMax ? ' / ' + fmtN(textMax) : '') + '자';
   refreshAppendUi();
   $('sum-counter').textContent = Array.from($('edit-summary').value).length + ' / ' + SUMMARY_MAX;
   refreshTtsUi();
@@ -1042,11 +1215,11 @@ function openEditNew(text) {
   pending = null;
   showView('edit');
 }
-async function openDetail(id, fromLink) {
+async function openDetail(id, fromLink) {   // fromLink: true = 연결·원본으로 이동, 'merge' = 합치기 직후(오류는 합치기 창에 표시)
   setMsg('list-msg', '');
   let n;
   try { n = await api('GET', '/api/voice-notes/' + id); }
-  catch (e) { setMsg(fromLink ? 'link-msg' : 'list-msg', e.message, 'error'); return; }
+  catch (e) { setMsg(fromLink === 'merge' ? 'merge-msg' : fromLink ? 'link-msg' : 'list-msg', e.message, 'error'); return; }
   editMode = 'detail'; editNoteId = n.id;
   resetSummaryUi();
   resetQuizState(n.transcript || '');
@@ -1054,6 +1227,7 @@ async function openDetail(id, fromLink) {
   $('edit-summary').value = n.summary || '';
   setSubject(n.subject, n.subject_detail);
   setStale(!!n.summary_stale);
+  renderMergeInfo(n.merged_from);
   $('edit-title').value = n.title || '';
   $('edit-text').value = n.transcript || '';
   $('edit-meta').textContent = '저장 ' + fmtDate(n.created_at) + (n.updated_at && n.updated_at !== n.created_at ? ' · 수정 ' + fmtDate(n.updated_at) : '');
@@ -1879,7 +2053,35 @@ function setAutosave(text, kind, withUndo) {
   $('undo-append').style.display = withUndo && undoState ? '' : 'none';
 }
 function setStale(on) { $('stale-banner').style.display = on ? '' : 'none'; }
+// 합본이면 "합본" 배지와 원본 자료 구역(원본 상태: 바뀜·삭제됨 안내)을 보여 준다
+function renderMergeInfo(sources) {
+  const box = $('merge-sources');
+  box.textContent = '';
+  if (!Array.isArray(sources) || !sources.length) { $('merge-info').style.display = 'none'; return; }
+  $('merge-info').style.display = '';
+  for (const src of sources) {
+    const row = document.createElement('div'); row.className = 'src-row';
+    if (src.status === 'deleted') {
+      const t = document.createElement('div'); t.className = 'merge-title'; t.textContent = src.title || '(제목 없음)'; row.appendChild(t);
+    } else {
+      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn small secondary';
+      btn.textContent = src.title || '(제목 없음)';
+      btn.addEventListener('click', () => {
+        if (editDirty && !confirm('저장하지 않은 내용이 있습니다. 이동할까요?')) return;
+        openDetail(src.id, true);
+      });
+      row.appendChild(btn);
+    }
+    if (src.status === 'changed' || src.status === 'deleted') {
+      const note = document.createElement('div'); note.className = 'link-check';
+      note.textContent = src.status === 'changed' ? '원본이 바뀌었습니다(합본에는 반영되지 않음)' : '원본이 삭제되었습니다';
+      row.appendChild(note);
+    }
+    box.appendChild(row);
+  }
+}
 function resetAutoSaveUi() {
+  renderMergeInfo(null);
   autoSaving = false; undoState = null; justConverted = false;
   setAutosave('');
   setStale(false);
@@ -1972,11 +2174,12 @@ async function appendConverted(text) {
   const base = cur.replace(/\s+$/, '');
   const next = base ? base + '\n\n' + piece : piece;
   pending = null;
-  if (Array.from(next).length > TEXT_MAX) {
+  if (textMax && Array.from(next).length > textMax) {
     $('over-text').value = piece;
+    $('over-msg').textContent = '이어 붙이면 ' + fmtN(textMax) + '자를 넘어 추가하지 않았습니다. 변환된 글을 복사해 두고 새 자료로 나누어 주세요.';
     $('over-box').style.display = '';
     history.back();
-    setAutosave('원문이 20,000자를 넘지 않도록 추가하지 않았습니다.', 'warn');
+    setAutosave('원문이 ' + fmtN(textMax) + '자를 넘지 않도록 추가하지 않았습니다.', 'warn');
     return;
   }
   undoState = cur.trim() ? { prev: cur } : null;
