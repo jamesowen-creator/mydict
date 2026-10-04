@@ -332,7 +332,9 @@
       <div id="rec-time" class="rec-time">00:00</div>
       <div id="rec-sub" class="rec-sub">최대 10분까지 녹음할 수 있습니다</div>
       <button id="rec-toggle" class="rec-btn" type="button">시작</button>
+      <div><button id="rec-pause" class="btn small secondary" type="button" style="display:none;margin-top:12px">일시정지</button></div>
     </div>
+    <div id="rec-long" class="msg info" style="display:none">녹음이 길어지고 있습니다. 여기서 끝내고 '이어서 녹음'으로 나누는 것을 권합니다.</div>
     <div id="rec-hint" class="msg warn" style="display:none">화면을 켜 둔 채 녹음하세요. 화면이 꺼지거나 다른 앱으로 이동하면 녹음이 중단될 수 있습니다.</div>
     <div id="rec-msg" class="msg"></div>
     <div id="rec-done" style="display:none">
@@ -360,7 +362,19 @@
     </div>
     <label class="field-label" for="edit-text">원문 (수정할 수 있습니다)</label>
     <textarea id="edit-text" maxlength="20000"></textarea>
-    <div id="edit-counter" class="counter">0 / 20000</div>
+    <div id="edit-counter" class="counter">0 / 20,000자</div>
+    <div id="autosave" class="msg info" style="display:none"><span id="autosave-text"></span><button id="undo-append" class="btn small secondary" type="button" style="display:none;margin-left:8px">되돌리기</button></div>
+    <div id="over-box" style="display:none">
+      <div class="msg warn">이어 붙이면 20,000자를 넘어 추가하지 않았습니다. 변환된 글을 복사해 두고 새 자료로 나누어 주세요.</div>
+      <textarea id="over-text" class="summary" readonly aria-label="추가하지 못한 변환 결과"></textarea>
+      <div class="btn-row"><button id="over-copy" class="btn small secondary" type="button">복사</button><button id="over-close" class="btn small secondary" type="button">닫기</button></div>
+    </div>
+    <div id="append-row" class="btn-row" style="display:none;flex-wrap:wrap">
+      <button id="append-rec" class="btn small secondary" type="button">＋ 이어서 녹음</button>
+      <button id="after-sum" class="btn small" type="button" style="display:none">요약 만들기</button>
+      <button id="after-list" class="btn small secondary" type="button" style="display:none">목록으로</button>
+    </div>
+    <div id="stale-banner" class="msg warn" style="display:none;margin-top:20px"><div>원문이 바뀌었습니다. 요약이 최신 원문을 반영하지 않습니다.</div><button id="stale-remake" class="btn small" type="button" style="margin-top:8px">요약 다시 만들기</button></div>
     <div class="sum-head">
       <label class="field-label" for="edit-summary">요약 (수정할 수 있습니다)</label>
       <button id="sum-make" class="btn small" type="button">요약 만들기</button>
@@ -624,9 +638,11 @@ function resetRecording() {
   $('rec-convert').textContent = '글로 변환';
   $('rec-convert').disabled = false;
   $('rec-redo').disabled = false;
+  clearPauseState();
   setMsg('rec-msg', '');
 }
 function toList() {
+  recTarget = 'new';
   resetRecording();
   editDirty = false;
   showView('list');
@@ -640,6 +656,12 @@ function requestBack() {
 window.addEventListener('popstate', () => {
   if (currentView === 'list') return;
   if (currentView === 'quiz' || currentView === 'chat') { showView('edit'); return; }   // 작업185·186: 퀴즈·대화에서 뒤로가기 → 자료 상세로 복귀
+  if (currentView === 'record' && recTarget === 'append') {   // 작업191: 이어서 녹음에서 뒤로가기 → 자료 상세로 복귀(입력 내용 유지)
+    if (!leaveConfirmed()) { history.pushState({ v: currentView }, ''); return; }
+    resetRecording();
+    showView('edit');
+    return;
+  }
   if (!leaveConfirmed()) {
     history.pushState({ v: currentView }, '');   // 방금 pop된 항목을 되돌려 현재 화면 유지
     return;
@@ -686,6 +708,11 @@ async function loadList() {
     t.className = 'note-title' + (r.title ? '' : ' empty');
     t.textContent = r.title || '(제목 없음)';
     b.appendChild(t);
+    if (r.summary_stale) {
+      const bd = document.createElement('div');
+      const sp = document.createElement('span'); sp.className = 'link-badge bg'; sp.textContent = '요약 갱신 필요';
+      bd.style.marginTop = '6px'; bd.appendChild(sp); b.appendChild(bd);
+    }
     if (r.subject) {
       const sj = document.createElement('div'); sj.className = 'note-subj';
       sj.textContent = r.subject + (r.subject_detail ? ' · ' + r.subject_detail : ''); b.appendChild(sj);
@@ -704,6 +731,24 @@ async function loadList() {
 let recState = 'idle';          // idle | recording | stopped
 let recorder = null, stream = null, chunks = [], recStart = 0, recTimer = null, wakeLock = null, recMime = '';
 let interrupted = false;
+let recPausedMs = 0, recPauseAt = 0, recLongShown = false;
+let recTarget = 'new';           // 'new' = 새 자료의 첫 녹음, 'append' = 저장된 자료에 이어서 녹음
+const REC_LONG_SEC = 240;
+function pauseSupported() {
+  return typeof window.MediaRecorder === 'function' && typeof MediaRecorder.prototype.pause === 'function' && typeof MediaRecorder.prototype.resume === 'function';
+}
+// 일시정지 구간을 뺀 녹음 시간(초)
+function recElapsedSec() {
+  const now = Date.now();
+  const paused = recPausedMs + (recPauseAt ? now - recPauseAt : 0);
+  return Math.max(0, (now - recStart - paused) / 1000);
+}
+function clearPauseState() {
+  recPausedMs = 0; recPauseAt = 0; recLongShown = false;
+  $('rec-pause').style.display = 'none';
+  $('rec-pause').textContent = '일시정지';
+  $('rec-long').style.display = 'none';
+}
 
 function pickMime() {
   if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
@@ -791,6 +836,10 @@ async function startRecording() {
   recorder.start(1000);   // 1초마다 조각을 받아 두어 중단돼도 분량이 남게 함
   recState = 'recording';
   recStart = Date.now();
+  recPausedMs = 0; recPauseAt = 0; recLongShown = false;
+  $('rec-long').style.display = 'none';
+  $('rec-pause').style.display = pauseSupported() ? '' : 'none';
+  $('rec-pause').textContent = '일시정지';
   $('rec-toggle').textContent = '중지';
   $('rec-toggle').className = 'rec-btn stop';
   $('rec-toggle').disabled = false;
@@ -798,10 +847,25 @@ async function startRecording() {
   recTimer = setInterval(tickRecording, 250);
 }
 function tickRecording() {
-  const sec = (Date.now() - recStart) / 1000;
+  const sec = recElapsedSec();
   $('rec-time').textContent = fmtTime(sec);
+  if (sec >= REC_LONG_SEC && !recLongShown) { recLongShown = true; $('rec-long').style.display = ''; }   // 4분이 지나면 나눠 녹음하도록 권한다
   if (sec >= MAX_REC_SEC) finishRecording(false, true);
 }
+$('rec-pause').addEventListener('click', () => {
+  if (recState !== 'recording' || !recorder) return;
+  if (!recPauseAt) {
+    try { recorder.pause(); } catch (e) { return; }
+    recPauseAt = Date.now();
+    $('rec-pause').textContent = '재개';
+    $('rec-sub').textContent = '일시정지됨';
+  } else {
+    try { recorder.resume(); } catch (e) { return; }
+    recPausedMs += Date.now() - recPauseAt; recPauseAt = 0;
+    $('rec-pause').textContent = '일시정지';
+    $('rec-sub').innerHTML = '<span class="rec-dot"></span>녹음 중';
+  }
+});
 // 사용자 중지/자동 종료/중단 모두 여기로 모인다
 function finishRecording(wasInterrupted, hitLimit) {
   if (recState !== 'recording') return;
@@ -816,7 +880,9 @@ function finishRecording(wasInterrupted, hitLimit) {
   onRecorderStopped();
 }
 function onRecorderStopped() {
-  const seconds = Math.min(MAX_REC_SEC, Math.round((Date.now() - recStart) / 1000));
+  const seconds = Math.min(MAX_REC_SEC, Math.round(recElapsedSec()));
+  $('rec-pause').style.display = 'none';
+  recPauseAt = 0;
   releaseStream();
   releaseWakeLock();
   if (!chunks.length) {
@@ -848,10 +914,21 @@ $('rec-redo').addEventListener('click', () => {
   resetRecording();
 });
 $('new-rec-btn').addEventListener('click', () => {
+  recTarget = 'new';
   resetRecording();
   $('rec-hint').style.display = (navigator.wakeLock && navigator.wakeLock.request) ? 'none' : '';
   go('record');
 });
+// 작업191: 저장된 자료의 원문 끝에 이어서 녹음한다(변환 결과는 현재 입력란 끝에 이어 붙임)
+function startAppend() {
+  if (editMode !== 'detail' || autoSaving) return;
+  recTarget = 'append';
+  resetRecording();
+  $('rec-hint').style.display = (navigator.wakeLock && navigator.wakeLock.request) ? 'none' : '';
+  go('record');
+  $('page-title').textContent = '이어서 녹음';
+}
+$('append-rec').addEventListener('click', startAppend);
 
 // ── 변환 ──
 async function convertPending() {
@@ -875,21 +952,22 @@ async function convertPending() {
   if (!res.ok) return convertFailed(apiErrorText(res.status, data && data.error), res.status);
   $('convert-status').style.display = 'none';
   $('rec-redo').disabled = false;
-  openEditNew((data && data.text) || '');
+  onConverted((data && data.text) || '');
 }
 // 실패해도 녹음(Blob)은 메모리에 남겨 "다시 시도"할 수 있다. 429·415·413은 재시도해도 같으므로 안내만.
 function convertFailed(text, status) {
   $('convert-status').style.display = 'none';
   $('rec-redo').disabled = false;
   $('rec-convert').disabled = false;
-  $('rec-convert').textContent = (status === 429 || status === 415 || status === 413) ? '글로 변환' : '다시 시도';
+  $('rec-convert').textContent = (status === 429 || status === 415 || status === 413) ? '글로 변환' : '다시 변환';
   setMsg('rec-msg', text, 'error');
 }
 $('rec-convert').addEventListener('click', convertPending);
 
 // ── ③ 변환 결과 편집 / ④ 자료 상세 ──
 function updateCounter() {
-  $('edit-counter').textContent = Array.from($('edit-text').value).length + ' / ' + TEXT_MAX;
+  $('edit-counter').textContent = Array.from($('edit-text').value).length.toLocaleString('en-US') + ' / ' + TEXT_MAX.toLocaleString('en-US') + '자';
+  refreshAppendUi();
   $('sum-counter').textContent = Array.from($('edit-summary').value).length + ' / ' + SUMMARY_MAX;
   refreshTtsUi();
   refreshQuizUi();
@@ -936,6 +1014,7 @@ let editSession = 0;   // 편집 화면을 새로 열 때마다 증가 - 늦게 
 function resetSummaryUi() {
   stopSpeech();
   editSession++;
+  resetAutoSaveUi();
   hideLinks();
   hideImage();
   $('edit-summary').value = '';
@@ -974,6 +1053,7 @@ async function openDetail(id, fromLink) {
   loadQuiz(n.id, editSession);
   $('edit-summary').value = n.summary || '';
   setSubject(n.subject, n.subject_detail);
+  setStale(!!n.summary_stale);
   $('edit-title').value = n.title || '';
   $('edit-text').value = n.transcript || '';
   $('edit-meta').textContent = '저장 ' + fmtDate(n.created_at) + (n.updated_at && n.updated_at !== n.created_at ? ' · 수정 ' + fmtDate(n.updated_at) : '');
@@ -988,7 +1068,7 @@ async function openDetail(id, fromLink) {
   startImage(n.id, editSession, !!(n.summary || '').trim());
 }
 $('edit-title').addEventListener('input', () => { editDirty = true; });
-$('edit-text').addEventListener('input', () => { editDirty = true; updateCounter(); });
+$('edit-text').addEventListener('input', () => { editDirty = true; undoState = null; $('undo-append').style.display = 'none'; updateCounter(); });
 $('edit-summary').addEventListener('input', () => { editDirty = true; updateCounter(); });
 $('edit-cancel').addEventListener('click', requestBack);
 
@@ -1021,6 +1101,7 @@ $('sum-make').addEventListener('click', async () => {
   $('sum-status').style.display = 'none';
   $('sum-make').disabled = false;
   $('edit-summary').value = (data && data.summary) || '';
+  setStale(false);   // 새 요약은 현재 원문을 기준으로 만들어졌다(저장하면 서버가 기준 원문을 갱신)
   setMsg('sum-warn', '');
   // 과목은 사용자가 아직 고르지 않았을 때만 채운다(이미 고른 값은 덮어쓰지 않음)
   if (data && data.subject && !$('edit-subject').value) setSubject(data.subject, '');
@@ -1777,6 +1858,164 @@ function resetChat() {
 $('chat-reset').addEventListener('click', resetChat);
 $('chat-reset2').addEventListener('click', resetChat);
 
+// ── 이어서 녹음 · 자동 저장 · 요약 갱신 표시 (작업191) ──
+let autoSaving = false, undoState = null, justConverted = false;
+const autoTitle = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return '음성 자료 ' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); };
+function notePayload() {
+  return {
+    title: $('edit-title').value.trim(),
+    transcript: $('edit-text').value,
+    summary: $('edit-summary').value,
+    subject: $('edit-subject').value || null,
+    subject_detail: $('edit-subject-detail').value || null,
+  };
+}
+const formSnapshot = () => JSON.stringify(notePayload());
+function setAutosave(text, kind, withUndo) {
+  const box = $('autosave');
+  $('autosave-text').textContent = text || '';
+  box.className = 'msg ' + (kind || 'info');
+  box.style.display = text ? '' : 'none';
+  $('undo-append').style.display = withUndo && undoState ? '' : 'none';
+}
+function setStale(on) { $('stale-banner').style.display = on ? '' : 'none'; }
+function resetAutoSaveUi() {
+  autoSaving = false; undoState = null; justConverted = false;
+  setAutosave('');
+  setStale(false);
+  $('over-box').style.display = 'none';
+  $('over-text').value = '';
+  $('edit-save').disabled = false;
+}
+function refreshAppendUi() {
+  $('append-row').style.display = editMode === 'detail' ? '' : 'none';
+  $('after-sum').style.display = $('after-list').style.display = justConverted ? '' : 'none';
+  $('append-rec').disabled = autoSaving;
+}
+async function refreshStaleFromServer(noteId, session) {
+  try {
+    const n = await api('GET', '/api/voice-notes/' + noteId);
+    if (session === editSession && noteId === editNoteId) setStale(!!n.summary_stale);
+  } catch (e) { /* 배너만 갱신하지 못한 것이므로 조용히 넘어간다 */ }
+}
+// 저장된 원문이 바뀌었으니 퀴즈·대화 상태를 저장된 원문 기준으로 다시 잡는다
+function afterTranscriptSaved(sentTranscript) {
+  resetQuizState(sentTranscript);
+  loadQuiz(editNoteId, editSession);
+  chatMessages = [];
+  updateCounter();
+}
+// 새 자료의 첫 변환이 성공하면 자동 저장(POST). 제목이 비어 있으면 "음성 자료 M/D HH:mm"
+async function autoSaveNew() {
+  if (!$('edit-text').value.trim()) return;
+  if (!$('edit-title').value.trim()) $('edit-title').value = autoTitle();
+  const session = editSession, sent = notePayload(), snap = JSON.stringify(sent);
+  autoSaving = true; $('edit-save').disabled = true; refreshAppendUi();
+  setAutosave('자동 저장 중…');
+  let row;
+  try { row = await api('POST', '/api/voice-notes', sent); }
+  catch (e) {
+    if (session !== editSession) return;
+    autoSaving = false; $('edit-save').disabled = false; refreshAppendUi();
+    setAutosave('자동 저장하지 못했습니다. ' + e.message + ' 아래 [저장]으로 다시 시도해 주세요.', 'error');
+    return;
+  }
+  if (session !== editSession) { if (currentView === 'list') loadList(); return; }
+  autoSaving = false; $('edit-save').disabled = false;
+  editMode = 'detail'; editNoteId = row.id;
+  $('edit-delete').style.display = '';
+  $('edit-save').textContent = '수정 저장';
+  $('edit-meta').textContent = '저장 ' + fmtDate(row.created_at);
+  editDirty = formSnapshot() !== snap;
+  afterTranscriptSaved(sent.transcript);
+  startLinks(row.id, editSession);
+  startImage(row.id, editSession, false);
+  setAutosave('자동 저장됨');
+}
+// 저장된 자료를 현재 입력란 기준으로 자동 저장(PATCH). 성공하면 true
+async function autoSaveExisting(doneText, withUndo) {
+  const session = editSession, noteId = editNoteId, sent = notePayload(), snap = JSON.stringify(sent);
+  autoSaving = true; $('edit-save').disabled = true; refreshAppendUi();
+  setAutosave('자동 저장 중…');
+  try { await api('PATCH', '/api/voice-notes/' + noteId, sent); }
+  catch (e) {
+    if (session !== editSession) return false;
+    autoSaving = false; $('edit-save').disabled = false; refreshAppendUi();
+    setAutosave('자동 저장하지 못했습니다. ' + e.message + ' [수정 저장]으로 다시 시도해 주세요.', 'error', withUndo);
+    return false;
+  }
+  if (session !== editSession) return false;
+  autoSaving = false; $('edit-save').disabled = false;
+  editDirty = formSnapshot() !== snap;
+  afterTranscriptSaved(sent.transcript);
+  setAutosave(doneText, 'info', withUndo);
+  refreshStaleFromServer(noteId, session);
+  return true;
+}
+async function onConverted(text) {
+  if (recTarget === 'append') return appendConverted(text);
+  openEditNew(text);
+  justConverted = true;
+  refreshAppendUi();
+  await autoSaveNew();
+}
+// 변환 결과를 입력란 끝에 빈 줄 하나를 두고 이어 붙이고 바로 자동 저장한다. 한도를 넘으면 추가하지 않는다
+async function appendConverted(text) {
+  const piece = String(text || '').trim();
+  if (!piece) {   // 인식된 글이 없으면 기존 원문은 그대로 두고 다시 녹음하게 한다
+    $('convert-status').style.display = 'none';
+    $('rec-redo').disabled = false; $('rec-convert').disabled = false;
+    setMsg('rec-msg', '인식된 글이 없습니다. 다시 녹음해 주세요.', 'warn');
+    return;
+  }
+  const cur = $('edit-text').value;
+  const base = cur.replace(/\s+$/, '');
+  const next = base ? base + '\n\n' + piece : piece;
+  pending = null;
+  if (Array.from(next).length > TEXT_MAX) {
+    $('over-text').value = piece;
+    $('over-box').style.display = '';
+    history.back();
+    setAutosave('원문이 20,000자를 넘지 않도록 추가하지 않았습니다.', 'warn');
+    return;
+  }
+  undoState = cur.trim() ? { prev: cur } : null;
+  $('edit-text').value = next;
+  $('over-box').style.display = 'none';
+  justConverted = true;
+  editDirty = true;
+  updateCounter();
+  history.back();   // popstate → 자료 상세 화면
+  await autoSaveExisting('자동 저장됨', true);
+}
+$('undo-append').addEventListener('click', async () => {
+  if (!undoState || autoSaving) return;
+  const prev = undoState.prev;
+  undoState = null;
+  $('edit-text').value = prev;
+  editDirty = true;
+  updateCounter();
+  await autoSaveExisting('되돌렸습니다. 자동 저장됨', false);
+});
+$('over-copy').addEventListener('click', async () => {
+  const box = $('over-text');
+  try { await navigator.clipboard.writeText(box.value); setMsg('edit-msg', '복사했습니다.', 'info'); return; } catch (e) { /* 아래에서 선택만 해 준다 */ }
+  box.focus(); box.select();
+  setMsg('edit-msg', '글을 선택했습니다. 복사해 주세요.', 'info');
+});
+$('over-close').addEventListener('click', () => { $('over-box').style.display = 'none'; $('over-text').value = ''; });
+$('after-sum').addEventListener('click', () => { $('sum-make').click(); });
+$('after-list').addEventListener('click', requestBack);
+$('stale-remake').addEventListener('click', () => { $('sum-make').click(); });
+// 저장하지 않은 편집·변환하지 않은 녹음이 있는 채로 탭을 닫거나 새로고침하면 확인 안내(앱 안의 이동은 leaveConfirmed가 처리)
+window.addEventListener('beforeunload', ev => {
+  const risky = (currentView === 'edit' && editDirty) || (currentView === 'record' && (recState === 'recording' || !!pending));
+  if (!risky) return;
+  ev.preventDefault();
+  ev.returnValue = '';
+  return '';
+});
+
 $('edit-save').addEventListener('click', async () => {
   const title = $('edit-title').value.trim();
   const transcript = $('edit-text').value;
@@ -1784,6 +2023,7 @@ $('edit-save').addEventListener('click', async () => {
   const subject = $('edit-subject').value || null;
   const subject_detail = $('edit-subject-detail').value || null;
   setMsg('edit-msg', '');
+  if (autoSaving) return;
   if (!transcript.trim()) { setMsg('edit-msg', '원문이 비어 있습니다. 내용을 입력해 주세요.', 'error'); return; }
   $('edit-save').disabled = true;
   try {

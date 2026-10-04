@@ -86,14 +86,26 @@ function parseId(raw) {
 const NOT_FOUND = { error: '자료를 찾을 수 없습니다.' };
 const SERVER_ERROR = { error: '서버 오류가 발생했습니다.' };
 
+// 작업191: 요약이 만들어진 뒤 원문이 바뀌었으면 summary_stale = true. 기존 자료(summary_source_hash NULL)는 false(알 수 없음)
+const LIST_STALE_SQL = `(summary IS NOT NULL AND btrim(summary) <> '' AND summary_source_hash IS NOT NULL
+  AND summary_source_hash IS DISTINCT FROM encode(sha256(convert_to(COALESCE(transcript, ''), 'UTF8')), 'hex')) AS summary_stale`;
+function isSummaryStale(row) {
+  return !!(row.summary && row.summary.trim() && row.summary_source_hash && row.summary_source_hash !== sha256Hex(row.transcript || ''));
+}
+
 router.get('/api/voice-notes', guard, async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT id, title, subject, subject_detail, LEFT(summary, 300) AS summary, created_at
+    const listSql = stale => `SELECT id, title, subject, subject_detail, LEFT(summary, 300) AS summary, created_at${stale ? ', ' + LIST_STALE_SQL : ''}
        FROM voice_notes WHERE user_id = $1
-       ORDER BY created_at DESC, id DESC`,
-      [req.user.id]
-    );
+       ORDER BY created_at DESC, id DESC`;
+    let rows;
+    try {
+      ({ rows } = await pool.query(listSql(true), [req.user.id]));
+    } catch (err) {
+      console.error('voice-notes list stale error:', err.message);   // 해시 함수를 쓸 수 없는 경우에도 목록은 보여 준다
+      ({ rows } = await pool.query(listSql(false), [req.user.id]));
+      rows = rows.map(r => ({ ...r, summary_stale: false }));
+    }
     res.json(rows);
   } catch (err) {
     console.error('voice-notes list error:', err.message);
@@ -106,12 +118,13 @@ router.get('/api/voice-notes/:id', guard, async (req, res) => {
   if (id === null) return res.status(404).json(NOT_FOUND);
   try {
     const { rows } = await pool.query(
-      `SELECT id, title, transcript, summary, subject, subject_detail, created_at, updated_at
+      `SELECT id, title, transcript, summary, summary_source_hash, subject, subject_detail, created_at, updated_at
        FROM voice_notes WHERE id = $1 AND user_id = $2`,
       [id, req.user.id]
     );
     if (!rows.length) return res.status(404).json(NOT_FOUND);
-    res.json(rows[0]);
+    const { summary_source_hash, ...note } = rows[0];
+    res.json({ ...note, summary_stale: isSummaryStale(rows[0]) });
   } catch (err) {
     console.error('voice-notes get error:', err.message);
     res.status(500).json(SERVER_ERROR);
@@ -125,11 +138,12 @@ router.post('/api/voice-notes', guard, async (req, res) => {
   try {
     // 건수 확인과 INSERT를 한 문장으로 처리
     const { rows } = await pool.query(
-      `INSERT INTO voice_notes (user_id, title, transcript, summary, subject, subject_detail)
-       SELECT $1, $2, $3, $4, $6, $7
+      `INSERT INTO voice_notes (user_id, title, transcript, summary, subject, subject_detail, summary_source_hash)
+       SELECT $1, $2, $3, $4, $6, $7, $8
        WHERE (SELECT COUNT(*) FROM voice_notes WHERE user_id = $1) < $5
        RETURNING id, title, transcript, summary, subject, subject_detail, created_at, updated_at`,
-      [req.user.id, title, transcript, summary, MAX_NOTES_PER_USER, subject, subject_detail]
+      // 요약이 있으면 그 요약이 기준으로 삼은 원문(저장되는 transcript)의 해시를 함께 저장한다
+      [req.user.id, title, transcript, summary, MAX_NOTES_PER_USER, subject, subject_detail, summary.trim() ? sha256Hex(transcript) : null]
     );
     if (!rows.length) {
       return res.status(400).json({ error: `자료는 최대 ${MAX_NOTES_PER_USER}건까지 저장할 수 있습니다.` });
@@ -152,21 +166,39 @@ router.patch('/api/voice-notes/:id', guard, async (req, res) => {
   if ('transcript' in parsed.fields && !parsed.fields.transcript.trim()) {
     return res.status(400).json({ error: 'transcript는 비울 수 없습니다.' });
   }
+  // 작업191: summary가 요청에 있으면 summary_source_hash를 함께 정한다. 요약을 비우면 NULL, 저장된 요약과 다른 요약이면
+  // 저장되는 원문(요청의 transcript, 없으면 저장된 원문)의 해시, 같은 요약이면 그대로 둔다. summary가 없는 요청(원문만 변경 등)은 건드리지 않는다.
+  const withHash = 'summary' in parsed.fields;
+  let conn = null;
   try {
-    // 컬럼명은 위 readFields가 통과시킨 고정 이름 5개뿐이고, 값은 모두 바인딩한다
+    if (withHash) {
+      conn = await pool.connect();
+      await conn.query('BEGIN');
+      const cur = await conn.query('SELECT summary, transcript FROM voice_notes WHERE id = $1 AND user_id = $2 FOR UPDATE', [id, req.user.id]);
+      if (!cur.rows.length) { await conn.query('ROLLBACK'); return res.status(404).json(NOT_FOUND); }
+      const newSummary = parsed.fields.summary;
+      const newTranscript = 'transcript' in parsed.fields ? parsed.fields.transcript : (cur.rows[0].transcript || '');
+      if (!newSummary.trim()) entries.push(['summary_source_hash', null]);
+      else if (newSummary !== (cur.rows[0].summary || '')) entries.push(['summary_source_hash', sha256Hex(newTranscript)]);
+    }
+    // 컬럼명은 위 readFields가 통과시킨 고정 이름과 서버가 정한 summary_source_hash뿐이고, 값은 모두 바인딩한다
     const sets = entries.map(([k], i) => `${k} = $${i + 3}`);
-    const { rows } = await pool.query(
+    const { rows } = await (conn || pool).query(
       `UPDATE voice_notes SET ${sets.join(', ')}, updated_at = now()
        WHERE id = $1 AND user_id = $2
        RETURNING id, title, transcript, summary, subject, subject_detail, created_at, updated_at`,
       [id, req.user.id, ...entries.map(([, v]) => v)]
     );
+    if (conn) await conn.query('COMMIT');
     if (!rows.length) return res.status(404).json(NOT_FOUND);
     res.json(rows[0]);
     scheduleLinkAnalysis(rows[0], req.user.id);
   } catch (err) {
+    if (conn) { try { await conn.query('ROLLBACK'); } catch (e) { /* 이미 끝난 트랜잭션 */ } }
     console.error('voice-notes update error:', err.message);
     res.status(500).json(SERVER_ERROR);
+  } finally {
+    if (conn) conn.release();
   }
 });
 
