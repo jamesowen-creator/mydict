@@ -99,9 +99,14 @@ router.get('/api/admin/stats', requireAdmin, async (req, res) => {
     // Cost estimation
     // claude-haiku-4-5: $1.00/MTok input, $5.00/MTok output
     // tts-1-hd: $0.030/1000 chars
-    // stt: char_count 칼럼에 오디오 초를 기록. 모델 gpt-4o-mini-transcribe 기준 $0.003/분
+    // stt: char_count 칼럼에 오디오 초를 기록. 분당 단가는 환경변수 VOICE_STT_COST_PER_MIN(달러)이 있으면 그 값,
+    // 없으면 VOICE_STT_MODEL(기본 gpt-4o-mini-transcribe) 기준 표: whisper-1·gpt-4o-transcribe 0.006, gpt-4o-mini-transcribe 0.003, 그 외 0.006
     function calcCost(rows) {
       let anthropic = 0, openai = 0;
+      const sttEnv = parseFloat(process.env.VOICE_STT_COST_PER_MIN);
+      const sttTable = { 'whisper-1': 0.006, 'gpt-4o-transcribe': 0.006, 'gpt-4o-mini-transcribe': 0.003 };
+      const sttModel = process.env.VOICE_STT_MODEL || 'gpt-4o-mini-transcribe';
+      const sttPerMin = Number.isFinite(sttEnv) && sttEnv >= 0 ? sttEnv : (Object.prototype.hasOwnProperty.call(sttTable, sttModel) ? sttTable[sttModel] : 0.006);
       for (const r of rows) {
         if (r.event_type === 'search' || r.event_type === 'ai' || r.event_type === 'summary' || r.event_type === 'quiz' || r.event_type === 'chat' || r.event_type === 'link' || r.event_type === 'image_aux') {
           anthropic += (Number(r.input_tokens) / 1_000_000) * 1.00;
@@ -112,7 +117,7 @@ router.get('/api/admin/stats', requireAdmin, async (req, res) => {
           openai += (Number(r.char_count) / 1000) * 0.030;
         }
         if (r.event_type === 'stt') {
-          openai += (Number(r.char_count) / 60) * 0.003;
+          openai += (Number(r.char_count) / 60) * sttPerMin;
         }
       }
       return { anthropic: +anthropic.toFixed(4), openai: +openai.toFixed(4) };
