@@ -257,6 +257,20 @@
   .kw-chip { font-family: 'Noto Sans KR', sans-serif; font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 999px; background: var(--card); color: var(--text1); border: 1px solid var(--border); cursor: pointer; }
   .kw-chip.on { background: var(--primary-light); color: var(--primary-dark); border-color: var(--primary); }
 
+  /* 작업190: 연상 그림(실험) */
+  .img-card { background: var(--card); border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,0.04); padding: 14px; margin-bottom: 12px; }
+  .img-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .img-card-title { font-size: 15px; font-weight: 700; word-break: break-all; }
+  .img-card-no { font-size: 12px; color: var(--text2); flex-shrink: 0; }
+  .img-card img { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 12px; }
+  .img-card img.stale { opacity: 0.4; }
+  .img-card .link-badge { display: inline-block; margin-top: 10px; }
+  .link-badge.err { background: var(--error-light); color: var(--error); }
+  .img-ph { text-align: center; font-size: 13px; color: var(--text2); padding: 28px 0; }
+  .img-save { margin-top: 10px; }
+  .img-rate { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 4px; font-size: 13px; color: var(--text2); }
+  .img-rate .kw-chip { font-size: 16px; padding: 6px 14px; }
+
   /* 요약 읽어주기 */
   .tts-box { margin-top: 10px; }
   .tts-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -409,6 +423,26 @@
       </div>
       <div id="link-msg" class="msg"></div>
     </div>
+    <div id="img-section" class="quiz-section" style="display:none">
+      <div class="sum-head"><span class="field-label">연상 그림 (실험)</span></div>
+      <div id="img-notice" class="msg info" style="display:none"><div>요약 내용이 OpenAI 이미지 서비스로 전달됩니다.</div><div>AI가 그린 연상용 그림입니다. 사실 자료가 아니며 기준은 요약 본문입니다.</div></div>
+      <div id="img-progress" class="convert-status" style="display:none;margin-top:8px"><div class="spinner small"></div><span id="img-progress-text">그림을 만드는 중입니다 (장당 30초~1분)</span></div>
+      <div id="img-slow" class="msg warn" style="display:none">시간이 오래 걸리고 있습니다. 잠시 후 다시 열어 보세요.</div>
+      <div id="img-flags"></div>
+      <div id="img-disclaimer" class="meta" style="display:none">AI가 그린 연상용 그림입니다. 사실 자료가 아니며 기준은 요약 본문입니다.</div>
+      <div id="img-pages" style="margin-top:10px"></div>
+      <div id="img-save-hint" class="meta" style="display:none">저장이 안 되면 그림을 길게 눌러 저장하세요.</div>
+      <div id="img-rate" class="img-rate" style="display:none">
+        <span>복습에 도움이 될 것 같나요?</span>
+        <button id="img-up" class="kw-chip" type="button" aria-label="도움이 될 것 같아요">👍</button>
+        <button id="img-down" class="kw-chip" type="button" aria-label="도움이 안 될 것 같아요">👎</button>
+      </div>
+      <div id="img-remaining" class="meta"></div>
+      <div id="img-actions" class="btn-row" style="display:none">
+        <button id="img-make" class="btn small" type="button">연상 그림 만들기</button>
+      </div>
+      <div id="img-msg" class="msg"></div>
+    </div>
     <div id="edit-meta" class="meta"></div>
     <div id="edit-msg" class="msg"></div>
     <div class="btn-row">
@@ -551,6 +585,8 @@ let pending = null;       // { blob, seconds, mime } - 변환 전/실패 시 메
 const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료', quiz: '퀴즈', chat: '질문하기' };
 function showView(name) {
   stopSpeech();   // 작업182: 화면 이동 시 읽어주기 즉시 정지
+  if (name !== 'edit' && name !== 'quiz' && name !== 'chat') hideImage();   // 작업190: 상세를 떠나면 그림 조회 중단·blob 주소 해제
+  if (name === 'edit') resumeImagePolling();
   if (name !== 'chat') chatSession++;   // 작업186: 대화 화면을 떠나면 늦게 오는 답변은 무시
   currentView = name;
   for (const v of ['list', 'record', 'edit', 'quiz', 'chat']) $('view-' + v).classList.toggle('active', v === name);
@@ -901,6 +937,7 @@ function resetSummaryUi() {
   stopSpeech();
   editSession++;
   hideLinks();
+  hideImage();
   $('edit-summary').value = '';
   $('sum-type').value = '';
   setMsg('sum-warn', '');
@@ -948,6 +985,7 @@ async function openDetail(id, fromLink) {
   if (fromLink) { history.replaceState({ v: 'edit' }, ''); showView('edit'); }   // 연결로 이동할 때는 기록을 쌓지 않아 뒤로가기가 목록으로 간다
   else go('edit');
   startLinks(n.id, editSession);
+  startImage(n.id, editSession, !!(n.summary || '').trim());
 }
 $('edit-title').addEventListener('input', () => { editDirty = true; });
 $('edit-text').addEventListener('input', () => { editDirty = true; updateCounter(); });
@@ -1118,6 +1156,193 @@ $('link-refresh').addEventListener('click', async () => {
   clearTimeout(linkTimer);
   linkTimer = setTimeout(() => fetchLinks(noteId, session, 1, prev, true), LINK_POLL_MS);
 });
+
+// ── 연상 그림 (작업190, 실험 기능): 서버가 만든 장별 이미지를 보여 준다. 이미지는 토큰 헤더로 받아 blob 주소로 표시한다 ──
+const IMG_POLL_MS = 5000, IMG_SLOW_MS = 15 * 60 * 1000;
+let imgTimer = null, imgNoteId = null, imgData = null, imgBusy = false, imgPollStart = 0, imgBlobs = {}, imgBlobGen = 0;
+const imgInProgress = d => !!d && (d.status === 'planning' || d.status === 'generating');
+function revokeImgBlobs() {
+  for (const k of Object.keys(imgBlobs)) { try { URL.revokeObjectURL(imgBlobs[k].url); } catch (e) { /* 이미 해제됨 */ } }
+  imgBlobs = {};
+  imgBlobGen++;   // 아직 받는 중인 이미지는 도착해도 버린다
+}
+function hideImage() {
+  clearTimeout(imgTimer); imgTimer = null;
+  imgNoteId = null; imgData = null; imgBusy = false; imgPollStart = 0;
+  revokeImgBlobs();
+  $('img-section').style.display = 'none';
+  $('img-pages').textContent = '';
+  $('img-flags').textContent = '';
+  for (const id of ['img-notice', 'img-progress', 'img-slow', 'img-disclaimer', 'img-save-hint', 'img-rate', 'img-actions']) $(id).style.display = 'none';
+  setMsg('img-msg', '');
+  $('img-remaining').textContent = '';
+}
+function startImage(noteId, session, hasSummary) {
+  hideImage();
+  if (!hasSummary) return;
+  imgNoteId = noteId;
+  loadImage();
+}
+function resumeImagePolling() {
+  if (imgNoteId !== null && imgInProgress(imgData) && !imgTimer) loadImage();
+}
+async function loadImage() {
+  const noteId = imgNoteId, session = editSession;
+  if (noteId === null) return;
+  clearTimeout(imgTimer); imgTimer = null;
+  let data;
+  try { data = await api('GET', '/api/voice-notes/' + noteId + '/image'); }
+  catch (e) {
+    if (noteId !== imgNoteId || session !== editSession) return;
+    if (!imgData) { $('img-section').style.display = 'none'; return; }   // 처음부터 불러오지 못하면 구역을 숨긴다
+    setMsg('img-msg', e.message, 'error');
+    if (imgInProgress(imgData)) imgTimer = setTimeout(pollImage, IMG_POLL_MS);
+    return;
+  }
+  if (noteId !== imgNoteId || session !== editSession) return;
+  imgData = data;
+  renderImage(data);
+}
+function pollImage() {
+  imgTimer = null;
+  if (currentView !== 'edit') return;   // 다른 화면에 있으면 멈춘다(돌아오면 resumeImagePolling)
+  loadImage();
+}
+function imgRemainingText(d) { return '오늘 남은 횟수 ' + d.remaining + '/' + d.cap; }
+function imgExt(type) { return type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg'; }
+function renderImage(d) {
+  if (!d.enabled) { hideImage(); return; }   // 기능이 꺼져 있으면 구역 전체를 숨긴다
+  $('img-section').style.display = '';
+  const st = d.status, progressing = imgInProgress(d);
+  $('img-notice').style.display = st === 'none' ? '' : 'none';
+  $('img-progress').style.display = progressing ? '' : 'none';
+  $('img-disclaimer').style.display = st === 'ready' ? '' : 'none';
+  $('img-remaining').textContent = progressing ? '' : imgRemainingText(d);
+  $('img-flags').textContent = '';
+  const flag = (text, kind) => { const m = document.createElement('div'); m.className = 'msg ' + kind; m.textContent = text; $('img-flags').appendChild(m); };
+  if (progressing) {
+    if (!imgPollStart) imgPollStart = Date.now();
+    const done = (d.pages || []).filter(p => p.status !== 'pending').length;
+    $('img-progress-text').textContent = '그림을 만드는 중입니다 (장당 30초~1분)' + (d.pages_total ? ' · ' + done + '/' + d.pages_total + '장 완료' : ' · 계획 중');
+    $('img-slow').style.display = Date.now() - imgPollStart > IMG_SLOW_MS ? '' : 'none';
+    imgTimer = setTimeout(pollImage, IMG_POLL_MS);
+  } else {
+    imgPollStart = 0;
+    $('img-slow').style.display = 'none';
+  }
+  // 장 목록은 완료·실패 상태에서만 그린다(진행 중에는 그리지 않아 이미지를 다시 받지 않는다)
+  if (!progressing) renderImagePages(d, flag); else { $('img-pages').textContent = ''; $('img-save-hint').style.display = 'none'; }
+  $('img-rate').style.display = st === 'ready' ? '' : 'none';
+  updateRatingUi();
+  const canMake = st === 'none' || st === 'ready' || st === 'failed';
+  $('img-actions').style.display = canMake ? '' : 'none';
+  $('img-make').textContent = st === 'none' ? '연상 그림 만들기' : '다시 만들기';
+  $('img-make').disabled = imgBusy || d.remaining <= 0;
+  if (canMake && d.remaining <= 0) flag('오늘 횟수를 모두 사용했습니다. 내일 다시 만들 수 있습니다.', 'warn');
+  if (st === 'failed') flag(d.error || '그림을 만들지 못했습니다.', 'error');
+}
+const IMG_BADGES = {
+  pass: ['✔ 글자 대조 통과', ''],
+  fail: ['⚠ 글자 대조 실패: 글자가 틀릴 수 있습니다', ' err'],
+  unavailable: ['글자 대조 불가', ' bg'],
+};
+function renderImagePages(d, flag) {
+  const box = $('img-pages');
+  box.textContent = '';
+  revokeImgBlobs();
+  const pages = d.pages || [];
+  $('img-save-hint').style.display = pages.some(p => p.status === 'ready') ? '' : 'none';
+  if (d.truncated) flag('횟수 한도로 일부 내용은 그림에서 제외되었습니다.', 'warn');
+  if (d.stale) flag('요약이 바뀌었습니다. 다시 만들면 새 요약 기준으로 만듭니다.', 'warn');
+  for (const p of pages) {
+    const card = document.createElement('div'); card.className = 'img-card';
+    const head = document.createElement('div'); head.className = 'img-card-head';
+    const t = document.createElement('span'); t.className = 'img-card-title'; t.textContent = p.title || ('그림 ' + p.page_no);
+    head.appendChild(t);
+    if ((d.pages_total || pages.length) >= 2) { const n = document.createElement('span'); n.className = 'img-card-no'; n.textContent = p.page_no + '/' + (d.pages_total || pages.length); head.appendChild(n); }
+    card.appendChild(head);
+    if (p.status === 'ready') {
+      const holder = document.createElement('div'); holder.className = 'img-ph'; holder.textContent = '그림을 불러오는 중…';
+      card.appendChild(holder);
+      const badgeInfo = IMG_BADGES[p.check];
+      if (badgeInfo) { const b = document.createElement('span'); b.className = 'link-badge' + badgeInfo[1]; b.textContent = badgeInfo[0]; card.appendChild(b); }
+      const save = document.createElement('button');
+      save.type = 'button'; save.className = 'btn small secondary block img-save'; save.textContent = '이미지 저장'; save.disabled = true;
+      card.appendChild(save);
+      loadImagePage(d, p, holder, save);
+    } else {
+      const m = document.createElement('div'); m.className = 'msg error'; m.style.marginTop = '0';
+      m.textContent = '이 장은 만들지 못했습니다' + (p.error ? ' (' + p.error + ')' : '');
+      card.appendChild(m);
+    }
+    box.appendChild(card);
+  }
+}
+// 이미지를 토큰 헤더로 받아 blob 주소로 표시한다(화면을 나가면 revokeImgBlobs가 해제)
+async function loadImagePage(d, p, holder, saveBtn) {
+  const noteId = imgNoteId, gen = imgBlobGen;
+  let blob = null;
+  try {
+    const res = await fetch('/api/voice-notes/' + noteId + '/image/file?page=' + p.page_no, { headers: authHeaders() });
+    if (res.ok) blob = await res.blob();
+  } catch (e) { /* 아래에서 안내 */ }
+  if (gen !== imgBlobGen || noteId !== imgNoteId) return;   // 화면을 나갔거나 다시 그려졌다
+  if (!blob) { holder.textContent = '그림을 불러오지 못했습니다.'; return; }
+  const url = URL.createObjectURL(blob);
+  imgBlobs[p.page_no] = { url, ext: imgExt(blob.type) };
+  const img = document.createElement('img');
+  img.src = url; img.alt = (p.title || '연상 그림') + ' 연상 그림';
+  if (d.stale) img.className = 'stale';
+  holder.replaceWith(img);
+  saveBtn.disabled = false;
+  saveBtn.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = url; a.download = 'voice-note-' + noteId + '-p' + p.page_no + '.' + imgBlobs[p.page_no].ext;
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+}
+function updateRatingUi() {
+  const r = imgData ? imgData.rating : null;
+  $('img-up').classList.toggle('on', r === 1);
+  $('img-down').classList.toggle('on', r === -1);
+  $('img-up').setAttribute('aria-pressed', r === 1 ? 'true' : 'false');
+  $('img-down').setAttribute('aria-pressed', r === -1 ? 'true' : 'false');
+  $('img-up').disabled = $('img-down').disabled = imgBusy;
+}
+async function makeImage() {
+  if (imgBusy || imgNoteId === null || !imgData) return;
+  const remake = imgData.status !== 'none';
+  if (remake && !confirm('기존 그림이 삭제되고 오늘 남은 횟수가 사용됩니다 (남은 횟수 ' + imgData.remaining + ')')) return;
+  const noteId = imgNoteId, session = editSession;
+  imgBusy = true;
+  $('img-make').disabled = true; updateRatingUi();
+  setMsg('img-msg', '');
+  let ok = true;
+  try { await api('POST', '/api/voice-notes/' + noteId + '/image'); }
+  catch (e) {
+    ok = false;
+    if (noteId !== imgNoteId || session !== editSession) return;
+    if (e.status === 429) setMsg('img-msg', '오늘 횟수를 모두 사용했습니다.', 'error');
+    else if (e.status === 409) setMsg('img-msg', '이미 만들고 있습니다.', 'warn');
+    else setMsg('img-msg', e.message, 'error');
+  }
+  if (noteId !== imgNoteId || session !== editSession) return;
+  imgBusy = false;
+  if (ok) { revokeImgBlobs(); $('img-pages').textContent = ''; imgPollStart = 0; }
+  await loadImage();   // 시작했으면 진행 상태를, 거절됐으면 현재 상태(진행 중이면 그 진행)를 다시 그린다
+}
+async function rateImage(v) {
+  if (imgBusy || imgNoteId === null || !imgData) return;
+  const noteId = imgNoteId, session = editSession;
+  imgBusy = true; updateRatingUi(); setMsg('img-msg', '');
+  try { await api('PATCH', '/api/voice-notes/' + noteId + '/image/rating', { rating: v }); if (noteId === imgNoteId && session === editSession) imgData.rating = v; }
+  catch (e) { if (noteId === imgNoteId && session === editSession) setMsg('img-msg', e.message, 'error'); }
+  if (noteId !== imgNoteId || session !== editSession) return;
+  imgBusy = false; updateRatingUi();
+}
+$('img-make').addEventListener('click', makeImage);
+$('img-up').addEventListener('click', () => rateImage(1));
+$('img-down').addEventListener('click', () => rateImage(-1));
 
 // ── 요약 읽어주기 (작업182): 브라우저 내장 speechSynthesis만 사용(외부 API·비용 없음) ──
 const TTS_RATE_KEY = 'voice_tts_rate';
