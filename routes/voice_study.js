@@ -1799,4 +1799,205 @@ router.get('/api/voice-notes/:id/quiz/attempts', guard, async (req, res) => {
   }
 });
 
+// ─── 작업193-4: 개념 학습(1~2단계) ───────────────────────────────────────────────
+// 용어·설명을 과목 > 대주제 > 소주제 맥락으로 모아 두고 카드로 복습한다. AI 호출·비용 없음.
+const CONCEPT_MAX_PER_USER = 500;
+const CONCEPT_LIMITS = { term: 60, explanation: 2000, topic: 60, subtopic: 60, q: 100 };
+const CONCEPT_COLUMNS = 'id, term, explanation, subject, subject_detail, topic, subtopic, last_rating, rated_at, created_at, updated_at';
+const CONCEPT_RATINGS = ['known', 'confused'];
+const CONCEPT_NOT_FOUND = { error: '개념을 찾을 수 없습니다.' };
+
+// 같은 용어 판정용: 공백 제거·대소문자 무시
+const conceptTermKey = term => String(term).replace(/\s+/g, '').toLowerCase();
+
+// body에서 개념 필드를 검증해 { fields } 또는 { error }로 돌려준다. partial=true면 들어온 것만(PATCH), false면 필수 확인(POST)
+function readConceptFields(body, { partial }) {
+  const src = body && typeof body === 'object' ? body : {};
+  const out = {};
+  const str = (key, max, { required, label }) => {
+    if (src[key] === undefined) { if (required && !partial) return `${label}을(를) 입력해 주세요.`; return null; }
+    if (src[key] === null && !required) { out[key] = null; return null; }
+    if (typeof src[key] !== 'string') return `${label}이(가) 올바르지 않습니다.`;
+    const v = key === 'explanation' ? src[key] : src[key].trim();
+    if (required && !v.trim()) return `${label}을(를) 입력해 주세요.`;
+    if (charLen(v) > max) return `${label}은(는) ${max}자 이하여야 합니다.`;
+    out[key] = !required && key !== 'explanation' && !v ? null : v;
+    return null;
+  };
+  const errors = [
+    str('term', CONCEPT_LIMITS.term, { required: true, label: '용어' }),
+    str('explanation', CONCEPT_LIMITS.explanation, { required: false, label: '설명' }),
+    str('topic', CONCEPT_LIMITS.topic, { required: true, label: '대주제' }),
+    str('subtopic', CONCEPT_LIMITS.subtopic, { required: false, label: '소주제' }),
+  ].filter(Boolean);
+  if (errors.length) return { error: errors[0] };
+  if (src.subject === undefined) {
+    if (!partial) return { error: '과목을 선택해 주세요.' };
+  } else if (typeof src.subject !== 'string' || !Object.prototype.hasOwnProperty.call(SUBJECTS, src.subject)) {
+    return { error: '과목이 올바르지 않습니다.' };
+  } else {
+    out.subject = src.subject;
+  }
+  if (src.subject_detail !== undefined) {
+    if (src.subject_detail !== null && typeof src.subject_detail !== 'string') return { error: '세부 과목이 올바르지 않습니다.' };
+    out.subject_detail = src.subject_detail === '' ? null : src.subject_detail;
+  }
+  return { fields: out };
+}
+
+// 같은 사용자의 같은 용어(공백 제거·대소문자 무시) + 같은 과목·대주제·소주제가 이미 있으면 그 행 id를, 없으면 null
+async function findDuplicateConcept(userId, v, excludeId) {
+  const { rows } = await pool.query(
+    `SELECT id FROM voice_concepts
+     WHERE user_id = $1 AND subject = $2 AND topic = $3 AND COALESCE(subtopic, '') = $4
+       AND lower(regexp_replace(term, '\\s+', '', 'g')) = $5 AND ($6::int IS NULL OR id <> $6)
+     LIMIT 1`,
+    [userId, v.subject, v.topic, v.subtopic || '', conceptTermKey(v.term), excludeId || null]
+  );
+  return rows.length ? rows[0].id : null;
+}
+
+function parseConceptId(raw) { return parseId(raw); }
+
+router.get('/api/voice-concepts/contexts', guard, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT subject, topic, subtopic, COUNT(*)::int AS n FROM voice_concepts WHERE user_id = $1 GROUP BY subject, topic, subtopic`,
+      [req.user.id]
+    );
+    // 과목 → 대주제(개수 = 그 대주제의 모든 개념) → 소주제 목록
+    const subjects = new Map();
+    for (const r of rows) {
+      if (!subjects.has(r.subject)) subjects.set(r.subject, new Map());
+      const topics = subjects.get(r.subject);
+      if (!topics.has(r.topic)) topics.set(r.topic, { topic: r.topic, count: 0, subtopics: new Set() });
+      const t = topics.get(r.topic);
+      t.count += r.n;
+      if (r.subtopic) t.subtopics.add(r.subtopic);
+    }
+    const byKo = (a, b) => String(a).localeCompare(String(b), 'ko');
+    res.json({
+      subjects: Array.from(subjects.entries()).sort((a, b) => byKo(a[0], b[0])).map(([subject, topics]) => ({
+        subject,
+        topics: Array.from(topics.values()).sort((a, b) => byKo(a.topic, b.topic)).map(t => ({ topic: t.topic, count: t.count, subtopics: Array.from(t.subtopics).sort(byKo) })),
+      })),
+    });
+  } catch (err) {
+    console.error('voice-concepts contexts error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+router.get('/api/voice-concepts', guard, async (req, res) => {
+  const where = ['user_id = $1'];
+  const params = [req.user.id];
+  for (const key of ['subject', 'subject_detail', 'topic', 'subtopic']) {
+    const v = req.query[key];
+    if (v === undefined || v === '') continue;
+    if (typeof v !== 'string') return res.status(400).json({ error: `${key}이(가) 올바르지 않습니다.` });
+    params.push(v);
+    where.push(`${key} = $${params.length}`);   // 컬럼명은 위 고정 목록뿐이고 값은 바인딩한다
+  }
+  const q = req.query.q;
+  if (q !== undefined && q !== '') {
+    if (typeof q !== 'string' || charLen(q) > CONCEPT_LIMITS.q) return res.status(400).json({ error: `검색어는 ${CONCEPT_LIMITS.q}자 이하여야 합니다.` });
+    params.push('%' + q.trim().replace(/[\\%_]/g, m => '\\' + m) + '%');
+    where.push(`(term ILIKE $${params.length} ESCAPE '\\' OR explanation ILIKE $${params.length} ESCAPE '\\')`);
+  }
+  try {
+    const { rows } = await pool.query(
+      `SELECT ${CONCEPT_COLUMNS} FROM voice_concepts WHERE ${where.join(' AND ')}
+       ORDER BY subject, topic, COALESCE(subtopic, ''), term, id LIMIT ${CONCEPT_MAX_PER_USER}`,
+      params
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('voice-concepts list error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+router.post('/api/voice-concepts', guard, async (req, res) => {
+  const parsed = readConceptFields(req.body, { partial: false });
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
+  const v = { explanation: '', subtopic: null, subject_detail: null, ...parsed.fields };
+  if (!subjectPairValid(v.subject, v.subject_detail)) return res.status(400).json({ error: '과목 또는 세부 과목이 올바르지 않습니다.' });
+  try {
+    const count = await pool.query('SELECT COUNT(*)::int AS n FROM voice_concepts WHERE user_id = $1', [req.user.id]);
+    if (count.rows[0].n >= CONCEPT_MAX_PER_USER) return res.status(400).json({ error: `개념은 최대 ${CONCEPT_MAX_PER_USER}개까지 저장할 수 있습니다.` });
+    if (await findDuplicateConcept(req.user.id, v, null)) return res.status(409).json({ error: '같은 맥락에 이미 있는 용어입니다.' });
+    const { rows } = await pool.query(
+      `INSERT INTO voice_concepts (user_id, term, explanation, subject, subject_detail, topic, subtopic)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${CONCEPT_COLUMNS}`,
+      [req.user.id, v.term, v.explanation, v.subject, v.subject_detail, v.topic, v.subtopic]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('voice-concepts create error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+router.patch('/api/voice-concepts/:id', guard, async (req, res) => {
+  const id = parseConceptId(req.params.id);
+  if (id === null) return res.status(404).json(CONCEPT_NOT_FOUND);
+  const parsed = readConceptFields(req.body, { partial: true });
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
+  const entries = Object.entries(parsed.fields);
+  if (!entries.length) return res.status(400).json({ error: '변경할 항목이 없습니다.' });
+  try {
+    const cur = await pool.query(`SELECT ${CONCEPT_COLUMNS} FROM voice_concepts WHERE id = $1 AND user_id = $2`, [id, req.user.id]);
+    if (!cur.rows.length) return res.status(404).json(CONCEPT_NOT_FOUND);
+    const merged = { ...cur.rows[0], ...parsed.fields };
+    // 과목만 바꾸면 세부 과목은 비운다(자료 API와 같은 규칙)
+    if (parsed.fields.subject !== undefined && parsed.fields.subject_detail === undefined && parsed.fields.subject !== cur.rows[0].subject) {
+      merged.subject_detail = null; entries.push(['subject_detail', null]);
+    }
+    if (!subjectPairValid(merged.subject, merged.subject_detail)) return res.status(400).json({ error: '과목 또는 세부 과목이 올바르지 않습니다.' });
+    if (await findDuplicateConcept(req.user.id, merged, id)) return res.status(409).json({ error: '같은 맥락에 이미 있는 용어입니다.' });
+    // 컬럼명은 readConceptFields가 통과시킨 고정 이름뿐이고, 값은 모두 바인딩한다
+    const sets = entries.map(([k], i) => `${k} = $${i + 3}`);
+    const { rows } = await pool.query(
+      `UPDATE voice_concepts SET ${sets.join(', ')}, updated_at = now() WHERE id = $1 AND user_id = $2 RETURNING ${CONCEPT_COLUMNS}`,
+      [id, req.user.id, ...entries.map(([, val]) => val)]
+    );
+    if (!rows.length) return res.status(404).json(CONCEPT_NOT_FOUND);
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('voice-concepts update error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+router.delete('/api/voice-concepts/:id', guard, async (req, res) => {
+  const id = parseConceptId(req.params.id);
+  if (id === null) return res.status(404).json(CONCEPT_NOT_FOUND);
+  try {
+    const { rowCount } = await pool.query('DELETE FROM voice_concepts WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (!rowCount) return res.status(404).json(CONCEPT_NOT_FOUND);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('voice-concepts delete error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+router.post('/api/voice-concepts/:id/rating', guard, async (req, res) => {
+  const id = parseConceptId(req.params.id);
+  if (id === null) return res.status(404).json(CONCEPT_NOT_FOUND);
+  const rating = req.body && req.body.rating;
+  if (!CONCEPT_RATINGS.includes(rating)) return res.status(400).json({ error: "rating은 'known' 또는 'confused'여야 합니다." });
+  try {
+    const { rows } = await pool.query(
+      `UPDATE voice_concepts SET last_rating = $3, rated_at = now() WHERE id = $1 AND user_id = $2 RETURNING ${CONCEPT_COLUMNS}`,
+      [id, req.user.id, rating]
+    );
+    if (!rows.length) return res.status(404).json(CONCEPT_NOT_FOUND);
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('voice-concepts rating error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
 module.exports = router;
