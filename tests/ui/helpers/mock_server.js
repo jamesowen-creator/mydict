@@ -18,6 +18,7 @@ function freshState() {
     studies: [], items: [], links: [], nextId: 1,
     explorePlan: [], respondPlan: [], refreshPlan: [],
     log: [],            // { method, url, body }
+    adminUsers: [],     // 관리자 화면 테스트용 사용자 목록(GET/PATCH /api/admin/users)
     networkDown: false, // true면 explore 요청의 연결을 끊음
     delayMs: 0,         // 모든 concepts API 응답 지연(대기 표시 확인용)
   };
@@ -66,12 +67,20 @@ async function startMockServer() {
 
   async function handleApi(req, res, url, body) {
     const u = url.pathname, m = req.method;
+    let mm;
     state.log.push({ method: m, url: u, body });
     const J = (status, obj) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+    if (u === '/api/admin/users' && m === 'GET') return J(200, state.adminUsers);
+    if (u === '/api/admin/stats') return J(200, { users: { total: state.adminUsers.length, active: state.adminUsers.length, blocked: 0, pending: 0, admins: 1 }, usage: [], monthly: [], cost: { total: { anthropic: 0, openai: 0 }, monthly: { anthropic: 0, openai: 0 } } });
+    if ((mm = u.match(/^\/api\/admin\/users\/(\d+)$/)) && m === 'PATCH') {
+      const user = state.adminUsers.find(x => x.id === Number(mm[1]));
+      if (!user) return J(404, { error: '사용자를 찾을 수 없습니다.' });
+      Object.assign(user, body);
+      return J(200, user);
+    }
     if (u === '/api/me') return state.authed ? J(200, state.me) : J(401, { error: 'no' });
     if (!state.authed) return J(401, { error: '로그인이 필요합니다.' });
     if (state.delayMs && u.startsWith('/api/concepts')) await new Promise(r => setTimeout(r, state.delayMs));
-    let mm;
     if (u === '/api/concepts/studies' && m === 'GET') {
       return J(200, state.studies.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at)).map(({ path: p, ...s }) => {
         const items = state.items.filter(i => i.study_id === s.id);
@@ -210,7 +219,8 @@ async function startMockServer() {
         try { await handleApi(req, res, url, body); } catch (e) { res.writeHead(500); res.end(String(e && e.message)); }
         return;
       }
-      const file = path.join(PUBLIC, decodeURIComponent(url.pathname));
+      const rel = url.pathname === '/' ? '/home/index.html' : url.pathname === '/admin' ? '/admin.html' : url.pathname;   // 서버의 '/'·'/admin' 라우트와 같게
+      const file = path.join(PUBLIC, decodeURIComponent(rel));
       if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end('not found'); return; }
       res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
       res.end(fs.readFileSync(file));

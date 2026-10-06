@@ -257,6 +257,7 @@
               <th>한입독서</th>
               <th>과학</th>
               <th>음성</th>
+              <th>개념</th>
               <th style="text-align:right">검색 횟수</th>
               <th style="text-align:right">TTS 횟수</th>
               <th style="text-align:right">단어장</th>
@@ -432,6 +433,7 @@ function renderUserRow(u) {
     ${permToggle(u, 'perm_digest_reading')}
     ${permToggle(u, 'perm_science_reading')}
     ${permToggle(u, 'perm_voice_study')}
+    ${permToggle(u, 'perm_concept_study')}
     <td style="text-align:right;font-weight:600">${fmt(u.search_count)}</td>
     <td style="text-align:right;font-weight:600">${fmt(u.tts_count)}</td>
     <td style="text-align:right">${fmt(u.wordbook_count)}</td>
