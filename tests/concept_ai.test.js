@@ -121,7 +121,7 @@ test('제안 필터·상한: 이미 있는 개념(활성·보류·제외)·자�
   await close();
 });
 
-test('서버 검증: 길이 초과 필드는 자르지 않고 비움, 잘못된 relation_type은 기타 관련, 제안 필드 정리', async () => {
+test('서버 검증: 선택 항목은 길이 초과 시 자르지 않고 비움, 잘못된 relation_type은 기타 관련, 제안 필드 정리', async () => {
   const { anthropic, call, close, sid } = await setup();
   const from = (await call('POST', `${S}/${sid}/items`, { term: '세포' })).body;
   anthropic.handler = () => good({
@@ -139,6 +139,7 @@ test('서버 검증: 길이 초과 필드는 자르지 않고 비움, 잘못된 
   assert.equal(r.body.ai_error, undefined);
   assert.equal(it.english, null); assert.equal(it.group_label, null); assert.equal(it.example, null); assert.equal(it.simple_text, null);
   assert.equal(it.definition.length, 300, '상한과 같은 길이는 통과');
+  assert.equal(it.content_source, 'ai');
   assert.equal(it.deeper_text.length, 250);
   assert.equal(r.body.link.relation_type, '기타 관련');
   assert.equal(r.body.link.label, null); assert.equal(r.body.link.detail, null);
@@ -432,5 +433,67 @@ test('권한 403·소유자 404·401(AI 경로)', async () => {
     assert.equal((await call(m, u, b, { user: 8 })).status, 404, 'other owner ' + u);
   }
   assert.equal(anthropic.calls.length, calls, '거절된 요청은 AI를 부르지 않음');
+  await close();
+});
+
+test('definition 초과(301자)는 빈 값으로 저장하지 않고 ai_error: 개념 보존, 연결 없음, 같은 이름으로 다시 호출하면 채움', async () => {
+  const { db, anthropic, call, close, sid } = await setup();
+  const from = (await call('POST', `${S}/${sid}/items`, { term: '세포' })).body;
+  anthropic.handler = () => good({ definition: 'd'.repeat(301) });
+  const origErr = console.error; console.error = () => {};
+  let r;
+  try { r = await call('POST', `${S}/${sid}/explore`, { text: '광합성', from_item_id: from.id }); } finally { console.error = origErr; }
+  assert.equal(r.status, 200);
+  assert.ok(r.body.ai_error);
+  assert.equal(r.body.link, null);
+  assert.equal(r.body.item.term, '광합성');
+  assert.equal(r.body.item.definition, null);
+  assert.equal(r.body.item.content_source, 'none', 'AI 내용으로 표시하지 않음');
+  assert.equal(r.body.item.suggestions == null || r.body.item.suggestions.length === 0, true);
+  assert.equal(db.tables.concept_links.length, 0);
+  assert.equal(usageOf(db).length, 1, '호출은 끝났으므로 사용량은 기록');
+  anthropic.handler = () => good();
+  r = await call('POST', `${S}/${sid}/explore`, { text: '광합성', from_item_id: from.id });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.ai_error, undefined);
+  assert.equal(r.body.item.content_source, 'ai');
+  assert.equal(r.body.item.definition.length > 0, true);
+  assert.equal(db.tables.concept_items.filter(i => i.term === '광합성').length, 1, '중복 생성 없음');
+  await close();
+});
+
+test('respond: simple_text·deeper_text가 상한 초과면 기존 내용 유지 + ai_error, 상한 정확히 일치는 통과', async () => {
+  const { anthropic, call, close, sid } = await setup();
+  anthropic.handler = () => good();
+  const it = (await call('POST', `${S}/${sid}/explore`, { text: '광합성' })).body.item;
+  const url = `/api/concepts/items/${it.id}/respond`;
+  const origErr = console.error; console.error = () => {};
+  try {
+    anthropic.handler = () => JSON.stringify({ simple_text: 's'.repeat(251) });
+    let r = await call('POST', url, { kind: 'easier' });
+    assert.ok(r.body.ai_error); assert.equal(r.body.item.simple_text, it.simple_text);
+    anthropic.handler = () => JSON.stringify({ deeper_text: 'p'.repeat(251) });
+    r = await call('POST', url, { kind: 'deeper' });
+    assert.ok(r.body.ai_error); assert.equal(r.body.item.deeper_text, it.deeper_text);
+  } finally { console.error = origErr; }
+  anthropic.handler = () => JSON.stringify({ simple_text: 's'.repeat(250) });
+  let r = await call('POST', url, { kind: 'easier' });
+  assert.equal(r.body.ai_error, undefined); assert.equal(r.body.item.simple_text.length, 250);
+  anthropic.handler = () => JSON.stringify({ deeper_text: 'p'.repeat(250) });
+  r = await call('POST', url, { kind: 'deeper' });
+  assert.equal(r.body.ai_error, undefined); assert.equal(r.body.item.deeper_text.length, 250);
+  await close();
+});
+
+test('프롬프트 규칙 7: 글자 수 안내는 한도의 약 80%(240/160/200/200), 서버 한도는 300/200/250/250 그대로', async () => {
+  const { anthropic, call, close, sid } = await setup();
+  anthropic.handler = () => good({ example: 'x'.repeat(200), simple_text: 's'.repeat(250), deeper_text: 'p'.repeat(250) });
+  const r = await call('POST', `${S}/${sid}/explore`, { text: '광합성' });
+  const sys = anthropic.calls[0].system;
+  for (const must of ['definition 240자 이내', 'example 160자 이내', 'simple_text 200자 이내', 'deeper_text 200자 이내']) assert.ok(sys.includes(must), must);
+  for (const old of ['definition 300', 'example 200,', 'simple_text 250', 'deeper_text 250']) assert.ok(!sys.includes(old), old);
+  assert.equal(r.body.item.example.length, 200);
+  assert.equal(r.body.item.simple_text.length, 250);
+  assert.equal(r.body.item.deeper_text.length, 250);
   await close();
 });

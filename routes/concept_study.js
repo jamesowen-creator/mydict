@@ -419,7 +419,7 @@ const CONCEPT_PROMPT_HEAD =
   '4) 제안은 현재 이해에 바로 필요한 개념 1개를 첫 번째(기본 제안)로 하고, 대안은 최대 2개입니다. [학습 중인 개념]과 [제외·보류 용어]에 있는 용어는 제안하지 않습니다. ' +
   '5) [반응 이력]이 있으면 반영합니다(쉬운 설명을 선호하면 더 쉽게, 더 깊은 설명을 선호하면 더 깊게, 다른 방향을 원하면 이전과 다른 방향으로). ' +
   '6) group_label은 [기존 그룹] 중 같은 뜻이 있으면 그 이름을 그대로 쓰고, 없을 때만 30자 이내의 새 이름을 씁니다. ' +
-  '7) 글자 수 한도를 넘기지 않습니다: definition 300, example 200, simple_text 250, deeper_text 250, 관계 label 40, 관계 detail 200, 제안 term 40, 제안 reason 120, 제안 relation_label 40. ' +
+  '7) 글자 수는 여유 있게 지킵니다: definition 240자 이내, example 160자 이내, simple_text 200자 이내, deeper_text 200자 이내, 관계 label 40자 이내, 관계 detail 200자 이내, 제안 term 40자 이내, 제안 reason 120자 이내, 제안 relation_label 40자 이내. ' +
   '8) relation_type은 포함, 원인→결과, 순서, 대비, 비슷함, 기타 관련 중 하나이고 load는 가벼움, 보통, 무거움 중 하나입니다. 9) JSON만 출력합니다.';
 const SUGGEST_SCHEMA = '"suggestions":[{"term":"","reason":"","relation_type":"","relation_label":"","load":""}]';
 const CONCEPT_PROMPT_TAILS = {
@@ -487,18 +487,19 @@ function sanitizeSuggestions(raw, existingKeys) {
   return out;
 }
 
-// explore 응답 검증. 파싱 결과가 객체가 아니거나 term·definition이 문자열로 없으면 null(ai_error)
+// explore 응답 검증. 객체가 아니거나 term·definition이 필수 조건을 못 지키면 null(ai_error). 선택 필드는 초과 시 그 필드만 비움
 function validateExplore(parsed, existingKeys) {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-  if (typeof parsed.term !== 'string' || !parsed.term.trim() || typeof parsed.definition !== 'string' || !parsed.definition.trim()) return null;
+  // term·definition은 필수: 없거나 비었거나 상한을 넘으면 ai_error(개념은 보존)
   const term = fitField(parsed.term, AI_LIMITS.term);
-  if (!term) return null;
+  const definition = fitField(parsed.definition, AI_LIMITS.definition);
+  if (!term || !definition) return null;
   const rel = parsed.relation && typeof parsed.relation === 'object' ? parsed.relation : {};
   return {
     term,
     english: fitField(parsed.english, AI_LIMITS.english),
     group_label: fitField(parsed.group_label, AI_LIMITS.group_label),
-    definition: fitField(parsed.definition, AI_LIMITS.definition),
+    definition,
     example: fitField(parsed.example, AI_LIMITS.example),
     simple_text: fitField(parsed.simple_text, AI_LIMITS.simple_text),
     deeper_text: fitField(parsed.deeper_text, AI_LIMITS.deeper_text),
