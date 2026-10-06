@@ -154,8 +154,74 @@
   .react { margin-top: 18px; padding-top: 4px; border-top: 1px solid var(--line); }
   .react .label { display: block; margin: 10px 0 2px; }
 
-  /* 지도·목록 자리(작업 195-3에서 채움) */
-  #explore-pane { color: var(--text2); }
+  /* 학습 기록: 진행 막대 + 선택 경로 */
+  .record { padding: 14px 0 12px; border-bottom: 1px solid var(--line); }
+  .progress { display: flex; align-items: center; gap: 10px; }
+  .progress .bar { flex: 1; height: 4px; background: var(--line); }
+  .progress .bar > i { display: block; height: 100%; background: var(--accent); }
+  .progress .count { font-size: 13px; color: var(--text2); white-space: nowrap; }
+  .progress .count b { color: var(--text); font-weight: 800; }
+  .path-line { display: flex; flex-wrap: wrap; align-items: center; margin-top: 6px; font-size: 14px; }
+  .path-line .sep { color: var(--text2); padding: 0 2px; }
+  .path-line button { min-height: 44px; min-width: 44px; padding: 0 6px; background: transparent; border: none; font-weight: 500; color: var(--text2); max-width: 11em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .path-line button[aria-current=true] { color: var(--text); font-weight: 800; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 5px; text-decoration-thickness: 2px; }
+
+  /* 지도 */
+  .map-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 6px; }
+  .map-tools .btn { min-height: 44px; padding: 0 10px; border-color: transparent; font-weight: 500; color: var(--text2); }
+  .map-tools .btn[aria-pressed=true] { color: var(--text); font-weight: 800; border-bottom: 2px solid var(--accent); }
+  .map-box { height: 400px; border: 1px solid var(--line); background: var(--surface); overflow: hidden; touch-action: none; position: relative; }
+  .map-box svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  .map-hint { font-size: 12px; color: var(--text2); margin-top: 6px; }
+  .m-edge path.line { fill: none; stroke: var(--text2); stroke-width: 1.5; }
+  .m-edge path.hit { fill: none; stroke: transparent; stroke-width: 16; cursor: pointer; }
+  .m-edge.hl path.line { stroke: var(--text); stroke-width: 2.5; }
+  .m-edge.dim { opacity: 0.25; }
+  .m-edge text { font-size: 11px; fill: var(--text2); text-anchor: middle; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; pointer-events: none; }
+  .m-edge.hl text { fill: var(--text); font-weight: 700; }
+  .m-edge.ghost path.line { stroke: var(--accent); stroke-dasharray: 5 4; }
+  .m-node { cursor: pointer; }
+  .m-node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+  .m-node text { font-size: 13px; fill: var(--text); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+  .m-node.hl rect { stroke: var(--text); stroke-width: 2; }
+  .m-node.hl text { font-weight: 700; }
+  .m-node.sel rect { stroke: var(--accent); stroke-width: 3; }
+  .m-node.sel text { font-weight: 800; }
+  .m-node.dim { opacity: 0.35; }
+  .m-node.ghost rect { stroke: var(--accent); stroke-dasharray: 5 4; fill: transparent; }
+  .m-node.ghost text { fill: var(--accent-text); font-weight: 700; }
+  .m-node:focus-visible rect { outline: none; stroke: var(--focus); stroke-width: 3; }
+  .m-edge:focus-visible { outline: none; }
+  .m-edge:focus-visible path.line { stroke: var(--focus); stroke-width: 3; }
+  .m-label { font-size: 12px; fill: var(--text2); font-weight: 700; }
+  .map-note { color: var(--text2); padding: 18px 0; }
+
+  /* 목록 보기 */
+  .grp { margin-top: 18px; }
+  .grp:first-child { margin-top: 0; }
+  .grp > .label { display: block; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+  .lrow { display: flex; align-items: center; border-bottom: 1px solid var(--line); }
+  .lrow-main { flex: 1; min-width: 0; text-align: left; background: transparent; border: none; min-height: 52px; padding: 8px 4px; }
+  .lrow-term { font-weight: 700; word-break: break-all; }
+  .lrow-main[aria-current=true] .lrow-term { font-weight: 800; text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+  .lrow-meta { font-size: 12px; color: var(--text2); }
+  .lrow-actions { display: flex; flex-wrap: wrap; gap: 0 6px; justify-content: flex-end; }
+
+  /* 보류·제외 관리 */
+  .sl > summary { list-style: none; min-height: 44px; display: flex; align-items: center; gap: 8px; font-weight: 700; cursor: pointer; }
+  .sl > summary::-webkit-details-marker { display: none; }
+  .sl > summary .ic { transition: transform 0.15s; color: var(--text2); }
+  .sl[open] > summary .ic { transform: rotate(90deg); }
+  .sl > summary .n { font-weight: 500; color: var(--text2); font-size: 13px; }
+  .sl + .sl { margin-top: 4px; }
+
+  dialog { margin: auto; max-width: min(420px, calc(100vw - 32px)); width: 100%; padding: 20px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+  dialog .rel-pair { font-size: 17px; font-weight: 800; word-break: break-all; }
+  dialog .rel-type { margin-top: 10px; }
+  dialog .rel-detail { margin-top: 10px; white-space: pre-wrap; }
+  dialog .rel-source { margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--accent-text); }
+  dialog .rel-source.user { color: var(--text2); }
 
   /* 하단 고정 입력창 */
   .bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 120; background: var(--bg); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
@@ -225,19 +291,24 @@
         <button id="back-btn" class="iconbtn" type="button" aria-label="학습 목록으로"><svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
         <div id="study-title" class="study-title"></div>
         <div class="seg" role="group" aria-label="보기 전환">
-          <button id="seg-map" type="button" aria-pressed="false">지도</button>
+          <button id="seg-map" type="button" aria-pressed="true">지도</button>
           <button id="seg-list" type="button" aria-pressed="false">목록</button>
         </div>
       </div>
     </div>
     <div class="wrap">
+      <section id="record" class="record" aria-label="학습 기록" hidden>
+        <div class="progress"><span class="label">이해</span><div id="progress-bar" class="bar" role="progressbar" aria-label="이해한 개념" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"><i></i></div><span id="progress-count" class="count"></span></div>
+        <nav id="path-line" class="path-line" aria-label="선택 경로"></nav>
+      </section>
       <div id="study-msg" class="msg" role="alert"></div>
       <div id="study-busy" class="busy-line" role="status" hidden><span class="spinner"></span><span>설명을 만드는 중…</span></div>
       <div id="study-empty" class="empty-state" hidden>아직 개념이 없습니다.<br>아래 입력창에 궁금한 개념 하나를 입력해 보세요.</div>
       <div id="detail-wrap" hidden>
         <section id="detail" class="section" aria-label="현재 개념"></section>
         <section id="nextstep" class="section" aria-label="다음 한 단계"></section>
-        <section id="explore" class="section" aria-label="지도와 목록" hidden><div id="explore-pane"></div></section>
+        <section id="explore" class="section" aria-label="지도와 목록"><div id="explore-pane"></div></section>
+        <section id="sidelined" class="section" aria-label="보류와 제외" hidden></section>
       </div>
     </div>
     <div class="bottom-bar">
@@ -251,6 +322,11 @@
     </div>
   </section>
 </div>
+
+<dialog id="edge-dialog" aria-labelledby="edge-pair">
+  <div id="edge-body"></div>
+  <div class="btn-row" style="margin-top:16px"><button id="edge-close" class="btn" type="button">닫기</button></div>
+</dialog>
 
 <script>
 'use strict';
@@ -336,7 +412,9 @@ function fmtDate(iso) {
 const S = {
   studies: [],
   study: null, items: [], links: [], selId: null,
-  explorePane: null,       // 'map' | 'list' | null (195-3)
+  explorePane: 'map',      // 'map' | 'list'
+  map: { full: false, fit: true, scale: 1, tx: 0, ty: 0, h: 0 },
+  slOpen: { held: false, excluded: false },   // 보류·제외 목록을 펼쳐 둔 상태(다시 그려도 유지)
   notice: null,            // { studyId, itemId|null, text, retryFn|null } — 안내·오류 한 줄(다시 받기 버튼 포함)
   retryFrom: {},           // 개념 id → 연결에 쓸 from 개념 id(AI 실패 직후 다시 받기용)
   busy: false,
@@ -495,6 +573,7 @@ async function loadStudy(id) {
     return;
   }
   S.study = r.body.study; S.items = r.body.items; S.links = r.body.links;
+  S.map.fit = true;
   const sel = r.body.study.selected_item_id;
   const path = r.body.study.path || [];
   S.selId = itemById(sel) ? sel : (path.length ? path[path.length - 1] : (S.items[0] ? S.items[0].id : null));
@@ -516,23 +595,325 @@ function renderStudy() {
   el('detail-wrap').hidden = !hasItems;
   el('seg-map').setAttribute('aria-pressed', String(S.explorePane === 'map'));
   el('seg-list').setAttribute('aria-pressed', String(S.explorePane === 'list'));
-  el('explore').hidden = !S.explorePane;
-  if (S.explorePane) renderExplorePane();
-  if (hasItems) { renderDetail(); renderNext(); }
+  renderRecord();
+  if (hasItems) { renderDetail(); renderNext(); renderExplorePane(); renderSidelined(); }
   if (S.pendingAsk) { el('ask-input').value = S.pendingAsk; S.pendingAsk = null; }
 }
 
-// 지도·목록(작업 195-3에서 구현)
-function renderExplorePane() {
-  el('explore-pane').textContent = S.explorePane === 'map' ? '지도 보기는 준비 중입니다.' : '목록 보기는 준비 중입니다.';
+// ── 학습 기록: 이해 진행 막대 + 선택 경로(A › B › C) ──
+function renderRecord() {
+  const rec = el('record');
+  const total = S.items.length;
+  rec.hidden = total === 0;
+  if (!total) return;
+  const understood = S.items.filter(i => i.review_state === 'understood').length;
+  const bar = el('progress-bar');
+  bar.setAttribute('aria-valuemax', String(total)); bar.setAttribute('aria-valuenow', String(understood));
+  bar.firstElementChild.style.width = Math.round(understood / total * 100) + '%';
+  const cnt = el('progress-count');
+  cnt.textContent = '';
+  cnt.append(h('b', {}, understood), ' / ' + total);
+  const nav = el('path-line');
+  nav.textContent = '';
+  const path = ((S.study && S.study.path) || []).map(id => itemById(id)).filter(Boolean);
+  path.forEach((it, i) => {
+    if (i) nav.append(h('span', { class: 'sep', 'aria-hidden': 'true' }, '›'));
+    nav.append(h('button', { type: 'button', 'data-t': 'path-item', 'data-id': it.id, 'aria-current': it.id === S.selId ? 'true' : null, onclick: () => selectItem(it.id) }, it.term));
+  });
 }
+
+// 개념을 선택한다(서버가 경로에 붙인다)
+async function selectItem(id) {
+  if (id === S.selId) { el('detail').scrollIntoView({ block: 'start' }); return; }
+  const r = await busy('불러오는 중…', () => api('PATCH', '/api/concepts/studies/' + S.study.id, { selected_item_id: id }));
+  if (!r) return;
+  if (r.status !== 200) { showMsg(errText(r)); return; }
+  setNotice(null);
+  await loadStudy(S.study.id);
+  el('detail').scrollIntoView({ block: 'start' });
+}
+
 el('seg-map').addEventListener('click', () => toggleExplore('map'));
 el('seg-list').addEventListener('click', () => toggleExplore('list'));
 function toggleExplore(which) {
-  S.explorePane = S.explorePane === which ? null : which;
+  S.explorePane = which;
+  S.map.fit = true;
   renderStudy();
-  if (S.explorePane) el('explore').scrollIntoView({ block: 'start' });
+  el('explore').scrollIntoView({ block: 'start' });
 }
+
+function renderExplorePane() {
+  const pane = el('explore-pane');
+  pane.textContent = '';
+  if (S.explorePane === 'list') renderListPane(pane); else renderMapPane(pane);
+}
+
+// ── 목록 보기: 그룹 라벨별 묶음 ──
+const REVIEW_TEXT = { understood: '이해함', confused: '헷갈림', new: '학습 전' };
+function renderListPane(pane) {
+  const active = S.items.filter(i => i.status === 'active');
+  if (!active.length) { pane.append(h('p', { class: 'map-note' }, '학습 중인 개념이 없습니다.')); return; }
+  const groups = new Map();
+  for (const it of active) {
+    const g = it.group_label || '';
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(it);
+  }
+  const labels = [...groups.keys()].sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b, 'ko')));
+  for (const g of labels) {
+    pane.append(h('div', { class: 'grp', 'data-t': 'group', 'data-group': g },
+      h('span', { class: 'label' }, g || '그룹 없음'),
+      groups.get(g).map(it => h('div', { class: 'lrow', 'data-id': it.id },
+        h('button', { class: 'lrow-main', type: 'button', 'data-t': 'list-item', 'aria-current': it.id === S.selId ? 'true' : null, onclick: () => selectItem(it.id) },
+          h('div', { class: 'lrow-term' }, it.term),
+          h('div', { class: 'lrow-meta' }, (REVIEW_TEXT[it.review_state] || '학습 전') + ' · ' + (it.origin || '출처 미상')))))));
+  }
+}
+
+// ── 지도 보기(SVG) ──
+// 배치: 연결로 이어진 개념끼리 한 덩어리(BFS 단계 = 열, 단계 안 순서 = 행)로 묶어 위에서 아래로 쌓고,
+// 연결이 없는 개념(이전된 개념 등)은 아래쪽 격자에 따로 둔다. 모든 노드가 서로 다른 칸을 쓰므로 겹치지 않는다.
+const MAPD = { W: 132, H: 44, COLW: 192, ROWH: 64, GAP: 48, COLS: 3 };
+const SVGNS = 'http://www.w3.org/2000/svg';
+function sv(tag, attrs, ...kids) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) if (v !== null && v !== undefined && v !== false) e.setAttribute(k, String(v));
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined) e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  return e;
+}
+function clipText(t, n) { const a = Array.from(t); return a.length > n ? a.slice(0, n - 1).join('') + '…' : t; }
+
+function layoutMap(nodes, edges) {
+  const adj = new Map(nodes.map(n => [n, []]));
+  const order = new Map(nodes.map((n, i) => [n, i]));
+  for (const [a, b] of edges) { adj.get(a).push(b); adj.get(b).push(a); }
+  const seen = new Set(), pos = new Map(), singles = [];
+  let y0 = 0;
+  for (const root of nodes) {
+    if (seen.has(root)) continue;
+    seen.add(root);
+    if (!adj.get(root).length) { singles.push(root); continue; }
+    const levels = [];
+    let frontier = [root];
+    while (frontier.length) {
+      levels.push(frontier);
+      const next = [];
+      for (const n of frontier) {
+        for (const m of adj.get(n).slice().sort((a, b) => order.get(a) - order.get(b))) if (!seen.has(m)) { seen.add(m); next.push(m); }
+      }
+      frontier = next;
+    }
+    let rows = 0;
+    levels.forEach((lv, li) => { lv.forEach((n, ri) => pos.set(n, { x: li * MAPD.COLW, y: y0 + ri * MAPD.ROWH })); rows = Math.max(rows, lv.length); });
+    y0 += rows * MAPD.ROWH + MAPD.GAP;
+  }
+  let labelY = null;
+  if (singles.length) {
+    labelY = y0 + 12;
+    const gy = y0 + 28;
+    singles.forEach((n, i) => pos.set(n, { x: (i % MAPD.COLS) * MAPD.COLW, y: gy + Math.floor(i / MAPD.COLS) * MAPD.ROWH }));
+  }
+  return { pos, labelY };
+}
+
+function edgeGeom(pa, pb) {
+  const { W, H } = MAPD;
+  const y1 = pa.y + H / 2, y2 = pb.y + H / 2;
+  if (pa.x === pb.x) {                      // 같은 열: 오른쪽으로 둥글게
+    const x = pa.x + W;
+    return { d: `M${x},${y1} C${x + 44},${y1} ${x + 44},${y2} ${x},${y2}`, mx: x + 33, my: (y1 + y2) / 2 };
+  }
+  const right = pb.x > pa.x;
+  const x1 = right ? pa.x + W : pa.x, x2 = right ? pb.x : pb.x + W;
+  const dx = Math.max(40, Math.abs(x2 - x1) / 2) * (right ? 1 : -1);
+  return { d: `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`, mx: (x1 + x2) / 2, my: (y1 + y2) / 2 };
+}
+
+let mapDrag = null;
+function renderMapPane(pane) {
+  const active = S.items.filter(i => i.status === 'active');
+  if (active.length < 2) {
+    pane.append(h('p', { class: 'map-note', 'data-t': 'map-note' }, active.length === 0 ? '지도에 표시할 개념이 없습니다.' : '개념이 1개뿐이라 아직 그릴 연결이 없어요. 다음 개념을 추가하면 지도가 만들어집니다.'));
+    return;
+  }
+  const activeIds = new Set(active.map(i => i.id));
+  const sel = selItem();
+  const nodes = active.map(i => i.id).sort((a, b) => a - b);
+  const links = S.links.filter(l => activeIds.has(l.from_item_id) && activeIds.has(l.to_item_id));
+  const edges = links.map(l => [l.from_item_id, l.to_item_id]);
+  // 다음 한 단계(기본 제안)는 점선 노드로 현재 개념 옆에 둔다
+  const sg = sel && sel.status === 'active' && sel.content_source !== 'none' && Array.isArray(sel.suggestions) && sel.suggestions[0] ? sel.suggestions[0] : null;
+  if (sg) { nodes.push('ghost'); edges.push([sel.id, 'ghost']); }
+  const { pos, labelY } = layoutMap(nodes, edges);
+  const pathSet = new Set(((S.study.path || []).filter(id => activeIds.has(id))).concat(sel ? [sel.id] : []));
+  const full = S.map.full;
+
+  pane.append(h('div', { class: 'map-tools' },
+    h('button', { class: 'btn', type: 'button', 'data-t': 'map-full', 'aria-pressed': String(full), onclick: () => { S.map.full = !S.map.full; S.map.fit = true; renderExplorePane(); } }, '전체 연결 보기'),
+    h('button', { class: 'btn', type: 'button', 'data-t': 'zoom-in', onclick: () => zoomBy(1.25) }, '확대'),
+    h('button', { class: 'btn', type: 'button', 'data-t': 'zoom-out', onclick: () => zoomBy(0.8) }, '축소'),
+    h('button', { class: 'btn', type: 'button', 'data-t': 'zoom-fit', onclick: () => { S.map.fit = true; renderExplorePane(); } }, '화면 맞춤')));
+  const box = h('div', { class: 'map-box', 'data-t': 'map-box' });
+  pane.append(box);
+  pane.append(h('p', { class: 'map-hint' }, full ? '모든 연결을 보여 줍니다. 개념을 누르면 선택하고, 선을 누르면 관계를 볼 수 있어요.' : '지금까지의 경로와 다음 한 단계만 진하게 보여 줍니다. 점선은 다음 제안이에요.'));
+
+  const termOf = id => (itemById(id) || {}).term || '';
+  const svg = sv('svg', { role: 'group', 'aria-label': '개념 지도', 'data-t': 'map-svg' });
+  const gEdges = sv('g'), gNodes = sv('g');
+  svg.append(gEdges, gNodes);
+  for (const l of links) {
+    const hl = pathSet.has(l.from_item_id) && pathSet.has(l.to_item_id);
+    const g = geom(l.from_item_id, l.to_item_id);
+    const rel = l.label || l.relation_type;
+    const open = () => openEdge(l);
+    const e = sv('g', { class: 'm-edge' + (hl ? ' hl' : '') + (!full && !hl ? ' dim' : ''), 'data-t': 'edge', 'data-id': l.id, 'data-hl': hl ? '1' : '0', role: 'button', tabindex: 0, 'aria-label': `${termOf(l.from_item_id)}와 ${termOf(l.to_item_id)}의 관계: ${rel}` },
+      sv('path', { class: 'line', d: g.d }), sv('path', { class: 'hit', d: g.d }),
+      (hl || full) && rel ? sv('text', { x: g.mx, y: g.my - 4 }, clipText(rel, 8)) : null);
+    e.addEventListener('click', () => { if (!mapDrag || !mapDrag.moved) open(); });
+    e.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); } });
+    gEdges.append(e);
+  }
+  function geom(a, b) { return edgeGeom(pos.get(a), pos.get(b)); }
+  if (sg) {
+    const g = geom(sel.id, 'ghost');
+    gEdges.append(sv('g', { class: 'm-edge ghost hl', 'data-t': 'ghost-edge' }, sv('path', { class: 'line', d: g.d })));
+  }
+  for (const id of nodes) {
+    const p = pos.get(id);
+    if (id === 'ghost') {
+      const gn = sv('g', { class: 'm-node ghost', 'data-t': 'ghost', 'data-term': sg.term, role: 'button', tabindex: 0, 'aria-label': '다음 제안: ' + sg.term, transform: `translate(${p.x},${p.y})` },
+        sv('title', {}, '다음 제안: ' + sg.term), sv('rect', { width: MAPD.W, height: MAPD.H }), sv('text', { x: MAPD.W / 2, y: MAPD.H / 2 }, clipText(sg.term, 9)));
+      const go = () => { if (!mapDrag || !mapDrag.moved) el('nextstep').scrollIntoView({ block: 'start' }); };
+      gn.addEventListener('click', go);
+      gn.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); } });
+      gNodes.append(gn);
+      continue;
+    }
+    const it = itemById(id);
+    const hl = pathSet.has(id), isSel = id === S.selId;
+    const n = sv('g', { class: 'm-node' + (hl ? ' hl' : '') + (isSel ? ' sel' : '') + (!full && !hl ? ' dim' : ''), 'data-t': 'node', 'data-id': id, 'data-hl': hl ? '1' : '0', role: 'button', tabindex: 0, 'aria-label': it.term + (isSel ? ' (현재 개념)' : ''), transform: `translate(${p.x},${p.y})` },
+      sv('title', {}, it.term), sv('rect', { width: MAPD.W, height: MAPD.H }), sv('text', { x: MAPD.W / 2, y: MAPD.H / 2 }, clipText(it.term, 9)));
+    const go = () => { if (!mapDrag || !mapDrag.moved) selectItem(id); };
+    n.addEventListener('click', go);
+    n.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); } });
+    gNodes.append(n);
+  }
+  if (labelY !== null) gNodes.append(sv('text', { class: 'm-label', x: 0, y: labelY }, '연결 없는 개념'));
+  box.append(svg);
+
+  // 보기 영역(viewBox): 확대·축소·이동·맞춤
+  const cw = box.clientWidth || 358;
+  const m = S.map;
+  let ch = box.clientHeight || 400;
+  const focusIds = full ? nodes : nodes.filter(id => id === 'ghost' || pathSet.has(id));
+  // 처음 보기: 경로와 다음 제안이 한눈에 들어오게 맞추되, 글자가 읽히는 크기(MIN_READ) 아래로는 줄이지 않는다.
+  // 그만큼 줄여도 다 안 들어가면 현재 개념과 다음 제안 쪽을 가운데에 둔다(나머지는 끌어서 이동·화면 맞춤으로 본다)
+  const MIN_READ = 0.75;
+  function bboxOf(ids) {
+    const r = ids.map(id => pos.get(id));
+    return { x0: Math.min(...r.map(q => q.x)) - 24, x1: Math.max(...r.map(q => q.x + MAPD.W)) + 24, y0: Math.min(...r.map(q => q.y)) - 24, y1: Math.max(...r.map(q => q.y + MAPD.H)) + 24 };
+  }
+  function fitView() {
+    const b = bboxOf(focusIds);
+    if (labelY !== null && full) b.y0 -= 16;
+    let scale = Math.min(cw / (b.x1 - b.x0), ch / (b.y1 - b.y0), 1.2);
+    let c = b;
+    if (scale < MIN_READ && !full) { scale = MIN_READ; c = bboxOf(nodes.filter(id => id === 'ghost' || id === S.selId)); }
+    else if (scale < MIN_READ) scale = Math.max(0.3, scale);
+    m.scale = Math.max(0.3, scale);
+    m.tx = (c.x0 + c.x1) / 2 - cw / m.scale / 2;
+    m.ty = (c.y0 + c.y1) / 2 - ch / m.scale / 2;
+    m.fit = false;
+    // 지도 상자 높이도 내용에 맞춘다(지도가 한 줄뿐인데 빈 공간이 커지지 않게)
+    const need = (b.y1 - b.y0) * m.scale + 40;
+    m.h = Math.round(Math.max(240, Math.min(440, need)));
+    ch = m.h;
+    m.ty = (c.y0 + c.y1) / 2 - ch / m.scale / 2;
+  }
+  function apply() { svg.setAttribute('viewBox', `${m.tx} ${m.ty} ${cw / m.scale} ${ch / m.scale}`); }
+  if (m.fit) fitView();
+  if (m.h) { box.style.height = m.h + 'px'; ch = m.h; }
+  apply();
+  S.mapView = { apply, cw, ch };
+
+  svg.addEventListener('pointerdown', ev => { mapDrag = { x: ev.clientX, y: ev.clientY, tx: m.tx, ty: m.ty, moved: false, id: ev.pointerId }; });
+  svg.addEventListener('pointermove', ev => {
+    if (!mapDrag || ev.pointerId !== mapDrag.id) return;
+    const dx = ev.clientX - mapDrag.x, dy = ev.clientY - mapDrag.y;
+    if (!mapDrag.moved && Math.hypot(dx, dy) < 6) return;
+    if (!mapDrag.moved) { mapDrag.moved = true; try { svg.setPointerCapture(ev.pointerId); } catch (e) { /* 무시 */ } }
+    m.tx = mapDrag.tx - dx / m.scale; m.ty = mapDrag.ty - dy / m.scale;
+    apply();
+  });
+  const end = () => { if (mapDrag) setTimeout(() => { mapDrag = null; }, 0); };
+  svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+}
+
+function zoomBy(f) {
+  const m = S.map, v = S.mapView;
+  if (!v) return;
+  const cx = m.tx + v.cw / m.scale / 2, cy = m.ty + v.ch / m.scale / 2;
+  m.scale = Math.max(0.25, Math.min(2.5, m.scale * f));
+  m.tx = cx - v.cw / m.scale / 2; m.ty = cy - v.ch / m.scale / 2;
+  m.fit = false;
+  v.apply();
+}
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (S.study && S.items.length && !el('view-study').hidden && S.explorePane === 'map') renderExplorePane(); }, 150);
+});
+
+// 연결선을 누르면 관계 설명 대화상자
+function openEdge(l) {
+  const a = itemById(l.from_item_id), b = itemById(l.to_item_id);
+  const body = el('edge-body');
+  body.textContent = '';
+  body.append(h('div', { id: 'edge-pair', class: 'rel-pair' }, (a ? a.term : '') + ' → ' + (b ? b.term : '')));
+  body.append(h('div', { class: 'rel-type' }, h('span', { class: 'label' }, '관계 종류'), h('div', { 'data-t': 'rel-type' }, l.relation_type)));
+  if (l.label) body.append(h('div', { class: 'rel-type' }, h('span', { class: 'label' }, '관계 문구'), h('div', { 'data-t': 'rel-label' }, l.label)));
+  if (l.detail) body.append(h('div', { class: 'rel-detail' }, h('span', { class: 'label' }, '관계 설명'), h('div', { 'data-t': 'rel-detail' }, l.detail)));
+  body.append(h('div', { class: 'rel-source' + (l.source === 'user' ? ' user' : '') }, l.source === 'user' ? '직접 만든 연결' : 'AI가 만든 연결 · 확인 필요'));
+  const dlg = el('edge-dialog');
+  if (!dlg.open) dlg.showModal();
+}
+el('edge-close').addEventListener('click', () => el('edge-dialog').close());
+el('edge-dialog').addEventListener('click', ev => { if (ev.target === el('edge-dialog')) el('edge-dialog').close(); });
+
+// ── 보류·제외 관리 ──
+function renderSidelined() {
+  const box = el('sidelined');
+  box.textContent = '';
+  const held = S.items.filter(i => i.status === 'held'), excl = S.items.filter(i => i.status === 'excluded');
+  box.hidden = !(held.length || excl.length);
+  if (box.hidden) return;
+  const group = (kind, title, list) => list.length ? h('details', { class: 'sl', 'data-t': 'sl-' + kind, open: S.slOpen[kind] ? true : null, ontoggle: ev => { S.slOpen[kind] = ev.target.open; } },
+    h('summary', {}, icon('chevron'), title, h('span', { class: 'n' }, list.length)),
+    list.map(it => h('div', { class: 'lrow', 'data-id': it.id },
+      h('button', { class: 'lrow-main', type: 'button', onclick: () => selectItem(it.id) },
+        h('div', { class: 'lrow-term' }, it.term),
+        h('div', { class: 'lrow-meta' }, it.content_source === 'none' ? '설명 없음' : '설명 있음')),
+      h('div', { class: 'lrow-actions' },
+        kind === 'held' ? h('button', { class: 'btn text', type: 'button', 'data-t': 'sl-view', onclick: () => restoreItem(it, { select: true }) }, '다시 보기') : null,
+        kind === 'held' && it.content_source === 'none' ? h('button', { class: 'btn text', type: 'button', 'data-t': 'sl-explain', onclick: () => restoreItem(it, { select: true, explain: true }) }, 'AI 설명 받기') : null,
+        kind === 'excluded' ? h('button', { class: 'btn text', type: 'button', 'data-t': 'sl-restore', onclick: () => restoreItem(it, {}) }, '복원') : null)))) : null;
+  box.append(h('div', { class: 'label', style: 'margin-bottom:4px' }, '보류와 제외'), ...[group('held', '나중에 볼 개념', held), group('excluded', '제외한 개념', excl)].filter(Boolean));
+}
+
+async function restoreItem(it, { select, explain }) {
+  const r = await busy('저장하는 중…', () => api('PATCH', '/api/concepts/items/' + it.id, { status: 'active' }));
+  if (!r) return;
+  if (r.status !== 200) { showMsg(errText(r)); return; }
+  setNotice(null);
+  if (select) {
+    const p = await busy('불러오는 중…', () => api('PATCH', '/api/concepts/studies/' + S.study.id, { selected_item_id: it.id }));
+    if (p && p.status !== 200) { showMsg(errText(p)); return; }
+  }
+  await loadStudy(S.study.id);
+  if (explain) await doExplore(it.term, 'input', null);
+  else if (select) el('detail').scrollIntoView({ block: 'start' });
+}
+
 el('back-btn').addEventListener('click', () => { location.hash = ''; });
 
 // 현재 개념과 이어진 개념(지도상 위치)

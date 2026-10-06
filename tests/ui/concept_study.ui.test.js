@@ -359,13 +359,15 @@ test('개념이 없는 학습: 안내만 보이고 입력창으로 시작할 수
   await done(page);
 });
 
-test('뒤로가기·해시 이동, 지도/목록 전환 자리', { skip: SKIP }, async () => {
+test('뒤로가기·해시 이동, 지도/목록 전환(기본은 지도)', { skip: SKIP }, async () => {
   const page = await openStudy();
   assert.equal(await page.eval('location.hash.startsWith("#s=")'), true);
-  await page.click('#seg-map');
   assert.equal(await page.eval("document.getElementById('seg-map').getAttribute('aria-pressed')"), 'true');
+  await page.click('#seg-list');
+  assert.equal(await page.eval("document.getElementById('seg-list').getAttribute('aria-pressed')"), 'true');
+  assert.equal(await page.exists('[data-t="list-item"]'), true);
   await page.click('#seg-map');
-  assert.equal(await page.visible('#explore'), false);
+  assert.equal(await page.exists('[data-t="map-svg"]'), true);
   await page.click('#back-btn');
   await page.waitFor("!document.getElementById('view-list').hidden");
   assert.equal(await page.count('.row'), 1);
