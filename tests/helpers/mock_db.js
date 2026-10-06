@@ -8,7 +8,7 @@
 
 const TABLE_DEFAULTS = {
   users: () => ({ is_blocked: false, perm_concept_study: true }),
-  concept_studies: () => ({ selected_item_id: null, created_at: new Date(), updated_at: new Date() }),
+  concept_studies: () => ({ selected_item_id: null, path: [], created_at: new Date(), updated_at: new Date() }),
   concept_items: () => ({
     english: null, group_label: null, definition: null, example: null, simple_text: null, deeper_text: null,
     content_source: 'none', status: 'active', review_state: 'new', origin: null, note: null,
@@ -20,7 +20,7 @@ const TABLE_DEFAULTS = {
   api_usage: () => ({ created_at: new Date() }),
 };
 const SERIAL = new Set(['concept_studies', 'concept_items', 'concept_links', 'api_usage', 'voice_concepts']);
-const JSON_COLS = new Set(['suggestions', 'feedback']);
+const JSON_COLS = new Set(['suggestions', 'feedback', 'path']);
 const UNIQUE = {
   concept_items: [['study_id', 'term_key'], ['legacy_voice_concept_id']],
   concept_migrations: [['name']],

@@ -18,7 +18,8 @@ const STATUSES = ['active', 'held', 'excluded'];
 const REVIEW_STATES = ['new', 'understood', 'confused'];
 const RELATION_TYPES = ['포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련'];
 
-const STUDY_COLUMNS = 'id, topic, selected_item_id, created_at, updated_at';
+const STUDY_COLUMNS = 'id, topic, selected_item_id, path, created_at, updated_at';
+const PATH_KEEP = 12;
 const ITEM_COLUMNS = 'id, study_id, term, english, group_label, definition, example, simple_text, deeper_text, content_source, status, review_state, origin, note, suggestions, feedback, legacy_voice_concept_id, created_at, updated_at';
 const LINK_COLUMNS = 'id, study_id, from_item_id, to_item_id, relation_type, label, detail, source, created_at';
 
@@ -82,6 +83,22 @@ async function loadStudy(id, userId) {
   return rows[0] || null;
 }
 
+// 선택 경로: 끝에 개념 id를 붙이고(연속 같은 id는 건너뜀) 최근 PATH_KEEP개만 유지
+function appendPath(path, itemId) {
+  const list = Array.isArray(path) ? path.filter(n => Number.isInteger(n)) : [];
+  if (list[list.length - 1] !== itemId) list.push(itemId);
+  return list.slice(-PATH_KEEP);
+}
+// 응답용: 삭제되었거나 이 학습에 없는 개념 id는 뺀다
+function cleanPath(path, itemIds) {
+  return (Array.isArray(path) ? path : []).filter(n => itemIds.has(n));
+}
+// 개념을 선택하고 경로에 반영한다(AI 호출이 실패해 내용이 비어 있는 개념도 선택된다)
+async function selectItem(study, userId, itemId) {
+  await pool.query('UPDATE concept_studies SET selected_item_id = $3, path = $4, updated_at = now() WHERE id = $1 AND user_id = $2',
+    [study.id, userId, itemId, JSON.stringify(appendPath(study.path, itemId))]);
+}
+
 async function loadItem(id, userId) {
   const { rows } = await pool.query(`SELECT ${ITEM_COLUMNS}, user_id FROM concept_items WHERE id = $1 AND user_id = $2`, [id, userId]);
   return rows[0] || null;
@@ -99,10 +116,13 @@ router.get('/api/concepts/studies', guard, async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT ${STUDY_COLUMNS} FROM concept_studies WHERE user_id = $1 ORDER BY updated_at DESC, id DESC`, [req.user.id]);
-    const counts = new Map();
-    const items = await pool.query('SELECT study_id FROM concept_items WHERE user_id = $1', [req.user.id]);
-    for (const it of items.rows) counts.set(it.study_id, (counts.get(it.study_id) || 0) + 1);
-    res.json(rows.map(r => ({ ...r, item_count: counts.get(r.id) || 0 })));
+    const counts = new Map(), understood = new Map();
+    const items = await pool.query('SELECT study_id, review_state FROM concept_items WHERE user_id = $1', [req.user.id]);
+    for (const it of items.rows) {
+      counts.set(it.study_id, (counts.get(it.study_id) || 0) + 1);
+      if (it.review_state === 'understood') understood.set(it.study_id, (understood.get(it.study_id) || 0) + 1);
+    }
+    res.json(rows.map(({ path, ...r }) => ({ ...r, item_count: counts.get(r.id) || 0, understood_count: understood.get(r.id) || 0 })));
   } catch (err) {
     console.error('concepts studies list error:', err.message);
     res.status(500).json(SERVER_ERROR);
@@ -119,7 +139,7 @@ router.post('/api/concepts/studies', guard, async (req, res) => {
     }
     const { rows } = await pool.query(
       `INSERT INTO concept_studies (user_id, topic) VALUES ($1, $2) RETURNING ${STUDY_COLUMNS}`, [req.user.id, topic.value]);
-    res.status(201).json({ ...rows[0], item_count: 0 });
+    res.status(201).json({ ...rows[0], path: [], item_count: 0, understood_count: 0 });
   } catch (err) {
     console.error('concepts study create error:', err.message);
     res.status(500).json(SERVER_ERROR);
@@ -137,8 +157,9 @@ router.get('/api/concepts/studies/:id', guard, async (req, res) => {
     const links = (await pool.query(
       `SELECT ${LINK_COLUMNS} FROM concept_links WHERE study_id = $1 AND user_id = $2 ORDER BY id`, [id, req.user.id])).rows;
     const keys = new Set(items.map(i => termKey(i.term)));
+    const ids = new Set(items.map(i => i.id));
     res.json({
-      study,
+      study: { ...study, path: cleanPath(study.path, ids) },
       items: items.map(i => ({ ...i, suggestions: filterSuggestions(i.suggestions, keys) })),
       links,
     });
@@ -172,11 +193,16 @@ router.patch('/api/concepts/studies/:id', guard, async (req, res) => {
       }
       params.push(src.selected_item_id === null ? null : Number(src.selected_item_id));
       sets.push(`selected_item_id = $${params.length}`);
+      if (src.selected_item_id !== null) {
+        params.push(JSON.stringify(appendPath(study.path, Number(src.selected_item_id))));
+        sets.push(`path = $${params.length}`);
+      }
     }
     const { rows } = await pool.query(
       `UPDATE concept_studies SET ${sets.join(', ')}, updated_at = now() WHERE id = $1 AND user_id = $2 RETURNING ${STUDY_COLUMNS}`, params);
     if (!rows.length) return res.status(404).json(STUDY_NOT_FOUND);
-    res.json(rows[0]);
+    const ids = new Set((await loadStudyItems(id, req.user.id)).map(i => i.id));
+    res.json({ ...rows[0], path: cleanPath(rows[0].path, ids) });
   } catch (err) {
     console.error('concepts study patch error:', err.message);
     res.status(500).json(SERVER_ERROR);
@@ -621,6 +647,7 @@ router.post('/api/concepts/studies/:id/explore', guard, async (req, res) => {
       items = await loadStudyItems(id, req.user.id);
     }
     const linkFrom = from && from.id !== item.id ? from : null;
+    await selectItem(study, req.user.id, item.id);   // 새로 만든(또는 다시 채우는) 개념을 선택하고 경로에 붙인다
 
     const input = buildConceptInput({ study, current: linkFrom, items, text: text.value, feedback: linkFrom ? linkFrom.feedback : null, selfId: item.id });
     const ai = await callConceptAI(req.user.id, 'explore', input, 1500);
