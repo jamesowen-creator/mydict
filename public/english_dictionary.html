@@ -1506,6 +1506,8 @@
      로그인 오버레이/nav/main보다 항상 위(DOM 순서상으로도, sticky로도)에 옴 -->
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
+<script src="/js/common/dialog.js"></script>
+<script>if (!window.metisConfirm) { window.metisConfirm = function (m) { return Promise.resolve(confirm(m)); }; window.metisAlert = function (m) { alert(m); return Promise.resolve(); }; }   // dialog.js를 못 불렀을 때 기본 대화상자로 대체</script>
 
 <!-- LOGIN OVERLAY -->
 <div id="login-overlay" style="display:none">
@@ -2953,7 +2955,7 @@ async function confirmDeleteSelectedWords() {
   const tab = currentWordbookTab;
   const words = wordbook.filter(w => (w.lang || 'en') === tab && selectedWords.has(w.word + '|' + tab));
   if (words.length === 0) { showToast('선택된 단어가 없습니다.'); return; }
-  if (!confirm(`선택한 ${words.length}개 단어를 삭제하시겠습니까?`)) return;
+  if (!(await metisConfirm(`선택한 ${words.length}개 단어를 삭제하시겠습니까?`, { danger: true }))) return;
   await Promise.all(words.filter(w => w.id).map(w => deleteWordFromDB(w.id)));
   const keys = new Set(words.map(w => w.word + '|' + tab));
   wordbook = wordbook.filter(w => !keys.has(w.word + '|' + (w.lang || 'en')));
@@ -3101,7 +3103,7 @@ function importJSON() {
 }
 
 async function clearWordbook() {
-  if (!confirm('단어장을 전체 삭제할까요?')) return;
+  if (!(await metisConfirm('단어장을 전체 삭제할까요?', { danger: true }))) return;
   await Promise.all(wordbook.filter(w => w.id).map(w => deleteWordFromDB(w.id)));
   wordbook = [];
   updateBadges();
@@ -3709,8 +3711,8 @@ function deleteWrong(i) {
   showToast('오답 노트에서 삭제했습니다.');
 }
 
-function clearWrong() {
-  if (!confirm('오답 노트를 전체 삭제할까요?')) return;
+async function clearWrong() {
+  if (!(await metisConfirm('오답 노트를 전체 삭제할까요?', { danger: true }))) return;
   wrongNote = [];
   save();
   renderWrongNote();

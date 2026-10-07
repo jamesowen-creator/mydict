@@ -464,6 +464,8 @@
 <!-- 작업13: 전 화면 공통 상단 헤더 -->
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
+<script src="/js/common/dialog.js"></script>
+<script>if (!window.metisConfirm) { window.metisConfirm = function (m) { return Promise.resolve(confirm(m)); }; window.metisAlert = function (m) { alert(m); return Promise.resolve(); }; }   // dialog.js를 못 불렀을 때 기본 대화상자로 대체</script>
 
 <!-- Loading -->
 <div id="loading">
@@ -844,12 +846,12 @@ function resetQuizState() {
 function startQuizFlow() {
   const conquered = getConqueredConcepts();
   if (conquered.length === 0) {
-    alert('먼저 개념을 정복해 주세요');
+    metisAlert('먼저 개념을 정복해 주세요');
     return;
   }
   const questions = buildQuestions(conquered);
   if (questions.length === 0) {
-    alert('퀴즈를 만들 수 없습니다. 다른 개념도 정복해 보세요');
+    metisAlert('퀴즈를 만들 수 없습니다. 다른 개념도 정복해 보세요');
     return;
   }
   quizState = { questions, currentIdx: 0, score: 0, wrong: [], answered: false };

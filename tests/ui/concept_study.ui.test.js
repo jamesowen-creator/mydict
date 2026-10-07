@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startMockServer } = require('./helpers/mock_server');
+const { dialogAnswer } = require('./helpers/dialog');
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 const WIDTHS = [[390, 844], [768, 1024], [1024, 800]];
@@ -106,14 +107,13 @@ test('목록 행: 이름·개념 수·이해 수·날짜, 이름 수정(검증 �
   await page.waitFor("document.querySelector('.row-title') && document.querySelector('.row-title').innerText === '세포 생물학'");
   assert.equal(srv.state.studies[0].topic, '세포 생물학');
   // 삭제: 취소하면 남고, 확인하면 삭제
-  page.autoDialog.accept = false;
   await page.click('[data-t="delete-study"]');
-  await page.waitFor('true'); await sleep(150);
-  assert.equal(page.dialogs.length, 1);
-  assert.match(page.dialogs[0].message, /개념 2개가 모두 삭제/);
+  assert.match(await dialogAnswer(page, false), /개념 2개가 모두 삭제/);   // 작업207: 기본 confirm 대신 공용 대화상자
+  await sleep(150);
+  assert.equal(page.dialogs.length, 0, '기본 대화상자는 쓰지 않음');
   assert.equal(srv.state.studies.length, 1);
-  page.autoDialog.accept = true;
   await page.click('[data-t="delete-study"]');
+  await dialogAnswer(page, true);
   await page.waitFor("document.getElementById('list-empty') && !document.getElementById('list-empty').hidden");
   assert.equal(srv.state.studies.length, 0);
   assert.equal(srv.state.items.length, 0);
@@ -334,12 +334,12 @@ test('이해함 토글·메모 자동 저장·개념 삭제 확인', { skip: SKI
   assert.equal(it().note, '메모 내용 추가');
   assert.equal(calls(/\/api\/concepts\/items\/\d+$/, 'PATCH').length - before, 1, '디바운스로 한 번만 저장');
   // 삭제: 취소 → 유지, 확인 → 삭제 후 다른 개념 선택
-  page.autoDialog.accept = false;
   await page.click('[data-t="delete-item"]');
+  assert.match(await dialogAnswer(page, false), /개념을 삭제할까요/);   // 작업207: 기본 confirm 대신 공용 대화상자
   await sleep(150);
   assert.equal(srv.state.items.length, 2);
-  page.autoDialog.accept = true;
   await page.click('[data-t="delete-item"]');
+  await dialogAnswer(page, true);
   await page.waitFor("document.querySelector('[data-t=term]').innerText === '세포'");
   assert.equal(srv.state.items.length, 1);
   assert.equal(srv.state.links.length, 0);

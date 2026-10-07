@@ -272,6 +272,8 @@
 
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
+<script src="/js/common/dialog.js"></script>
+<script>if (!window.metisConfirm) { window.metisConfirm = function (m) { return Promise.resolve(confirm(m)); }; window.metisAlert = function (m) { alert(m); return Promise.resolve(); }; }   // dialog.js를 못 불렀을 때 기본 대화상자로 대체</script>
 
 <div id="loading" role="status"><div class="spinner"></div><p>불러오는 중…</p></div>
 
@@ -557,7 +559,7 @@ function startRename(row, s) {
 }
 
 async function deleteStudy(s) {
-  if (!confirm("'" + s.topic + "' 학습과 그 안의 개념 " + s.item_count + '개가 모두 삭제됩니다. 삭제할까요?')) return;
+  if (!(await metisConfirm("'" + s.topic + "' 학습과 그 안의 개념 " + s.item_count + '개가 모두 삭제됩니다. 삭제할까요?', { danger: true }))) return;
   const r = await busy('삭제하는 중…', () => api('DELETE', '/api/concepts/studies/' + s.id));
   if (!r) return;
   if (r.status !== 200 && r.status !== 404) { el('list-msg').className = 'msg error'; el('list-msg').textContent = errText(r); return; }
@@ -1117,7 +1119,7 @@ function openLinkForm(it, host, openBtn) {
 }
 
 async function deleteLink(l) {
-  if (!confirm('이 연결을 삭제할까요?')) return;
+  if (!(await metisConfirm('이 연결을 삭제할까요?', { danger: true }))) return;
   const r = await busy('삭제하는 중…', () => api('DELETE', '/api/concepts/links/' + l.id));
   if (!r) return;
   if (r.status !== 200 && r.status !== 404) { showMsg(errText(r)); return; }
@@ -1323,7 +1325,7 @@ function openGroupEdit(it, host, tools) {
 }
 
 async function deleteItem(it) {
-  if (!confirm("'" + it.term + "' 개념을 삭제할까요? 이어진 연결도 함께 삭제됩니다.")) return;
+  if (!(await metisConfirm("'" + it.term + "' 개념을 삭제할까요? 이어진 연결도 함께 삭제됩니다.", { danger: true }))) return;
   const r = await busy('삭제하는 중…', () => api('DELETE', '/api/concepts/items/' + it.id));
   if (!r) return;
   if (r.status !== 200 && r.status !== 404) { showMsg(errText(r)); return; }

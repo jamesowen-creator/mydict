@@ -545,6 +545,8 @@
      그 기능이 없어짐) -->
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
+<script src="/js/common/dialog.js"></script>
+<script>if (!window.metisConfirm) { window.metisConfirm = function (m) { return Promise.resolve(confirm(m)); }; window.metisAlert = function (m) { alert(m); return Promise.resolve(); }; }   // dialog.js를 못 불렀을 때 기본 대화상자로 대체</script>
 
 <!-- Loading -->
 <div id="loading">
@@ -1049,7 +1051,7 @@ function renderCard() {
     if (!allUnlocked) {
       quizBtn.textContent = '학습 완료 후 해제';
       quizBtn.style.background = '#9CA3AF';
-      quizBtn.onclick = () => alert('모든 작품의 quiz_unlocked가 true여야 퀴즈를 시작할 수 있습니다.');
+      quizBtn.onclick = () => metisAlert('모든 작품의 quiz_unlocked가 true여야 퀴즈를 시작할 수 있습니다.');
     } else {
       quizBtn.innerHTML = `
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">

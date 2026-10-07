@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startMockServer } = require('./helpers/mock_server');
+const { dialogAnswer } = require('./helpers/dialog');
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 let browser, srv;
@@ -86,13 +87,13 @@ test('관계 문구는 40자까지, 개념이 1개뿐이면 연결 추가 버튼
 
 test('연결 삭제: 취소하면 그대로, 확인하면 삭제되고 지도에서도 사라짐', { skip: SKIP }, async () => {
   const page = await openStudy();
-  page.autoDialog.accept = false;
   await page.click('[data-t="link-delete"]');
+  assert.equal(await dialogAnswer(page, false), '이 연결을 삭제할까요?');   // 작업207: 기본 confirm 대신 공용 대화상자
   await sleep(300);
   assert.equal(calls(/\/api\/concepts\/links\/\d+$/, 'DELETE').length, 0);
   assert.equal(await page.count('[data-t="link"]'), 1);
-  page.autoDialog.accept = true;
   await page.click('[data-t="link-delete"]');
+  await dialogAnswer(page, true);
   await page.waitFor("document.querySelectorAll('[data-t=link]').length === 0");
   assert.equal(calls(/\/api\/concepts\/links\/\d+$/, 'DELETE').length, 1);
   assert.equal(srv.state.links.length, 0);

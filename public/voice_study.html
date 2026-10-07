@@ -304,6 +304,8 @@
 <!-- 작업13: 전 화면 공통 상단 헤더 -->
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
+<script src="/js/common/dialog.js"></script>
+<script>if (!window.metisConfirm) { window.metisConfirm = function (m) { return Promise.resolve(confirm(m)); }; window.metisAlert = function (m) { alert(m); return Promise.resolve(); }; }   // dialog.js를 못 불렀을 때 기본 대화상자로 대체</script>
 
 <div id="loading">
   <div class="spinner"></div>
@@ -1144,8 +1146,8 @@ $('rec-toggle').addEventListener('click', () => {
   if (recState === 'idle') startRecording();
   else if (recState === 'recording') finishRecording(false);
 });
-$('rec-redo').addEventListener('click', () => {
-  if (pending && !confirm('이 녹음을 버리고 다시 녹음할까요?')) return;
+$('rec-redo').addEventListener('click', async () => {
+  if (pending && !(await metisConfirm('이 녹음을 버리고 다시 녹음할까요?', { danger: true }))) return;
   resetRecording();
 });
 $('new-rec-btn').addEventListener('click', () => {
@@ -1319,7 +1321,7 @@ $('sum-make').addEventListener('click', async () => {
   setMsg('sum-msg', '');
   const transcript = $('edit-text').value;
   if (!transcript.trim()) { setMsg('sum-msg', '원문이 비어 있어 요약할 수 없습니다. 원문을 입력해 주세요.', 'error'); return; }
-  if ($('edit-summary').value.trim() && !confirm('기존 요약을 덮어씁니다. 계속할까요?')) return;
+  if ($('edit-summary').value.trim() && !(await metisConfirm('기존 요약을 덮어씁니다. 계속할까요?'))) return;
   const session = editSession;
   $('sum-make').disabled = true;
   $('sum-status').style.display = '';
@@ -1424,8 +1426,8 @@ function renderLinks(data, analyzing) {
     } else {
       const c = document.createElement('div'); c.className = 'link-check'; c.textContent = '사실 확인 필요'; b.appendChild(c);
     }
-    b.addEventListener('click', () => {
-      if (editDirty && !confirm('저장하지 않은 내용이 있습니다. 이동할까요?')) return;
+    b.addEventListener('click', async () => {
+      if (editDirty && !(await metisConfirm('저장하지 않은 내용이 있습니다. 이동할까요?'))) return;
       openDetail(l.note_id, true);
     });
     $('link-list').appendChild(b);
@@ -1629,7 +1631,7 @@ function updateRatingUi() {
 async function makeImage() {
   if (imgBusy || imgNoteId === null || !imgData) return;
   const remake = imgData.status !== 'none';
-  if (remake && !confirm('기존 그림이 삭제되고 오늘 남은 횟수가 사용됩니다 (남은 횟수 ' + imgData.remaining + ')')) return;
+  if (remake && !(await metisConfirm('기존 그림이 삭제되고 오늘 남은 횟수가 사용됩니다 (남은 횟수 ' + imgData.remaining + ')', { danger: true }))) return;
   const noteId = imgNoteId, session = editSession;
   imgBusy = true;
   $('img-make').disabled = true; updateRatingUi();
@@ -1887,7 +1889,7 @@ function quizErrorText(e) {
 $('quiz-make').addEventListener('click', async () => {
   if (quizBusy || editMode !== 'detail') return;
   setMsg('quiz-msg', '');
-  if (quizData && !confirm('퀴즈를 새로 만들면 오늘 만들 수 있는 횟수(하루 10건)가 1건 차감되고 기존 퀴즈는 새 퀴즈로 바뀝니다. 계속할까요?')) return;
+  if (quizData && !(await metisConfirm('퀴즈를 새로 만들면 오늘 만들 수 있는 횟수(하루 10건)가 1건 차감되고 기존 퀴즈는 새 퀴즈로 바뀝니다. 계속할까요?'))) return;
   const session = editSession, noteId = editNoteId;
   quizBusy = true;
   $('quiz-status').style.display = '';
@@ -2124,9 +2126,9 @@ $('chat-send').addEventListener('click', async () => {
   chatBusy = false;
   renderChat();
 });
-function resetChat() {
+async function resetChat() {
   if (chatBusy) return;
-  if (chatMessages.length && !confirm('대화를 비우고 새로 시작할까요? 지금까지의 대화는 사라집니다.')) return;
+  if (chatMessages.length && !(await metisConfirm('대화를 비우고 새로 시작할까요? 지금까지의 대화는 사라집니다.', { danger: true }))) return;
   chatMessages = [];
   $('chat-input').value = '';
   setMsg('chat-msg', '');
@@ -2169,8 +2171,8 @@ function renderMergeInfo(sources) {
     } else {
       const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn small secondary';
       btn.textContent = src.title || '(제목 없음)';
-      btn.addEventListener('click', () => {
-        if (editDirty && !confirm('저장하지 않은 내용이 있습니다. 이동할까요?')) return;
+      btn.addEventListener('click', async () => {
+        if (editDirty && !(await metisConfirm('저장하지 않은 내용이 있습니다. 이동할까요?'))) return;
         openDetail(src.id, true);
       });
       row.appendChild(btn);
@@ -2345,7 +2347,7 @@ $('edit-save').addEventListener('click', async () => {
   history.back();   // popstate → 목록
 });
 $('edit-delete').addEventListener('click', async () => {
-  if (!confirm('이 자료를 삭제할까요? 삭제하면 되돌릴 수 없습니다.')) return;
+  if (!(await metisConfirm('이 자료를 삭제할까요? 삭제하면 되돌릴 수 없습니다.', { danger: true }))) return;
   $('edit-delete').disabled = true;
   try { await api('DELETE', '/api/voice-notes/' + editNoteId); }
   catch (e) {
