@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- 작업13: 전 화면 공통 상단 헤더(로고+로그인상태) -->
 <link rel="stylesheet" href="/css/common/appHeader.css">
+<link rel="stylesheet" href="/css/common/tokens.css">
 <link rel="stylesheet" href="/css/common/screenBar.css">
 <style>
   /* 작업180: 음성 학습 - 녹음 → 글로 변환 → 원문 수정 → 저장. 음성은 서버에 저장되지 않는다.
@@ -36,11 +37,12 @@
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
   body {
+    font-size: var(--body-font-size);
     font-family: 'Noto Sans KR', 'Inter', sans-serif;
     background: var(--bg);
     color: var(--text1);
     min-height: 100dvh;
-    max-width: 480px;
+    max-width: var(--content-max);
     margin: 0 auto;
     position: relative;
     overflow-x: hidden;
@@ -79,7 +81,7 @@
   .view-sub { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
 
   /* ── 안내/오류 메시지 (science_reading.html의 .ox-feedback 모양) ── */
-  .msg { margin-top: 12px; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 500; line-height: 1.6; }
+  .msg { margin-top: 12px; padding: 10px 14px; border-radius: var(--msg-radius); font-size: 13px; font-weight: 500; line-height: 1.6; }
   .msg.error { background: var(--error-light); color: var(--error); }
   .msg.warn { background: var(--bg); color: var(--text1); border: 1px solid var(--border); }
   .msg.info { background: var(--primary-light); color: var(--primary-dark); }
@@ -88,10 +90,10 @@
 
   /* ── 버튼 (science_reading.html의 .result-btn / .quiz-next-btn 모양) ── */
   .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: var(--ctl-min-h); display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     padding: 15px 20px;
-    border: none; border-radius: 14px;
-    font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 700;
+    border: none; border-radius: var(--btn-radius);
+    font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: var(--btn-weight);
     cursor: pointer; background: var(--primary); color: #fff;
     transition: all 0.15s;
   }
@@ -102,14 +104,14 @@
   .btn.danger { background: var(--error-light); color: var(--error); }
   .btn.danger:hover:not(:disabled) { background: var(--error-light); }
   .btn.block { display: flex; width: 100%; }
-  .btn.small { padding: 10px 14px; border-radius: 12px; font-size: 13px; }
+  .btn.small { min-height: var(--ctl-min-h); padding: 10px 14px; border-radius: var(--btn-radius); font-size: 13px; }
   .btn-row { display: flex; gap: 10px; margin-top: 12px; }
   .btn-row .btn { flex: 1; }
 
   /* ── 카드 (science_reading.html의 .science-section 모양) ── */
   .note-item, .rec-box {
     background: var(--card);
-    border-radius: 16px;
+    border-radius: var(--card-radius);
     border: 1px solid var(--border);
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
   }
@@ -152,7 +154,7 @@
   .field-label:first-child { margin-top: 0; }
   input[type=text], textarea {
     width: 100%; font-family: 'Noto Sans KR', sans-serif; font-size: 16px; color: var(--text1);
-    background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--input-radius); padding: 12px 14px;
   }
   textarea { min-height: 280px; line-height: 1.7; resize: vertical; }
   textarea.summary { min-height: 150px; }
@@ -166,7 +168,7 @@
   .quiz-section { margin-top: 24px; }
   .quiz-question-counter { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
   .quiz-card {
-    background: var(--card); border-radius: 16px;
+    background: var(--card); border-radius: var(--card-radius);
     border: 1px solid var(--border); padding: 20px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
   }
@@ -230,7 +232,7 @@
   /* 작업187: 과목 선택, 요약 유형 선택(select는 .tts-rate select와 같은 값) */
   .subj-row { display: flex; gap: 10px; }
   .subj-row > div { flex: 1; min-width: 0; }
-  .sel { font-family: 'Noto Sans KR', sans-serif; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text1); }
+  .sel { font-family: 'Noto Sans KR', sans-serif; font-size: 14px; padding: 8px 10px; border-radius: var(--input-radius); border: 1px solid var(--border); background: var(--card); color: var(--text1); min-height: var(--ctl-min-h); }
   .subj-row .sel { width: 100%; }
   .sum-type { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; color: var(--text2); }
   .sum-type .sel { flex: 1; min-width: 0; }
@@ -249,7 +251,7 @@
   .kw-chip.on { background: var(--primary-light); color: var(--primary-dark); border-color: var(--primary); }
 
   /* 작업190: 연상 그림(실험) */
-  .img-card { background: var(--card); border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,0.04); padding: 14px; margin-bottom: 12px; }
+  .img-card { background: var(--card); border-radius: var(--card-radius); border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,0.04); padding: 14px; margin-bottom: 12px; }
   .img-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
   .img-card-title { font-size: 15px; font-weight: 700; word-break: break-all; }
   .img-card-no { font-size: 12px; color: var(--text2); flex-shrink: 0; }
@@ -294,7 +296,7 @@
   .tts-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .tts-row .btn.small { flex: none; }
   .tts-rate { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text2); margin-left: auto; }
-  .tts-rate select { font-family: 'Noto Sans KR', sans-serif; font-size: 14px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text1); }
+  .tts-rate select { font-family: 'Noto Sans KR', sans-serif; font-size: 14px; padding: 6px 8px; border-radius: var(--input-radius); border: 1px solid var(--border); background: var(--card); color: var(--text1); }
 </style>
 </head>
 <body>

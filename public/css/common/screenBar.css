@@ -20,7 +20,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px;
+  padding: 6px var(--gutter, 16px);
   background: #ffffff;
   border-bottom: 1px solid #dde2f5;
   font-family: 'Noto Sans KR', sans-serif;

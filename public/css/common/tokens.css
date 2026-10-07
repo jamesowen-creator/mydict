@@ -1,0 +1,19 @@
+/* 작업201: 전 화면 공통 "색 제외" 토큰. 값은 사전(english_dictionary.html)의 실제 CSS에서 가져왔다:
+     버튼   .btn            border-radius: var(--radius-sm)=10px, font-weight: 600
+     입력창 .search-input   border-radius: var(--radius-sm)=10px
+     카드   .result-card    border-radius: var(--radius)=16px
+     본문 폭 main           max-width: 680px
+   --ctl-min-h(44px)는 터치 영역 기준, --gutter(16px)는 화면 좌우 여백, --body-font-size(15px)는 본문 글자 크기(요청값).
+   색은 화면마다 따로 둔다(주제색은 모두 코랄 #e2583b, 정답 초록·오답 빨강 같은 의미색은 화면의 변수 그대로).
+   각 화면은 자기 CSS에서 같은 역할의 요소가 이 변수를 쓰게 한다. */
+:root {
+  --ctl-min-h: 44px;
+  --btn-radius: 10px;
+  --btn-weight: 600;
+  --input-radius: 10px;
+  --card-radius: 16px;
+  --msg-radius: 10px;
+  --gutter: 16px;
+  --body-font-size: 15px;
+  --content-max: 680px;
+}

@@ -22,6 +22,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <!-- 작업13: 전 화면 공통 상단 헤더(로고+로그인상태) -->
 <link rel="stylesheet" href="/css/common/appHeader.css">
+<link rel="stylesheet" href="/css/common/tokens.css">
 <style>
   :root {
     --bg: #f5f7ff;
@@ -50,6 +51,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
+    font-size: var(--body-font-size);
     background: var(--bg);
     color: var(--text);
     font-family: 'Noto Sans KR', sans-serif;
@@ -222,13 +224,13 @@
   .search-clear-btn:hover { color: var(--text); }
 
   .btn {
-    background: var(--accent);
+    min-height: var(--ctl-min-h); background: var(--accent);
     color: white;
     border: none;
     border-radius: var(--radius-sm);
     padding: 12px 20px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: var(--btn-weight);
     cursor: pointer;
     transition: opacity 0.2s, transform 0.1s;
     white-space: nowrap;
@@ -295,7 +297,7 @@
     /* 작업12: 하단 고정 nav(--navbar-h + 안전영역)에 콘텐츠가 가려지지
        않도록 여백 확보 */
     padding: 0 16px calc(var(--navbar-h) + env(safe-area-inset-bottom) + 16px);
-    max-width: 680px;
+    max-width: var(--content-max);
     width: 100%;
     margin: 0 auto;
   }
@@ -1463,12 +1465,12 @@
     pointer-events: none;
   }
   #page-search .search-input {
-    border-radius: 14px;
+    border-radius: var(--input-radius);
     padding-left: 40px;
   }
   #search-btn {
     background: #e2583b;
-    border-radius: 14px;
+    border-radius: var(--btn-radius);
   }
 
   #page-search .lang-indicator { gap: 20px; align-items: center; }

@@ -9,12 +9,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/common/appHeader.css">
+<link rel="stylesheet" href="/css/common/tokens.css">
 <link rel="stylesheet" href="/css/common/screenBar.css">
 <style>
   /* 작업195: 개념학습. 개념 하나에서 시작해 AI가 쉬운 설명과 다음 한 걸음을 제안한다.
      METIS 미니멀 디자인 원칙(docs/design/design-principles.md): 카드·뱃지 없이 여백과 1px 구분선,
      포인트 색은 코랄 하나, 터치 영역 44px 이상, 인라인 SVG 아이콘만. */
-  /* 작업200: 사전(english_dictionary.html)의 색·반경 값을 그대로 쓴다. 다크모드는 쓰지 않는다. */
+  /* 작업200: 사전(english_dictionary.html)의 색을 그대로 쓴다. 다크모드는 쓰지 않는다. 반경·글자 같은 색 아닌 값은 /css/common/tokens.css */
   :root {
     --bg: #f5f7ff;
     --surface: #ffffff;
@@ -28,8 +29,8 @@
     --danger: #B42318;
     --focus: #1a1f3c;
     --node-line: #868ca8;   /* 지도 노드 테두리: 흰 배경 대비 3.3:1(비텍스트 3:1 이상) */
-    --radius: 16px;
-    --radius-sm: 10px;
+    --danger-bg: #fcebeb;   /* 오류 박스 배경(음성 학습의 --error-light와 같은 값) */
+    --info-bg: #fdf0ec;     /* 안내 박스 배경(코랄 연한 색) */
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html { -webkit-text-size-adjust: 100%; }
@@ -40,7 +41,7 @@
     min-height: 100dvh;
     overflow-x: hidden;
     line-height: 1.6;
-    font-size: 15px;
+    font-size: var(--body-font-size);
   }
   button, input, textarea { font-family: inherit; font-size: inherit; color: inherit; }
   button { cursor: pointer; }
@@ -49,7 +50,7 @@
   [hidden] { display: none !important; }
   svg.ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
-  .wrap { max-width: 640px; margin: 0 auto; padding: 0 16px; }
+  .wrap { max-width: var(--content-max); margin: 0 auto; padding: 0 16px; }
   #app { padding-bottom: 24px; }
   #app.in-study { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 
@@ -65,7 +66,7 @@
   .label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--text2); text-transform: uppercase; }
   .muted { color: var(--text2); }
   .small { font-size: 13px; }
-  .btn { min-height: 44px; padding: 10px 18px; border: 1px solid var(--line); background: var(--surface2); border-radius: var(--radius-sm); font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn { min-height: 44px; padding: 10px 18px; border: 1px solid var(--line); background: var(--surface2); border-radius: var(--btn-radius); font-weight: var(--btn-weight); display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .btn.text { background: transparent; border: none; padding: 10px 6px; color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
   .btn.text.danger { color: var(--danger); }
@@ -73,17 +74,17 @@
   .iconbtn { width: 44px; height: 44px; border: none; background: transparent; display: inline-flex; align-items: center; justify-content: center; color: var(--text2); }
   .btn-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
   input[type=text], textarea {
-    width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 11px 12px; min-height: 44px; line-height: 1.5;
+    width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--input-radius); padding: 11px 12px; min-height: 44px; line-height: 1.5;
   }
   textarea { resize: vertical; min-height: 88px; }
   .field { margin-top: 14px; }
   .field > .label { display: block; margin-bottom: 6px; }
   .counter { font-size: 12px; color: var(--text2); text-align: right; margin-top: 2px; }
-  .msg { margin-top: 12px; font-size: 14px; line-height: 1.6; }
+  .msg { margin-top: 12px; padding: 10px 14px; border-radius: var(--msg-radius); font-size: 13px; font-weight: 500; line-height: 1.6; }
   .msg:empty { display: none; }
-  .msg.error { color: var(--danger); }
-  .msg.err-block { border-left: 2px solid var(--danger); padding: 4px 0 4px 12px; color: var(--text); }
-  .msg.info { color: var(--text2); }
+  .msg.error { background: var(--danger-bg); color: var(--danger); }
+  .msg.err-block { background: var(--danger-bg); color: var(--danger); }
+  .msg.info { background: var(--info-bg); color: var(--accent-text); }
   .busy-line { display: flex; align-items: center; gap: 10px; color: var(--text2); font-size: 14px; margin-top: 12px; }
   .busy-line .spinner { width: 16px; height: 16px; border-width: 2px; }
 
@@ -121,7 +122,7 @@
   .sec.quote p { border-left: 2px solid var(--accent); padding-left: 12px; }
   .empty-explain { margin-top: 16px; color: var(--text2); }
   .state-note { margin-top: 10px; font-size: 13px; color: var(--text2); border-left: 2px solid var(--line); padding-left: 10px; }
-  .toggle { min-height: 44px; padding: 0 14px 0 10px; background: transparent; border: 1px solid var(--line); border-radius: var(--radius-sm); display: inline-flex; align-items: center; gap: 8px; font-weight: 500; color: var(--text2); }
+  .toggle { min-height: 44px; padding: 0 14px 0 10px; background: transparent; border: 1px solid var(--line); border-radius: var(--btn-radius); display: inline-flex; align-items: center; gap: 8px; font-weight: 500; color: var(--text2); }
   .toggle[aria-pressed=true] { color: var(--text); font-weight: 800; border-color: var(--text); }
   .toggle .ic { visibility: hidden; }
   .toggle[aria-pressed=true] .ic { visibility: visible; color: var(--accent-text); }
@@ -160,7 +161,7 @@
   .map-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 6px; }
   .map-tools .btn { min-height: 44px; padding: 0 10px; background: transparent; border-color: transparent; font-weight: 500; color: var(--text2); }
   .map-tools .btn[aria-pressed=true] { color: var(--text); font-weight: 800; border-bottom: 2px solid var(--accent); }
-  .map-box { height: 400px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; touch-action: none; position: relative; }
+  .map-box { height: 400px; border: 1px solid var(--line); border-radius: var(--card-radius); background: var(--surface); overflow: hidden; touch-action: none; position: relative; }
   .map-box svg { width: 100%; height: 100%; display: block; cursor: grab; }
   .map-hint { font-size: 12px; color: var(--text2); margin-top: 6px; }
   .m-edge path.line { fill: none; stroke: var(--text2); stroke-width: 1.5; }
@@ -205,7 +206,7 @@
   .sl > summary .n { font-weight: 500; color: var(--text2); font-size: 13px; }
   .sl + .sl { margin-top: 4px; }
 
-  dialog { border-radius: var(--radius); margin: auto; max-width: min(420px, calc(100vw - 32px)); width: 100%; padding: 20px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+  dialog { border-radius: var(--card-radius); margin: auto; max-width: min(420px, calc(100vw - 32px)); width: 100%; padding: 20px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
   dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
   dialog .rel-pair { font-size: 17px; font-weight: 800; word-break: break-all; }
   dialog .rel-type { margin-top: 10px; }

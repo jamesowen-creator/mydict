@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- 작업13: 전 화면 공통 상단 헤더(로고+로그인상태) -->
 <link rel="stylesheet" href="/css/common/appHeader.css">
+<link rel="stylesheet" href="/css/common/tokens.css">
 <link rel="stylesheet" href="/css/common/screenBar.css">
 <style>
   :root {
@@ -33,11 +34,12 @@
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
   body {
+    font-size: var(--body-font-size);
     font-family: 'Noto Sans KR', 'Inter', sans-serif;
     background: var(--bg);
     color: var(--text1);
     min-height: 100dvh;
-    max-width: 680px;
+    max-width: var(--content-max);
     margin: 0 auto;
     position: relative;
     overflow-x: hidden;
@@ -69,7 +71,7 @@
   /* ── Tab Bar ── */
   .tab-bar {
     position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: 680px;
+    width: 100%; max-width: var(--content-max);
     height: calc(var(--tab-height) + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: var(--card);
@@ -251,7 +253,7 @@
 
   .digest-work-header {
     background: var(--card);
-    border-radius: 16px;
+    border-radius: var(--card-radius);
     border: 1px solid var(--border);
     padding: 20px;
     margin-bottom: 14px;
@@ -262,7 +264,7 @@
 
   .digest-section {
     background: var(--card);
-    border-radius: 16px;
+    border-radius: var(--card-radius);
     border: 1px solid var(--border);
     padding: 18px 20px;
     margin-bottom: 14px;
@@ -332,17 +334,17 @@
   /* Conquest toggle */
   .conquest-bar {
     position: fixed; bottom: var(--tab-height); left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: 680px;
+    width: 100%; max-width: var(--content-max);
     padding: 10px 16px;
     background: var(--card);
     border-top: 1px solid var(--border);
     z-index: 150;
   }
   .conquest-btn {
-    width: 100%; padding: 14px;
-    border-radius: 14px; border: 2px solid var(--border);
+    min-height: var(--ctl-min-h); width: 100%; padding: 14px;
+    border-radius: var(--btn-radius); border: 2px solid var(--border);
     background: var(--bg); cursor: pointer;
-    font-size: 15px; font-weight: 700;
+    font-size: 15px; font-weight: var(--btn-weight);
     font-family: 'Noto Sans KR', sans-serif;
     display: flex; align-items: center; justify-content: center; gap: 8px;
     color: var(--text2); transition: all 0.2s;
@@ -370,7 +372,7 @@
   }
   .quiz-question-counter { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
   .quiz-card {
-    background: var(--card); border-radius: 16px;
+    background: var(--card); border-radius: var(--card-radius);
     border: 1px solid var(--border); padding: 20px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
   }
@@ -423,11 +425,11 @@
   .ox-feedback.wrong-fb { background: var(--error-light); color: var(--error); }
 
   .quiz-next-btn {
-    margin-top: 20px;
+    min-height: var(--ctl-min-h); margin-top: 20px;
     background: var(--primary); color: #fff;
-    border: none; border-radius: 12px;
+    border: none; border-radius: var(--btn-radius);
     padding: 14px; width: 100%;
-    font-size: 15px; font-weight: 700; cursor: pointer;
+    font-size: 15px; font-weight: var(--btn-weight); cursor: pointer;
     display: none; font-family: 'Noto Sans KR', sans-serif;
     transition: background 0.15s;
   }
@@ -458,8 +460,8 @@
   .result-wrong-a::before { content: '정답: '; color: var(--text2); font-weight: 400; }
   .result-actions { display: flex; flex-direction: column; gap: 10px; }
   .result-btn {
-    border-radius: 14px; padding: 15px;
-    font-size: 15px; font-weight: 700; cursor: pointer;
+    min-height: var(--ctl-min-h); border-radius: var(--btn-radius); padding: 15px;
+    font-size: 15px; font-weight: var(--btn-weight); cursor: pointer;
     border: none; transition: all 0.15s;
     font-family: 'Noto Sans KR', sans-serif;
   }
