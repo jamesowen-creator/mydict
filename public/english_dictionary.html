@@ -1449,50 +1449,9 @@
   /* 작업34: 아이콘 원형 버튼 대신 텍스트 전용 버튼으로 */
   .ocr-open-btn{position:fixed;right:16px;bottom:calc(var(--navbar-h) + env(safe-area-inset-bottom) + 12px);z-index:120;padding:12px 20px;border:0;border-radius:999px;background:#1A1A1E;color:#fff;font-size:14px;font-weight:700;font-family:'Noto Sans KR',sans-serif;box-shadow:0 2px 10px rgba(0,0,0,0.2)}
 
-  /* 작업27: 사전 페이지 한정 헤더/검색창/언어탭 미니멀 리디자인 실험.
-     appHeader.js/css는 그대로 두고, 이 페이지 전용 스크립트가 inject()가
-     만든 DOM에 아래 클래스들을 덧붙여서 이 페이지 안에서만 스타일을
-     덮어쓴다 - 다른 4개 화면(문학나침반/한입독서/관리자/MetaCong)에는
-     영향 없음. #search-btn/.lang-tag 등 이 페이지 전용 셀렉터로만
-     스코프를 좁혀서 전역 .btn/--accent는 건드리지 않는다. */
-  .dict-exp-header-left {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    min-width: 0;
-  }
-  .dict-exp-header-subtext {
-    font-size: 12px;
-    font-weight: 500;
-    color: #6B7280;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 60vw;
-  }
-  .dict-exp-header-subtext .dict-exp-admin-link {
-    background: none;
-    border: none;
-    padding: 0;
-    border-radius: 0;
-    font: inherit;
-    color: inherit;
-    text-decoration: none;
-  }
-  .dict-exp-header-subtext .dict-exp-admin-link:hover { text-decoration: underline; }
-  .dict-exp-header-subtext .metis-app-header-name { font-size: 12px; }
-  .dict-exp-header .dict-exp-logout-btn {
-    background: none;
-    border: none;
-    padding: 10px 6px;
-    border-radius: 0;
-    font-size: 13px;
-    font-weight: 500;
-    color: #6B7280;
-    min-height: 44px;
-  }
-  .dict-exp-header .dict-exp-logout-btn:hover { color: #1A1A1E; }
+  /* 작업27: 사전 페이지 한정 검색창/언어탭 미니멀 리디자인. #search-btn/.lang-tag 등 이 페이지 전용
+     셀렉터로만 스코프를 좁혀서 전역 .btn/--accent는 건드리지 않는다.
+     (작업198: 헤더 재배치는 공용 appHeader.js/css의 기본 모양으로 옮겨져 여기서 제거됨) */
 
   #page-search .search-input-wrap { position: relative; }
   #page-search .search-icon {
@@ -1543,51 +1502,6 @@
      로그인 오버레이/nav/main보다 항상 위(DOM 순서상으로도, sticky로도)에 옴 -->
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
-<script>
-// 작업27: 사전 페이지 한정 헤더 재배치 실험. appHeader.js/css는 수정하지
-// 않고, inject()가 만든 DOM(.metis-app-header-name/.metis-app-header-btn
-// 등 기존 클래스)을 이 페이지 안에서만 재배치한다. renderAuthWidget()이
-// 비동기(fetch /api/me)라 완료 시점을 MutationObserver로 감지 - 콜백에서
-// 바로 observer를 끊어서, 이 안에서 노드를 옮기는 것 자체가 다시
-// childList 변화를 일으켜 무한 루프가 되는 걸 막는다.
-(function () {
-  const header = document.querySelector('.metis-app-header');
-  if (!header) return;
-  header.classList.add('dict-exp-header');
-  const logo = header.querySelector('.metis-app-header-logo');
-  const right = header.querySelector('.metis-app-header-right');
-  if (!logo || !right) return;
-
-  const left = document.createElement('div');
-  left.className = 'dict-exp-header-left';
-  header.insertBefore(left, logo);
-  left.appendChild(logo);
-  const subtext = document.createElement('div');
-  subtext.className = 'dict-exp-header-subtext';
-  left.appendChild(subtext);
-
-  const observer = new MutationObserver(function () {
-    observer.disconnect();
-    const adminLink = right.querySelector('.metis-app-header-btn.admin');
-    const nameSpan = right.querySelector('.metis-app-header-name');
-    const logoutBtn = Array.prototype.find.call(
-      right.querySelectorAll('.metis-app-header-btn'),
-      function (b) { return !b.classList.contains('admin') && !b.classList.contains('primary'); }
-    );
-    // 비로그인(Google 로그인 버튼만 있는 상태)이면 subtext는 비워두고
-    // 기존 로그인 버튼은 손대지 않는다.
-    if (!adminLink && !nameSpan) return;
-    if (adminLink) {
-      adminLink.classList.add('dict-exp-admin-link');
-      subtext.appendChild(adminLink);
-      if (nameSpan) subtext.appendChild(document.createTextNode(' · '));
-    }
-    if (nameSpan) subtext.appendChild(nameSpan);
-    if (logoutBtn) logoutBtn.classList.add('dict-exp-logout-btn');
-  });
-  observer.observe(right, { childList: true });
-})();
-</script>
 
 <!-- LOGIN OVERLAY -->
 <div id="login-overlay" style="display:none">

@@ -66,9 +66,18 @@
   // container 하나를 받아 로그인 상태에 맞는 위젯을 채워넣음 - 공통 헤더를
   // 새로 만드는 페이지뿐 아니라, admin.html처럼 이미 있는 헤더 안에
   // 자리만 내주는 경우에도 재사용 가능하도록 별도 함수로 분리.
+  // 작업198: 공용 헤더(.metis-app-header 안의 container)는 사전 모양으로 그린다 - 관리자 링크·
+  // "이름 님"은 로고 아래 작은 글씨(.metis-app-header-subtext), 로그아웃은 우측 텍스트 버튼.
+  // admin.html처럼 헤더 밖 container는 예전 모양(이름 + 필 버튼)을 그대로 쓴다.
+  // 매 호출마다 container와 subtext를 비우고 다시 채우므로 몇 번 불려도 DOM이 한 번 그린 것과 같고,
+  // 비동기 응답이 겹치면 마지막 호출만 그린다.
   async function renderAuthWidget(container) {
     consumeApprovalPending();
+    const header = container.closest ? container.closest('.metis-app-header') : null;
+    const sub = header ? header.querySelector('.metis-app-header-subtext') : null;
+    const seq = (container._metisRenderSeq = (container._metisRenderSeq || 0) + 1);
     container.innerHTML = '';
+    if (sub) sub.innerHTML = '';
     const token = getToken();
     const next = encodeURIComponent(window.location.pathname);
 
@@ -84,6 +93,7 @@
     }
 
     const user = await fetchMe(token);
+    if (seq !== container._metisRenderSeq) return;   // 더 새로운 호출이 있으면 그쪽이 그린다
     if (!user) {
       // 토큰이 만료/무효화된 경우 - 조용히 정리하고 로그인 버튼으로 대체
       clearToken();
@@ -91,11 +101,13 @@
       return;
     }
 
+    const textHost = sub || container;   // 사전 모양이면 로고 아래, 아니면 우측 위젯 안
     if (user.role === 'admin' && window.location.pathname !== '/admin') {
-      container.appendChild(el('a', { href: '/admin', class: 'metis-app-header-btn admin' }, '관리자'));
+      textHost.appendChild(el('a', { href: '/admin', class: 'metis-app-header-btn admin' }, '관리자'));
+      if (sub) sub.appendChild(document.createTextNode(' · '));
     }
-    container.appendChild(el('span', { class: 'metis-app-header-name' }, (user.name || '') + ' 님'));
-    const logoutBtn = el('button', { type: 'button', class: 'metis-app-header-btn' }, '로그아웃');
+    textHost.appendChild(el('span', { class: 'metis-app-header-name' }, (user.name || '') + ' 님'));
+    const logoutBtn = el('button', { type: 'button', class: 'metis-app-header-btn' + (sub ? ' logout' : '') }, '로그아웃');
     logoutBtn.onclick = () => {
       clearToken();
       window.location.reload();
@@ -111,7 +123,11 @@
     // 작업13-b: 아이콘+워드마크 이미지 대신 "METIS" 텍스트(코랄 볼드)만 사용
     const logo = el('a', { href: '/', class: 'metis-app-header-logo', 'aria-label': 'METIS' }, 'METIS');
     const right = el('div', { class: 'metis-app-header-right' });
-    header.appendChild(logo);
+    // 작업198: 사전의 헤더 모양이 기본 - 로고 아래에 관리자 링크·이름을 작게 둔다(로그인 전에는 비어 있음)
+    const left = el('div', { class: 'metis-app-header-left' });
+    left.appendChild(logo);
+    left.appendChild(el('div', { class: 'metis-app-header-subtext' }));
+    header.appendChild(left);
     header.appendChild(right);
     document.body.insertBefore(header, document.body.firstChild);
     renderAuthWidget(right);
