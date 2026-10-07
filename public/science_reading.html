@@ -414,7 +414,7 @@
 
   .quiz-next-btn {
     min-height: var(--ctl-min-h); margin-top: 20px;
-    background: var(--btn-primary-bg); color: #fff;
+    background: var(--btn-primary-bg, #b8442e); color: #fff;
     border: none; border-radius: var(--btn-radius);
     padding: 14px; width: 100%;
     font-size: 15px; font-weight: var(--btn-weight); cursor: pointer;
@@ -422,7 +422,7 @@
     transition: background 0.15s;
   }
   .quiz-next-btn.visible { display: block; }
-  .quiz-next-btn:hover { background: var(--btn-primary-bg-hover); }
+  .quiz-next-btn:hover { background: var(--btn-primary-bg-hover, #9c3a27); }
 
   /* ── View 4: Result ── */
   #view-result .content { padding: 24px 16px; }
@@ -453,8 +453,8 @@
     border: none; transition: all 0.15s;
     font-family: 'Noto Sans KR', sans-serif;
   }
-  .result-btn-primary { background: var(--btn-primary-bg); color: #fff; }
-  .result-btn-primary:hover { background: var(--btn-primary-bg-hover); }
+  .result-btn-primary { background: var(--btn-primary-bg, #b8442e); color: #fff; }
+  .result-btn-primary:hover { background: var(--btn-primary-bg-hover, #9c3a27); }
   .result-btn-secondary { background: var(--card); color: var(--text1); border: 1.5px solid var(--border); }
   .result-btn-secondary:hover { background: var(--bg); }
 </style>
