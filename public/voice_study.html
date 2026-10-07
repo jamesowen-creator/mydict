@@ -10,15 +10,20 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- 작업13: 전 화면 공통 상단 헤더(로고+로그인상태) -->
 <link rel="stylesheet" href="/css/common/appHeader.css">
+<link rel="stylesheet" href="/css/common/screenBar.css">
 <style>
   /* 작업180: 음성 학습 - 녹음 → 글로 변환 → 원문 수정 → 저장. 음성은 서버에 저장되지 않는다.
      작업181: 원문 아래 요약 영역. 작업182: 요약 읽어주기(브라우저 내장 음성). 작업185: 퀴즈(원문 근거 검증, 점수는 저장하지 않음). 작업186: 질문하기(자료 1개 근거, 대화는 저장하지 않음).
      작업184: 겉모양을 science_reading.html과 통일 - 색·글꼴·버튼·카드·안내 스타일은
      그 화면의 값을 그대로 쓰고 새 색·새 글꼴은 도입하지 않는다. 상단은 공통 헤더(appHeader). */
   :root {
-    --primary: #1D9E75;
-    --primary-light: #E1F5EE;
-    --primary-dark: #085041;
+    --primary: #e2583b;
+    --primary-light: #FDF0EC;
+    --primary-dark: #b8442e;
+    /* 작업200: 정답 같은 의미색은 주제색(코랄)과 분리해 초록 유지 */
+    --success: #1D9E75;
+    --success-light: #E1F5EE;
+    --success-dark: #085041;
     --bg: #FAFAF9;
     --card: #FFFFFF;
     --text1: #1a1a1a;
@@ -61,25 +66,11 @@
 
   /* ── 상단 고정 영역: 공통 헤더 바로 아래에 (하위 화면의 top-bar +) 개인정보 안내 ── */
   .sticky-zone {
-    position: sticky; top: var(--hdr-h, 0px); z-index: 100;
+    position: sticky; top: var(--hdr-h, 65px); z-index: 100;
     background: var(--bg);
   }
-  .top-bar {
-    background: var(--card);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 16px;
-    display: flex; align-items: center; gap: 12px;
-  }
-  .back-btn {
-    background: none; border: none; cursor: pointer;
-    padding: 6px; border-radius: 8px;
-    color: var(--text2); display: flex; align-items: center;
-    min-width: 44px; min-height: 44px; justify-content: center;
-    transition: background 0.15s;
-  }
-  .back-btn:hover { background: var(--primary-light); color: var(--primary); }
-  .back-btn svg { width: 20px; height: 20px; }
-  .bar-title { font-size: 17px; font-weight: 700; color: var(--text1); }
+  /* 작업200: 제목 줄은 공용 /css/common/screenBar.css(.screen-bar). sticky는 이 영역(.sticky-zone)이 맡는다 */
+  .sticky-zone .screen-bar { position: static; }
   .notice-wrap { padding: 10px 16px; border-bottom: 1px solid var(--border); }
 
   .view { display: none; padding: 20px 16px 40px; }
@@ -194,9 +185,9 @@
   }
   .mcq-option:hover:not(.answered) { border-color: var(--primary); background: var(--primary-light); }
   .mcq-option.answered { cursor: default; }
-  .mcq-option.correct { background: var(--primary-light); border-color: var(--primary); }
+  .mcq-option.correct { background: var(--success-light); border-color: var(--success); }
   .mcq-option.wrong { background: var(--error-light); border-color: var(--error); }
-  .mcq-option.correct-hint { background: var(--primary-light); border-color: var(--primary); }
+  .mcq-option.correct-hint { background: var(--success-light); border-color: var(--success); }
   .mcq-num {
     width: 26px; height: 26px; border-radius: 50%;
     background: var(--border);
@@ -204,9 +195,9 @@
     font-size: 12px; font-weight: 700; flex-shrink: 0; color: var(--text2);
     transition: all 0.15s;
   }
-  .mcq-option.correct .mcq-num { background: var(--primary); color: #fff; }
+  .mcq-option.correct .mcq-num { background: var(--success); color: #fff; }
   .mcq-option.wrong .mcq-num { background: var(--error); color: #fff; }
-  .mcq-option.correct-hint .mcq-num { background: var(--primary); color: #fff; }
+  .mcq-option.correct-hint .mcq-num { background: var(--success); color: #fff; }
   .mcq-text { font-size: 14px; line-height: 1.5; color: var(--text1); word-break: keep-all; }
   .quiz-feedback .fb-line { font-weight: 700; }
   .quiz-feedback .fb-sub { font-weight: 500; margin-top: 6px; word-break: keep-all; }
@@ -294,7 +285,7 @@
   .wrong-q { font-size: 14px; font-weight: 700; line-height: 1.6; word-break: keep-all; }
   .wrong-line { font-size: 13px; line-height: 1.6; margin-top: 4px; word-break: break-all; }
   .wrong-line.mine { color: var(--error); }
-  .wrong-line.right { color: var(--primary-dark); }
+  .wrong-line.right { color: var(--success-dark); }
   .wrong-line.src { color: var(--text2); font-size: 12px; }
 
 
@@ -327,13 +318,13 @@
 
 <div id="app" style="display:none">
   <div class="sticky-zone">
-    <div class="top-bar" id="subbar" style="display:none">
-      <button id="back-btn" class="back-btn" type="button" aria-label="목록으로">
+    <div class="screen-bar" id="subbar" style="display:none">
+      <button id="back-btn" class="screen-bar-back" type="button" aria-label="목록으로">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="15 18 9 12 15 6"></polyline>
         </svg>
       </button>
-      <span id="page-title" class="bar-title">음성 학습</span>
+      <h1 id="page-title" class="screen-bar-title">음성 학습</h1>
     </div>
     <div class="notice-wrap">
       <div class="msg notice">녹음은 글로 바꾸기 위해 외부 서비스(OpenAI)로 전송되며 서버에는 저장되지 않습니다.</div>
