@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 const Anthropic = require('@anthropic-ai/sdk');
 const { pool, trackUsage } = require('../lib/db');
@@ -402,6 +403,131 @@ router.delete('/api/concepts/links/:id', guard, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('concepts link delete error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+// ─── 작업205: 돌아보기 퀴즈(AI 호출 없음) ──────────────────────────────────────
+// 사용자가 저장한 개념(설명이 있는 활성 개념)만으로 4지선다를 만든다.
+//  유형 A: 설명을 보여 주고 용어 고르기 / 유형 B: 용어를 보여 주고 설명 고르기. 오답 보기는 같은 학습의 다른 개념에서 뽑는다.
+// 정답은 서버만 안다: 문제마다 정답 개념 id·보기 순서를 AES-256-GCM으로 봉인한 토큰만 내려주고(클라이언트는 읽을 수 없음),
+// 채점은 그 토큰을 풀어서 한다. 이해 상태(review_state)는 정오 결과로 바꾸지 않는다.
+const QUIZ_MIN_POOL = 4;
+const QUIZ_DEFAULT_COUNT = 5;
+const QUIZ_MAX_COUNT = 10;
+const QUIZ_TOKEN_TTL_MS = 2 * 60 * 60 * 1000;
+const QUIZ_KINDS = ['A', 'B'];
+const QUIZ_REVIEW_RANK = { confused: 0, new: 1, understood: 2 };
+const QUIZ_NOT_ENOUGH = `퀴즈를 만들려면 설명이 있는 개념이 ${QUIZ_MIN_POOL}개 이상 필요합니다.`;
+const QUIZ_BAD_TOKEN = { error: '문제가 올바르지 않거나 만료되었습니다. 퀴즈를 다시 시작해 주세요.' };
+const quizKey = () => crypto.createHash('sha256').update('concept-quiz:' + (process.env.JWT_SECRET || 'mydict-jwt-secret')).digest();
+
+function sealQuizToken(payload) {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', quizKey(), iv);
+  const enc = Buffer.concat([c.update(JSON.stringify(payload), 'utf8'), c.final()]);
+  return Buffer.concat([iv, c.getAuthTag(), enc]).toString('base64url');
+}
+function openQuizToken(token) {
+  try {
+    if (typeof token !== 'string' || token.length > 2000) return null;
+    const raw = Buffer.from(token, 'base64url');
+    if (raw.length < 29) return null;
+    const d = crypto.createDecipheriv('aes-256-gcm', quizKey(), raw.subarray(0, 12));
+    d.setAuthTag(raw.subarray(12, 28));
+    const obj = JSON.parse(Buffer.concat([d.update(raw.subarray(28)), d.final()]).toString('utf8'));
+    return obj && typeof obj === 'object' ? obj : null;
+  } catch (e) { return null; }
+}
+function shuffled(list) {
+  const a = list.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = crypto.randomInt(0, i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+const hasDefinition = it => typeof it.definition === 'string' && it.definition.trim().length > 0;
+// 출제 순서: 헷갈림 → 새것 → 이해함(오래 손대지 않은 순). 같은 상태 안에서는 id 순
+function quizOrder(items) {
+  const time = it => (it.updated_at instanceof Date ? it.updated_at.getTime() : new Date(it.updated_at || 0).getTime()) || 0;
+  return items.slice().sort((a, b) => {
+    const r = (QUIZ_REVIEW_RANK[a.review_state] ?? 1) - (QUIZ_REVIEW_RANK[b.review_state] ?? 1);
+    if (r) return r;
+    if (a.review_state === 'understood') return time(a) - time(b) || a.id - b.id;
+    return a.id - b.id;
+  });
+}
+// 한 문제를 만든다. 보기를 4개 채우지 못하면 null
+function buildQuestion(target, pool, kind, userId, studyId) {
+  const text = it => (kind === 'A' ? it.term : it.definition);
+  const seen = new Set([text(target).trim()]);
+  const wrong = [];
+  for (const it of shuffled(pool.filter(x => x.id !== target.id))) {
+    const t = text(it).trim();
+    if (seen.has(t)) continue;
+    seen.add(t); wrong.push(it);
+    if (wrong.length === 3) break;
+  }
+  if (wrong.length < 3) return null;
+  const opts = shuffled([target, ...wrong]);
+  return {
+    kind,
+    prompt: kind === 'A' ? target.definition : target.term,
+    options: opts.map(text),
+    ai_source: target.content_source === 'ai',
+    token: sealQuizToken({ u: userId, s: studyId, i: target.id, k: kind, o: opts.map(o => o.id), exp: Date.now() + QUIZ_TOKEN_TTL_MS }),
+  };
+}
+
+router.get('/api/concepts/studies/:id/review', guard, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(404).json(STUDY_NOT_FOUND);
+  const asked = Number(req.query.count);
+  const count = Number.isInteger(asked) && asked >= 1 ? Math.min(asked, QUIZ_MAX_COUNT) : QUIZ_DEFAULT_COUNT;
+  try {
+    const study = await loadStudy(id, req.user.id);
+    if (!study) return res.status(404).json(STUDY_NOT_FOUND);
+    const items = (await pool.query(
+      `SELECT ${ITEM_COLUMNS} FROM concept_items WHERE study_id = $1 AND user_id = $2 ORDER BY id`, [id, req.user.id])).rows;
+    const eligible = items.filter(i => i.status === 'active' && hasDefinition(i));   // 보류·제외, 설명이 비어 있는 개념은 출제하지 않는다
+    if (eligible.length < QUIZ_MIN_POOL) return res.json({ questions: [], eligible: eligible.length, min: QUIZ_MIN_POOL, message: QUIZ_NOT_ENOUGH });
+    const questions = [];
+    for (const target of quizOrder(eligible)) {
+      if (questions.length >= count) break;
+      const first = QUIZ_KINDS[questions.length % 2];
+      const q = buildQuestion(target, eligible, first, req.user.id, id) || buildQuestion(target, eligible, first === 'A' ? 'B' : 'A', req.user.id, id);
+      if (q) questions.push(q);
+    }
+    if (!questions.length) return res.json({ questions: [], eligible: eligible.length, min: QUIZ_MIN_POOL, message: QUIZ_NOT_ENOUGH });
+    res.json({ questions, eligible: eligible.length, min: QUIZ_MIN_POOL });
+  } catch (err) {
+    console.error('concepts review create error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+router.post('/api/concepts/studies/:id/review/answer', guard, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(404).json(STUDY_NOT_FOUND);
+  const src = req.body && typeof req.body === 'object' ? req.body : {};
+  const choice = src.choice;
+  if (!Number.isInteger(choice) || choice < 0 || choice > 3) return res.status(400).json({ error: 'choice는 0~3 사이의 정수여야 합니다.' });
+  const t = openQuizToken(src.token);
+  if (!t || t.u !== req.user.id || t.s !== id || !QUIZ_KINDS.includes(t.k) || !Array.isArray(t.o) || t.o.length !== 4 || !Number.isInteger(t.i) || !(t.exp > Date.now())) {
+    return res.status(400).json(QUIZ_BAD_TOKEN);
+  }
+  try {
+    const study = await loadStudy(id, req.user.id);
+    if (!study) return res.status(404).json(STUDY_NOT_FOUND);
+    const item = await loadItem(t.i, req.user.id);
+    if (!item || item.study_id !== id) return res.status(404).json(ITEM_NOT_FOUND);
+    const correct = t.o[choice] === t.i;
+    await pool.query('INSERT INTO concept_quiz_attempts (user_id, study_id, item_id, kind, correct) VALUES ($1, $2, $3, $4, $5)', [req.user.id, id, item.id, t.k, correct]);
+    res.json({
+      correct,
+      correct_index: t.o.indexOf(t.i),
+      item: { id: item.id, term: item.term, definition: item.definition, example: item.example, content_source: item.content_source, review_state: item.review_state },
+    });
+  } catch (err) {
+    console.error('concepts review answer error:', err.message);
     res.status(500).json(SERVER_ERROR);
   }
 });

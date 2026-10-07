@@ -18,6 +18,7 @@ function freshState() {
     studies: [], items: [], links: [], nextId: 1,
     explorePlan: [], respondPlan: [], refreshPlan: [],
     log: [],            // { method, url, body }
+    quizAnswers: [],    // 돌아보기 퀴즈 답안 기록(POST .../review/answer)
     voiceNotes: [],     // 음성 학습 자료 목록(GET /api/voice-notes)
     adminUsers: [],     // 관리자 화면 테스트용 사용자 목록(GET/PATCH /api/admin/users)
     networkDown: false, // true면 explore 요청의 연결을 끊음
@@ -206,6 +207,36 @@ async function startMockServer() {
       if (!l) return J(404, { error: '연결을 찾을 수 없습니다.' });
       state.links = state.links.filter(x => x !== l);
       return J(200, { ok: true });
+    }
+    // 작업205: 돌아보기 퀴즈. 서버와 같은 규칙(활성·설명 있음, 4개 미만이면 안내, 헷갈림→새것→이해함)을 간단히 흉내 낸다.
+    // 정답 위치는 문제 번호로 돌려 가며 정하고, 정답 정보는 토큰 안에만 둔다(응답 본문에는 없음).
+    if ((mm = u.match(/^\/api\/concepts\/studies\/(\d+)\/review$/)) && m === 'GET') {
+      const s = studyOf(Number(mm[1]));
+      if (!s) return J(404, { error: '학습을 찾을 수 없습니다.' });
+      const rank = { confused: 0, new: 1, understood: 2 };
+      const pool = state.items.filter(i => i.study_id === s.id && i.status === 'active' && i.definition && i.definition.trim())
+        .sort((a, b) => (rank[a.review_state] - rank[b.review_state]) || a.id - b.id);
+      if (pool.length < 4) return J(200, { questions: [], eligible: pool.length, min: 4, message: '퀴즈를 만들려면 설명이 있는 개념이 4개 이상 필요합니다.' });
+      const count = Math.min(Number(url.searchParams.get('count')) || 5, 10, pool.length);
+      const questions = pool.slice(0, count).map((target, qi) => {
+        const kind = qi % 2 === 0 ? 'A' : 'B';
+        const others = pool.filter(x => x.id !== target.id).slice(qi % (pool.length - 1)).concat(pool.filter(x => x.id !== target.id)).slice(0, 3);
+        const opts = others.slice(); opts.splice(qi % 4, 0, target);
+        const text = it => (kind === 'A' ? it.term : it.definition);
+        return { kind, prompt: kind === 'A' ? target.definition : target.term, options: opts.map(text), ai_source: target.content_source === 'ai',
+          token: Buffer.from(JSON.stringify({ i: target.id, o: opts.map(o => o.id), s: s.id })).toString('base64url') };
+      });
+      return J(200, { questions, eligible: pool.length, min: 4 });
+    }
+    if ((mm = u.match(/^\/api\/concepts\/studies\/(\d+)\/review\/answer$/)) && m === 'POST') {
+      let t = null;
+      try { t = JSON.parse(Buffer.from(String(body.token), 'base64url').toString('utf8')); } catch (e) { /* 잘못된 토큰 */ }
+      if (!t || t.s !== Number(mm[1]) || !Number.isInteger(body.choice) || body.choice < 0 || body.choice > 3) return J(400, { error: '문제가 올바르지 않거나 만료되었습니다. 퀴즈를 다시 시작해 주세요.' });
+      const it = itemOf(t.i);
+      if (!it) return J(404, { error: '개념을 찾을 수 없습니다.' });
+      const correct = t.o[body.choice] === t.i;
+      state.quizAnswers.push({ item_id: it.id, correct });
+      return J(200, { correct, correct_index: t.o.indexOf(t.i), item: { id: it.id, term: it.term, definition: it.definition, example: it.example, content_source: it.content_source, review_state: it.review_state } });
     }
     return J(404, { error: 'mock: 알 수 없는 경로 ' + m + ' ' + u });
   }

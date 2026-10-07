@@ -16,10 +16,11 @@ const TABLE_DEFAULTS = {
   }),
   concept_links: () => ({ label: null, detail: null, created_at: new Date() }),
   voice_concepts: () => ({}),
+  concept_quiz_attempts: () => ({ created_at: new Date() }),
   concept_migrations: () => ({ done_at: new Date() }),
   api_usage: () => ({ created_at: new Date() }),
 };
-const SERIAL = new Set(['concept_studies', 'concept_items', 'concept_links', 'api_usage', 'voice_concepts']);
+const SERIAL = new Set(['concept_studies', 'concept_items', 'concept_links', 'api_usage', 'voice_concepts', 'concept_quiz_attempts']);
 const JSON_COLS = new Set(['suggestions', 'feedback', 'path']);
 const UNIQUE = {
   concept_items: [['study_id', 'term_key'], ['legacy_voice_concept_id']],
@@ -29,6 +30,7 @@ const CHECKS = {
   concept_items: {
     content_source: ['none', 'ai', 'user'], status: ['active', 'held', 'excluded'], review_state: ['new', 'understood', 'confused'],
   },
+  concept_quiz_attempts: { kind: ['A', 'B'] },
   concept_links: {
     relation_type: ['포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련'], source: ['ai', 'user'],
   },
@@ -37,6 +39,7 @@ const NOT_NULL = {
   concept_studies: ['user_id', 'topic'],
   concept_items: ['study_id', 'user_id', 'term', 'term_key'],
   concept_links: ['study_id', 'user_id', 'from_item_id', 'to_item_id', 'relation_type', 'source'],
+  concept_quiz_attempts: ['user_id', 'study_id', 'item_id', 'kind', 'correct'],
 };
 
 function dbError(code, message) { const e = new Error(message); e.code = code; return e; }
@@ -93,9 +96,11 @@ function createMockDb() {
     if (table === 'concept_studies') {
       db.tables.concept_links = db.tables.concept_links.filter(l => !ids.has(l.study_id));
       db.tables.concept_items = db.tables.concept_items.filter(i => !ids.has(i.study_id));
+      db.tables.concept_quiz_attempts = db.tables.concept_quiz_attempts.filter(a => !ids.has(a.study_id));
     }
     if (table === 'concept_items') {
       db.tables.concept_links = db.tables.concept_links.filter(l => !ids.has(l.from_item_id) && !ids.has(l.to_item_id));
+      db.tables.concept_quiz_attempts = db.tables.concept_quiz_attempts.filter(a => !ids.has(a.item_id));
     }
   }
 

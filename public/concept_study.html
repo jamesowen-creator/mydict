@@ -29,6 +29,8 @@
     --danger: #B42318;
     --focus: #1a1f3c;
     --node-line: #868ca8;   /* 지도 노드 테두리: 흰 배경 대비 3.3:1(비텍스트 3:1 이상) */
+    --success: #1D9E75;     /* 의미색(퀴즈 정답) - 주제색 코랄과 분리 */
+    --success-bg: #E1F5EE;
     --danger-bg: #fcebeb;   /* 오류 박스 배경(음성 학습의 --error-light와 같은 값) */
     --info-bg: #fdf0ec;     /* 안내 박스 배경(코랄 연한 색) */
   }
@@ -220,6 +222,21 @@
   .lk-meta { font-size: 13px; color: var(--text2); margin-top: 2px; }
   .lk-src { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; margin-top: 2px; color: var(--accent-text); }
   .lk-src.user { color: var(--text2); }
+  /* 돌아보기 퀴즈 */
+  .qz-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 14px; }
+  .qz-q { margin-top: 10px; padding: 16px; border: 1px solid var(--line); border-radius: var(--card-radius); background: var(--surface); }
+  .qz-prompt { margin-top: 6px; font-size: 17px; font-weight: 700; white-space: pre-wrap; word-break: break-word; }
+  .qz-opts { display: grid; gap: 8px; margin-top: 12px; }
+  .qz-opt { width: 100%; justify-content: flex-start; text-align: left; font-weight: 500; white-space: normal; word-break: break-word; }
+  .qz-opt.right { border-color: var(--success); background: var(--success-bg); }
+  .qz-opt.wrong { border-color: var(--danger); background: var(--danger-bg); }
+  .qz-mark { flex: none; font-weight: 800; }
+  .qz-fb { margin-top: 12px; font-weight: 800; }
+  .qz-fb.right { color: var(--success); }
+  .qz-fb.wrong { color: var(--danger); }
+  .qz-explain { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .qz-explain p { white-space: pre-wrap; word-break: break-word; margin-top: 2px; }
+  .in-quiz .bottom-bar { display: none; }
   dialog { border-radius: var(--card-radius); margin: auto; max-width: min(420px, calc(100vw - 32px)); width: 100%; padding: 20px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
   dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
   dialog .rel-pair { font-size: 17px; font-weight: 800; word-break: break-all; }
@@ -303,10 +320,12 @@
       <section id="record" class="record" aria-label="학습 기록" hidden>
         <div class="progress"><span class="label">이해</span><div id="progress-bar" class="bar" role="progressbar" aria-label="이해한 개념" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"><i></i></div><span id="progress-count" class="count"></span></div>
         <nav id="path-line" class="path-line" aria-label="선택 경로"></nav>
+        <div class="btn-row" style="margin-top:6px"><button id="quiz-open" class="btn" type="button">돌아보기 퀴즈</button></div>
       </section>
       <div id="study-msg" class="msg" role="alert"></div>
       <div id="study-busy" class="busy-line" role="status" hidden><span class="spinner"></span><span>설명을 만드는 중…</span></div>
       <div id="study-empty" class="empty-state" hidden>아직 개념이 없습니다.<br>아래 입력창에 궁금한 개념 하나를 입력해 보세요.</div>
+      <div id="quiz-box" hidden></div>
       <div id="detail-wrap" hidden>
         <section id="detail" class="section" aria-label="현재 개념"></section>
         <section id="nextstep" class="section" aria-label="다음 한 단계"></section>
@@ -595,12 +614,17 @@ function renderStudy() {
     if (S.notice.retryFn) msg.append(' ', h('button', { class: 'btn text', type: 'button', 'data-t': 'ai-retry', onclick: () => S.notice.retryFn() }, '다시 받기'));
   } else { msg.className = 'msg'; }
   const hasItems = S.items.length > 0;
+  const inQuiz = !!S.quiz && hasItems;
+  el('quiz-box').hidden = !inQuiz;
+  if (!inQuiz) el('quiz-box').textContent = '';   // 닫은 퀴즈의 옛 내용이 남지 않게
+  el('app').classList.toggle('in-quiz', inQuiz);
   el('study-empty').hidden = hasItems;
-  el('detail-wrap').hidden = !hasItems;
+  el('detail-wrap').hidden = !hasItems || inQuiz;
   el('seg-map').setAttribute('aria-pressed', String(S.explorePane === 'map'));
   el('seg-list').setAttribute('aria-pressed', String(S.explorePane === 'list'));
   renderRecord();
-  if (hasItems) { renderDetail(); renderNext(); renderLinks(); renderExplorePane(); renderSidelined(); }
+  if (inQuiz) { el('record').hidden = true; renderQuiz(); }
+  else if (hasItems) { renderDetail(); renderNext(); renderLinks(); renderExplorePane(); renderSidelined(); }
   if (S.pendingAsk) { el('ask-input').value = S.pendingAsk; S.pendingAsk = null; }
 }
 
@@ -900,6 +924,122 @@ function openEdge(l) {
 el('edge-close').addEventListener('click', () => el('edge-dialog').close());
 el('edge-dialog').addEventListener('click', ev => { if (ev.target === el('edge-dialog')) el('edge-dialog').close(); });
 
+// ── 돌아보기 퀴즈(작업205): AI 호출 없음. 문제·채점은 서버, 이해 상태는 사용자가 버튼을 눌러야만 바뀐다 ──
+S.quiz = null;   // { questions, message, i, answered, results, error }
+el('quiz-open').addEventListener('click', () => startQuiz());
+async function startQuiz() {
+  const r = await busy('문제를 만드는 중…', () => api('GET', '/api/concepts/studies/' + S.study.id + '/review?count=5'));
+  if (!r) return;
+  if (r.status !== 200) { showMsg(errText(r)); return; }
+  S.quiz = { questions: r.body.questions || [], message: r.body.message || null, i: 0, answered: null, results: [], error: null };
+  setNotice(null);
+  renderStudy();
+  window.scrollTo(0, 0);
+}
+function closeQuiz() { S.quiz = null; renderStudy(); }
+async function answerQuiz(choice) {
+  const qz = S.quiz;
+  if (!qz || qz.answered) return;
+  const q = qz.questions[qz.i];
+  const r = await busy('채점하는 중…', () => api('POST', '/api/concepts/studies/' + S.study.id + '/review/answer', { token: q.token, choice }));
+  if (!r || S.quiz !== qz) return;
+  if (r.status !== 200) { qz.error = errText(r); renderQuiz(); return; }
+  qz.error = null;
+  qz.answered = Object.assign({ choice }, r.body);
+  qz.results.push({ item: r.body.item, correct: r.body.correct });
+  renderQuiz();
+}
+function nextQuiz() { const qz = S.quiz; qz.i++; qz.answered = null; qz.error = null; renderQuiz(); window.scrollTo(0, 0); }
+async function markConfused(itemId) {
+  const r = await busy('저장하는 중…', () => api('PATCH', '/api/concepts/items/' + itemId, { review_state: 'confused' }));
+  if (!r) return;
+  if (r.status !== 200) { if (S.quiz) { S.quiz.error = errText(r); renderQuiz(); } return; }
+  const it = itemById(itemId);
+  if (it) mergeItem(it, r.body);
+  if (S.quiz) { S.quiz.marked = S.quiz.marked || {}; S.quiz.marked[itemId] = true; S.quiz.error = null; renderQuiz(); }
+}
+async function viewQuizItem(itemId) { S.quiz = null; renderStudy(); await selectItem(itemId); }
+
+function renderQuiz() {
+  const box = el('quiz-box');
+  const qz = S.quiz;
+  box.textContent = '';
+  if (!qz) return;
+  const exit = h('button', { class: 'btn text', type: 'button', 'data-t': 'quiz-exit', onclick: closeQuiz }, '그만하기');
+  if (!qz.questions.length) {
+    box.append(h('div', { class: 'qz-head' }, h('div', { class: 'label' }, '돌아보기 퀴즈')),
+      h('p', { class: 'msg info', 'data-t': 'quiz-empty', role: 'status' }, qz.message || '출제할 수 있는 문제가 없습니다.'),
+      h('div', { class: 'btn-row', style: 'margin-top:12px' }, h('button', { class: 'btn primary', type: 'button', 'data-t': 'quiz-exit', onclick: closeQuiz }, '돌아가기')));
+    return;
+  }
+  const total = qz.questions.length;
+  if (qz.i >= total) {   // 결과
+    const right = qz.results.filter(x => x.correct).length;
+    const wrong = qz.results.filter(x => !x.correct);
+    box.append(h('div', { class: 'qz-head' }, h('div', { class: 'label' }, '퀴즈 결과')),
+      h('h2', { class: 'next-term', 'data-t': 'quiz-score', style: 'margin-top:8px' }, total + '문제 중 ' + right + '개 맞혔어요'));
+    if (wrong.length) {
+      box.append(h('div', { class: 'label', style: 'margin-top:16px;display:block' }, '틀린 개념'));
+      for (const x of wrong) {
+        const marked = qz.marked && qz.marked[x.item.id];
+        const cur = itemById(x.item.id);
+        box.append(h('div', { class: 'lrow', 'data-t': 'quiz-wrong', 'data-id': x.item.id },
+          h('div', { class: 'lrow-main', style: 'display:block' }, h('div', { class: 'lrow-term' }, x.item.term)),
+          h('div', { class: 'lrow-actions' },
+            h('button', { class: 'btn text', type: 'button', 'data-t': 'quiz-view-item', onclick: () => viewQuizItem(x.item.id) }, '개념 보기'),
+            (marked || (cur && cur.review_state === 'confused')) ? h('span', { class: 'lrow-meta', 'data-t': 'quiz-marked' }, '헷갈림으로 표시됨')
+              : h('button', { class: 'btn text', type: 'button', 'data-t': 'quiz-confuse', onclick: () => markConfused(x.item.id) }, '헷갈림으로 표시'))));
+      }
+    } else box.append(h('p', { class: 'muted', style: 'margin-top:8px' }, '모두 맞혔어요.'));
+    if (qz.error) box.append(h('div', { class: 'msg error', role: 'alert' }, qz.error));
+    box.append(h('div', { class: 'btn-row', style: 'margin-top:16px' },
+      h('button', { class: 'btn primary', type: 'button', 'data-t': 'quiz-again', onclick: () => startQuiz() }, '다시 하기'),
+      h('button', { class: 'btn', type: 'button', 'data-t': 'quiz-exit', onclick: closeQuiz }, '닫기')));
+    return;
+  }
+  const q = qz.questions[qz.i];
+  const a = qz.answered;
+  box.append(h('div', { class: 'qz-head' },
+    h('div', { class: 'label', 'data-t': 'quiz-progress' }, '문제 ' + (qz.i + 1) + ' / ' + total), exit));
+  const card = h('div', { class: 'qz-q', 'data-t': 'quiz-question', 'data-kind': q.kind },
+    h('div', { class: 'label' }, q.kind === 'A' ? '이 설명에 맞는 용어는?' : '이 용어의 설명은?'),
+    h('div', { class: 'qz-prompt', 'data-t': 'quiz-prompt' }, q.prompt));
+  if (q.ai_source) card.append(h('div', { class: 'source', 'data-t': 'quiz-ai' }, 'AI 설명 · 확인 필요'));
+  const opts = h('div', { class: 'qz-opts', role: 'group', 'aria-label': '보기' });
+  q.options.forEach((text, idx) => {
+    const isRight = a && idx === a.correct_index;
+    const isMine = a && idx === a.choice;
+    const cls = 'btn qz-opt' + (isRight ? ' right' : (isMine ? ' wrong' : ''));
+    opts.append(h('button', { class: cls, type: 'button', 'data-t': 'quiz-opt', 'data-i': idx, disabled: a ? true : null, onclick: () => answerQuiz(idx) },
+      a ? h('span', { class: 'qz-mark', 'aria-hidden': 'true' }, isRight ? '✓' : (isMine ? '✗' : '')) : null,
+      h('span', {}, text)));
+  });
+  card.append(opts);
+  box.append(card);
+  if (qz.error) box.append(h('div', { class: 'msg error', role: 'alert', 'data-t': 'quiz-error' }, qz.error),
+    h('div', { class: 'btn-row', style: 'margin-top:8px' }, h('button', { class: 'btn', type: 'button', 'data-t': 'quiz-skip', onclick: nextQuiz }, '다음 문제로')));
+  if (a) {
+    box.append(h('div', { class: 'qz-fb ' + (a.correct ? 'right' : 'wrong'), 'data-t': 'quiz-feedback', role: 'status' }, a.correct ? '✓ 정답입니다' : '✗ 틀렸어요'));
+    const ex = h('div', { class: 'qz-explain', 'data-t': 'quiz-explain' },
+      h('div', { class: 'label' }, '정답'),
+      h('div', { class: 'next-term', style: 'font-size:18px' }, a.item.term),
+      h('p', {}, a.item.definition || ''));
+    if (a.item.example) ex.append(h('div', { class: 'label', style: 'display:block;margin-top:8px' }, '예시'), h('p', {}, a.item.example));
+    if (a.item.content_source === 'ai') ex.append(h('div', { class: 'source', style: 'margin-top:6px' }, 'AI 설명 · 확인 필요'));
+    box.append(ex);
+    const last = qz.i + 1 >= total;
+    const row = h('div', { class: 'btn-row', style: 'margin-top:12px' },
+      h('button', { class: 'btn primary', type: 'button', 'data-t': 'quiz-next', onclick: nextQuiz }, last ? '결과 보기' : '다음'));
+    if (!a.correct) {
+      const cur = itemById(a.item.id);
+      const done = (qz.marked && qz.marked[a.item.id]) || (cur && cur.review_state === 'confused');
+      row.append(done ? h('span', { class: 'lrow-meta', 'data-t': 'quiz-marked', style: 'align-self:center' }, '헷갈림으로 표시됨')
+        : h('button', { class: 'btn', type: 'button', 'data-t': 'quiz-confuse', onclick: () => markConfused(a.item.id) }, '헷갈림으로 표시할까요?'));
+    }
+    box.append(row);
+  }
+}
+
 // ── 연결(작업203): 현재 개념과 이어진 연결 목록, 직접 연결 추가·삭제 ──
 const RELATION_TYPES = ['포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련'];
 const LABEL_MAX = 40;
@@ -1007,7 +1147,7 @@ async function restoreItem(it, { select, explain }) {
   else if (select) el('detail').scrollIntoView({ block: 'start' });
 }
 
-el('back-btn').addEventListener('click', () => { location.hash = ''; });
+el('back-btn').addEventListener('click', () => { if (S.quiz) { closeQuiz(); return; } location.hash = ''; });
 
 // 현재 개념과 이어진 개념(지도상 위치)
 function placeText(it) {
