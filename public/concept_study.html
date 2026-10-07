@@ -206,6 +206,15 @@
   .sl > summary .n { font-weight: 500; color: var(--text2); font-size: 13px; }
   .sl + .sl { margin-top: 4px; }
 
+  select { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--input-radius); padding: 11px 12px; min-height: 44px; line-height: 1.5; color: inherit; }
+  /* 연결 목록·추가 */
+  .lk { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .lk-row { display: flex; align-items: center; gap: 8px; }
+  .lk-pair { font-weight: 700; word-break: break-all; }
+  .lk .btn.text { min-width: 44px; }   /* 터치 영역 44px */
+  .lk-meta { font-size: 13px; color: var(--text2); margin-top: 2px; }
+  .lk-src { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; margin-top: 2px; color: var(--accent-text); }
+  .lk-src.user { color: var(--text2); }
   dialog { border-radius: var(--card-radius); margin: auto; max-width: min(420px, calc(100vw - 32px)); width: 100%; padding: 20px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
   dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
   dialog .rel-pair { font-size: 17px; font-weight: 800; word-break: break-all; }
@@ -296,6 +305,7 @@
       <div id="detail-wrap" hidden>
         <section id="detail" class="section" aria-label="현재 개념"></section>
         <section id="nextstep" class="section" aria-label="다음 한 단계"></section>
+        <section id="linksec" class="section" aria-label="연결"></section>
         <section id="explore" class="section" aria-label="지도와 목록"><div id="explore-pane"></div></section>
         <section id="sidelined" class="section" aria-label="보류와 제외" hidden></section>
       </div>
@@ -585,7 +595,7 @@ function renderStudy() {
   el('seg-map').setAttribute('aria-pressed', String(S.explorePane === 'map'));
   el('seg-list').setAttribute('aria-pressed', String(S.explorePane === 'list'));
   renderRecord();
-  if (hasItems) { renderDetail(); renderNext(); renderExplorePane(); renderSidelined(); }
+  if (hasItems) { renderDetail(); renderNext(); renderLinks(); renderExplorePane(); renderSidelined(); }
   if (S.pendingAsk) { el('ask-input').value = S.pendingAsk; S.pendingAsk = null; }
 }
 
@@ -868,6 +878,79 @@ function openEdge(l) {
 }
 el('edge-close').addEventListener('click', () => el('edge-dialog').close());
 el('edge-dialog').addEventListener('click', ev => { if (ev.target === el('edge-dialog')) el('edge-dialog').close(); });
+
+// ── 연결(작업203): 현재 개념과 이어진 연결 목록, 직접 연결 추가·삭제 ──
+const RELATION_TYPES = ['포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련'];
+const LABEL_MAX = 40;
+function renderLinks() {
+  const it = selItem();
+  const box = el('linksec');
+  box.textContent = '';
+  if (!it) return;
+  box.append(h('div', { class: 'label' }, '연결'));
+  const mine = S.links.filter(l => l.from_item_id === it.id || l.to_item_id === it.id);
+  if (!mine.length) box.append(h('p', { class: 'muted', 'data-t': 'no-links', style: 'margin-top:8px' }, '이 개념과 이어진 연결이 아직 없습니다.'));
+  for (const l of mine) {
+    const a = itemById(l.from_item_id), b = itemById(l.to_item_id);
+    box.append(h('div', { class: 'lk', 'data-t': 'link', 'data-id': l.id },
+      h('div', { class: 'lk-row' },
+        h('div', { style: 'flex:1;min-width:0' },
+          h('div', { class: 'lk-pair' }, (a ? a.term : '') + ' → ' + (b ? b.term : '')),
+          h('div', { class: 'lk-meta' }, [l.relation_type, l.label].filter(Boolean).join(' · '))),
+        h('button', { class: 'btn text danger', type: 'button', 'data-t': 'link-delete', 'aria-label': (a ? a.term : '') + ' → ' + (b ? b.term : '') + ' 연결 삭제', onclick: () => deleteLink(l) }, '삭제')),
+      h('div', { class: 'lk-src' + (l.source === 'user' ? ' user' : ''), 'data-t': 'link-source' }, l.source === 'user' ? '직접 연결' : 'AI 연결 · 확인 필요')));
+  }
+  if (S.items.length > 1) {
+    const host = h('div', { id: 'link-host' });
+    const open = h('button', { class: 'btn', type: 'button', 'data-t': 'link-open', onclick: () => openLinkForm(it, host, open) }, '연결 추가');
+    box.append(h('div', { class: 'btn-row', style: 'margin-top:12px' }, open), host);
+  }
+}
+
+function openLinkForm(it, host, openBtn) {
+  openBtn.hidden = true;
+  host.textContent = '';
+  const toSel = h('select', { id: 'link-to', 'aria-label': '이어 줄 개념' },
+    S.items.filter(i => i.id !== it.id).map(i => h('option', { value: String(i.id) }, i.term)));
+  const typeSel = h('select', { id: 'link-type', 'aria-label': '관계 종류' }, RELATION_TYPES.map(t => h('option', { value: t }, t)));
+  const label = h('input', { id: 'link-label', type: 'text', maxlength: LABEL_MAX, autocomplete: 'off', 'aria-label': '관계 문구', placeholder: '예: 때문에 (선택)' });
+  const msg = h('div', { class: 'msg error', role: 'alert' });
+  const close = () => { host.textContent = ''; openBtn.hidden = false; };
+  const form = h('form', { novalidate: true, 'data-t': 'link-form' },
+    h('div', { class: 'field' }, h('label', { class: 'label', for: 'link-to' }, '‘' + it.term + '’에서 이어질 개념'), toSel),
+    h('div', { class: 'field' }, h('label', { class: 'label', for: 'link-type' }, '관계 종류'), typeSel),
+    h('div', { class: 'field' }, h('label', { class: 'label', for: 'link-label' }, '관계 문구 (선택, ' + LABEL_MAX + '자)'), label),
+    msg,
+    h('div', { class: 'btn-row', style: 'margin-top:14px' },
+      h('button', { class: 'btn primary', type: 'submit', 'data-t': 'link-save' }, '저장'),
+      h('button', { class: 'btn text', type: 'button', 'data-t': 'link-cancel', onclick: close }, '취소')));
+  form.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    msg.textContent = '';
+    const text = label.value.trim();
+    if (clen(text) > LABEL_MAX) { msg.textContent = '관계 문구는 ' + LABEL_MAX + '자 이하여야 합니다.'; return; }
+    const body = { from_item_id: it.id, to_item_id: Number(toSel.value), relation_type: typeSel.value };
+    if (text) body.label = text;
+    const r = await busy('저장하는 중…', () => api('POST', '/api/concepts/studies/' + S.study.id + '/links', body));
+    if (!r) return;
+    if (r.status !== 201) { msg.textContent = errText(r); return; }   // 이미 연결된 쌍(409)이면 서버 문구 그대로
+    S.links.push(r.body);
+    setNotice(null);
+    renderStudy();
+  });
+  host.append(form);
+  toSel.focus();
+}
+
+async function deleteLink(l) {
+  if (!confirm('이 연결을 삭제할까요?')) return;
+  const r = await busy('삭제하는 중…', () => api('DELETE', '/api/concepts/links/' + l.id));
+  if (!r) return;
+  if (r.status !== 200 && r.status !== 404) { showMsg(errText(r)); return; }
+  S.links = S.links.filter(x => x.id !== l.id);
+  setNotice(null);
+  renderStudy();
+}
 
 // ── 보류·제외 관리 ──
 function renderSidelined() {
