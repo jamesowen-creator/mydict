@@ -297,27 +297,6 @@
   .wrong-line.right { color: var(--primary-dark); }
   .wrong-line.src { color: var(--text2); font-size: 12px; }
 
-  /* 작업193-4: 개념 학습 */
-  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-  .tab { flex: 1; padding: 12px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--card); color: var(--text2); font-family: 'Noto Sans KR', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; }
-  .tab.on { background: var(--primary-light); border-color: var(--primary); color: var(--primary-dark); }
-  .cc-filters { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px; }
-  .cc-filters input { grid-column: 1 / -1; }
-  .cc-filters .sel { width: 100%; min-width: 0; }
-  .sel.full { width: 100%; }
-  .cc-subject { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #3A3A40; margin: 16px 0 8px; }
-  .cc-sub { font-size: 12px; font-weight: 700; color: var(--primary-dark); margin: 10px 0 4px; }
-  .cc-item { border-top: 1px solid var(--border); padding: 10px 0; }
-  .cc-item:first-of-type { border-top: none; }
-  .cc-term { font-size: 15px; font-weight: 700; word-break: break-all; }
-  .cc-expl { font-size: 13px; color: var(--text2); margin-top: 4px; line-height: 1.5; word-break: break-all; }
-  .cc-actions { display: flex; gap: 8px; margin-top: 8px; }
-  .cc-actions .btn.small { padding: 8px 14px; }
-  .rv-term { font-size: 24px; font-weight: 700; text-align: center; word-break: break-all; padding: 24px 0 8px; }
-  .rv-ctx { font-size: 12px; color: var(--text2); text-align: center; margin-bottom: 12px; }
-  .rv-expl { font-size: 15px; line-height: 1.7; white-space: pre-wrap; word-break: break-all; padding: 12px 4px 4px; }
-  .rv-hint { font-size: 13px; color: var(--text2); text-align: center; padding: 12px 0; }
-  #rv-card { cursor: pointer; }
 
   /* 요약 읽어주기 */
   .tts-box { margin-top: 10px; }
@@ -365,11 +344,6 @@
   <div id="view-list" class="view active">
     <div class="view-title">음성 학습</div>
     <div class="view-sub">소리 내어 읽은 공부를 글과 요약으로</div>
-    <div class="tabs" role="tablist">
-      <button id="tab-notes" class="tab on" type="button" role="tab" aria-selected="true">자료</button>
-      <button id="tab-concepts" class="tab" type="button" role="tab" aria-selected="false">개념</button>
-    </div>
-    <div id="notes-pane">
     <button id="new-rec-btn" class="btn block" type="button">🎙 새로 녹음</button>
     <button id="wrong-btn" class="btn secondary block" type="button" style="margin-top:10px">오답 노트</button>
     <div class="list-head">
@@ -385,23 +359,6 @@
     </div>
     <div id="list-msg" class="msg"></div>
     <div id="note-list"></div>
-    </div>
-    <div id="concept-pane" style="display:none">
-      <button id="cc-add" class="btn block" type="button">＋ 개념 추가</button>
-      <button id="cc-review" class="btn secondary block" type="button" style="margin-top:10px">카드 복습</button>
-      <div class="list-head">
-        <h2>내 개념</h2>
-        <span id="cc-count" style="font-size:12px;color:var(--text2)"></span>
-      </div>
-      <div class="cc-filters">
-        <select id="cf-subject" class="sel" aria-label="과목"></select>
-        <select id="cf-topic" class="sel" aria-label="대주제"></select>
-        <select id="cf-subtopic" class="sel" aria-label="소주제"></select>
-        <input id="cf-q" type="text" maxlength="100" placeholder="용어·설명 검색">
-      </div>
-      <div id="cc-msg" class="msg"></div>
-      <div id="cc-list"></div>
-    </div>
   </div>
 
   <!-- ② 녹음 -->
@@ -614,69 +571,6 @@
     </div>
   </div>
 
-  <!-- ⑨ 개념 입력 -->
-  <div id="view-concept" class="view">
-    <label class="field-label" for="cc-subject">과목</label>
-    <select id="cc-subject" class="sel full"></select>
-    <label class="field-label" for="cc-detail">세부 과목</label>
-    <select id="cc-detail" class="sel full"></select>
-    <label class="field-label" for="cc-topic">대주제 (필수)</label>
-    <input id="cc-topic" type="text" maxlength="60" list="cc-topic-list" placeholder="예: 광합성" autocomplete="off">
-    <datalist id="cc-topic-list"></datalist>
-    <label class="field-label" for="cc-subtopic">소주제 (선택)</label>
-    <input id="cc-subtopic" type="text" maxlength="60" list="cc-subtopic-list" placeholder="예: 명반응" autocomplete="off">
-    <datalist id="cc-subtopic-list"></datalist>
-    <label class="field-label" for="cc-term">용어</label>
-    <input id="cc-term" type="text" maxlength="60" placeholder="용어" autocomplete="off">
-    <div class="sum-head">
-      <label class="field-label" for="cc-expl">설명</label>
-      <button id="cc-voice" class="btn small secondary" type="button">🎙 음성으로 입력</button>
-    </div>
-    <textarea id="cc-expl" class="summary" maxlength="2000" placeholder="설명을 쓰거나 음성으로 입력하세요"></textarea>
-    <div id="cc-counter" class="counter">0 / 2000자</div>
-    <div id="cc-over" style="display:none">
-      <div class="msg warn">이어 붙이면 2000자를 넘어 추가하지 않았습니다. 아래 글을 복사해 나누어 입력해 주세요.</div>
-      <textarea id="cc-over-text" class="summary" readonly aria-label="추가하지 못한 변환 결과"></textarea>
-      <div class="btn-row"><button id="cc-over-close" class="btn small secondary" type="button">닫기</button></div>
-    </div>
-    <div id="cc-form-msg" class="msg"></div>
-    <div class="btn-row">
-      <button id="cc-cancel" class="btn secondary" type="button">취소</button>
-      <button id="cc-save" class="btn" type="button">저장</button>
-    </div>
-  </div>
-
-  <!-- ⑩ 개념 카드 복습 -->
-  <div id="view-review" class="view">
-    <div id="rv-empty" class="empty-state" style="display:none">복습할 개념이 없습니다.<br>개념을 먼저 추가해 주세요.</div>
-    <div id="rv-run">
-      <div id="rv-progress" class="quiz-question-counter">1 / 1</div>
-      <div id="rv-card" class="quiz-card" role="button" tabindex="0" aria-label="눌러서 설명 보기">
-        <div id="rv-term" class="rv-term"></div>
-        <div id="rv-ctx" class="rv-ctx"></div>
-        <div id="rv-hint" class="rv-hint">눌러서 설명 보기</div>
-        <div id="rv-expl" class="rv-expl" style="display:none"></div>
-      </div>
-      <div id="rv-msg" class="msg"></div>
-      <div class="btn-row">
-        <button id="rv-speak" class="btn secondary" type="button">🔊 읽어주기</button>
-      </div>
-      <div class="btn-row">
-        <button id="rv-confused" class="btn secondary" type="button">헷갈림</button>
-        <button id="rv-known" class="btn" type="button">알겠음</button>
-      </div>
-    </div>
-    <div id="rv-done" style="display:none">
-      <div class="result-score-wrap">
-        <div class="result-msg" id="rv-done-msg"></div>
-      </div>
-      <div class="result-actions">
-        <button id="rv-again" class="btn block" type="button">다시 복습</button>
-        <button id="rv-back" class="btn secondary block" type="button">목록으로</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ⑧ 오답 노트 -->
   <div id="view-wrong" class="view">
     <div class="view-title">오답 노트</div>
@@ -772,15 +666,14 @@ let editNoteId = null;
 let editDirty = false;
 let pending = null;       // { blob, seconds, mime } - 변환 전/실패 시 메모리에만 유지
 
-const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료', quiz: '퀴즈', chat: '질문하기', merge: '자료 합치기', wrong: '오답 노트', concept: '개념 입력', review: '개념 복습' };
+const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료', quiz: '퀴즈', chat: '질문하기', merge: '자료 합치기', wrong: '오답 노트' };
 function showView(name) {
   stopSpeech();   // 작업182: 화면 이동 시 읽어주기 즉시 정지
-  if (name !== 'review') cancelReviewSpeech();   // 작업193-4: 카드 복습 읽어주기도 정지
   if (name !== 'edit' && name !== 'quiz' && name !== 'chat') hideImage();   // 작업190: 상세를 떠나면 그림 조회 중단·blob 주소 해제
   if (name === 'edit') resumeImagePolling();
   if (name !== 'chat') chatSession++;   // 작업186: 대화 화면을 떠나면 늦게 오는 답변은 무시
   currentView = name;
-  for (const v of ['list', 'record', 'edit', 'quiz', 'chat', 'merge', 'wrong', 'concept', 'review']) $('view-' + v).classList.toggle('active', v === name);
+  for (const v of ['list', 'record', 'edit', 'quiz', 'chat', 'merge', 'wrong']) $('view-' + v).classList.toggle('active', v === name);
   $('page-title').textContent = TITLES[name];
   $('subbar').style.display = name === 'list' ? 'none' : '';
   window.scrollTo(0, 0);
@@ -820,7 +713,6 @@ function resetRecording() {
 }
 function toList() {
   recTarget = 'new';
-  ccDirty = false;
   exitSelectMode();
   resetRecording();
   editDirty = false;
@@ -836,18 +728,12 @@ window.addEventListener('popstate', () => {
   if (currentView === 'list') return;
   if (currentView === 'quiz' || currentView === 'chat') { showView('edit'); return; }   // 작업185·186: 퀴즈·대화에서 뒤로가기 → 자료 상세로 복귀
   if (currentView === 'merge' || currentView === 'wrong') { showView('list'); return; }   // 작업192·193: 합치기 창·오답 노트에서 뒤로가기 → 목록
-  if (currentView === 'record' && (recTarget === 'append' || recTarget === 'concept')) {   // 작업191·193: 이어서 녹음·개념 음성 입력에서 뒤로가기 → 원래 화면으로 복귀(입력 내용 유지)
+  if (currentView === 'record' && recTarget === 'append') {   // 작업191: 이어서 녹음에서 뒤로가기 → 자료 상세로 복귀(입력 내용 유지)
     if (!leaveConfirmed()) { history.pushState({ v: currentView }, ''); return; }
     resetRecording();
-    showView(recTarget === 'concept' ? 'concept' : 'edit');
+    showView('edit');
     return;
   }
-  if (currentView === 'concept') {   // 작업193-4: 개념 입력에서 뒤로가기 → 개념 목록
-    if (ccDirty && !confirm('저장하지 않은 내용이 있습니다. 나갈까요?')) { history.pushState({ v: 'concept' }, ''); return; }
-    ccDirty = false; setTab('concepts', true); showView('list'); loadConcepts();
-    return;
-  }
-  if (currentView === 'review') { setTab('concepts', true); showView('list'); loadConcepts(); return; }
   if (!leaveConfirmed()) {
     history.pushState({ v: currentView }, '');   // 방금 pop된 항목을 되돌려 현재 화면 유지
     return;
@@ -1014,308 +900,6 @@ async function loadWrong() {
   }
 }
 $('wrong-btn').addEventListener('click', () => { go('wrong'); loadWrong(); });
-
-// ── 개념 학습 (작업193-4): [자료 | 개념] 전환, 입력·목록·카드 복습. AI 호출 없음 ──
-let listTab = 'notes', concepts = [], ccCtx = { subjects: [] }, ccEditId = null, ccDirty = false, ccBusy = false, ccFilterTimer = null;
-function setTab(name, silent) {
-  listTab = name;
-  $('tab-notes').classList.toggle('on', name === 'notes'); $('tab-notes').setAttribute('aria-selected', name === 'notes' ? 'true' : 'false');
-  $('tab-concepts').classList.toggle('on', name === 'concepts'); $('tab-concepts').setAttribute('aria-selected', name === 'concepts' ? 'true' : 'false');
-  $('notes-pane').style.display = name === 'notes' ? '' : 'none';
-  $('concept-pane').style.display = name === 'concepts' ? '' : 'none';
-  if (name === 'concepts') { exitSelectMode(); if (!silent) loadConcepts(); }
-}
-$('tab-notes').addEventListener('click', () => setTab('notes'));
-$('tab-concepts').addEventListener('click', () => setTab('concepts'));
-
-const ccFilter = () => ({ subject: $('cf-subject').value, topic: $('cf-topic').value, subtopic: $('cf-subtopic').value, q: $('cf-q').value.trim() });
-function ccQuery(f) {
-  const parts = [];
-  for (const k of ['subject', 'topic', 'subtopic', 'q']) if (f[k]) parts.push(k + '=' + encodeURIComponent(f[k]));
-  return parts.length ? '?' + parts.join('&') : '';
-}
-function ccTopicsOf(subject) { const s = ccCtx.subjects.find(x => x.subject === subject); return s ? s.topics : []; }
-function ccSubtopicsOf(subject, topic) { const t = ccTopicsOf(subject).find(x => x.topic === topic); return t ? t.subtopics : []; }
-// 필터 선택칸: 과목 → 대주제 → 소주제 목록은 서버가 알려 준 맥락에서 채운다(현재 선택은 가능하면 유지)
-function fillConceptFilters() {
-  const cur = ccFilter();
-  fillSelect($('cf-subject'), Object.keys(SUBJECTS), '과목 전체');
-  $('cf-subject').value = cur.subject;
-  fillSelect($('cf-topic'), ccTopicsOf($('cf-subject').value).map(t => t.topic), '대주제 전체');
-  $('cf-topic').value = cur.topic;
-  $('cf-topic').disabled = !$('cf-subject').value;
-  fillSelect($('cf-subtopic'), ccSubtopicsOf($('cf-subject').value, $('cf-topic').value), '소주제 전체');
-  $('cf-subtopic').value = cur.subtopic;
-  $('cf-subtopic').disabled = !$('cf-topic').value;
-}
-async function loadConceptContexts() {
-  try { ccCtx = await api('GET', '/api/voice-concepts/contexts'); } catch (e) { ccCtx = { subjects: [] }; }
-  if (!ccCtx || !Array.isArray(ccCtx.subjects)) ccCtx = { subjects: [] };
-}
-async function loadConcepts(skipContexts) {
-  setMsg('cc-msg', '');
-  if (!skipContexts) { await loadConceptContexts(); fillConceptFilters(); }
-  try { concepts = await api('GET', '/api/voice-concepts' + ccQuery(ccFilter())); }
-  catch (e) { setMsg('cc-msg', e.message, 'error'); return; }
-  renderConcepts();
-}
-function onConceptFilterChange(level) {
-  if (level === 'subject') { $('cf-topic').value = ''; $('cf-subtopic').value = ''; }
-  if (level === 'topic') $('cf-subtopic').value = '';
-  fillConceptFilters();
-  loadConcepts(true);
-}
-$('cf-subject').addEventListener('change', () => onConceptFilterChange('subject'));
-$('cf-topic').addEventListener('change', () => onConceptFilterChange('topic'));
-$('cf-subtopic').addEventListener('change', () => onConceptFilterChange('subtopic'));
-$('cf-q').addEventListener('input', () => { clearTimeout(ccFilterTimer); ccFilterTimer = setTimeout(() => loadConcepts(true), 300); });
-function ratingBadge(r) {
-  if (r !== 'known' && r !== 'confused') return null;
-  const b = document.createElement('span');
-  b.className = 'link-badge' + (r === 'known' ? '' : ' bg');
-  b.textContent = r === 'known' ? '✔ 알겠음' : '헷갈림';
-  b.style.marginLeft = '8px';
-  return b;
-}
-// 과목 > 대주제(개수) > 소주제 순으로 묶어 보여 준다
-function renderConcepts() {
-  const box = $('cc-list');
-  box.textContent = '';
-  $('cc-count').textContent = concepts.length + '개';
-  if (!concepts.length) {
-    const d = document.createElement('div'); d.className = 'empty-state';
-    d.innerHTML = '저장한 개념이 없습니다.<br>"개념 추가"로 시작해 보세요.';
-    box.appendChild(d);
-    return;
-  }
-  let lastSubject = null, card = null, lastTopicKey = null, lastSub = undefined;
-  for (const c of concepts) {
-    if (c.subject !== lastSubject) {
-      const h = document.createElement('div'); h.className = 'cc-subject'; h.textContent = c.subject;
-      box.appendChild(h); lastSubject = c.subject; lastTopicKey = null;
-    }
-    const topicKey = c.subject + '\u0001' + c.topic;
-    if (topicKey !== lastTopicKey) {
-      const n = concepts.filter(x => x.subject === c.subject && x.topic === c.topic).length;
-      card = document.createElement('div'); card.className = 'img-card';
-      const head = document.createElement('div'); head.className = 'img-card-head';
-      const t = document.createElement('span'); t.className = 'img-card-title'; t.textContent = c.topic + ' (' + n + '개)';
-      const rv = document.createElement('button'); rv.type = 'button'; rv.className = 'btn small secondary'; rv.textContent = '복습';
-      rv.addEventListener('click', () => startReview({ subject: c.subject, topic: c.topic, subtopic: '' }));
-      head.appendChild(t); head.appendChild(rv); card.appendChild(head);
-      box.appendChild(card); lastTopicKey = topicKey; lastSub = undefined;
-    }
-    const sub = c.subtopic || '';
-    if (sub !== lastSub) {
-      if (sub) { const sh = document.createElement('div'); sh.className = 'cc-sub'; sh.textContent = sub; card.appendChild(sh); }
-      lastSub = sub;
-    }
-    const item = document.createElement('div'); item.className = 'cc-item';
-    const term = document.createElement('div'); term.className = 'cc-term'; term.textContent = c.term;
-    const badge = ratingBadge(c.last_rating); if (badge) term.appendChild(badge);
-    item.appendChild(term);
-    if (c.explanation) { const ex = document.createElement('div'); ex.className = 'cc-expl'; ex.textContent = Array.from(c.explanation).slice(0, 100).join('') + (Array.from(c.explanation).length > 100 ? '…' : ''); item.appendChild(ex); }
-    const act = document.createElement('div'); act.className = 'cc-actions';
-    const ed = document.createElement('button'); ed.type = 'button'; ed.className = 'btn small secondary'; ed.textContent = '수정';
-    ed.addEventListener('click', () => openConceptForm(c));
-    const del = document.createElement('button'); del.type = 'button'; del.className = 'btn small danger'; del.textContent = '삭제';
-    del.addEventListener('click', () => deleteConcept(c));
-    act.appendChild(ed); act.appendChild(del); item.appendChild(act);
-    card.appendChild(item);
-  }
-}
-async function deleteConcept(c) {
-  if (!confirm('"' + c.term + '" 개념을 삭제할까요?')) return;
-  try { await api('DELETE', '/api/voice-concepts/' + c.id); }
-  catch (e) { setMsg('cc-msg', e.message, 'error'); return; }
-  loadConcepts();
-}
-
-// ── 개념 입력 ──
-function ccRefreshDetail() {
-  const subj = $('cc-subject').value, prev = $('cc-detail').value;
-  const list = Object.prototype.hasOwnProperty.call(SUBJECTS, subj) ? SUBJECTS[subj] : [];
-  fillSelect($('cc-detail'), list, '선택 안 함');
-  $('cc-detail').value = list.indexOf(prev) >= 0 ? prev : '';
-  $('cc-detail').disabled = !list.length;
-}
-function ccRefreshSuggestions() {
-  const subj = $('cc-subject').value, topic = $('cc-topic').value.trim();
-  const tl = $('cc-topic-list'), sl = $('cc-subtopic-list');
-  tl.textContent = ''; sl.textContent = '';
-  for (const t of ccTopicsOf(subj)) { const o = document.createElement('option'); o.value = t.topic; tl.appendChild(o); }
-  for (const t of ccSubtopicsOf(subj, topic)) { const o = document.createElement('option'); o.value = t; sl.appendChild(o); }
-}
-function ccUpdateCounter() { $('cc-counter').textContent = Array.from($('cc-expl').value).length + ' / 2000자'; }
-for (const id2 of ['cc-topic', 'cc-subtopic', 'cc-term']) $(id2).addEventListener('input', () => { ccDirty = true; if (id2 !== 'cc-term') ccRefreshSuggestions(); });
-$('cc-expl').addEventListener('input', () => { ccDirty = true; ccUpdateCounter(); });
-$('cc-subject').addEventListener('change', () => { ccDirty = true; ccRefreshDetail(); ccRefreshSuggestions(); });
-$('cc-detail').addEventListener('change', () => { ccDirty = true; });
-async function openConceptForm(c) {
-  ccEditId = c ? c.id : null;
-  const f = ccFilter();
-  fillSelect($('cc-subject'), Object.keys(SUBJECTS), '선택하세요');   // SUBJECTS는 아래쪽에서 정의되므로 열 때 채운다
-  $('cc-subject').value = c ? c.subject : f.subject;
-  ccRefreshDetail();
-  $('cc-detail').value = c && c.subject_detail ? c.subject_detail : '';
-  $('cc-topic').value = c ? c.topic : f.topic;
-  $('cc-subtopic').value = c ? (c.subtopic || '') : f.subtopic;
-  $('cc-term').value = c ? c.term : '';
-  $('cc-expl').value = c ? (c.explanation || '') : '';
-  $('cc-over').style.display = 'none'; $('cc-over-text').value = '';
-  setMsg('cc-form-msg', '');
-  $('cc-save').textContent = c ? '수정 저장' : '저장';
-  ccUpdateCounter(); ccRefreshSuggestions();
-  ccDirty = false; ccBusy = false;
-  go('concept');
-  $('page-title').textContent = c ? '개념 수정' : '개념 입력';
-}
-$('cc-add').addEventListener('click', () => openConceptForm(null));
-$('cc-cancel').addEventListener('click', requestBack);
-$('cc-save').addEventListener('click', async () => {
-  if (ccBusy) return;
-  const body = {
-    subject: $('cc-subject').value,
-    subject_detail: $('cc-detail').value || null,
-    topic: $('cc-topic').value.trim(),
-    subtopic: $('cc-subtopic').value.trim() || null,
-    term: $('cc-term').value.trim(),
-    explanation: $('cc-expl').value,
-  };
-  setMsg('cc-form-msg', '');
-  if (!body.subject) { setMsg('cc-form-msg', '과목을 선택해 주세요.', 'error'); return; }
-  if (!body.topic) { setMsg('cc-form-msg', '대주제를 입력해 주세요.', 'error'); return; }
-  if (!body.term) { setMsg('cc-form-msg', '용어를 입력해 주세요.', 'error'); return; }
-  ccBusy = true; $('cc-save').disabled = true;
-  const editing = ccEditId !== null;
-  try { await api(editing ? 'PATCH' : 'POST', editing ? '/api/voice-concepts/' + ccEditId : '/api/voice-concepts', body); }
-  catch (e) {
-    ccBusy = false; $('cc-save').disabled = false;
-    setMsg('cc-form-msg', e.status === 409 ? '같은 맥락에 이미 있는 용어입니다.' : e.message, 'error');
-    return;
-  }
-  ccBusy = false; $('cc-save').disabled = false; ccDirty = false;
-  if (editing) { history.back(); return; }   // popstate → 개념 목록
-  // 연속 입력: 같은 맥락(과목·대주제·소주제)을 유지하고 용어·설명만 비운다
-  $('cc-term').value = ''; $('cc-expl').value = ''; ccUpdateCounter();
-  setMsg('cc-form-msg', '"' + body.term + '" 저장했습니다. 같은 맥락에서 이어서 입력하세요.', 'info');
-  loadConceptContexts().then(ccRefreshSuggestions);
-  $('cc-term').focus();
-});
-// 설명 칸 음성 입력: 기존 녹음·변환 화면을 다시 쓰고, 변환 결과를 설명 칸 끝에 이어 붙인다
-$('cc-voice').addEventListener('click', () => {
-  recTarget = 'concept';
-  resetRecording();
-  $('rec-hint').style.display = (navigator.wakeLock && navigator.wakeLock.request) ? 'none' : '';
-  go('record');
-  $('page-title').textContent = '음성으로 입력';
-});
-function conceptVoiceConverted(text) {
-  const piece = String(text || '').trim();
-  if (!piece) {
-    $('convert-status').style.display = 'none';
-    $('rec-redo').disabled = false; $('rec-convert').disabled = false;
-    setMsg('rec-msg', '인식된 글이 없습니다. 다시 녹음해 주세요.', 'warn');
-    return;
-  }
-  const cur = $('cc-expl').value;
-  const next = cur.trim() ? cur.replace(/\s+$/, '') + '\n' + piece : piece;
-  pending = null;
-  if (Array.from(next).length > 2000) {
-    $('cc-over-text').value = piece; $('cc-over').style.display = '';
-  } else {
-    $('cc-expl').value = next; ccDirty = true; ccUpdateCounter(); $('cc-over').style.display = 'none';
-  }
-  history.back();   // popstate → 개념 입력 화면
-}
-$('cc-over-close').addEventListener('click', () => { $('cc-over').style.display = 'none'; $('cc-over-text').value = ''; });
-
-// ── 카드 복습: 순서는 헷갈림 → 평가 없음 → 알겠음. 눌러서 설명, 읽어주기, 알겠음/헷갈림 저장 ──
-let rv = { filter: null, cards: [], i: 0, revealed: false, busy: false, known: 0, confused: 0 };
-let rvSpeakRun = 0;
-const RV_RANK = { confused: 0, known: 2 };
-function cancelReviewSpeech() {
-  rvSpeakRun++;
-  if (ttsSupported()) { try { speechSynthesis.cancel(); } catch (e) { /* 무시 */ } }
-}
-async function startReview(filter) {
-  setMsg('cc-msg', '');
-  let rows;
-  try { rows = await api('GET', '/api/voice-concepts' + ccQuery({ subject: filter.subject, topic: filter.topic, subtopic: filter.subtopic, q: '' })); }
-  catch (e) { setMsg('cc-msg', e.message, 'error'); return; }
-  const ranked = rows.map((c, idx) => ({ c, idx })).sort((a, b) => (RV_RANK[a.c.last_rating] === undefined ? 1 : RV_RANK[a.c.last_rating]) - (RV_RANK[b.c.last_rating] === undefined ? 1 : RV_RANK[b.c.last_rating]) || a.idx - b.idx);
-  rv = { filter, cards: ranked.map(x => x.c), i: 0, revealed: false, busy: false, known: 0, confused: 0 };
-  if (currentView === 'review') showView('review'); else go('review');
-  $('page-title').textContent = '개념 복습';
-  renderReview();
-}
-function renderReview() {
-  cancelReviewSpeech();
-  setMsg('rv-msg', '');
-  const none = !rv.cards.length, done = !none && rv.i >= rv.cards.length;
-  $('rv-empty').style.display = none ? '' : 'none';
-  $('rv-run').style.display = none || done ? 'none' : '';
-  $('rv-done').style.display = done ? '' : 'none';
-  if (done) {
-    $('rv-done-msg').textContent = '복습을 마쳤습니다 · 알겠음 ' + rv.known + ' · 헷갈림 ' + rv.confused;
-    return;
-  }
-  if (none) return;
-  const c = rv.cards[rv.i];
-  rv.revealed = false;
-  $('rv-progress').textContent = (rv.i + 1) + ' / ' + rv.cards.length;
-  $('rv-term').textContent = c.term;
-  $('rv-ctx').textContent = [c.subject, c.topic, c.subtopic].filter(Boolean).join(' > ');
-  $('rv-expl').style.display = 'none'; $('rv-expl').textContent = '';
-  $('rv-hint').style.display = ''; $('rv-hint').textContent = '눌러서 설명 보기';
-  $('rv-speak').style.display = ttsSupported() ? '' : 'none';
-  if (!ttsSupported()) setMsg('rv-msg', '이 브라우저는 읽어주기를 지원하지 않습니다.', 'warn');
-  $('rv-known').disabled = $('rv-confused').disabled = false;
-}
-function revealCard() {
-  if (rv.revealed || !rv.cards.length || rv.i >= rv.cards.length) return;
-  rv.revealed = true;
-  const c = rv.cards[rv.i];
-  $('rv-expl').textContent = c.explanation || '(설명이 없습니다)';
-  $('rv-expl').style.display = ''; $('rv-hint').style.display = 'none';
-}
-$('rv-card').addEventListener('click', revealCard);
-$('rv-card').addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); revealCard(); } });
-$('rv-speak').addEventListener('click', () => {
-  if (!ttsSupported() || !rv.cards.length || rv.i >= rv.cards.length) return;
-  revealCard();
-  cancelReviewSpeech();
-  const run = rvSpeakRun;
-  const info = koVoiceInfo();
-  if (info.missing) { setMsg('rv-msg', '이 기기에 한국어 음성이 없습니다. 기기 설정에서 한국어 음성을 설치해 주세요.', 'warn'); return; }
-  setMsg('rv-msg', '');
-  const c = rv.cards[rv.i];
-  const parts = [c.term].concat(c.explanation ? splitLong(c.explanation, TTS_MAX_CHUNK) : []);
-  for (const p of parts) {
-    if (run !== rvSpeakRun) return;
-    const u = new SpeechSynthesisUtterance(p);
-    u.lang = info.voice ? info.voice.lang : 'ko-KR';
-    if (info.voice) u.voice = info.voice;
-    u.rate = currentRate();
-    try { speechSynthesis.speak(u); } catch (e) { setMsg('rv-msg', '읽어주기를 시작하지 못했습니다.', 'error'); return; }
-  }
-});
-async function rateCard(rating) {
-  if (rv.busy || !rv.cards.length || rv.i >= rv.cards.length) return;
-  rv.busy = true; $('rv-known').disabled = $('rv-confused').disabled = true;
-  const c = rv.cards[rv.i];
-  try { await api('POST', '/api/voice-concepts/' + c.id + '/rating', { rating }); }
-  catch (e) { rv.busy = false; $('rv-known').disabled = $('rv-confused').disabled = false; setMsg('rv-msg', e.message, 'error'); return; }
-  c.last_rating = rating;
-  if (rating === 'known') rv.known++; else rv.confused++;
-  rv.busy = false; rv.i++;
-  renderReview();
-}
-$('rv-known').addEventListener('click', () => rateCard('known'));
-$('rv-confused').addEventListener('click', () => rateCard('confused'));
-$('rv-again').addEventListener('click', () => { if (rv.filter) startReview(rv.filter); });
-$('rv-back').addEventListener('click', requestBack);
-$('cc-review').addEventListener('click', () => { const f = ccFilter(); startReview({ subject: f.subject, topic: f.topic, subtopic: f.subtopic }); });
 
 // ── 자료 합치기 창 ──
 let mergeOrder = [], mergeTitleTouched = false, mergeBusy = false;
@@ -2681,7 +2265,6 @@ async function autoSaveExisting(doneText, withUndo) {
   return true;
 }
 async function onConverted(text) {
-  if (recTarget === 'concept') return conceptVoiceConverted(text);
   if (recTarget === 'append') return appendConverted(text);
   openEditNew(text);
   justConverted = true;
@@ -2739,7 +2322,7 @@ $('after-list').addEventListener('click', requestBack);
 $('stale-remake').addEventListener('click', () => { $('sum-make').click(); });
 // 저장하지 않은 편집·변환하지 않은 녹음이 있는 채로 탭을 닫거나 새로고침하면 확인 안내(앱 안의 이동은 leaveConfirmed가 처리)
 window.addEventListener('beforeunload', ev => {
-  const risky = (currentView === 'edit' && editDirty) || (currentView === 'concept' && ccDirty) || (currentView === 'record' && (recState === 'recording' || !!pending));
+  const risky = (currentView === 'edit' && editDirty) || (currentView === 'record' && (recState === 'recording' || !!pending));
   if (!risky) return;
   ev.preventDefault();
   ev.returnValue = '';

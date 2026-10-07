@@ -18,6 +18,7 @@ function freshState() {
     studies: [], items: [], links: [], nextId: 1,
     explorePlan: [], respondPlan: [], refreshPlan: [],
     log: [],            // { method, url, body }
+    voiceNotes: [],     // 음성 학습 자료 목록(GET /api/voice-notes)
     adminUsers: [],     // 관리자 화면 테스트용 사용자 목록(GET/PATCH /api/admin/users)
     networkDown: false, // true면 explore 요청의 연결을 끊음
     delayMs: 0,         // 모든 concepts API 응답 지연(대기 표시 확인용)
@@ -80,6 +81,7 @@ async function startMockServer() {
     }
     if (u === '/api/me') return state.authed ? J(200, state.me) : J(401, { error: 'no' });
     if (!state.authed) return J(401, { error: '로그인이 필요합니다.' });
+    if (u === '/api/voice-notes' && m === 'GET') return J(200, state.voiceNotes);   // 작업196: 음성 학습 목록 화면 테스트용
     if (state.delayMs && u.startsWith('/api/concepts')) await new Promise(r => setTimeout(r, state.delayMs));
     if (u === '/api/concepts/studies' && m === 'GET') {
       return J(200, state.studies.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at)).map(({ path: p, ...s }) => {
