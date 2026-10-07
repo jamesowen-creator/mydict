@@ -191,6 +191,11 @@
   .grp { margin-top: 18px; }
   .grp:first-child { margin-top: 0; }
   .grp > .label { display: block; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+  .grp-head { display: grid; grid-template-columns: 24px 1fr; align-items: center; width: 100%; min-height: 44px; padding: 6px 0; text-align: left; background: transparent; border: none; border-bottom: 1px solid var(--line); }
+  .grp-head .ic { transition: transform 0.15s; color: var(--text2); }
+  .grp-head[aria-expanded=true] .ic { transform: rotate(90deg); }
+  .grp-head .grp-name { padding-bottom: 0; border-bottom: none; word-break: break-all; }
+  .grp-sum { grid-column: 2; font-size: 12px; color: var(--text2); }
   .lrow { display: flex; align-items: center; border-bottom: 1px solid var(--line); }
   .lrow-main { flex: 1; min-width: 0; text-align: left; background: transparent; border: none; min-height: 52px; padding: 8px 4px; }
   .lrow-term { font-weight: 700; word-break: break-all; }
@@ -647,11 +652,22 @@ function renderExplorePane() {
   if (S.explorePane === 'list') renderListPane(pane); else renderMapPane(pane);
 }
 
-// ── 목록 보기: 그룹 라벨별 묶음 ──
+// ── 목록 보기(작업204): [목록 | 그룹] 전환. 그룹은 group_label 기준(접기·펼치기, 개수·이해 상태 요약). 접힘 상태는 화면에서만 유지 ──
 const REVIEW_TEXT = { understood: '이해함', confused: '헷갈림', new: '학습 전' };
+S.listMode = 'group';           // 'flat'(목록) | 'group'(그룹)
+S.grpCollapsed = new Set();     // 접어 둔 그룹 이름('' = 그룹 없음). 서버에 저장하지 않는다
+function listRow(it) {
+  return h('div', { class: 'lrow', 'data-id': it.id },
+    h('button', { class: 'lrow-main', type: 'button', 'data-t': 'list-item', 'aria-current': it.id === S.selId ? 'true' : null, onclick: () => selectItem(it.id) },
+      h('div', { class: 'lrow-term' }, it.term),
+      h('div', { class: 'lrow-meta' }, (REVIEW_TEXT[it.review_state] || '학습 전') + ' · ' + (it.origin || '출처 미상'))));
+}
 function renderListPane(pane) {
   const active = S.items.filter(i => i.status === 'active');
   if (!active.length) { pane.append(h('p', { class: 'map-note' }, '학습 중인 개념이 없습니다.')); return; }
+  const mode = btn => h('button', { class: 'btn', type: 'button', 'data-t': 'list-mode-' + btn[0], 'aria-pressed': String(S.listMode === btn[0]), onclick: () => { S.listMode = btn[0]; renderExplorePane(); } }, btn[1]);
+  pane.append(h('div', { class: 'map-tools', 'data-t': 'list-mode' }, mode(['flat', '목록']), mode(['group', '그룹'])));
+  if (S.listMode === 'flat') { active.forEach(it => pane.append(listRow(it))); return; }
   const groups = new Map();
   for (const it of active) {
     const g = it.group_label || '';
@@ -660,12 +676,17 @@ function renderListPane(pane) {
   }
   const labels = [...groups.keys()].sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b, 'ko')));
   for (const g of labels) {
+    const list = groups.get(g);
+    const open = !S.grpCollapsed.has(g);
+    const cnt = { understood: 0, confused: 0, new: 0 };
+    for (const it of list) cnt[it.review_state in cnt ? it.review_state : 'new']++;
     pane.append(h('div', { class: 'grp', 'data-t': 'group', 'data-group': g },
-      h('span', { class: 'label' }, g || '그룹 없음'),
-      groups.get(g).map(it => h('div', { class: 'lrow', 'data-id': it.id },
-        h('button', { class: 'lrow-main', type: 'button', 'data-t': 'list-item', 'aria-current': it.id === S.selId ? 'true' : null, onclick: () => selectItem(it.id) },
-          h('div', { class: 'lrow-term' }, it.term),
-          h('div', { class: 'lrow-meta' }, (REVIEW_TEXT[it.review_state] || '학습 전') + ' · ' + (it.origin || '출처 미상')))))));
+      h('button', { class: 'grp-head', type: 'button', 'data-t': 'group-toggle', 'aria-expanded': String(open),
+        onclick: () => { if (S.grpCollapsed.has(g)) S.grpCollapsed.delete(g); else S.grpCollapsed.add(g); renderExplorePane(); } },
+        icon('chevron'),
+        h('span', { class: 'label grp-name' }, g || '그룹 없음'),
+        h('span', { class: 'grp-sum', 'data-t': 'group-sum' }, list.length + '개 · 이해 ' + cnt.understood + ' · 헷갈림 ' + cnt.confused + ' · 새것 ' + cnt.new)),
+      open ? list.map(listRow) : null));
   }
 }
 
@@ -1029,7 +1050,8 @@ function renderDetail() {
   box.append(editHost);
   const tools = h('div', { class: 'btn-row', style: 'margin-top:18px' },
     h('button', { class: 'toggle', type: 'button', 'aria-pressed': String(it.review_state === 'understood'), 'data-t': 'understood', onclick: () => toggleUnderstood(it) }, icon('check'), '이해함'),
-    h('button', { class: 'btn', type: 'button', 'data-t': 'edit-open', onclick: () => openEdit(it, editHost, tools) }, '설명 고치기')
+    h('button', { class: 'btn', type: 'button', 'data-t': 'edit-open', onclick: () => openEdit(it, editHost, tools) }, '설명 고치기'),
+    h('button', { class: 'btn', type: 'button', 'data-t': 'group-edit', onclick: () => openGroupEdit(it, editHost, tools) }, '그룹 바꾸기')
   );
   box.append(tools);
 
@@ -1114,6 +1136,37 @@ function openEdit(it, host, tools) {
   });
   host.append(form);
   areas.definition.focus();
+}
+
+// ── 그룹 바꾸기(작업204): 개념 하나의 group_label을 고친다(기존 PATCH). 비우면 그룹에서 뺀다 ──
+const GROUP_MAX = 30;
+function openGroupEdit(it, host, tools) {
+  tools.hidden = true;
+  host.textContent = '';
+  const names = [...new Set(S.items.map(i => i.group_label).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+  const input = h('input', { id: 'group-input', type: 'text', maxlength: GROUP_MAX, list: 'group-names', autocomplete: 'off', 'aria-label': '그룹 이름', placeholder: '그룹 이름 (비우면 그룹 없음)' });
+  input.value = it.group_label || '';
+  const msg = h('div', { class: 'msg error', role: 'alert' });
+  const form = h('form', { novalidate: true, 'data-t': 'group-form' },
+    h('div', { class: 'field' }, h('label', { class: 'label', for: 'group-input' }, '그룹 (' + GROUP_MAX + '자까지)'), input,
+      h('datalist', { id: 'group-names' }, names.map(n => h('option', { value: n })))),
+    msg,
+    h('div', { class: 'btn-row', style: 'margin-top:14px' },
+      h('button', { class: 'btn primary', type: 'submit', 'data-t': 'group-save' }, '저장'),
+      h('button', { class: 'btn text', type: 'button', 'data-t': 'group-cancel', onclick: () => { host.textContent = ''; tools.hidden = false; } }, '취소')));
+  form.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const v = input.value.trim();
+    if (clen(v) > GROUP_MAX) { msg.textContent = '그룹은 ' + GROUP_MAX + '자 이하여야 합니다.'; return; }
+    if (v === (it.group_label || '')) { host.textContent = ''; tools.hidden = false; return; }
+    const r = await busy('저장하는 중…', () => api('PATCH', '/api/concepts/items/' + it.id, { group_label: v }));
+    if (!r) return;
+    if (r.status !== 200) { msg.textContent = errText(r); return; }
+    mergeItem(it, r.body);
+    renderStudy();
+  });
+  host.append(form);
+  input.focus();
 }
 
 async function deleteItem(it) {
