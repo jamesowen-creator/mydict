@@ -5,7 +5,7 @@ const { createMockDb } = require('./helpers/mock_db');
 const { startApp } = require('./helpers/app');
 // 실제 lib/db는 모의 로더가 켜지기 전에 한 번만 불러 둔다(startApp이 lib/db를 모의로 바꾸므로)
 const realDb = require('../lib/db');
-const { migrateVoiceConcepts } = realDb;
+const { migrateVoiceConcepts, migrateVoiceConceptsV2 } = realDb;
 
 async function setup() {
   const db = createMockDb();
@@ -372,4 +372,79 @@ test('initDB: 새 테이블·고유 인덱스·권한 컬럼 DDL과 이전 호�
   }
   assert.ok(ddl.indexOf('CREATE TABLE IF NOT EXISTS concept_items') < ddl.indexOf('FROM voice_concepts'), '테이블을 만든 뒤 이전');
   assert.equal(db.tables.concept_items.length, 1);
+});
+
+// ─── 작업196-3: 194 이후 재이전(v2) ────────────────────────────────────────────────
+
+const V1_DONE = new Date('2026-02-01T00:00:00Z');
+const AFTER_V1 = new Date('2026-03-01T00:00:00Z');
+async function runV1(db) {
+  const r = await migrateVoiceConcepts(db.client);
+  db.tables.concept_migrations.find(m => m.name === 'voice_concepts_v1').done_at = V1_DONE;   // 시각을 고정해 "이후"를 정한다
+  return r;
+}
+async function runV2Quiet(db) {
+  const origLog = console.log; console.log = () => {};
+  try { return await migrateVoiceConceptsV2(db.client); } finally { console.log = origLog; }
+}
+
+test('v2: v1 이전 뒤 추가된 행만 이전하고 건수를 로그로 남김', async () => {
+  const db = createMockDb();
+  db.addUser(7);
+  const old1 = vc(db, { term: 'a', explanation: '설명' }); vc(db, { term: 'b' });
+  await runV1(db);
+  const itemsBefore = JSON.stringify(db.tables.concept_items);
+  const n1 = vc(db, { term: 'c', topic: '새주제', created_at: AFTER_V1, last_rating: 'known' });
+  const n2 = vc(db, { term: 'd', topic: '새주제', created_at: AFTER_V1 });
+  const before = JSON.stringify(db.tables.voice_concepts);
+  const logs = []; const origLog = console.log; console.log = (...a) => logs.push(a.join(' '));
+  let r; try { r = await migrateVoiceConceptsV2(db.client); } finally { console.log = origLog; }
+  assert.deepEqual([r.studies, r.items], [1, 2]);
+  assert.equal(db.tables.concept_items.length, 4);
+  assert.equal(JSON.stringify(db.tables.concept_items.slice(0, 2)), itemsBefore, 'v1 항목은 그대로');
+  assert.ok(db.tables.concept_items.find(i => i.legacy_voice_concept_id === old1));
+  assert.equal(db.tables.concept_items.find(i => i.legacy_voice_concept_id === n1).review_state, 'understood');
+  assert.ok(db.tables.concept_items.find(i => i.legacy_voice_concept_id === n2));
+  assert.equal(JSON.stringify(db.tables.voice_concepts), before, '원본 불변');
+  assert.ok(db.tables.concept_migrations.some(m => m.name === 'voice_concepts_v2'));
+  assert.ok(logs.some(l => /concept migration v2/.test(l) && /학습 1개, 개념 2개/.test(l)), '건수 로그: ' + logs.join('|'));
+});
+
+test('v2: 재실행하면 추가 0건 (표시가 있을 때, 표시를 지워도)', async () => {
+  const db = createMockDb();
+  db.addUser(7);
+  vc(db, { term: 'a' });
+  await runV1(db);
+  vc(db, { term: 'c', created_at: AFTER_V1 });
+  await runV2Quiet(db);
+  const again = await runV2Quiet(db);
+  assert.equal(again.skipped, true);
+  assert.equal(db.tables.concept_items.length, 2);
+  db.tables.concept_migrations = db.tables.concept_migrations.filter(m => m.name !== 'voice_concepts_v2');   // 표시가 없어도 중복은 생기지 않음
+  const third = await runV2Quiet(db);
+  assert.equal(third.items, 0);
+  assert.equal(db.tables.concept_items.length, 2);
+  assert.equal(new Set(db.tables.concept_items.map(i => i.legacy_voice_concept_id)).size, 2);
+});
+
+test('v2: v1 이후 사용자가 지운 개념은 되살아나지 않음', async () => {
+  const db = createMockDb();
+  db.addUser(7);
+  vc(db, { term: 'a' }); vc(db, { term: 'b' });
+  await runV1(db);
+  db.tables.concept_items.splice(0, 1);                       // 사용자가 v1 이전 항목 하나를 삭제
+  vc(db, { term: 'c', created_at: AFTER_V1 });
+  await runV2Quiet(db);
+  assert.deepEqual(db.tables.concept_items.map(i => i.term).sort(), ['b', 'c']);
+});
+
+test('v2: v1 완료 표시가 없으면 아무것도 하지 않고 v2 표시도 남기지 않음', async () => {
+  const db = createMockDb();
+  db.addUser(7);
+  vc(db, { term: 'a', created_at: AFTER_V1 });
+  const r = await runV2Quiet(db);
+  assert.equal(r.skipped, true);
+  assert.equal(db.tables.concept_items.length, 0);
+  assert.equal(db.tables.concept_studies.length, 0);
+  assert.equal(db.tables.concept_migrations.length, 0);
 });

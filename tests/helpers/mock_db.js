@@ -111,6 +111,12 @@ function createMockDb() {
       const rows = db.tables.voice_concepts.filter(v => !used.has(v.id)).sort((a, b) => a.user_id - b.user_id || a.id - b.id);
       return { rows: rows.map(r => ({ ...r })), rowCount: rows.length };
     }],
+    [/^SELECT id, user_id, term, explanation, subject, subject_detail, topic, subtopic, last_rating, created_at FROM voice_concepts WHERE created_at > \$1 AND NOT EXISTS/, (sql, p) => {
+      const used = new Set(db.tables.concept_items.map(i => i.legacy_voice_concept_id).filter(x => x !== null));
+      const since = new Date(p[0]).getTime();
+      const rows = db.tables.voice_concepts.filter(v => !used.has(v.id) && new Date(v.created_at).getTime() > since).sort((a, b) => a.user_id - b.user_id || a.id - b.id);
+      return { rows: rows.map(r => ({ ...r })), rowCount: rows.length };
+    }],
     [/^SELECT COUNT\(\*\)::int AS n FROM api_usage WHERE user_id = \$1 AND event_type = \$2 AND created_at >=/, (sql, p) => {
       const n = db.tables.api_usage.filter(r => r.user_id === p[0] && r.event_type === p[1]).length;
       return { rows: [{ n }], rowCount: 1 };
