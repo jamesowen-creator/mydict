@@ -38,7 +38,7 @@ for (const w of [390, 768, 1024]) {
     await page.eval('document.getElementById("app").style.minHeight = "3000px"; window.scrollTo(0, 800)');
     await sleep(200);
     assert.equal(await page.eval("Math.round(document.querySelector('.sticky-zone').getBoundingClientRect().top)"), 65, '스크롤해도 공용 헤더 바로 아래에 붙음');
-    assert.equal(await css(page, "document.querySelector('.btn')", 'backgroundColor'), 'rgb(226, 88, 59)', '주 버튼은 코랄');
+    assert.equal(await css(page, "document.querySelector('.btn')", 'backgroundColor'), 'rgb(184, 68, 46)', '주 버튼은 진한 코랄(--btn-primary-bg)');
     assert.equal(await page.eval("getComputedStyle(document.documentElement).getPropertyValue('--primary').trim().toLowerCase()"), '#e2583b');
     assert.equal(await page.eval("getComputedStyle(document.documentElement).getPropertyValue('--success').trim().toLowerCase()"), '#1d9e75', '의미색(정답)은 초록 유지');
     assert.equal(await page.hasHorizontalScroll(), false);
@@ -69,7 +69,7 @@ for (const w of [390, 768, 1024]) {
     assert.equal(await css(page, "document.getElementById('ask-submit')", 'borderRadius'), '10px', '주 버튼 반경');
     assert.equal(await css(page, "document.getElementById('ask-input')", 'borderRadius'), '10px', '입력창 반경');
     assert.equal(await css(page, "document.querySelector('.map-box') || document.getElementById('edge-dialog')", 'borderRadius'), '16px', '카드 반경');
-    assert.equal(await css(page, "document.getElementById('ask-submit')", 'backgroundColor'), 'rgb(226, 88, 59)');
+    assert.equal(await css(page, "document.getElementById('ask-submit')", 'backgroundColor'), 'rgb(184, 68, 46)');
     // 다크모드 없음: 어두운 화면 설정으로 바꿔도 배경은 사전의 밝은 배경 그대로
     await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
     await sleep(200);

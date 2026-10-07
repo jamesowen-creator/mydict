@@ -224,7 +224,7 @@
   .search-clear-btn:hover { color: var(--text); }
 
   .btn {
-    min-height: var(--ctl-min-h); background: var(--accent);
+    min-height: var(--ctl-min-h); background: var(--btn-primary-bg);
     color: white;
     border: none;
     border-radius: var(--radius-sm);
@@ -237,6 +237,8 @@
     font-family: 'Noto Sans KR', sans-serif;
   }
   .btn:hover { opacity: 0.88; }
+  .btn:not(.secondary):not(.danger):not(:disabled):hover { opacity: 1; background: var(--btn-primary-bg-hover); }
+  .btn:not(.secondary):not(.danger):not(:disabled):active { background: var(--btn-primary-bg-active); }
   .btn:active { transform: scale(0.97); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn.secondary {
@@ -1469,7 +1471,7 @@
     padding-left: 40px;
   }
   #search-btn {
-    background: #e2583b;
+    background: var(--btn-primary-bg);
     border-radius: var(--btn-radius);
   }
 

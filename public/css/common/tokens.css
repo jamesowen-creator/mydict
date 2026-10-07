@@ -16,4 +16,11 @@
   --gutter: 16px;
   --body-font-size: 15px;
   --content-max: 680px;
+
+  /* 작업207: 코랄 주 버튼(흰 글자). 로고·테두리·강조색은 #e2583b 그대로 두고, 버튼 바탕만 흰 글자 대비 4.5:1 이상이 되는 진한 코랄로 쓴다.
+     (#e2583b 바탕 흰 글자는 3.7:1). 마음에 들지 않으면 아래 세 줄만 되돌리면 된다:
+       --btn-primary-bg: #e2583b;  --btn-primary-bg-hover: #b8442e;  --btn-primary-bg-active: #9c3a27; */
+  --btn-primary-bg: #b8442e;
+  --btn-primary-bg-hover: #9c3a27;
+  --btn-primary-bg-active: #86311f;
 }
