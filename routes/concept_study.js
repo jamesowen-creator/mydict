@@ -880,4 +880,78 @@ router.post('/api/concepts/items/:id/suggestions/refresh', guard, async (req, re
   }
 });
 
+// ─── 작업206: 음성 입력(녹음 → 글로 변환) ───────────────────────────────────────
+// voice_study.js의 STT 변환(작업180)을 이 파일로 복제해 독립시킨 것이다(코드 공유 없음).
+// 음성은 메모리(req.body Buffer)에서만 다루고 OpenAI로 보낸 뒤 버린다. 디스크·DB·로그에는 남기지 않는다(로그에는 상태코드·오류 이름만).
+// 변환만으로는 AI(Haiku)를 호출하지 않는다: 결과는 사용자가 입력창에서 확인·수정한 뒤 직접 "추가"를 눌러야 explore가 호출된다.
+// 한도는 AI 설명 한도(CONCEPT_AI_DAILY_CAP)와 별도로 하루 CONCEPT_VOICE_DAILY_CAP(기본 20)회. 권한은 perm_concept_study를 그대로 따른다.
+const CONCEPT_STT_EVENT = 'concept_stt';
+const CONCEPT_STT_MAX_BYTES = '6mb';          // 60초 녹음은 보통 1MB 안팎(voice_study는 10분용 12mb)
+const CONCEPT_STT_MAX_SECONDS = 60;
+const CONCEPT_STT_TIMEOUT_MS = 60000;
+const CONCEPT_STT_TYPES = { 'audio/webm': 'webm', 'audio/mp4': 'm4a', 'audio/mpeg': 'mp3', 'audio/wav': 'wav' };
+const VOICE_FAIL = { error: '음성 변환에 실패했습니다. 잠시 후 다시 시도해주세요.' };
+
+function conceptVoiceDailyCap() {
+  const n = parseInt(process.env.CONCEPT_VOICE_DAILY_CAP, 10);
+  return Number.isFinite(n) && n >= 1 && n <= 10000 ? n : 20;
+}
+function audioBaseType(req) {
+  return String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+}
+function requireAudioType(req, res, next) {
+  if (!CONCEPT_STT_TYPES[audioBaseType(req)]) return res.status(415).json({ error: '지원하지 않는 오디오 형식입니다.' });
+  next();
+}
+// 한도 초과(PayloadTooLargeError 등)를 JSON 응답으로 바꿔 준다
+function audioBody(req, res, next) {
+  express.raw({ type: 'audio/*', limit: CONCEPT_STT_MAX_BYTES })(req, res, err => {
+    if (!err) return next();
+    const status = err.status === 413 ? 413 : 400;
+    res.status(status).json({ error: status === 413 ? '녹음 파일이 너무 큽니다.' : '요청을 읽을 수 없습니다.' });
+  });
+}
+
+router.post('/api/concepts/voice/transcribe', guard, requireAudioType, audioBody, async (req, res) => {
+  const audio = req.body;
+  if (!Buffer.isBuffer(audio) || audio.length === 0) return res.status(400).json({ error: '녹음 데이터가 비어 있습니다.' });
+  try {
+    if (await countToday(req.user.id, CONCEPT_STT_EVENT) >= conceptVoiceDailyCap()) {
+      return res.status(429).json({ error: `하루 ${conceptVoiceDailyCap()}회까지 음성으로 입력할 수 있습니다.` });
+    }
+  } catch (err) {
+    console.error('concepts stt limit check error:', err.message);
+    return res.status(500).json(SERVER_ERROR);
+  }
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: '음성 변환 기능을 사용할 수 없습니다.' });
+
+  const model = process.env.VOICE_STT_MODEL || 'gpt-4o-mini-transcribe';   // voice_study와 같은 모델·단가표
+  const type = audioBaseType(req);
+  const secondsRaw = parseFloat(req.headers['x-audio-seconds']);
+  const seconds = Number.isFinite(secondsRaw) ? Math.min(CONCEPT_STT_MAX_SECONDS, Math.max(0, Math.round(secondsRaw))) : 0;
+  try {
+    const form = new FormData();
+    form.append('file', new Blob([audio], { type }), 'audio.' + CONCEPT_STT_TYPES[type]);
+    form.append('model', model);
+    form.append('language', 'ko');
+    const openaiRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: form,
+      signal: AbortSignal.timeout(CONCEPT_STT_TIMEOUT_MS),
+    });
+    if (!openaiRes.ok) {
+      console.error('concepts stt upstream status:', openaiRes.status);
+      return res.status(502).json(VOICE_FAIL);
+    }
+    const data = await openaiRes.json();
+    const text = typeof data.text === 'string' ? data.text.trim() : '';
+    trackUsage(req.user.id, CONCEPT_STT_EVENT, model, 0, 0, seconds);   // 변환이 끝났으면 빈 결과여도 비용이 생겼으므로 기록한다
+    res.json({ text });
+  } catch (err) {
+    console.error('concepts stt error:', err.name);   // 오류 이름만 남기고 메시지·본문은 남기지 않는다
+    res.status(502).json(VOICE_FAIL);
+  }
+});
+
 module.exports = router;

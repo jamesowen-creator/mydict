@@ -18,6 +18,8 @@ function freshState() {
     studies: [], items: [], links: [], nextId: 1,
     explorePlan: [], respondPlan: [], refreshPlan: [],
     log: [],            // { method, url, body }
+    voicePlan: [],      // 음성 변환 응답 계획 [{ status, body }]. 비어 있으면 { text: '광합성' }
+    voiceCalls: [],     // 음성 변환 호출 기록 { type, seconds, bytes }
     quizAnswers: [],    // 돌아보기 퀴즈 답안 기록(POST .../review/answer)
     voiceNotes: [],     // 음성 학습 자료 목록(GET /api/voice-notes)
     adminUsers: [],     // 관리자 화면 테스트용 사용자 목록(GET/PATCH /api/admin/users)
@@ -207,6 +209,12 @@ async function startMockServer() {
       if (!l) return J(404, { error: '연결을 찾을 수 없습니다.' });
       state.links = state.links.filter(x => x !== l);
       return J(200, { ok: true });
+    }
+    // 작업206: 개념학습 음성 입력(변환 모의 - 실제 OpenAI 호출 없음)
+    if (u === '/api/concepts/voice/transcribe' && m === 'POST') {
+      state.voiceCalls.push({ type: req.headers['content-type'], seconds: req.headers['x-audio-seconds'], bytes: Number(req.headers['content-length'] || 0) });
+      const plan = state.voicePlan.shift() || { status: 200, body: { text: '광합성' } };
+      return J(plan.status, plan.body);
     }
     // 작업205: 돌아보기 퀴즈. 서버와 같은 규칙(활성·설명 있음, 4개 미만이면 안내, 헷갈림→새것→이해함)을 간단히 흉내 낸다.
     // 정답 위치는 문제 번호로 돌려 가며 정하고, 정답 정보는 토큰 안에만 둔다(응답 본문에는 없음).

@@ -222,6 +222,12 @@
   .lk-meta { font-size: 13px; color: var(--text2); margin-top: 2px; }
   .lk-src { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; margin-top: 2px; color: var(--accent-text); }
   .lk-src.user { color: var(--text2); }
+  /* 음성 입력 */
+  .with-mic { display: flex; gap: 8px; }
+  .with-mic input { flex: 1; min-width: 0; }
+  .btn.mic { width: 44px; padding: 0; flex: none; }
+  .ask .btn.mic { padding: 0; }
+  .btn.mic[aria-pressed=true] { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
   /* 돌아보기 퀴즈 */
   .qz-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 14px; }
   .qz-q { margin-top: 10px; padding: 16px; border: 1px solid var(--line); border-radius: var(--card-radius); background: var(--surface); }
@@ -291,7 +297,8 @@
         </div>
         <div class="field">
           <label class="label" for="start-first">첫 개념 또는 짧은 질문</label>
-          <input id="start-first" type="text" maxlength="80" autocomplete="off" placeholder="예: 광합성">
+          <div class="with-mic"><input id="start-first" type="text" maxlength="80" autocomplete="off" placeholder="예: 광합성"><button id="start-first-mic" class="btn mic" type="button" aria-label="음성으로 입력" aria-pressed="false"></button></div>
+          <div id="start-first-voice" class="msg info" role="status"></div>
         </div>
         <div id="start-msg" class="msg error" role="alert"></div>
         <div id="start-busy" class="busy-line" hidden><span class="spinner"></span><span>설명을 만드는 중…</span></div>
@@ -338,9 +345,11 @@
       <div class="wrap">
         <form id="ask-form" class="ask" novalidate>
           <input id="ask-input" type="text" maxlength="80" autocomplete="off" placeholder="새로 궁금해진 개념 하나를 입력하세요" aria-label="새로 궁금해진 개념 하나를 입력하세요">
+          <button id="ask-mic" class="btn mic" type="button" aria-label="음성으로 입력" aria-pressed="false"></button>
           <button id="ask-submit" class="btn primary" type="submit" aria-label="보내기"><svg class="ic" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg></button>
         </form>
         <div id="ask-msg" class="ask-msg msg error" role="alert"></div>
+        <div id="ask-voice" class="ask-msg msg info" role="status"></div>
       </div>
     </div>
   </section>
@@ -418,6 +427,8 @@ const ICONS = {
   trash: '<polyline points="4 7 20 7"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
   check: '<polyline points="5 12 10 17 19 7"/>',
   chevron: '<polyline points="9 6 15 12 9 18"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/>',
+  stop: '<rect x="6" y="6" width="12" height="12"/>',
 };
 function icon(name) {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -1443,6 +1454,149 @@ el('ask-form').addEventListener('submit', async ev => {
   const ok = await doExplore(text, 'input', it ? it.id : null);
   if (ok) input.value = '';           // 실패하면 입력 내용을 그대로 둔다
 });
+
+// ── 음성 입력(작업206): 녹음 → 서버 변환 → 입력창에 채우기 ──
+// voice_study.html의 녹음 코드(MediaRecorder 형식 후보, 마이크 권한 오류 문구, 업로드 방식)를 복제해 이 화면 안에 독립시킨 것이다(코드 공유 없음).
+// 변환 결과는 입력창에 채우기만 한다. 사용자가 확인·수정한 뒤 직접 "추가"를 눌러야 AI가 호출된다(변환만으로 AI 호출 없음).
+// 음성은 서버에 저장되지 않는다. 마이크가 안 되거나 변환이 실패해도 글자 입력은 그대로 쓸 수 있다.
+const MIC_MAX_SEC = 60;
+const MIC_MAX_BYTES = 6 * 1024 * 1024;
+const MIC_MIMES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'];
+const Mic = { state: 'idle', owner: null, rec: null, stream: null, chunks: [], t0: 0, timer: null, mime: '' };   // idle | recording | stopping | cancelled | transcribing
+const MIC_TARGETS = [
+  { input: 'start-first', btn: 'start-first-mic', msg: 'start-first-voice', lock: null },
+  { input: 'ask-input', btn: 'ask-mic', msg: 'ask-voice', lock: 'ask-submit' },
+];
+const micSupported = () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+function micPickMime() {
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+  for (const m of MIC_MIMES) if (MediaRecorder.isTypeSupported(m)) return m;
+  return '';
+}
+const micClock = sec => Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0');
+function micSay(o, text, kind) { const m = el(o.msg); m.textContent = text || ''; m.className = 'msg ' + (kind || 'info') + (o.msg === 'ask-voice' ? ' ask-msg' : ''); }
+function micPaint(o, recording) {
+  const b = el(o.btn);
+  b.textContent = '';
+  b.append(icon(recording ? 'stop' : 'mic'));
+  b.setAttribute('aria-pressed', String(recording));
+  b.setAttribute('aria-label', recording ? '녹음 끝내기' : '음성으로 입력');
+}
+function micRelease() { if (Mic.stream) { try { Mic.stream.getTracks().forEach(t => t.stop()); } catch (e) { /* 무시 */ } } Mic.stream = null; }
+function micErrText(e) {
+  const n = e && e.name;
+  if (n === 'NotAllowedError' || n === 'SecurityError') return '마이크 사용이 허용되지 않았습니다. 브라우저(또는 기기) 설정에서 이 사이트의 마이크를 허용하면 음성으로 입력할 수 있어요. 지금은 글로 입력해 주세요.';
+  if (n === 'NotFoundError' || n === 'OverconstrainedError') return '사용할 수 있는 마이크를 찾지 못했습니다. 글로 입력해 주세요.';
+  if (n === 'NotReadableError') return '마이크를 사용할 수 없습니다. 다른 앱이 마이크를 쓰고 있지 않은지 확인해 주세요.';
+  return '마이크를 켜지 못했습니다. 잠시 후 다시 시도하거나 글로 입력해 주세요.';
+}
+function micHttpText(r) {
+  if (r.status === 413) return '녹음 파일이 너무 큽니다. 더 짧게 말해 주세요.';
+  if (r.status === 415) return '이 기기의 녹음 형식은 지원되지 않습니다. 글로 입력해 주세요.';
+  if (r.status === 502) return '음성 변환 서비스에 문제가 있었습니다. 잠시 후 다시 시도하거나 글로 입력해 주세요.';
+  return errText(r, '음성 변환에 실패했습니다. 글로 입력해 주세요.');   // 429는 서버 문구("하루 N회까지…") 그대로
+}
+async function micToggle(o) {
+  if (Mic.state === 'recording' && Mic.owner === o) { micStop(); return; }
+  if (Mic.state !== 'idle') return;
+  micSay(o, '');
+  if (!micSupported()) { micSay(o, '이 브라우저는 음성 입력을 지원하지 않습니다. 글로 입력해 주세요.', 'error'); return; }
+  Mic.state = 'stopping';   // 권한 창이 떠 있는 동안 중복 시작 방지
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { Mic.state = 'idle'; micSay(o, micErrText(e), 'error'); return; }
+  const mime = micPickMime();
+  let rec;
+  try { rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream); }
+  catch (e) { stream.getTracks().forEach(t => t.stop()); Mic.state = 'idle'; micSay(o, '이 기기에서는 녹음을 시작할 수 없습니다. 글로 입력해 주세요.', 'error'); return; }
+  Object.assign(Mic, { stream, rec, owner: o, chunks: [], mime: rec.mimeType || mime || '', t0: Date.now(), state: 'recording' });
+  rec.ondataavailable = ev => { if (ev.data && ev.data.size) Mic.chunks.push(ev.data); };
+  rec.onstop = () => micStopped(o);
+  rec.onerror = () => micStop();
+  stream.getAudioTracks().forEach(t => { t.onended = () => micStop(); });
+  rec.start(1000);
+  micPaint(o, true);
+  if (o.lock) el(o.lock).disabled = true;   // 녹음·변환 중에는 보내기를 잠가 중간 내용이 AI로 가지 않게 한다
+  Mic.timer = setInterval(() => {
+    const sec = (Date.now() - Mic.t0) / 1000;
+    micSay(o, '녹음 중 ' + micClock(sec) + ' / ' + micClock(MIC_MAX_SEC) + ' · 다시 누르면 끝나요', 'info');
+    if (sec >= MIC_MAX_SEC) micStop();
+  }, 250);
+  micSay(o, '녹음 중 0:00 / ' + micClock(MIC_MAX_SEC) + ' · 다시 누르면 끝나요', 'info');
+}
+function micStop() {
+  if (Mic.state !== 'recording') return;
+  clearInterval(Mic.timer); Mic.timer = null;
+  Mic.state = 'stopping';
+  try { Mic.rec.stop(); } catch (e) { micStopped(Mic.owner); }
+}
+// 화면을 떠나거나 닫을 때: 녹음을 버린다(업로드하지 않음)
+function micCancel() {
+  if (Mic.state !== 'recording') return;
+  clearInterval(Mic.timer); Mic.timer = null;
+  Mic.state = 'cancelled';
+  try { Mic.rec.stop(); } catch (e) { micStopped(Mic.owner); }
+}
+function micDone(o) {
+  Mic.state = 'idle'; Mic.owner = null; Mic.rec = null; Mic.chunks = [];
+  micPaint(o, false);
+  el(o.btn).disabled = false;
+  if (o.lock) el(o.lock).disabled = false;
+}
+async function micUpload(blob, seconds) {
+  try {
+    const r = await fetch('/api/concepts/voice/transcribe', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + getToken(), 'Content-Type': blob.type, 'X-Audio-Seconds': String(seconds) },
+      body: blob,
+    });
+    let json = null;
+    try { json = await r.json(); } catch (e) { /* 본문 없음 */ }
+    return { status: r.status, body: json };
+  } catch (e) { return { status: 0, body: null }; }
+}
+async function micStopped(o) {
+  clearInterval(Mic.timer); Mic.timer = null;
+  const seconds = Math.min(MIC_MAX_SEC, Math.round((Date.now() - Mic.t0) / 1000));
+  const chunks = Mic.chunks;
+  const mime = (chunks[0] && chunks[0].type) || Mic.mime || 'audio/webm';
+  const cancelled = Mic.state === 'cancelled';
+  micRelease();
+  Mic.chunks = [];
+  if (cancelled) { micSay(o, ''); micDone(o); return; }
+  if (!chunks.length) { micSay(o, '녹음된 소리가 없습니다. 다시 시도해 주세요.', 'error'); micDone(o); return; }
+  const blob = new Blob(chunks, { type: mime });
+  if (blob.size > MIC_MAX_BYTES) { micSay(o, '녹음 파일이 너무 큽니다. 더 짧게 말해 주세요.', 'error'); micDone(o); return; }
+  Mic.state = 'transcribing';
+  micPaint(o, false);
+  el(o.btn).disabled = true;
+  micSay(o, '글로 바꾸는 중…', 'info');
+  const r = await micUpload(blob, seconds);
+  if (r.status === 200) {
+    const text = r.body && typeof r.body.text === 'string' ? r.body.text.trim() : '';
+    if (!text) micSay(o, '들리는 말을 찾지 못했습니다. 다시 말해 주세요.', 'info');
+    else {
+      const input = el(o.input);
+      const max = input.maxLength > 0 ? input.maxLength : TERM_MAX;
+      let v = input.value.trim() ? input.value.trim() + ' ' + text : text;
+      let cut = false;
+      if (clen(v) > max) { v = Array.from(v).slice(0, max).join(''); cut = true; }
+      input.value = v;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      micDone(o);
+      input.focus();
+      micSay(o, (cut ? '길어서 ' + max + '자까지만 넣었어요. ' : '') + '변환 결과를 확인하고 고친 뒤 직접 추가해 주세요. (자동으로 추가되지 않아요)', 'info');
+      return;
+    }
+  } else micSay(o, micHttpText(r), 'error');
+  micDone(o);
+}
+for (const o of MIC_TARGETS) {
+  el(o.btn).append(icon('mic'));
+  el(o.btn).addEventListener('click', () => micToggle(o));
+}
+window.addEventListener('hashchange', micCancel);
+window.addEventListener('pagehide', micCancel);
 
 // ── 시작 ──
 function applyHeaderHeight() {

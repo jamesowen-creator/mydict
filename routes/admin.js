@@ -116,7 +116,7 @@ router.get('/api/admin/stats', requireAdmin, async (req, res) => {
         if (r.event_type === 'tts') {
           openai += (Number(r.char_count) / 1000) * 0.030;
         }
-        if (r.event_type === 'stt') {
+        if (r.event_type === 'stt' || r.event_type === 'concept_stt') {   // 개념학습 음성 입력(작업206)도 같은 오디오 초 × 분당 단가
           openai += (Number(r.char_count) / 60) * sttPerMin;
         }
       }
