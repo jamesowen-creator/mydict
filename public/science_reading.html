@@ -10,15 +10,20 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- 작업13: 전 화면 공통 상단 헤더(로고+로그인상태) -->
 <link rel="stylesheet" href="/css/common/appHeader.css">
+<link rel="stylesheet" href="/css/common/screenBar.css">
 <style>
   /* 작업153: digest_reading.html을 복제한 독립 파일. 작업173: 하단 탭바와
      개념 정복 버튼(conquest-bar)을 추가함(퀴즈 엔진·결과 화면은 작업174).
      작업155: 범례 필터 방식을 버리고 과목 선택 화면(view-subjects)을 추가 -
      3단계(과목 선택 → 과목별 캐러셀 → 개념 상세) 구조로 바뀜 */
   :root {
-    --primary: #1D9E75;
-    --primary-light: #E1F5EE;
-    --primary-dark: #085041;
+    --primary: #e2583b;
+    --primary-light: #FDF0EC;
+    --primary-dark: #b8442e;
+    /* 작업199: 정답 같은 의미색은 주제색(코랄)과 분리해 초록 유지 */
+    --success: #1D9E75;
+    --success-light: #E1F5EE;
+    --success-dark: #085041;
     --bg: #FAFAF9;
     --card: #FFFFFF;
     --text1: #1a1a1a;
@@ -36,7 +41,7 @@
     background: var(--bg);
     color: var(--text1);
     min-height: 100dvh;
-    max-width: 480px;
+    max-width: 680px;
     margin: 0 auto;
     position: relative;
     overflow-x: hidden;
@@ -60,26 +65,10 @@
   #loading p { color: var(--text2); font-size: 14px; }
 
   /* ── Views ── */
-  .view { display: none; min-height: 100dvh; padding-bottom: var(--tab-height); }
+  .view { display: none; min-height: 100dvh; padding-bottom: calc(var(--tab-height) + env(safe-area-inset-bottom, 0px)); }
   .view.active { display: block; }
 
-  /* ── Top Bar(상세) / Subject Bar(과목별 캐러셀) 공통 ── */
-  .top-bar, .subject-bar {
-    position: sticky; top: 0; z-index: 100;
-    background: var(--card);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 16px;
-    display: flex; align-items: center; gap: 12px;
-  }
-  .back-btn {
-    background: none; border: none; cursor: pointer;
-    padding: 6px; border-radius: 8px;
-    color: var(--text2); display: flex; align-items: center;
-    min-width: 44px; min-height: 44px; justify-content: center;
-    transition: background 0.15s;
-  }
-  .back-btn:hover { background: var(--primary-light); color: var(--primary); }
-  .back-btn svg { width: 20px; height: 20px; }
+  /* 작업199: 제목 줄은 공용 /css/common/screenBar.css(.screen-bar) */
 
   /* 작업155: 과목별 캐러셀 상단의 현재 과목 칩 */
   .subject-chip {
@@ -219,7 +208,6 @@
     --coral-tint: #FDF0EC;
   }
   #view-science .content { padding: 20px 16px 100px; }
-  #view-science .back-btn:hover { background: var(--coral-tint); color: var(--coral-ink); }
 
   .science-work-header {
     background: var(--card);
@@ -303,8 +291,9 @@
   /* ── 하단 탭바 (작업173: digest_reading.html 82-105와 같은 모양) ── */
   .tab-bar {
     position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: 480px;
-    height: var(--tab-height);
+    width: 100%; max-width: 680px;
+    height: calc(var(--tab-height) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     background: var(--card);
     border-top: 1px solid var(--border);
     display: flex; z-index: 200;
@@ -328,7 +317,7 @@
   /* ── 개념 정복 버튼 (작업173: digest_reading.html 344-367와 같은 모양) ── */
   .conquest-bar {
     position: fixed; bottom: var(--tab-height); left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: 480px;
+    width: 100%; max-width: 680px;
     padding: 10px 16px;
     background: var(--card);
     border-top: 1px solid var(--border);
@@ -350,7 +339,6 @@
   .conquest-btn svg { width: 18px; height: 18px; }
 
   /* ── View 3: Quiz (작업174: digest_reading.html 368-481과 같은 모양) ── */
-  .top-bar h1 { font-size: 16px; font-weight: 700; color: var(--text1); }
   #view-quiz .content { padding: 20px 16px; }
 
   .quiz-progress-bar-wrap {
@@ -386,9 +374,9 @@
   }
   .mcq-option:hover:not(.answered) { border-color: var(--primary); background: var(--primary-light); }
   .mcq-option.answered { cursor: default; }
-  .mcq-option.correct { background: var(--primary-light); border-color: var(--primary); }
+  .mcq-option.correct { background: var(--success-light); border-color: var(--success); }
   .mcq-option.wrong { background: var(--error-light); border-color: var(--error); }
-  .mcq-option.correct-hint { background: var(--primary-light); border-color: var(--primary); }
+  .mcq-option.correct-hint { background: var(--success-light); border-color: var(--success); }
   .mcq-num {
     width: 26px; height: 26px; border-radius: 50%;
     background: var(--border);
@@ -396,9 +384,9 @@
     font-size: 12px; font-weight: 700; flex-shrink: 0; color: var(--text2);
     transition: all 0.15s;
   }
-  .mcq-option.correct .mcq-num { background: var(--primary); color: #fff; }
+  .mcq-option.correct .mcq-num { background: var(--success); color: #fff; }
   .mcq-option.wrong .mcq-num { background: var(--error); color: #fff; }
-  .mcq-option.correct-hint .mcq-num { background: var(--primary); color: #fff; }
+  .mcq-option.correct-hint .mcq-num { background: var(--success); color: #fff; }
   .mcq-text { font-size: 14px; line-height: 1.5; color: var(--text1); word-break: keep-all; }
 
   .ox-buttons { display: flex; gap: 12px; margin-top: 4px; }
@@ -411,7 +399,7 @@
     display: flex; align-items: center; justify-content: center;
   }
   .ox-btn:hover:not(:disabled) { border-color: var(--primary); background: var(--primary-light); }
-  .ox-btn.correct { background: var(--primary-light); border-color: var(--primary); }
+  .ox-btn.correct { background: var(--success-light); border-color: var(--success); }
   .ox-btn.wrong { background: var(--error-light); border-color: var(--error); }
   .ox-btn:disabled { cursor: default; }
   .ox-feedback {
@@ -419,7 +407,7 @@
     border-radius: 10px; font-size: 13px; font-weight: 500; display: none;
   }
   .ox-feedback.show { display: block; }
-  .ox-feedback.correct-fb { background: var(--primary-light); color: var(--primary-dark); }
+  .ox-feedback.correct-fb { background: var(--success-light); color: var(--success-dark); }
   .ox-feedback.wrong-fb { background: var(--error-light); color: var(--error); }
 
   .quiz-next-btn {
@@ -454,7 +442,7 @@
     border: 1px solid var(--border); padding: 12px 14px;
   }
   .result-wrong-q { font-size: 13px; color: var(--text2); margin-bottom: 4px; white-space: pre-line; word-break: keep-all; }
-  .result-wrong-a { font-size: 14px; font-weight: 600; color: var(--primary); word-break: keep-all; }
+  .result-wrong-a { font-size: 14px; font-weight: 600; color: var(--success); word-break: keep-all; }
   .result-wrong-a::before { content: '정답: '; color: var(--text2); font-weight: 400; }
   .result-actions { display: flex; flex-direction: column; gap: 10px; }
   .result-btn {
@@ -500,8 +488,8 @@
 
 <!-- View 1: 과목별 캐러셀 -->
 <div id="view-list" class="view">
-  <div class="subject-bar">
-    <button class="back-btn" onclick="goSubjects()" aria-label="과목 선택으로">
+  <div class="screen-bar">
+    <button class="screen-bar-back" onclick="goSubjects()" aria-label="과목 선택으로">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="15 18 9 12 15 6"></polyline>
       </svg>
@@ -515,8 +503,8 @@
 
 <!-- View 2: Concept detail -->
 <div id="view-science" class="view">
-  <div class="top-bar">
-    <button class="back-btn" onclick="goList()" aria-label="목록으로">
+  <div class="screen-bar">
+    <button class="screen-bar-back" onclick="goList()" aria-label="목록으로">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="15 18 9 12 15 6"></polyline>
       </svg>
@@ -535,20 +523,20 @@
 
 <!-- View 3: Quiz (작업174) -->
 <div id="view-quiz" class="view">
-  <div class="top-bar">
-    <button class="back-btn" onclick="leaveQuiz()" aria-label="퀴즈에서 나가기">
+  <div class="screen-bar">
+    <button class="screen-bar-back" onclick="leaveQuiz()" aria-label="퀴즈에서 나가기">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="15 18 9 12 15 6"></polyline>
       </svg>
     </button>
-    <h1>개념 퀴즈</h1>
+    <h1 class="screen-bar-title">개념 퀴즈</h1>
   </div>
   <div class="content" id="quiz-content"></div>
 </div>
 
 <!-- View 4: Result (작업174) -->
 <div id="view-result" class="view">
-  <div class="top-bar"><h1>퀴즈 결과</h1></div>
+  <div class="screen-bar"><h1 class="screen-bar-title">퀴즈 결과</h1></div>
   <div class="content" id="result-content"></div>
 </div>
 

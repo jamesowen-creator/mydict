@@ -139,7 +139,12 @@ async function launchBrowser() {
   const portFile = path.join(dir, 'DevToolsActivePort');
   for (let i = 0; i < 100 && !fs.existsSync(portFile); i++) await sleep(100);
   if (!fs.existsSync(portFile)) { proc.kill(); throw new Error('Chrome 디버그 포트를 찾지 못했습니다.'); }
-  const port = Number(fs.readFileSync(portFile, 'utf8').split('\n')[0]);
+  // 작업199: Windows에서 Chrome이 파일을 쓰는 순간에 읽으면 EBUSY가 난다(UI 테스트 파일이 병렬로 늘면서 드러남) → 몇 번 다시 읽는다
+  let port = NaN;
+  for (let i = 0; i < 50 && !(port > 0); i++) {
+    try { port = Number(fs.readFileSync(portFile, 'utf8').split('\n')[0]); } catch (e) { await sleep(100); }
+  }
+  if (!(port > 0)) { proc.kill(); throw new Error('Chrome 디버그 포트를 읽지 못했습니다.'); }
   return new Browser(proc, port, dir);
 }
 
