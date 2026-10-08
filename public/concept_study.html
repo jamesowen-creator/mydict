@@ -66,17 +66,20 @@
   @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
 
   /* 공통 요소 */
-  .label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--text2); text-transform: uppercase; }
+  /* 작업220: 섹션 제목 규격 — 12px / 700 / --accent-text(#b8442e, 페이지 바탕 위 5.25:1) / 블록으로 쓰이는 제목은 아래 2px 코랄 선(장식) */
+  .label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--accent-text); text-transform: uppercase; }
   .muted { color: var(--text2); }
   .small { font-size: 13px; }
-  .btn { min-height: 44px; padding: 10px 18px; border: 1px solid var(--line); background: var(--surface2); border-radius: var(--btn-radius); font-weight: var(--btn-weight); display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-  .btn.primary { background: var(--btn-primary-bg, #b8442e); border-color: var(--btn-primary-bg, #b8442e); color: var(--on-accent); }
-  .btn.primary:hover:not(:disabled) { background: var(--btn-primary-bg-hover, #9c3a27); border-color: var(--btn-primary-bg-hover, #9c3a27); }
-  .btn.primary:active:not(:disabled) { background: var(--btn-primary-bg-active, #86311f); border-color: var(--btn-primary-bg-active, #86311f); }
+  /* 작업220: 주 버튼 규격 — 높이 최소 44px, 15px / 600, 좌우 padding 20px, 테두리 없음 */
+  .btn { min-height: 44px; padding: 10px 20px; border: none; font-size: 15px; background: var(--surface2); border-radius: var(--btn-radius); font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn.primary { background: var(--btn-primary-bg, #b8442e); color: var(--on-accent); }
+  .btn.primary:hover:not(:disabled) { background: var(--btn-primary-bg-hover, #9c3a27); }
+  .btn.primary:active:not(:disabled) { background: var(--btn-primary-bg-active, #86311f); }
   /* 작업216-4: 보조 동작은 박스 없이 텍스트(음성 학습의 .btn.text와 같은 사양). 터치 영역: 높이 44px(.btn) + 가로 44px 이상(min-width).
      글자 대비(계산값): --text2 #4a5070 은 흰 바탕 7.86:1 / --bg 7.35 / 안내 상자 7.05 / 오류 상자 6.82, 위험 --danger #B42318 은 6.57 / 6.15 / 5.90 / 5.70 (모두 4.5:1 이상).
      이 화면의 .btn에는 :hover 채움 규칙이 없어 호버에서 바탕이 새지 않는다. 포커스 윤곽선은 전역 :focus-visible(2px, --focus)을 쓴다. */
-  .btn.text { background: transparent; border: none; padding: 10px 6px; min-width: 44px; color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
+  /* 작업220: 텍스트 버튼 규격 — 15px / 600, 보조색, padding 0 8px, 최소 44×44px, 밑줄 */
+  .btn.text { background: transparent; border: none; padding: 0 8px; min-height: 44px; min-width: 44px; font-size: 15px; font-weight: 600; color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
   .btn.text:hover:not(:disabled), .btn.text:active:not(:disabled) { background: transparent; color: var(--text); }
   .btn.text.danger { color: var(--danger); }
   .btn.text.danger:hover:not(:disabled), .btn.text.danger:active:not(:disabled) { color: var(--danger); }
@@ -88,7 +91,7 @@
   }
   textarea { resize: vertical; min-height: 88px; }
   .field { margin-top: 14px; }
-  .field > .label { display: block; margin-bottom: 6px; }
+  .field > .label { display: block; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 2px solid var(--accent); }
   .counter { font-size: 12px; color: var(--text2); text-align: right; margin-top: 2px; }
   .msg { position: relative; margin-top: 12px; padding: 10px 0 10px 24px; font-size: 13px; font-weight: 500; line-height: 1.6; }
   /* 작업217-4: 메시지는 색 바탕·테두리 없이 앞의 기호와 글자색으로 구분한다. ✕ 오류(--danger 흰 바탕 6.57:1) / i 안내(--accent-text 5.38:1) */
@@ -99,11 +102,12 @@
   .msg.info { color: var(--accent-text); }
   .msg.info::before { content: 'i'; }
   .busy-line { display: flex; align-items: center; gap: 10px; color: var(--text2); font-size: 14px; margin-top: 12px; }
-  .busy-line .spinner { width: 16px; height: 16px; border-width: 2px; }
+  .busy-line .spinner { width: 20px; height: 20px; border-width: 2px; }   /* 작업220: 버튼 안·인라인 스피너 20px */
 
   /* 목록 화면 */
   .view-head { padding: 24px 0 8px; }
-  .view-title { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; }
+  /* 작업220: 목록 첫 화면 제목 22px / 700 / 주 글자색 */
+  .view-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
   .view-sub { color: var(--text2); font-size: 14px; margin-top: 4px; }
   .rows { margin-top: 16px; border-top: 1px solid var(--line); }
   .row { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
@@ -130,7 +134,7 @@
   .source.user { color: var(--text2); }
   .place { font-size: 13px; color: var(--text2); margin-top: 8px; }
   .sec { margin-top: 18px; }
-  .sec > .label { display: block; margin-bottom: 4px; }
+  .sec > .label { display: block; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 2px solid var(--accent); }
   .sec p { white-space: pre-wrap; word-break: break-word; }
   .sec.quote p { border-left: 2px solid var(--accent); padding-left: 12px; }
   .empty-explain { margin-top: 16px; color: var(--text2); }
@@ -147,7 +151,7 @@
   .next-main { margin-top: 12px; }
   .next-term { font-size: 20px; font-weight: 800; word-break: break-all; }
   .kv { margin-top: 10px; }
-  .kv .label { display: block; margin-bottom: 1px; }
+  .kv .label { display: block; margin-bottom: 1px; padding-bottom: 4px; border-bottom: 2px solid var(--accent); }
   .actions { margin-top: 16px; }
   .alts { margin-top: 18px; border-top: 1px solid var(--line); }
   .alts > summary { list-style: none; min-height: 44px; display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text2); cursor: pointer; }
@@ -158,7 +162,7 @@
   .alt:first-of-type { border-top: none; }
   .alt-term { font-size: 16px; font-weight: 700; word-break: break-all; }
   .react { margin-top: 18px; padding-top: 4px; border-top: 1px solid var(--line); }
-  .react .label { display: block; margin: 10px 0 2px; }
+  .react .label { display: block; margin: 10px 0 2px; padding-bottom: 4px; border-bottom: 2px solid var(--accent); }
 
   /* 학습 기록: 진행 막대 + 선택 경로 */
   .record { padding: 14px 0 12px; border-bottom: 1px solid var(--line); }
@@ -220,7 +224,7 @@
   /* 목록 보기 */
   .grp { margin-top: 18px; }
   .grp:first-child { margin-top: 0; }
-  .grp > .label { display: block; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+  .grp > .label { display: block; padding-bottom: 4px; border-bottom: 2px solid var(--accent); }
   .grp-head { display: grid; grid-template-columns: 24px 1fr; align-items: center; width: 100%; min-height: 44px; padding: 6px 0; text-align: left; background: transparent; border: none; border-bottom: 1px solid var(--line); }
   .grp-head .ic { transition: transform 0.15s; color: var(--text2); }
   .grp-head[aria-expanded=true] .ic { transform: rotate(90deg); }
@@ -299,7 +303,6 @@
   .ask-msg:empty { display: none; }
 
   @media (min-width: 768px) {
-    .view-title { font-size: 28px; }
     .term { font-size: 30px; }
   }
 </style>
