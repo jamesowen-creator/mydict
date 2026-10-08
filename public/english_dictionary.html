@@ -102,10 +102,10 @@
     overflow-y: hidden;
     scrollbar-width: none;
     scroll-snap-type: x mandatory;
-    /* 작업12-b: 탭 사이 간격을 padding이 아니라 이 gap 하나로만
-       통일 - 라벨 길이/뱃지 유무와 무관하게 항상 동일한 간격 보장
-       작업34: 로고 블록 제거로 생긴 여유 공간만큼 간격을 20px→40px로 확대 */
-    gap: 40px;
+    /* 작업12-b: 탭 사이 간격을 padding이 아니라 이 gap 하나로만 통일
+       작업222: 탭 5개가 내비 폭 안에 모두 들어오도록 간격 대신 탭을 균등 폭(flex:1 1 0, min-width:0)으로 나눔 — 예전 gap 40px + 고정 폭
+       배치는 390px에서 마지막 탭이 화면 밖(350~426px)으로 나가 "오답노트"가 잘렸음 */
+    gap: 0;
   }
   .nav-tabs::-webkit-scrollbar { display: none; }
 
@@ -115,7 +115,9 @@
     align-items: baseline;
     justify-content: center;
     gap: 2px;
-    padding: 10px 4px;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 10px 0;
     font-size: 15px;
     font-weight: 500;
     color: var(--text2);
@@ -141,6 +143,12 @@
     border-top-color: var(--accent);
   }
   .nav-tab:hover:not(.active) { color: var(--text); }
+  /* 작업222: 좁은 화면(≤460px)에서는 라벨 13px, 숫자 배지는 라벨 아래 줄로(5탭 라벨이 잘리지 않게). 넓은 화면은 예전처럼 라벨 옆 */
+  @media (max-width: 460px) {
+    .nav-tab { flex-direction: column; align-items: center; justify-content: flex-start; gap: 0; font-size: 13px; }
+    .nav-tab-badge-slot { min-height: 14px; }
+    .nav-tab .badge { margin-left: 0; font-size: 11px; line-height: 14px; }
+  }
 
   .nav-tab-metacong {
     padding: 14px 16px;
@@ -198,6 +206,7 @@
 
   .search-input-wrap {
     flex: 1;
+    min-width: 0;   /* 작업222: 320px에서 입력칸의 기본 최소 폭 때문에 검색 버튼이 화면 밖으로 나가던 문제(입력칸이 줄어들 수 있게) */
     position: relative;
     display: flex;
     align-items: center;
@@ -205,6 +214,7 @@
 
   .search-input {
     flex: 1;
+    min-width: 0;   /* 작업222: 위와 같은 이유(입력칸 기본 최소 폭 때문에 320px에서 넘침) */
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
@@ -1167,7 +1177,8 @@
   /* PODCAST PLAYER */
   .podcast-player {
     position: fixed;
-    bottom: 0; left: 0; right: 0;
+    /* 작업222: 하단 내비와 같은 680px 열 안에서 가운데 정렬(left 50% + translateX + max-width) */
+    bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--content-max);
     background: var(--surface);
     border-top: 2px solid var(--border);
     padding: 14px 20px 30px;
@@ -1465,7 +1476,7 @@
   /* 작업12: 하단 고정 nav 위로 띄워서 겹치지 않게 */
   /* 작업31: 텍스트 필 버튼 대신 원형 그레이스케일 아이콘 버튼으로 */
   /* 작업34: 아이콘 원형 버튼 대신 텍스트 전용 버튼으로 */
-  .ocr-open-btn{position:fixed;right:16px;bottom:calc(var(--navbar-h) + env(safe-area-inset-bottom) + 12px);z-index:120;padding:12px 20px;border:0;border-radius:999px;background:#1A1A1E;color:#fff;font-size:14px;font-weight:700;font-family:'Noto Sans KR',sans-serif;box-shadow:0 2px 10px rgba(0,0,0,0.2)}
+  .ocr-open-btn{position:fixed;left:min(calc(50% + var(--content-max) / 2 - 16px), calc(100% - 16px));transform:translateX(-100%);width:max-content;white-space:nowrap;bottom:calc(var(--navbar-h) + env(safe-area-inset-bottom) + 12px);z-index:120;padding:12px 20px;border:0;border-radius:999px;background:#1A1A1E;color:#fff;font-size:14px;font-weight:700;font-family:'Noto Sans KR',sans-serif;box-shadow:0 2px 10px rgba(0,0,0,0.2)}
 
   /* 작업27: 사전 페이지 한정 검색창/언어탭 미니멀 리디자인. #search-btn/.lang-tag 등 이 페이지 전용
      셀렉터로만 스코프를 좁혀서 전역 .btn/--accent는 건드리지 않는다.

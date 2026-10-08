@@ -39,7 +39,11 @@ const MEASURE = sc => `(() => {
   const q = s => [...document.querySelectorAll(s)].find(e => e.getClientRects().length);
   const tabs = [...document.querySelectorAll(${JSON.stringify(sc.tab)})].filter(e => e.getClientRects().length).map(R);
   return { vw: document.documentElement.clientWidth, scrollW: document.documentElement.scrollWidth,
-    header: R(q('.metis-app-header')), logo: R(q('.metis-app-header-logo')), bar: R(q(${JSON.stringify(sc.bar)})), tabs, main: R(q('main, #view-home .content')) };
+    header: R(q('.metis-app-header')), logo: R(q('.metis-app-header-logo')), bar: R(q(${JSON.stringify(sc.bar)})), tabs, main: R(q('main, #view-home .content')),
+    labels: [...document.querySelectorAll('.nav-tab')].map(t => { const l = t.querySelector('.nav-tab-label'), b = t.querySelector('.nav-tab-badge-slot'); const tr = t.getBoundingClientRect(), lr = l ? l.getBoundingClientRect() : null, br = b && b.getClientRects().length ? b.getBoundingClientRect() : null;
+      return { text: l ? l.textContent : '', labelFits: l ? l.scrollWidth <= l.clientWidth : true, labelX0: lr ? lr.left : 0, labelX1: lr ? lr.right : 0, tabX0: tr.left, tabX1: tr.right, contentX1: Math.max(lr ? lr.right : 0, br ? br.right : 0), contentX0: Math.min(lr ? lr.left : 1e9, br ? br.left : 1e9) }; }),
+    tabsBox: R(q('.nav-tabs')), tabsOverflow: (() => { const t = q('.nav-tabs'); return t ? t.scrollWidth > t.clientWidth + 1 : null; })(),
+    ocr: R(q('#ocr-open')), player: R(document.getElementById('podcast-player')) };
 })()`;
 async function measure(key, width) {
   const sc = SCREENS[key];
@@ -51,6 +55,7 @@ async function measure(key, width) {
   await page.waitFor(sc.ready, 12000);
   await page.eval(NO_MOTION);
   await settle(page);
+  if (key === 'dict') await page.eval("document.getElementById('podcast-player').classList.add('show')");   // 팟캐스트 플레이어를 표시 상태로 만들어 위치를 잰다
   await sleep(300);
   const m = await page.eval(MEASURE(sc));
   assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), [], key + ' ' + width + ': 스크립트 오류');
@@ -78,22 +83,47 @@ for (const w of [768, 820, 1024, 1280]) {
     // 내비 항목이 서로 겹치지 않음
     for (let i = 1; i < d.tabs.length; i++) assert.ok(d.tabs[i - 1].x1 <= d.tabs[i].x0 + 0.5, `탭 ${i} 와 ${i + 1} 이 겹침`);
     assert.equal(d.tabs.length, 5, '탭 개수는 그대로 5개');
+    // 작업222: 팟캐스트 플레이어는 내비와 같은 680px 열, OCR 버튼은 그 열의 오른쪽 끝에서 16px 안쪽
+    assert.ok(near(d.player.x0, d.bar.x0) && near(d.player.x1, d.bar.x1), `플레이어 ${d.player.x0}~${d.player.x1} vs 내비 ${d.bar.x0}~${d.bar.x1}`);
+    assert.ok(near(d.ocr.x1, d.bar.x1 - 16), `OCR 버튼 오른쪽 ${d.ocr.x1} (열 오른쪽 ${d.bar.x1} - 16)`);
+    assert.ok(d.ocr.x0 >= d.bar.x0, 'OCR 버튼이 열 안에 있음');
+    // 5탭이 내비 안쪽 폭(좌우 16px 제외)에 모두 들어오고 라벨이 잘리지 않음
+    assert.ok(d.tabs[4].x1 <= d.bar.x1 - 16 + 0.5, `마지막 탭 오른쪽 ${d.tabs[4].x1} ≤ 내비 안쪽 ${d.bar.x1 - 16}`);
+    for (const t of d.labels) { assert.ok(t.labelFits, `라벨 "${t.text}" 잘림`); assert.ok(t.contentX0 >= t.tabX0 - 0.5 && t.contentX1 <= t.tabX1 + 0.5, `"${t.text}" 내용이 탭 폭을 넘음`); }
+    assert.equal(d.tabsOverflow, false, '탭 줄이 가로로 넘치지 않음');
     assert.ok(d.scrollW <= d.vw + 1, '가로 스크롤 없음');
   });
 }
 
 // 폰 폭: 수정 전과 같은 값(수정 전 측정: 작업219 1단계). 320px에서는 사전 콘텐츠 최소 폭 때문에 고정 내비가 387px로 그려지는 기존 동작이 그대로임.
+test('222 사전 5탭: 320 / 390 / 768px에서 5개 탭이 모두 내비 안에 들어오고, 라벨이 잘리지 않고, 서로 겹치지 않음, 폭이 균등', { skip: SKIP }, async () => {
+  for (const w of [320, 390, 768]) {
+    const d = await measure('dict', w);
+    assert.equal(d.tabs.length, 5, w + 'px: 탭 5개');
+    assert.ok(d.tabs[4].x1 <= d.bar.x1 - 16 + 0.5, `${w}px: 마지막 탭 오른쪽 ${d.tabs[4].x1} ≤ 내비 안쪽 ${d.bar.x1 - 16}`);
+    assert.ok(d.tabs[0].x0 >= d.bar.x0 + 16 - 0.5, `${w}px: 첫 탭이 내비 안쪽에서 시작`);
+    for (const t of d.labels) { assert.ok(t.labelFits, `${w}px: 라벨 "${t.text}" 잘림`); assert.ok(t.contentX0 >= t.tabX0 - 0.5 && t.contentX1 <= t.tabX1 + 0.5, `${w}px: "${t.text}" 내용(라벨·숫자)이 탭 폭을 넘음`); }
+    for (let i = 1; i < d.tabs.length; i++) assert.ok(d.tabs[i - 1].x1 <= d.tabs[i].x0 + 0.5, `${w}px: 탭 ${i}·${i + 1} 겹침`);
+    const widths = d.tabs.map(t => Math.round((t.x1 - t.x0) * 10) / 10);
+    assert.ok(Math.max(...widths) - Math.min(...widths) <= 1, `${w}px: 탭 폭이 균등 ${widths}`);
+    assert.equal(d.tabsOverflow, false, `${w}px: 탭 줄 가로 넘침 없음`);
+  }
+});
+
 test('219 사전 320px·390px: 수정 전과 같은 위치(헤더·본문 전체 폭, 로고 16px, 첫 탭 16px), 가로 스크롤 없음(320px는 기존 동작 그대로), 내비 항목이 겹치지 않음', { skip: SKIP }, async () => {
   const d390 = await measure('dict', 390);
   assert.deepEqual(d390.header, { x0: 0, x1: 390 }); assert.deepEqual(d390.bar, { x0: 0, x1: 390 }); assert.deepEqual(d390.main, { x0: 0, x1: 390 });
   assert.equal(d390.logo.x0, 16); assert.equal(d390.tabs[0].x0, 16);
   assert.ok(d390.scrollW <= d390.vw + 1, '390px: 가로 스크롤 없음');
+  assert.ok(near(d390.ocr.x1, 390 - 16), `390px OCR 버튼 오른쪽 ${d390.ocr.x1} = 374(전과 같음)`);
+  assert.ok(d390.ocr.x1 - d390.ocr.x0 >= 90, `390px OCR 버튼이 한 줄 알약 모양을 유지(폭 ${d390.ocr.x1 - d390.ocr.x0} ≥ 90, 전에는 약 95px)`);
+  assert.deepEqual(d390.player, { x0: 0, x1: 390 }, '390px 플레이어는 전체 폭(전과 같음)');
   for (let i = 1; i < d390.tabs.length; i++) assert.ok(d390.tabs[i - 1].x1 <= d390.tabs[i].x0 + 0.5, `390px 탭 ${i} 와 ${i + 1} 이 겹침`);
   const d320 = await measure('dict', 320);
   assert.deepEqual(d320.header, { x0: 0, x1: 320 }); assert.deepEqual(d320.main, { x0: 0, x1: 320 });
-  assert.equal(d320.bar.x0, 0); assert.equal(d320.logo.x0, 16); assert.equal(d320.tabs[0].x0, 16);
+  assert.deepEqual(d320.bar, { x0: 0, x1: 320 }, '320px 내비는 화면 폭(수정 전에는 387px로 넘쳤음)'); assert.equal(d320.logo.x0, 16); assert.equal(d320.tabs[0].x0, 16);
   assert.equal(d320.tabs.length, 5);
-  // 320px는 수정 전부터 검색 버튼(#search-btn)이 화면 오른쪽 밖(321~387px)으로 나가 문서 폭이 387px이다(작업219 1단계 측정, 이 작업의 범위 밖이라 그대로 둠). 수정 때문에 더 넓어지지 않았는지만 확인(스크롤바를 숨기면 365px로 잡히기도 해서 상한만 비교)
-  assert.ok(d320.scrollW <= 387, `320px: 문서 폭이 수정 전 값(387px)보다 넓어지지 않음 (${d320.scrollW})`);
+  // 작업222: 320px에서 검색 버튼이 화면 밖으로 나가던 문제(문서 폭 387px)를 고쳐서 다시 "가로 스크롤 없음"으로 되돌림(작업219에서는 ≤387로 완화했던 기대)
+  assert.ok(d320.scrollW <= 320, `320px: 문서 폭 ${d320.scrollW} ≤ 320`);
   for (let i = 1; i < d320.tabs.length; i++) assert.ok(d320.tabs[i - 1].x1 <= d320.tabs[i].x0 + 0.5, `320px 탭 ${i} 와 ${i + 1} 이 겹침`);
 });
