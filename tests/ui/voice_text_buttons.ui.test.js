@@ -161,16 +161,15 @@ test('지도 팝업·과목 선택의 보조 버튼과 JS 생성 버튼(이유 �
   await page.close();
 });
 
-test('유지 목록은 박스 그대로: 오답 노트·선택·다시 녹음·이어서 녹음·자료로 돌아가기, 주요 채움 버튼, 칩·select·카드 행', { skip: SKIP }, async () => {
+test('작업217-2 이후 유지 목록: 주요 채움 버튼, select·카드 행은 박스 그대로(오답 노트·선택·다시 녹음·이어서 녹음·자료로 돌아가기는 텍스트 버튼으로 전환됨)', { skip: SKIP }, async () => {
   const page = await open();
   await openDetail(page, 2);
-  const keepBoxed = [['wrong-btn', 'list'], ['sel-toggle', 'list'], ['rec-redo', 'record'], ['append-rec', 'edit'], ['quiz-back', 'quiz']];
-  for (const [id, view] of keepBoxed) {
+  // 작업217-2: 옛 기대("secondary 박스 유지")를 새 기준으로 바꿈 — 이 5개는 이제 텍스트 버튼(박스 없음·44px·대비 4.5:1·밑줄)
+  const nowText = [['wrong-btn', 'list'], ['sel-toggle', 'list'], ['rec-redo', 'record'], ['append-rec', 'edit'], ['quiz-back', 'quiz']];
+  for (const [id, view] of nowText) {
     await page.eval(`showView(${JSON.stringify(view)})`);
-    const m = await page.eval(MEASURE('#' + id));
-    assert.match(m.cls, /secondary/, id + ': secondary 유지');
-    assert.doesNotMatch(m.cls, /\btext\b/, id + ': 변환되지 않음');
-    assert.notEqual(m.bg, TRANSPARENT, id + ': 배경 유지'); assert.equal(m.bw[0], '1px', id + ': 테두리 유지(CSS 1.5px는 배율 1에서 1px로 내림)'); assert.equal(m.radius, '10px', id + ': 반경 유지');
+    if (id === 'sel-toggle') await page.eval("document.getElementById('sel-toggle').style.display = ''");
+    assertTextButton(await page.eval(MEASURE('#' + id)), id);
   }
   const filled = [['new-rec-btn', 'list'], ['rec-convert', 'record'], ['sum-make', 'edit'], ['edit-save', 'edit'], ['merge-go', 'merge'], ['quiz-play', 'edit'], ['chat-send', 'chat']];
   for (const [id, view] of filled) {
@@ -178,7 +177,7 @@ test('유지 목록은 박스 그대로: 오답 노트·선택·다시 녹음·�
     const m = await page.eval(MEASURE('#' + id));
     assert.equal(m.bg, PRIMARY_FILL, id + ': 주요 채움 버튼 유지(이 테스트는 마우스를 쓰지 않아 기본색)'); assert.equal(m.radius, '10px'); assert.equal(m.weight, '600');
   }
-  // 칩·select·카드 행은 변환 대상이 아니다
+  // select·카드 행은 변환 대상이 아니다(칩은 217-2에서 전환)
   await page.eval("showView('edit')");
   const others = await page.eval(`(() => {
     const host = document.querySelector('#view-edit'); const out = {};
@@ -190,7 +189,7 @@ test('유지 목록은 박스 그대로: 오답 노트·선택·다시 녹음·�
     const card = getComputedStyle(document.querySelector('.note-item')); out.card = { bw: card.borderTopWidth, radius: card.borderTopLeftRadius };
     return out;
   })()`);
-  assert.deepEqual(others.chip, { radius: '999px', bw: '1px' });
+  assert.deepEqual(others.chip, { radius: '0px', bw: '0px' }, '작업217-2: 키워드 칩은 박스 없음(상세 검증은 voice_secondary_text.ui.test.js)');
   assert.equal(others.select.bw, '1px'); assert.equal(others.select.radius, '10px');
   assert.deepEqual(others.card, { bw: '1px', radius: '16px' });
   await page.close();
@@ -287,5 +286,103 @@ test('키보드 포커스: Tab으로 텍스트 버튼에 닿으면 2px 윤곽선
   assert.equal(hov.hover, true);
   assert.equal(hov.bg, TRANSPARENT, '호버해도 배경 투명');
   assert.equal(hov.color, 'rgb(26, 26, 26)', '호버하면 글자만 진해짐');
+  await page.close();
+});
+
+// ───────────────────────── 작업217-2: 보조 버튼 전부(.secondary → .text), 경고 문구, 키워드·평가 칩 ─────────────────────────
+// 클릭 경합 방지: 글꼴 로드 + 보이는 버튼·칩 위치가 50ms 간격으로 연속 4번 같을 때까지 기다린다(NO_MOTION은 open()에서 이미 주입)
+async function settle217(page) {
+  await page.waitFor("document.fonts.status === 'loaded'", 5000);
+  let last = '', same = 0;
+  for (let i = 0; i < 100 && same < 4; i++) {
+    const now = await page.eval("[...document.querySelectorAll('.view.active button, .view.active .bubble, dialog[open] button')].filter(e => e.getClientRects().length).map(e => { const r = e.getBoundingClientRect(); return Math.round(r.top) + ':' + Math.round(r.left); }).join('|') + '|' + document.documentElement.scrollHeight");
+    same = now === last ? same + 1 : 0; last = now;
+    await sleep(50);
+  }
+  assert.ok(same >= 4, '화면 레이아웃이 안정되지 않음');
+}
+function assertNoBox(m, label) {
+  assert.ok(m, label + ': 요소 없음');
+  assert.equal(m.bg, TRANSPARENT, label + ': 배경 투명');
+  assert.deepEqual(m.bw, ['0px', '0px', '0px', '0px'], label + ': 테두리 없음');
+  assert.equal(m.radius, '0px', label + ': 둥근 모서리 없음');
+}
+
+test('217-2 (a)(b)(c) 코드로 만들어지는 .secondary 보조 버튼도 전부 텍스트: 자료로 돌아가기 목록의 열기·위로/아래로·이미지 저장·퀴즈 새로 만들기·지도 과목 선택', { skip: SKIP }, async () => {
+  const page = await open();
+  // 마크업 5개는 '유지 목록' 테스트가 확인한다. 여기서는 동적으로 만들어지거나 팝업 안에 있는 것들
+  await page.click('#vm-open-btn');
+  await page.waitFor("document.getElementById('vm-subject').open");
+  await settle217(page);
+  const subj = await page.eval("document.querySelectorAll('.vm-subject-btn').length");
+  assert.ok(subj >= 1);
+  assertTextButton(await page.eval(MEASURE('.vm-subject-btn')), '.vm-subject-btn');
+  await page.eval("document.getElementById('vm-subject').close()");
+  // 퀴즈가 이미 있을 때 "퀴즈 새로 만들기"는 .text, 없을 때는 주요 채움 버튼
+  await openDetail(page, 2);
+  await page.eval("quizChecking = false; quizLoadedText = normNl(document.getElementById('edit-text').value); quizData = [{}]; refreshQuizUi()");
+  const withQuiz = await page.eval(MEASURE('#quiz-make'));
+  assertTextButton(withQuiz, '#quiz-make(퀴즈 있음)');
+  await page.eval("quizData = null; refreshQuizUi()");
+  assert.equal((await page.eval(MEASURE('#quiz-make'))).bg, PRIMARY_FILL, '퀴즈가 없으면 채움 유지(마우스 없음)');
+  // 합본 목록의 위로/아래로, 이미지 저장, 자료 열기 버튼은 같은 클래스 문자열을 쓴다(소스에 .secondary 문자열이 남지 않음)
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'public', 'voice_study.html'), 'utf8');
+  assert.equal(/class(Name)?\s*[:=]\s*['"][^'"]*\bbtn\b[^'"]*\bsecondary\b/.test(src), false, '버튼 클래스에 secondary가 남아 있지 않음');
+  assert.equal(page.errors.length, 0); await page.close();
+});
+
+test('217-2 .b-warn: 박스·테두리·배경·padding 없는 12px --text2 문구, "⚠" 기호 없음, 말풍선 안 대비 4.5:1', { skip: SKIP }, async () => {
+  const page = await open();
+  await page.eval("chatMessages = [{ role: 'user', content: '질문' }, { role: 'bot', content: '답', grounded: false, quotes: [] }]; showView('chat'); renderChat()");
+  await settle217(page);
+  const m = await page.eval(MEASURE('.b-warn'));
+  assertNoBox(m, '.b-warn');
+  assert.equal(m.pad, '0px'); assert.ok(m.ratio >= 4.5, '대비 ' + m.ratio.toFixed(2));
+  assert.equal(await page.eval("getComputedStyle(document.querySelector('.b-warn')).fontSize"), '12px');
+  assert.equal(m.color, 'rgb(107, 114, 128)', '--text2');
+  const text = await page.text('.b-warn');
+  assert.equal(text, '근거를 확인하지 못했습니다. 원문과 대조해 보세요.'); assert.doesNotMatch(text, /[⚠!！]/, '앞에 기호 없음');
+  await page.close();
+});
+
+test('217-2 (a)(b)(c)(d) .kw-chip: 박스 없음, 44×44px 이상, 대비 4.5:1, 선택됨(.on)=--primary-dark+굵게700+밑줄(안 고르면 500·밑줄 없음), "◇" 유지', { skip: SKIP }, async () => {
+  const page = await open();
+  await openDetail(page, 2);
+  await page.eval(`(() => { const box = document.getElementById('kw-chips'); box.parentElement.style.display = 'block'; box.textContent = '';
+    for (const [w, on] of [['광합성', false], ['엽록체', true]]) { const c = document.createElement('button'); c.type = 'button'; c.className = 'kw-chip' + (on ? ' on' : ''); c.textContent = '◇ ' + w; c.dataset.w = w; box.appendChild(c); } })()`);
+  await settle217(page);
+  const off = await page.eval(MEASURE('.kw-chip[data-w="광합성"]')), on = await page.eval(MEASURE('.kw-chip[data-w="엽록체"]'));
+  for (const [m, label] of [[off, '안 고른 칩'], [on, '고른 칩']]) {
+    assertNoBox(m, label);
+    assert.ok(m.h >= 43.5 && m.w >= 43.5, `${label}: 터치 영역 44px 이상 (${m.w}x${m.h})`);
+    assert.ok(m.ratio >= 4.5, `${label}: 대비 4.5:1 이상 (${m.ratio.toFixed(2)})`);
+    assert.equal(m.cursor, 'pointer');
+  }
+  assert.equal(off.weight, '500'); assert.equal(off.underline, false); assert.equal(off.color, 'rgb(107, 114, 128)');
+  assert.equal(on.weight, '700'); assert.equal(on.underline, true); assert.equal(on.color, 'rgb(184, 68, 46)');
+  assert.match(await page.text('.kw-chip[data-w="엽록체"]'), /^◇ /, '"◇" 유지');
+  // 클릭하면 선택 상태가 옮겨 가는 것은 앱 코드(1608~1611행)의 동작. 같은 클래스 전환으로 굵기·밑줄이 따라 바뀌는지만 본다
+  await page.eval("document.querySelector('.kw-chip[data-w=\"광합성\"]').classList.add('on'); document.querySelector('.kw-chip[data-w=\"엽록체\"]').classList.remove('on')");
+  const flipped = await page.eval(MEASURE('.kw-chip[data-w="광합성"]')), flipped2 = await page.eval(MEASURE('.kw-chip[data-w="엽록체"]'));
+  assert.equal(flipped.weight, '700'); assert.equal(flipped.underline, true);
+  assert.equal(flipped2.weight, '500'); assert.equal(flipped2.underline, false);
+  await page.close();
+});
+
+test('217-2 👍/👎(#img-up, #img-down): 테두리·배경 없음, 44×44px 이상, 평가 상태(.on, aria-pressed)에 따라 굵기·밑줄 변화', { skip: SKIP }, async () => {
+  const page = await open();
+  await openDetail(page, 2);
+  await page.eval("document.getElementById('img-up').parentElement.style.display = 'flex'");
+  for (const id of ['img-up', 'img-down']) {
+    const m = await page.eval(MEASURE('#' + id));
+    assertNoBox(m, id); assert.ok(m.h >= 43.5 && m.w >= 43.5, `${id}: 44px 이상 (${m.w}x${m.h})`);
+    assert.equal(m.underline, false); assert.equal(m.weight, '500');
+  }
+  await page.eval("imgData = { rating: 1 }; updateRatingUi()");
+  const up = await page.eval(MEASURE('#img-up')), down = await page.eval(MEASURE('#img-down'));
+  assert.equal(await page.eval("document.getElementById('img-up').getAttribute('aria-pressed')"), 'true');
+  assert.equal(await page.eval("document.getElementById('img-down').getAttribute('aria-pressed')"), 'false');
+  assert.equal(up.weight, '700'); assert.equal(up.underline, true); assert.equal(down.weight, '500'); assert.equal(down.underline, false);
+  assert.ok(up.h >= 43.5 && up.w >= 43.5);
   await page.close();
 });

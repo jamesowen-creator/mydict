@@ -233,7 +233,8 @@
   .bubble.user { align-self: flex-end; background: var(--btn-primary-bg, #b8442e); color: #fff; }
   .bubble.bot { align-self: flex-start; background: var(--card); color: var(--text1); border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
   .bubble .b-quote { font-size: 12px; color: var(--text2); margin-top: 8px; line-height: 1.5; }
-  .bubble .b-warn { margin-top: 8px; padding: 8px 12px; border-radius: 10px; font-size: 12px; font-weight: 500; background: var(--bg); color: var(--text1); border: 1px solid var(--border); }
+  /* 작업217-2: 근거 경고 문구는 박스 없이 작은 보조색 글자(--text2는 흰 말풍선 위 4.83:1) */
+  .bubble .b-warn { margin-top: 8px; font-size: 12px; font-weight: 500; color: var(--text2); line-height: 1.5; }
   .bubble.loading { display: flex; align-items: center; gap: 10px; color: var(--text2); }
   .chat-input-bar { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0 4px; margin-top: 16px; }
   .chat-input-bar textarea { min-height: 72px; }
@@ -259,8 +260,12 @@
   .link-quote { font-size: 12px; color: var(--text2); margin-top: 6px; line-height: 1.5; word-break: break-all; }
   .link-check { font-size: 12px; font-weight: 500; color: var(--text2); margin-top: 8px; }
   .kw-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .kw-chip { font-family: 'Noto Sans KR', sans-serif; font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 999px; background: var(--card); color: var(--text1); border: 1px solid var(--border); cursor: pointer; }
-  .kw-chip.on { background: var(--primary-light); color: var(--primary-dark); border-color: var(--primary); }
+  /* 작업217-2: 키워드 선택·평가(👍👎) 칩은 박스 없이 글자. 터치 영역 44×44px 이상. 안 고른 칩=--text2(흰 바탕 4.83:1),
+     고른 칩(.on)=--primary-dark(5.38:1)+굵게(700)+밑줄 */
+  .kw-chip { font-family: 'Noto Sans KR', sans-serif; font-size: 13px; font-weight: 500; min-height: var(--ctl-min-h); min-width: var(--ctl-min-h); padding: 0 8px; border: none; border-radius: 0; background: transparent; color: var(--text2); cursor: pointer; text-underline-offset: 3px; }
+  .kw-chip:hover:not(:disabled) { color: var(--text1); }
+  .kw-chip:focus-visible { outline: 2px solid var(--text1); outline-offset: 2px; border-radius: 4px; }
+  .kw-chip.on { color: var(--primary-dark); font-weight: 700; text-decoration: underline; }
 
   /* 작업190: 연상 그림(실험) */
   .img-card { background: var(--card); border-radius: var(--card-radius); border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,0.04); padding: 14px; margin-bottom: 12px; }
@@ -402,12 +407,12 @@
     <div class="view-title">음성 학습</div>
     <div class="view-sub">소리 내어 읽은 공부를 글과 요약으로</div>
     <button id="new-rec-btn" class="btn block" type="button">🎙 새로 녹음</button>
-    <button id="wrong-btn" class="btn secondary block" type="button" style="margin-top:10px">오답 노트</button>
+    <button id="wrong-btn" class="btn text block" type="button" style="margin-top:10px">오답 노트</button>
     <div class="list-head">
       <h2>내 자료</h2>
       <span id="list-count" style="font-size:12px;color:var(--text2);margin-left:auto;margin-right:10px"></span>
       <button id="vm-open-btn" class="btn small text" type="button" data-t="vm-open-btn" style="margin-right:8px">지도 보기</button>
-      <button id="sel-toggle" class="btn small secondary" type="button" style="display:none">선택</button>
+      <button id="sel-toggle" class="btn small text" type="button" style="display:none">선택</button>
     </div>
     <div id="sel-bar" class="sel-bar" style="display:none">
       <div class="msg info" style="margin-top:0">같은 과목의 자료끼리 합치는 것을 권장합니다. (2~6개 선택)</div>
@@ -432,7 +437,7 @@
     <div id="rec-msg" class="msg"></div>
     <div id="rec-done" style="display:none">
       <div class="btn-row">
-        <button id="rec-redo" class="btn secondary" type="button">다시 녹음</button>
+        <button id="rec-redo" class="btn text" type="button">다시 녹음</button>
         <button id="rec-convert" class="btn" type="button">글로 변환</button>
       </div>
       <div id="convert-status" class="convert-status" style="display:none"><div class="spinner small"></div><span>글로 바꾸는 중… (최대 몇십 초 걸릴 수 있습니다)</span></div>
@@ -467,7 +472,7 @@
       <div class="btn-row"><button id="over-copy" class="btn small text" type="button">복사</button><button id="over-close" class="btn small text" type="button">닫기</button></div>
     </div>
     <div id="append-row" class="btn-row" style="display:none;flex-wrap:wrap">
-      <button id="append-rec" class="btn small secondary" type="button">＋ 이어서 녹음</button>
+      <button id="append-rec" class="btn small text" type="button">＋ 이어서 녹음</button>
       <button id="after-sum" class="btn small" type="button" style="display:none">요약 만들기</button>
       <button id="after-list" class="btn small text" type="button" style="display:none">목록으로</button>
     </div>
@@ -621,7 +626,7 @@
       <div id="quiz-saved" class="msg info" style="display:none"></div>
       <div class="result-actions">
         <button id="quiz-retry" class="btn block" type="button">다시 풀기</button>
-        <button id="quiz-back" class="btn secondary block" type="button">자료로 돌아가기</button>
+        <button id="quiz-back" class="btn text block" type="button">자료로 돌아가기</button>
       </div>
     </div>
     <div id="quiz-history" style="display:none;margin-top:20px">
@@ -1044,7 +1049,7 @@ async function loadWrong() {
       if (it.quote) { const src = document.createElement('div'); src.className = 'wrong-line src'; src.textContent = '근거: “' + it.quote + '”'; box.appendChild(src); }
       card.appendChild(box);
     }
-    const open = document.createElement('button'); open.type = 'button'; open.className = 'btn small secondary block'; open.style.marginTop = '10px';
+    const open = document.createElement('button'); open.type = 'button'; open.className = 'btn small text block'; open.style.marginTop = '10px';
     open.textContent = '해당 자료 열기';
     open.addEventListener('click', () => openDetail(noteId, 'wrong'));
     card.appendChild(open);
@@ -1077,10 +1082,10 @@ function renderMerge() {
     const t = document.createElement('div'); t.className = 'merge-title'; t.textContent = titleOf(id);
     const c = document.createElement('div'); c.className = 'merge-chars'; c.textContent = fmtN(charsOf(id)) + '자';
     text.appendChild(t); text.appendChild(c);
-    const up = document.createElement('button'); up.type = 'button'; up.className = 'btn small secondary'; up.textContent = '▲'; up.setAttribute('aria-label', '위로');
+    const up = document.createElement('button'); up.type = 'button'; up.className = 'btn small text'; up.textContent = '▲'; up.setAttribute('aria-label', '위로');
     up.disabled = i === 0 || mergeBusy;
     up.addEventListener('click', () => moveMerge(i, -1));
-    const down = document.createElement('button'); down.type = 'button'; down.className = 'btn small secondary'; down.textContent = '▼'; down.setAttribute('aria-label', '아래로');
+    const down = document.createElement('button'); down.type = 'button'; down.className = 'btn small text'; down.textContent = '▼'; down.setAttribute('aria-label', '아래로');
     down.disabled = i === mergeOrder.length - 1 || mergeBusy;
     down.addEventListener('click', () => moveMerge(i, 1));
     row.appendChild(no); row.appendChild(text); row.appendChild(up); row.appendChild(down);
@@ -1746,7 +1751,7 @@ function renderImagePages(d, flag) {
       const badgeInfo = IMG_BADGES[p.check];
       if (badgeInfo) { const b = document.createElement('span'); b.className = 'link-badge' + badgeInfo[1]; b.textContent = badgeInfo[0]; card.appendChild(b); }
       const save = document.createElement('button');
-      save.type = 'button'; save.className = 'btn small secondary block img-save'; save.textContent = '이미지 저장'; save.disabled = true;
+      save.type = 'button'; save.className = 'btn small text block img-save'; save.textContent = '이미지 저장'; save.disabled = true;
       card.appendChild(save);
       loadImagePage(d, p, holder, save);
     } else {
@@ -2037,7 +2042,7 @@ function refreshQuizUi() {
   $('quiz-play').disabled = disabled;
   $('quiz-make').disabled = disabled;
   $('quiz-make').textContent = quizData ? '퀴즈 새로 만들기' : '퀴즈 만들기';
-  $('quiz-make').className = 'btn small' + (quizData ? ' secondary' : '');
+  $('quiz-make').className = 'btn small' + (quizData ? ' text' : '');
 }
 function quizErrorText(e) {
   if (e.status === 429) return '오늘 만들 수 있는 퀴즈(하루 10건)를 모두 사용했습니다. 내일 다시 이용해 주세요.';
@@ -2218,7 +2223,7 @@ function renderChat() {
         const d = document.createElement('div'); d.className = 'b-quote'; d.textContent = '근거: 「' + q + '」'; b.appendChild(d);
       }
       if (m.grounded === false) {
-        const w = document.createElement('div'); w.className = 'b-warn'; w.textContent = '⚠ 근거를 확인하지 못했습니다. 원문과 대조해 보세요.'; b.appendChild(w);
+        const w = document.createElement('div'); w.className = 'b-warn'; w.textContent = '근거를 확인하지 못했습니다. 원문과 대조해 보세요.'; b.appendChild(w);
       }
     }
     list.appendChild(b);
@@ -2329,7 +2334,7 @@ function renderMergeInfo(sources) {
     if (src.status === 'deleted') {
       const t = document.createElement('div'); t.className = 'merge-title'; t.textContent = src.title || '(제목 없음)'; row.appendChild(t);
     } else {
-      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn small secondary';
+      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn small text';
       btn.textContent = src.title || '(제목 없음)';
       btn.addEventListener('click', async () => {
         if (editDirty && !(await metisConfirm('저장하지 않은 내용이 있습니다. 이동할까요?'))) return;
@@ -2630,7 +2635,7 @@ function vmapChooseSubject() {
   list.textContent = '';
   for (const name of Object.keys(SUBJECTS)) {
     if (!counts.has(name)) continue;
-    list.appendChild(vmapEl('button', { type: 'button', class: 'btn secondary vm-subject-btn', 'data-subject': name, onclick: () => { $('vm-subject').close(); vmapOpen(name, null); } }, name + ' · ' + counts.get(name) + '건'));
+    list.appendChild(vmapEl('button', { type: 'button', class: 'btn text vm-subject-btn', 'data-subject': name, onclick: () => { $('vm-subject').close(); vmapOpen(name, null); } }, name + ' · ' + counts.get(name) + '건'));
   }
   $('vm-subject').showModal();
 }
