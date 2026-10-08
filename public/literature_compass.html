@@ -130,8 +130,8 @@
   .era-card {
     background: var(--card);
     border: none; border-radius: 0; box-shadow: none; border-bottom: 1px solid var(--border);
-    padding: 20px;
-    margin-bottom: 0;
+    padding: 20px 16px;
+    margin: 0 -16px;   /* 작업222: 글자 시작 x 16px */
   }
   .era-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
   .era-name { font-size: 17px; font-weight: 700; color: var(--text1); }
@@ -215,7 +215,7 @@
   .section-box {
     background: var(--card);
     border: none; border-radius: 0;
-    padding: 14px 16px;
+    padding: 14px 16px; margin: 0 -16px;   /* 작업222: 글자 시작 x 16px */
     font-size: 14px; line-height: 1.7; color: var(--text1);
   }
   .keyword-tags { display: flex; flex-wrap: wrap; gap: 6px 8px; }
@@ -409,7 +409,7 @@
   .quiz-card {
     background: var(--card);
     border: none; border-radius: 0; box-shadow: none;
-    padding: 20px;
+    padding: 20px 16px; margin: 0 -16px;   /* 작업222: 글자 시작 x 16px */
   }
 
   /* Round 1 — Matching */
@@ -459,7 +459,7 @@
   .ox-btn.wrong { color: var(--error-dark); }
   .ox-btn.wrong::after { content: '✕ 오답'; }
   /* 작업217-3: 해설 줄은 색 바탕 없이 기호(○/✕)+글자색 */
-  .ox-feedback { margin-top: 12px; padding: 10px 0 0; font-size: 13px; font-weight: 500; line-height: 1.6; display: none; }
+  .ox-feedback { position: relative; margin-top: 12px; padding: 10px 0 10px 24px; font-size: 13px; font-weight: 500; line-height: 1.6; display: none; }   /* 작업222: 기호 자리 24px(.msg와 같은 방식) */
   .ox-feedback.show { display: block; }
   /* 작업221: 정오 한 줄(.fb-line)만 기호+초록/빨강, 해설은 주 글자색 */
   .ox-feedback.correct-fb, .ox-feedback.wrong-fb { color: var(--text1); }
@@ -468,8 +468,9 @@
   .ox-feedback .fb-line { font-weight: 700; }
   .ox-feedback.correct-fb .fb-line { color: var(--success-dark); }
   .ox-feedback.wrong-fb .fb-line { color: var(--error-dark); }
-  .ox-feedback.correct-fb::before { content: '○ '; font-weight: 700; }
-  .ox-feedback.wrong-fb::before { content: '✕ '; font-weight: 700; }
+  .ox-feedback::before { position: absolute; left: 2px; top: 10px; width: 16px; text-align: center; font-weight: 800; }
+  .ox-feedback.correct-fb::before { content: '○'; }
+  .ox-feedback.wrong-fb::before { content: '✕'; }
 
   /* Round 3 — MCQ */
   .mcq-question { font-size: 17px; font-weight: 700; line-height: 1.6; margin-bottom: 20px; color: var(--text1); }
@@ -711,6 +712,11 @@ function showView(id) {
   document.getElementById(id).classList.add('active');
   const tabHome = document.getElementById('tab-home');
   tabHome.classList.toggle('active', id === 'view-home');
+  // 작업222: 퀴즈 풀이·결과 화면에서는 "퀴즈" 탭이 활성(과학 읽기·한입 독서와 같게)
+  const inQuiz = id === 'view-quiz' || id === 'view-result';
+  const tabQuiz = document.getElementById('tab-quiz');
+  tabQuiz.classList.toggle('active', inQuiz);
+  tabQuiz.classList.toggle('disabled', !inQuiz);
 }
 
 // ── Permission Check ──
