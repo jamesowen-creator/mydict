@@ -293,7 +293,7 @@ test('217-3 읽기 3화면 O/X: 박스 없는 큰 글자 O X(32px 굵게, 좌우
     assert.equal(wx.mark, '"✕ 오답"', r.file); assert.equal(xm.color, RED); assert.equal(wx.markColor, RED); assert.equal(xm.underline, true, '고른 쪽 밑줄'); assert.ok(wx.markRatio >= 4.5);
     assert.equal(cx.mark, '"○ 정답"'); assert.equal(om.color, GREEN); assert.equal(cx.markColor, GREEN); assert.equal(om.underline, false, '고르지 않은 정답은 밑줄 없음'); assert.ok(cx.markRatio >= 4.5);
     assert.equal(await page.eval("document.getElementById('ox-x').disabled && document.getElementById('ox-o').disabled"), true);
-    const fb = await page.eval(MEASURE(r.fb, '::before')); assert.equal(fb.bg, TRANSPARENT); assert.equal(fb.radius, '0px'); assert.equal(fb.color, RED); assert.equal(fb.mark, '"✕ "'); assert.ok(fb.ratio >= 4.5);
+    const fb = await page.eval(MEASURE(r.fb, '::before')); assert.equal(fb.bg, TRANSPARENT); assert.equal(fb.radius, '0px'); assert.equal(fb.markColor, RED); assert.equal(fb.color, 'rgb(26, 26, 26)', '작업221: 해설은 주 글자색(옛 기대: 전체 빨강)'); assert.equal(fb.mark, '"✕ "'); assert.ok(fb.ratio >= 4.5 && fb.markRatio >= 4.5);
     // 정답을 고르는 경우(두 번째 문제의 정답은 X)
     await page.click('.quiz-next-btn.visible, #quiz-next');
     await page.waitFor("!document.getElementById('ox-x').disabled");
@@ -302,7 +302,7 @@ test('217-3 읽기 3화면 O/X: 박스 없는 큰 글자 O X(32px 굵게, 좌우
     await page.waitFor("document.getElementById('ox-x').classList.contains('correct')");
     const ok = await page.eval(MEASURE('#ox-x')), okm = await page.eval(MEASURE('#ox-x', '::after')), fb2 = await page.eval(MEASURE(r.fb, '::before'));
     assert.equal(ok.color, GREEN); assert.equal(ok.underline, true); assert.equal(okm.mark, '"○ 정답"');
-    assert.equal(fb2.color, GREEN); assert.equal(fb2.mark, '"○ "'); assert.ok(fb2.ratio >= 4.5);
+    assert.equal(fb2.markColor, GREEN); assert.equal(fb2.color, 'rgb(26, 26, 26)'); assert.equal(fb2.mark, '"○ "'); assert.ok(fb2.ratio >= 4.5 && fb2.markRatio >= 4.5);
     assert.equal(await page.count('.ox-btn.wrong'), 0);
     await done(page);
   }
