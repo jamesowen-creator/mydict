@@ -72,8 +72,13 @@
   .btn.primary { background: var(--btn-primary-bg, #b8442e); border-color: var(--btn-primary-bg, #b8442e); color: var(--on-accent); }
   .btn.primary:hover:not(:disabled) { background: var(--btn-primary-bg-hover, #9c3a27); border-color: var(--btn-primary-bg-hover, #9c3a27); }
   .btn.primary:active:not(:disabled) { background: var(--btn-primary-bg-active, #86311f); border-color: var(--btn-primary-bg-active, #86311f); }
-  .btn.text { background: transparent; border: none; padding: 10px 6px; color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
+  /* 작업216-4: 보조 동작은 박스 없이 텍스트(음성 학습의 .btn.text와 같은 사양). 터치 영역: 높이 44px(.btn) + 가로 44px 이상(min-width).
+     글자 대비(계산값): --text2 #4a5070 은 흰 바탕 7.86:1 / --bg 7.35 / 안내 상자 7.05 / 오류 상자 6.82, 위험 --danger #B42318 은 6.57 / 6.15 / 5.90 / 5.70 (모두 4.5:1 이상).
+     이 화면의 .btn에는 :hover 채움 규칙이 없어 호버에서 바탕이 새지 않는다. 포커스 윤곽선은 전역 :focus-visible(2px, --focus)을 쓴다. */
+  .btn.text { background: transparent; border: none; padding: 10px 6px; min-width: 44px; color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
+  .btn.text:hover:not(:disabled), .btn.text:active:not(:disabled) { background: transparent; color: var(--text); }
   .btn.text.danger { color: var(--danger); }
+  .btn.text.danger:hover:not(:disabled), .btn.text.danger:active:not(:disabled) { color: var(--danger); }
   .btn.block { display: flex; width: 100%; }
   .iconbtn { width: 44px; height: 44px; border: none; background: transparent; display: inline-flex; align-items: center; justify-content: center; color: var(--text2); }
   .btn-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
@@ -377,14 +382,14 @@
 <dialog id="map-sheet" class="map-sheet" aria-labelledby="map-sheet-title">
   <div class="sheet-head">
     <h2 id="map-sheet-title">개념 지도</h2>
-    <button id="map-close" class="btn" type="button" data-t="map-close" aria-label="지도 닫기">닫기</button>
+    <button id="map-close" class="btn text" type="button" data-t="map-close" aria-label="지도 닫기">닫기</button>
   </div>
   <div id="map-sheet-body" class="sheet-body"></div>
 </dialog>
 
 <dialog id="edge-dialog" aria-labelledby="edge-pair">
   <div id="edge-body"></div>
-  <div class="btn-row" style="margin-top:16px"><button id="edge-close" class="btn" type="button">닫기</button></div>
+  <div class="btn-row" style="margin-top:16px"><button id="edge-close" class="btn text" type="button">닫기</button></div>
 </dialog>
 
 <script>
@@ -891,9 +896,9 @@ function drawMap(pane) {
 
   pane.append(h('div', { class: 'map-tools' },
     h('button', { class: 'btn', type: 'button', 'data-t': 'map-full', 'aria-pressed': String(full), onclick: () => { S.map.full = !S.map.full; renderExplorePane(); } }, '전체 연결 보기'),
-    h('button', { class: 'btn', type: 'button', 'data-t': 'zoom-in', onclick: () => zoomBy(1.25) }, '확대'),
-    h('button', { class: 'btn', type: 'button', 'data-t': 'zoom-out', onclick: () => zoomBy(0.8) }, '축소'),
-    h('button', { class: 'btn', type: 'button', 'data-t': 'zoom-fit', onclick: () => { S.sheet.fit = true; renderMapSheetBody(); } }, '화면 맞춤')));
+    h('button', { class: 'btn text', type: 'button', 'data-t': 'zoom-in', onclick: () => zoomBy(1.25) }, '확대'),
+    h('button', { class: 'btn text', type: 'button', 'data-t': 'zoom-out', onclick: () => zoomBy(0.8) }, '축소'),
+    h('button', { class: 'btn text', type: 'button', 'data-t': 'zoom-fit', onclick: () => { S.sheet.fit = true; renderMapSheetBody(); } }, '화면 맞춤')));
   const box = h('div', { class: 'map-box', 'data-t': 'map-box' });
   pane.append(box);
   pane.append(h('p', { class: 'map-hint' }, full ? '모든 연결을 보여 줍니다. 개념을 누르면 선택하고, 선을 누르면 연결한 이유를 볼 수 있어요.' : '지금까지의 경로와 다음 한 단계만 진하게 보여 줍니다. 점선은 다음 제안이에요. 두 손가락으로 확대·축소할 수 있어요.'));
@@ -1121,7 +1126,7 @@ function renderQuiz() {
     if (qz.error) box.append(h('div', { class: 'msg error', role: 'alert' }, qz.error));
     box.append(h('div', { class: 'btn-row', style: 'margin-top:16px' },
       h('button', { class: 'btn primary', type: 'button', 'data-t': 'quiz-again', onclick: () => startQuiz() }, '다시 하기'),
-      h('button', { class: 'btn', type: 'button', 'data-t': 'quiz-exit', onclick: closeQuiz }, '닫기')));
+      h('button', { class: 'btn text', type: 'button', 'data-t': 'quiz-exit', onclick: closeQuiz }, '닫기')));
     return;
   }
   const q = qz.questions[qz.i];
@@ -1144,7 +1149,7 @@ function renderQuiz() {
   card.append(opts);
   box.append(card);
   if (qz.error) box.append(h('div', { class: 'msg error', role: 'alert', 'data-t': 'quiz-error' }, qz.error),
-    h('div', { class: 'btn-row', style: 'margin-top:8px' }, h('button', { class: 'btn', type: 'button', 'data-t': 'quiz-skip', onclick: nextQuiz }, '다음 문제로')));
+    h('div', { class: 'btn-row', style: 'margin-top:8px' }, h('button', { class: 'btn text', type: 'button', 'data-t': 'quiz-skip', onclick: nextQuiz }, '다음 문제로')));
   if (a) {
     box.append(h('div', { class: 'qz-fb ' + (a.correct ? 'right' : 'wrong'), 'data-t': 'quiz-feedback', role: 'status' }, a.correct ? '✓ 정답입니다' : '✗ 틀렸어요'));
     const ex = h('div', { class: 'qz-explain', 'data-t': 'quiz-explain' },
@@ -1161,7 +1166,7 @@ function renderQuiz() {
       const cur = itemById(a.item.id);
       const done = (qz.marked && qz.marked[a.item.id]) || (cur && cur.review_state === 'confused');
       row.append(done ? h('span', { class: 'lrow-meta', 'data-t': 'quiz-marked', style: 'align-self:center' }, '헷갈림으로 표시됨')
-        : h('button', { class: 'btn', type: 'button', 'data-t': 'quiz-confuse', onclick: () => markConfused(a.item.id) }, '헷갈림으로 표시할까요?'));
+        : h('button', { class: 'btn text', type: 'button', 'data-t': 'quiz-confuse', onclick: () => markConfused(a.item.id) }, '헷갈림으로 표시할까요?'));
     }
     box.append(row);
   }
@@ -1199,7 +1204,7 @@ function renderLinks() {
   }
   if (S.items.length > 1) {
     const host = h('div', { id: 'link-host' });
-    const open = h('button', { class: 'btn', type: 'button', 'data-t': 'link-open', onclick: () => openLinkForm(it, host, open) }, '연결 추가');
+    const open = h('button', { class: 'btn text', type: 'button', 'data-t': 'link-open', onclick: () => openLinkForm(it, host, open) }, '연결 추가');
     box.append(h('div', { class: 'btn-row', style: 'margin-top:12px' }, open), host);
   }
 }
@@ -1224,7 +1229,7 @@ function openLinkEdit(l, entry) {
   const form = h('form', { class: 'lk-edit', novalidate: true, 'data-t': 'link-edit-form' },
     pair,
     h('div', { class: 'btn-row', style: 'margin-top:6px' },
-      h('button', { class: 'btn', type: 'button', 'data-t': 'link-swap', onclick: () => { swapped = !swapped; showPair(); } }, '방향 바꾸기')),
+      h('button', { class: 'btn text', type: 'button', 'data-t': 'link-swap', onclick: () => { swapped = !swapped; showPair(); } }, '방향 바꾸기')),
     h('div', { class: 'field' }, h('label', { class: 'label', for: 'le-type' }, '관계 종류'), typeSel),
     h('div', { class: 'field' }, h('label', { class: 'label', for: 'le-label' }, '관계 문구 (선택, ' + LABEL_MAX + '자)'), label),
     h('div', { class: 'field' }, h('label', { class: 'label', for: 'le-detail' }, '연결한 이유 (' + REASON_MAX + '자)'), detail, cnt),
@@ -1380,8 +1385,8 @@ function renderDetail() {
   box.append(editHost);
   const tools = h('div', { class: 'btn-row', style: 'margin-top:18px' },
     h('button', { class: 'toggle', type: 'button', 'aria-pressed': String(it.review_state === 'understood'), 'data-t': 'understood', onclick: () => toggleUnderstood(it) }, icon('check'), '이해함'),
-    h('button', { class: 'btn', type: 'button', 'data-t': 'edit-open', onclick: () => openEdit(it, editHost, tools) }, '설명 고치기'),
-    h('button', { class: 'btn', type: 'button', 'data-t': 'group-edit', onclick: () => openGroupEdit(it, editHost, tools) }, '그룹 바꾸기')
+    h('button', { class: 'btn text', type: 'button', 'data-t': 'edit-open', onclick: () => openEdit(it, editHost, tools) }, '설명 고치기'),
+    h('button', { class: 'btn text', type: 'button', 'data-t': 'group-edit', onclick: () => openGroupEdit(it, editHost, tools) }, '그룹 바꾸기')
   );
   box.append(tools);
 
@@ -1521,8 +1526,8 @@ function suggestionBlock(sg, big) {
     kv('예상 학습 부담', LOAD_TEXT[sg.load] || sg.load),
     h('div', { class: 'btn-row actions' },
       h('button', { class: 'btn primary', type: 'button', 'data-t': 'suggest-add', onclick: () => addSuggestion(sg) }, '이 개념 추가'),
-      h('button', { class: 'btn', type: 'button', 'data-t': 'suggest-hold', onclick: () => sideline(sg, 'held') }, '나중에'),
-      h('button', { class: 'btn', type: 'button', 'data-t': 'suggest-exclude', onclick: () => sideline(sg, 'excluded') }, '제외')
+      h('button', { class: 'btn text', type: 'button', 'data-t': 'suggest-hold', onclick: () => sideline(sg, 'held') }, '나중에'),
+      h('button', { class: 'btn text', type: 'button', 'data-t': 'suggest-exclude', onclick: () => sideline(sg, 'excluded') }, '제외')
     )
   );
 }
@@ -1546,7 +1551,7 @@ function renderNext() {
     }
   } else {
     box.append(h('p', { class: 'muted', 'data-t': 'no-suggest', style: 'margin-top:8px' }, '남은 제안이 없습니다. 아래 입력창에 궁금한 개념을 직접 입력하거나, 제안을 다시 받아 보세요.'));
-    box.append(h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', 'data-t': 'refresh-suggest', onclick: () => refreshSuggestions(it) }, '제안 다시 받기')));
+    box.append(h('div', { class: 'actions' }, h('button', { class: 'btn text', type: 'button', 'data-t': 'refresh-suggest', onclick: () => refreshSuggestions(it) }, '제안 다시 받기')));
   }
   if (it.content_source !== 'none') {
     box.append(h('div', { class: 'react' },
