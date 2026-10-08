@@ -194,7 +194,7 @@ test('digest_reading: 표시 전용 뱃지가 없음(변경 없음) — 목록·
 });
 
 // ───────────────────────── 유지 목록 ─────────────────────────
-test('유지(변환 금지): literature의 사조 칩·타임라인 칩·탭·카드 이동 버튼, science의 과목 카드·정복 토글, digest의 정복 토글·캐러셀 이동 버튼', { skip: SKIP }, async () => {
+test('유지(변환 금지): literature의 사조 칩·타임라인 칩·탭, science의 과목 카드·정복 토글, digest의 정복 토글(카드 이동 화살표는 작업217-2에서 박스 제거)', { skip: SKIP }, async () => {
   let page = await open('literature_compass');
   const bar = await must(page, '.tl-bar');
   assert.equal(bar.radius, '8px'); assert.notEqual(bar.bg, TRANSPARENT); assert.equal(bar.cursor, 'pointer');
@@ -205,8 +205,8 @@ test('유지(변환 금지): literature의 사조 칩·타임라인 칩·탭·�
   const pill = await must(page, '.movement-pill');
   assert.equal(pill.radius, '20px', '사조 칩(눌러서 고르는 칩)은 알약 그대로'); assert.notEqual(pill.bg, TRANSPARENT); assert.equal(pill.cursor, 'pointer');
   await step(page, `showBriefing(${JSON.stringify(await page.eval(PICK_MOVEMENT))}); showCards();`);
-  const nav = await must(page, '.nav-btn');
-  assert.equal(nav.radius, '50%'); assert.notEqual(nav.bg, TRANSPARENT);
+  const nav = await must(page, '#next-btn');   // 첫 카드에서 #prev-btn은 비활성(cursor not-allowed)이라 다음 버튼으로 확인   // 작업217-2: 옛 기대(원형 박스 50%·배경 있음)를 버림 — 이제 박스 없는 화살표 글자(상세는 reading_text_buttons.ui.test.js)
+  assert.equal(nav.cursor, 'pointer');
   await page.close();
 
   page = await open('science_reading');

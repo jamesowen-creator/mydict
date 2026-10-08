@@ -196,18 +196,17 @@
     font-size: 12px; color: var(--text2);
   }
   .carousel-nav-count { font-family: 'Inter', sans-serif; min-width: 56px; text-align: center; }
+  /* 작업217-2: 이전·다음 화살표는 테두리·배경 없이 글자(‹ ›) 그대로, 터치 영역 44×44px. 글자색 --text1(흰 바탕 약 17:1), 호버 --primary-dark(5.38:1) */
   .carousel-nav-btn {
     position: relative;
-    width: 34px; height: 34px; border-radius: 50%;
-    border: 1px solid var(--border); background: var(--card);
+    width: 44px; height: 44px; padding: 0 0 4px;
+    border: none; border-radius: 0; background: transparent;
     color: var(--text1); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 30px; line-height: 1; font-weight: 400;
   }
-  .carousel-nav-btn svg { width: 16px; height: 16px; }
-  /* 작업83: 보이는 크기(34px)는 그대로, ::after로 터치 영역만 44×44
-     (admin.html 토글과 같은 방식) */
-  /* inset은 테두리(1px) 안쪽 기준이라 32 + 6×2 = 44 */
-  .carousel-nav-btn::after { content: ''; position: absolute; inset: -6px; }
+  .carousel-nav-btn:hover:not(:disabled) { color: var(--primary-dark); }
+  .carousel-nav-btn:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; border-radius: 4px; }
   .carousel-legend {
     display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 10px;
     margin-top: 12px; font-size: 12px; color: var(--text2);
@@ -467,8 +466,10 @@
   }
   .result-btn-primary { background: var(--btn-primary-bg, #b8442e); color: #fff; }
   .result-btn-primary:hover { background: var(--btn-primary-bg-hover, #9c3a27); }
-  .result-btn-secondary { background: var(--card); color: var(--text1); border: 1.5px solid var(--border); }
-  .result-btn-secondary:hover { background: var(--bg); }
+  /* 작업217-2: 보조 결과 버튼은 박스 없이 밑줄 텍스트(높이 44px = .result-btn min-height, 가로 44px 이상). 글자 --text2는 페이지 바탕(#FAFAF9) 위 4.63:1 */
+  .result-btn-secondary { background: transparent; color: var(--text2); border: none; min-width: var(--ctl-min-h); text-decoration: underline; text-underline-offset: 3px; }
+  .result-btn-secondary:hover { background: transparent; color: var(--text1); }
+  .result-btn-secondary:focus-visible { outline: 2px solid var(--text1); outline-offset: 2px; border-radius: 4px; }
 
   /* ── Misc ── */
   .error-msg { text-align: center; padding: 40px 24px; color: var(--error); font-size: 14px; }
@@ -1059,13 +1060,9 @@ const Carousel = (() => {
         </div>
       </div>
       <div class="carousel-nav">
-        <button class="carousel-nav-btn" data-dir="-1" aria-label="이전 작품">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        </button>
+        <button class="carousel-nav-btn" data-dir="-1" aria-label="이전 작품">‹</button>
         <span class="carousel-nav-count"></span>
-        <button class="carousel-nav-btn" data-dir="1" aria-label="다음 작품">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-        </button>
+        <button class="carousel-nav-btn" data-dir="1" aria-label="다음 작품">›</button>
       </div>
       <div class="carousel-legend"></div>`;
 

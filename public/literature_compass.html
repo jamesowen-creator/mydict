@@ -107,6 +107,16 @@
   .app-link:focus-visible { outline: 2px solid var(--text1); outline-offset: 2px; border-radius: 4px; }
   .app-link svg { width: 13px; height: 13px; }
 
+  /* 작업217-2: 홈 상단 "어휘 사전" 링크는 그라데이션 박스 없이 한 줄 밑줄 텍스트(높이 44px). 글자 --primary-dark는 페이지 바탕(#FAFAF9) 위 5.2:1 이상 */
+  .dict-link {
+    display: flex; align-items: center; width: fit-content; min-height: var(--ctl-min-h); min-width: var(--ctl-min-h);
+    margin: 0 0 8px -6px; padding: 0 6px;
+    font-size: 14px; font-weight: 600; color: var(--primary-dark);
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+  .dict-link:hover { color: var(--text1); }
+  .dict-link:focus-visible { outline: 2px solid var(--text1); outline-offset: 2px; border-radius: 4px; }
+
   /* ── Home View ── */
   #view-home .content { padding: 20px 16px; }
   .home-header { margin-bottom: 24px; }
@@ -338,19 +348,18 @@
     display: flex; align-items: center; justify-content: center;
     gap: 16px; padding: 0 16px 16px;
   }
+  /* 작업217-2: 이전·다음 화살표는 테두리·배경 없이 글자(‹ ›) 그대로, 터치 영역 44×44px. 글자색 --text1(흰 바탕 약 17:1), 호버 --primary-dark(5.38:1) */
   .nav-btn {
-    width: 44px; height: 44px;
-    border-radius: 50%;
-    border: 1.5px solid var(--border);
-    background: var(--card);
-    cursor: pointer;
+    position: relative;
+    width: 44px; height: 44px; padding: 0 0 4px;
+    border: none; border-radius: 0; background: transparent;
+    color: var(--text1); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    color: var(--text1);
-    transition: all 0.15s;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 30px; line-height: 1; font-weight: 400;
   }
-  .nav-btn:hover:not(:disabled) { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+  .nav-btn:hover:not(:disabled) { color: var(--primary-dark); }
+  .nav-btn:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; border-radius: 4px; }
   .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-  .nav-btn svg { width: 18px; height: 18px; }
   .dot-indicators { display: flex; gap: 6px; align-items: center; flex: 1; justify-content: center; }
   .dot {
     width: 7px; height: 7px; border-radius: 50%;
@@ -523,8 +532,10 @@
   }
   .result-btn-primary { background: var(--btn-primary-bg, #b8442e); color: #fff; }
   .result-btn-primary:hover { background: var(--btn-primary-bg-hover, #9c3a27); }
-  .result-btn-secondary { background: var(--card); color: var(--text1); border: 1.5px solid var(--border); }
-  .result-btn-secondary:hover { background: var(--bg); }
+  /* 작업217-2: 보조 결과 버튼은 박스 없이 밑줄 텍스트(높이 44px = .result-btn min-height, 가로 44px 이상). 글자 --text2는 페이지 바탕(#FAFAF9) 위 4.63:1 */
+  .result-btn-secondary { background: transparent; color: var(--text2); border: none; min-width: var(--ctl-min-h); text-decoration: underline; text-underline-offset: 3px; }
+  .result-btn-secondary:hover { background: transparent; color: var(--text1); }
+  .result-btn-secondary:focus-visible { outline: 2px solid var(--text1); outline-offset: 2px; border-radius: 4px; }
 
   /* ── Misc ── */
   .error-msg {
@@ -610,17 +621,9 @@
     <div class="dot-indicators" id="dot-indicators"></div>
   </div>
   <div class="card-nav">
-    <button class="nav-btn" id="prev-btn" onclick="prevCard()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="15 18 9 12 15 6"></polyline>
-      </svg>
-    </button>
+    <button class="nav-btn" id="prev-btn" onclick="prevCard()" aria-label="이전 카드">‹</button>
     <div style="flex:1"></div>
-    <button class="nav-btn" id="next-btn" onclick="nextCard()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="9 18 15 12 9 6"></polyline>
-      </svg>
-    </button>
+    <button class="nav-btn" id="next-btn" onclick="nextCard()" aria-label="다음 카드">›</button>
   </div>
   <button class="quiz-start-btn" id="quiz-start-btn" onclick="startQuiz()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -835,16 +838,7 @@ function renderHome() {
     <h2>한국 문학 탐구</h2>
     <p>시대별 문학 사조와 작품을 배경지식과 함께 깊이 있게 알아보세요.</p>
   </div>
-  <a href="/" style="display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#1e1b6b 0%,#4a6ef5 100%);border-radius:16px;padding:16px 18px;margin-bottom:16px;text-decoration:none;cursor:pointer;color:#fff">
-    <div style="font-size:28px;line-height:1">📚</div>
-    <div style="flex:1;min-width:0">
-      <div style="font-size:15px;font-weight:700;letter-spacing:-0.01em">어휘 사전</div>
-      <div style="font-size:12px;opacity:0.75;margin-top:3px">METIS 단어장으로 돌아가기</div>
-    </div>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;opacity:0.85;flex-shrink:0">
-      <line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline>
-    </svg>
-  </a>`;
+  <a class="dict-link" href="/" aria-label="어휘 사전 — METIS 단어장으로 돌아가기">어휘 사전 →</a>`;
 
   DB.eras.forEach(era => {
     const tabsHtml = GENRE_TABS.map(g =>
