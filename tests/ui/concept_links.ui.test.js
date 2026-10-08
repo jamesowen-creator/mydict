@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startMockServer } = require('./helpers/mock_server');
 const { dialogAnswer } = require('./helpers/dialog');
+const { openMap, closeMap } = require('./helpers/map');
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 let browser, srv;
@@ -46,7 +47,9 @@ test('연결 목록: 현재 개념의 연결만, AI 연결과 직접 연결을 �
   const sources = await page.eval("[...document.querySelectorAll('[data-t=link-source]')].map(e => e.textContent)");
   assert.deepEqual(sources.sort(), ['AI 판단 · 확인 필요', '직접 연결'].sort());
   // 지도에는 코드 변경 없이 새 연결이 그려진다
+  await openMap(page);   // 작업209-4: 지도는 팝업
   assert.equal(await page.count('[data-t="edge"]'), 2, '지도의 연결선 2개');
+  await closeMap(page);
   assert.deepEqual(page.errors, []);
   await page.close();
 });

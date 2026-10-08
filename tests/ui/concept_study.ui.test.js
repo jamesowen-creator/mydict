@@ -367,7 +367,12 @@ test('뒤로가기·해시 이동, 지도/목록 전환(기본은 지도)', { sk
   assert.equal(await page.eval("document.getElementById('seg-list').getAttribute('aria-pressed')"), 'true');
   assert.equal(await page.exists('[data-t="list-item"]'), true);
   await page.click('#seg-map');
-  assert.equal(await page.exists('[data-t="map-svg"]'), true);
+  // 작업209-4: 지도 화면에는 [지도 보기] 버튼이 있고, 눌러야 지도가 그려진다
+  assert.equal(await page.exists('[data-t="map-svg"]'), false);
+  await page.click('[data-t="map-open"]');
+  await page.waitFor("document.getElementById('map-sheet').open && !!document.querySelector('[data-t=map-svg]')");
+  await page.click('#map-close');
+  await page.waitFor("!document.getElementById('map-sheet').open");
   await page.click('#back-btn');
   await page.waitFor("!document.getElementById('view-list').hidden");
   assert.equal(await page.count('.row'), 1);

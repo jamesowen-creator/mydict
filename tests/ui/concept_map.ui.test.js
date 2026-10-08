@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startMockServer } = require('./helpers/mock_server');
+const { openMap, closeMap } = require('./helpers/map');   // 작업209-4: 지도는 팝업
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 let browser, srv;
@@ -37,6 +38,7 @@ const nodeRect = async (page, sel) => page.eval(`(() => { const g = document.que
 
 test('지도 강조: 경로 노드·경로 연결선·다음 제안(점선)만 진하고 나머지는 연함', { skip: SKIP }, async () => {
   const page = await openStudy(five);
+  await openMap(page);
   assert.equal(await page.count('[data-t="node"]'), 5);
   const hl = await page.eval("[...document.querySelectorAll('[data-t=node]')].map(n => n.dataset.hl + ':' + n.classList.contains('dim') + ':' + n.classList.contains('sel'))");
   const order = await page.eval("[...document.querySelectorAll('[data-t=node]')].map(n => Number(n.dataset.id))");
@@ -56,6 +58,7 @@ test('지도 강조: 경로 노드·경로 연결선·다음 제안(점선)만 �
 
 test('전체 연결 보기 토글: 모든 노드·연결선이 같은 진하기가 되고 문구가 보임, 다시 누르면 복귀', { skip: SKIP }, async () => {
   const page = await openStudy(five);
+  await openMap(page);
   assert.equal(await page.eval("document.querySelector('[data-t=map-full]').getAttribute('aria-pressed')"), 'false');
   await page.click('[data-t="map-full"]');
   assert.equal(await page.eval("document.querySelector('[data-t=map-full]').getAttribute('aria-pressed')"), 'true');
@@ -67,11 +70,12 @@ test('전체 연결 보기 토글: 모든 노드·연결선이 같은 진하기�
   await done(page);
 });
 
-test('노드를 누르면 그 개념이 선택되고 경로가 늘어남(처음 보기는 글자 크기를 지켜 먼 노드는 화면 밖 → 맞춤으로 본 뒤 선택)', { skip: SKIP }, async () => {
+test('노드를 누르면 그 개념이 선택되고 경로가 늘어남(팝업은 열릴 때 전체가 한눈에 맞춰져 모든 노드가 화면 안)', { skip: SKIP }, async () => {
   const page = await openStudy(five);
+  await openMap(page);
   const photo = srv.state.items[1], cell = srv.state.items[0];
-  assert.equal(await page.eval(`(() => { const r = document.querySelector('[data-t=node][data-id="${cell.id}"]').getBoundingClientRect(); const b = document.querySelector('[data-t=map-box]').getBoundingClientRect(); return r.left >= b.left && r.right <= b.right; })()`), false, '처음 보기에서 첫 노드는 화면 밖');
-  await page.click('[data-t="zoom-fit"]');   // 경로 전체가 한눈에 보이게 맞춤은 글자 크기 하한 때문에 같을 수 있어 전체 보기로
+  // (작업209-4) 이전에는 인라인 지도가 글자 크기 하한 때문에 첫 노드를 화면 밖에 두었지만, 팝업은 하한 없이 전체를 맞춘다
+  assert.equal(await page.eval(`(() => { const r = document.querySelector('[data-t=node][data-id="${cell.id}"]').getBoundingClientRect(); const b = document.querySelector('[data-t=map-box]').getBoundingClientRect(); return r.left >= b.left && r.right <= b.right && r.top >= b.top && r.bottom <= b.bottom; })()`), true, '열릴 때 첫 노드도 화면 안');
   await page.click('[data-t="map-full"]');
   await page.click(`[data-t="node"][data-id="${photo.id}"]`);
   await page.waitFor("document.querySelector('[data-t=term]').innerText === '광합성'");
@@ -87,6 +91,7 @@ test('노드를 누르면 그 개념이 선택되고 경로가 늘어남(처음 
 
 test('연결선을 누르면 관계 종류·문구·설명 대화상자(AI 연결은 확인 필요 표기)', { skip: SKIP }, async () => {
   const page = await openStudy(five);
+  await openMap(page);
   await page.click('[data-t="map-full"]');
   const l = srv.state.links[1];
   await page.click(`[data-t="edge"][data-id="${l.id}"] path.hit`);
@@ -104,6 +109,7 @@ test('연결선을 누르면 관계 종류·문구·설명 대화상자(AI 연�
 
 test('확대·축소·화면 맞춤·끌어서 이동', { skip: SKIP }, async () => {
   const page = await openStudy(five);
+  await openMap(page);
   const vb = () => page.eval("document.querySelector('[data-t=map-svg]').getAttribute('viewBox').split(' ').map(Number)");
   const v0 = await vb();
   await page.click('[data-t="zoom-in"]');
@@ -119,7 +125,7 @@ test('확대·축소·화면 맞춤·끌어서 이동', { skip: SKIP }, async ()
   assert.equal(calls(/studies\/\d+$/, 'PATCH').length, 0, '끌기는 노드 선택으로 처리되지 않음');
   await page.click('[data-t="zoom-fit"]');
   const v4 = await vb();
-  assert.ok(Math.abs(v4[0] - v0[0]) < 0.01 && Math.abs(v4[2] - v0[2]) < 0.01, '맞춤은 처음 보기로 복귀');
+  assert.ok(Math.abs(v4[0] - v0[0]) < 0.01 && Math.abs(v4[2] - v0[2]) < 0.01, '맞춤은 열릴 때의 보기로 복귀');
   await done(page);
 });
 
@@ -141,6 +147,7 @@ test('목록 보기: 그룹 라벨별 묶음(그룹 없음은 마지막), 이해
 
 test('이전된 개념(연결 없음)은 지도에서 연결 없는 노드로 따로 두고 억지로 잇지 않음', { skip: SKIP }, async () => {
   const page = await openStudy(five);
+  await openMap(page);
   await page.click('[data-t="map-full"]');
   assert.match(await page.eval("document.querySelector('.m-label').textContent"), /연결 없는 개념/);
   const legacy = srv.state.items[4];
@@ -165,7 +172,9 @@ test('보류·제외 관리: 접힌 목록, [다시 보기]·[AI 설명 받기]�
   assert.equal(await page.eval("document.querySelector('[data-t=sl-held]').open"), false, '접혀 있음');
   assert.match(await page.text('[data-t="sl-held"] summary'), /나중에 볼 개념\s*2/);
   assert.match(await page.text('[data-t="sl-excluded"] summary'), /제외한 개념\s*1/);
+  await openMap(page);
   assert.equal(await page.count('[data-t="node"]'), 3, '보류·제외 개념은 지도에 그리지 않음');
+  await closeMap(page);
   await page.click('[data-t="sl-held"] summary');
   assert.equal(await page.count('[data-t="sl-explain"]'), 1, '설명이 없는 개념에만 [AI 설명 받기]');
   // 다시 보기(설명 있음): active 복원 + 선택
@@ -173,7 +182,9 @@ test('보류·제외 관리: 접힌 목록, [다시 보기]·[AI 설명 받기]�
   await page.waitFor("document.querySelector('[data-t=term]').innerText === '미토콘드리아'");
   assert.equal(srv.state.items[3].status, 'active');
   assert.equal(calls(/explore$/).length, 0, 'AI 호출 없음');
+  await openMap(page);
   assert.equal(await page.count('[data-t="node"]'), 4);
+  await closeMap(page);
   // 설명 없는 보류 개념: AI 설명 받기 → 복원 + explore
   await page.click('[data-t="sl-explain"]');
   await page.waitFor("document.querySelector('[data-t=term]').innerText === '옛 개념' && !!document.querySelector('[data-t=source]')");
@@ -216,6 +227,7 @@ test('개념 0개·1개: 지도를 억지로 그리지 않고 안내', { skip: S
   await done(page);
   page = await openStudy(s => s.seed({ items: [{ term: '세포' }] }));
   assert.equal(await page.exists('[data-t="map-svg"]'), false);
+  assert.equal(await page.exists('[data-t="map-open"]'), false, '그릴 연결이 없으면 지도 보기 버튼도 없음');
   assert.match(await page.text('[data-t="map-note"]'), /개념이 1개뿐이라 아직 그릴 연결이 없어요/);
   assert.equal(await page.text('#progress-count'), '0 / 1');
   await page.click('#seg-list');
@@ -229,6 +241,7 @@ test('개념 60개: 노드가 서로 겹치지 않고 가로 스크롤·오류 �
   for (let i = 1; i < 45; i++) links.push([Math.floor((i - 1) / 3), i]);        // 트리(여러 단계·넓은 단계)
   for (let i = 45; i < 52; i++) links.push([i - 44, 59]);                       // 한 노드에 여러 연결(교차)
   const page = await openStudy(s => s.seed({ items, links, path: [0, 1, 4, 13] }));
+  await openMap(page);
   for (const full of [false, true]) {
     if (full) await page.click('[data-t="map-full"]');
     const rects = await page.eval(`[...document.querySelectorAll('[data-t=node],[data-t=ghost]')].map(g => { const m = /translate\\(([-\\d.]+),([-\\d.]+)\\)/.exec(g.getAttribute('transform')); return [+m[1], +m[2]]; })`);
@@ -240,6 +253,7 @@ test('개념 60개: 노드가 서로 겹치지 않고 가로 스크롤·오류 �
     assert.equal(overlaps, 0, '겹치는 노드 쌍');
     assert.equal(await page.hasHorizontalScroll(), false);
   }
+  await closeMap(page);
   await page.click('#seg-list');
   assert.equal(await page.count('[data-t="list-item"]'), 60);
   assert.equal(await page.count('[data-t="group"]'), 3);
@@ -250,6 +264,7 @@ for (const [w, h] of [[390, 844], [768, 1024], [1024, 800]]) {
   test(`레이아웃 ${w}px: 지도·목록·대화상자·보류 영역 가로 스크롤 없음, 지도가 화면 폭 안`, { skip: SKIP }, async () => {
     const page = await openStudy(s => { five(s); s.state.items[3].status = 'held'; }, { width: w, height: h });
     assert.equal(await page.hasHorizontalScroll(), false);
+    await openMap(page);
     const box = await page.eval("(() => { const r = document.querySelector('[data-t=map-box]').getBoundingClientRect(); return [r.left, r.right, innerWidth]; })()");
     assert.ok(box[0] >= 0 && box[1] <= box[2], '지도 상자가 화면 안: ' + box);
     await page.click('[data-t="map-full"]');
@@ -258,6 +273,9 @@ for (const [w, h] of [[390, 844], [768, 1024], [1024, 800]]) {
     const dlg = await page.eval("(() => { const r = document.getElementById('edge-dialog').getBoundingClientRect(); return [r.left, r.right, innerWidth]; })()");
     assert.ok(dlg[0] >= 0 && dlg[1] <= dlg[2], '대화상자가 화면 안');
     await page.click('#edge-close');
+    const smallSheet = await page.eval(`[...document.querySelectorAll('#map-sheet button')].filter(b => { const r = b.getBoundingClientRect(); return r.width > 0 && (r.height < 43.5 || r.width < 43.5); }).map(b => b.getAttribute('data-t') || b.id)`);
+    assert.deepEqual(smallSheet, [], '팝업 안 44px 미만 터치 요소');
+    await closeMap(page);
     await page.click('#seg-list');
     assert.equal(await page.hasHorizontalScroll(), false);
     await page.click('[data-t="sl-held"] summary');

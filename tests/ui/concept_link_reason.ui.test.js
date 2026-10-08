@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startMockServer } = require('./helpers/mock_server');
 const { dialogAnswer } = require('./helpers/dialog');
+const { openMap } = require('./helpers/map');
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 let browser, srv;
@@ -169,6 +170,7 @@ test('수정 폼 안의 삭제: 확인 대화상자(취소하면 그대로, 확�
 
 test('연결선 카드: 관계 종류·문구·이유·출처(4상태)가 보임', { skip: SKIP }, async () => {
   const page = await openStudy();
+  await openMap(page);
   await page.click('[data-t="map-full"]');
   const cases = [
     [srv.state.links[0], 'AI 판단 · 확인 필요', '세포 안에서 일어나기 때문입니다.'],
