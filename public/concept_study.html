@@ -273,7 +273,7 @@
   /* 작업217-3: 보기는 박스 없이 행(보기 사이는 아래 구분선). 상태는 색 하나로만 구분하지 않고 기호(○ ✕)와 굵기·밑줄을 함께 쓴다.
      정답 ○+--success-dark(흰 바탕 약 10:1), 내가 고른 오답 ✕+--danger(6.57:1), 고른 보기는 밑줄. 답한 뒤 버튼은 disabled라서 흐려지지 않게 opacity 1 */
   .qz-opts { display: grid; gap: 0; margin-top: 12px; }
-  .btn.qz-opt { width: 100%; min-height: 44px; padding: 12px 0; align-items: flex-start; justify-content: flex-start; text-align: left; font-weight: 500; white-space: normal; word-break: break-word;
+  .btn.qz-opt { width: 100%; min-height: 44px; padding: 12px 0; align-items: flex-start; justify-content: flex-start; text-align: left; font-size: 15px; font-weight: 400; white-space: normal; word-break: break-word;
     background: transparent; border: none; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--text); }
   .qz-opts .btn.qz-opt:last-child { border-bottom: none; }
   .btn.qz-opt:disabled { opacity: 1; }
@@ -281,6 +281,17 @@
   .qz-opt.wrong { color: var(--danger); font-weight: 700; }
   .qz-opt.mine > span:last-child { text-decoration: underline; text-underline-offset: 3px; }
   .qz-mark { flex: none; width: 16px; text-align: center; font-weight: 800; }
+  /* 작업221: 보기 번호(폭 20px 고정, 보조색) — 다른 화면의 4지선다와 같은 모양 */
+  .qz-num { flex: none; width: 20px; text-align: right; font-size: 13px; line-height: 1.5; color: var(--text2); }
+  .qz-opt.right .qz-num, .qz-opt.wrong .qz-num { color: inherit; font-weight: 700; }
+  /* 작업221: 진행 표시 = 얇은 막대 + "문제 n / N" 글자 */
+  .quiz-progress-bar-wrap { height: 6px; background: var(--info-bg); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .quiz-progress-bar { height: 100%; background: var(--accent); border-radius: 3px; }
+  /* 작업221: 결과 = 큰 점수(42px / 700) + 한 줄 요약 + 틀린 개념 목록 + 버튼 */
+  .result-score-wrap { text-align: center; margin: 8px 0 28px; padding: 12px 0 24px; border-bottom: 1px solid var(--line); }
+  .result-score { font-size: 42px; font-weight: 700; color: var(--accent-text); line-height: 1.2; }
+  .result-score span { font-size: 20px; color: var(--text2); font-weight: 700; }
+  .result-msg { font-size: 16px; font-weight: 600; margin-top: 8px; }
   .qz-fb { margin-top: 12px; font-weight: 800; }
   .qz-fb.right { color: var(--success-dark); }
   .qz-fb.wrong { color: var(--danger); }
@@ -1128,7 +1139,9 @@ function renderQuiz() {
     const right = qz.results.filter(x => x.correct).length;
     const wrong = qz.results.filter(x => !x.correct);
     box.append(h('div', { class: 'qz-head' }, h('div', { class: 'label' }, '퀴즈 결과')),
-      h('h2', { class: 'next-term', 'data-t': 'quiz-score', style: 'margin-top:8px' }, total + '문제 중 ' + right + '개 맞혔어요'));
+      h('div', { class: 'result-score-wrap' },
+        h('div', { class: 'result-score', 'data-t': 'quiz-score-big' }, String(right), h('span', {}, ' / ' + total)),
+        h('div', { class: 'result-msg', 'data-t': 'quiz-score' }, total + '문제 중 ' + right + '개 맞혔어요')));
     if (wrong.length) {
       box.append(h('div', { class: 'label', style: 'margin-top:16px;display:block' }, '틀린 개념'));
       for (const x of wrong) {
@@ -1152,6 +1165,7 @@ function renderQuiz() {
   const a = qz.answered;
   box.append(h('div', { class: 'qz-head' },
     h('div', { class: 'label', 'data-t': 'quiz-progress' }, '문제 ' + (qz.i + 1) + ' / ' + total), exit));
+  box.append(h('div', { class: 'quiz-progress-bar-wrap', 'aria-hidden': 'true' }, h('div', { class: 'quiz-progress-bar', style: 'width:' + Math.round(qz.i / total * 100) + '%' })));
   const card = h('div', { class: 'qz-q', 'data-t': 'quiz-question', 'data-kind': q.kind },
     h('div', { class: 'label' }, q.kind === 'A' ? '이 설명에 맞는 용어는?' : '이 용어의 설명은?'),
     h('div', { class: 'qz-prompt', 'data-t': 'quiz-prompt' }, q.prompt));
@@ -1163,6 +1177,7 @@ function renderQuiz() {
     const cls = 'btn qz-opt' + (isRight ? ' right' : (isMine ? ' wrong' : '')) + (isMine ? ' mine' : '');
     opts.append(h('button', { class: cls, type: 'button', 'data-t': 'quiz-opt', 'data-i': idx, disabled: a ? true : null, onclick: () => answerQuiz(idx) },
       h('span', { class: 'qz-mark', 'aria-hidden': 'true' }, a ? (isRight ? '○' : (isMine ? '✕' : '')) : ''),
+      h('span', { class: 'qz-num', 'aria-hidden': 'true' }, String(idx + 1)),
       h('span', {}, text)));
   });
   card.append(opts);
@@ -1170,7 +1185,7 @@ function renderQuiz() {
   if (qz.error) box.append(h('div', { class: 'msg error', role: 'alert', 'data-t': 'quiz-error' }, qz.error),
     h('div', { class: 'btn-row', style: 'margin-top:8px' }, h('button', { class: 'btn text', type: 'button', 'data-t': 'quiz-skip', onclick: nextQuiz }, '다음 문제로')));
   if (a) {
-    box.append(h('div', { class: 'qz-fb ' + (a.correct ? 'right' : 'wrong'), 'data-t': 'quiz-feedback', role: 'status' }, a.correct ? '✓ 정답입니다' : '✗ 틀렸어요'));
+    box.append(h('div', { class: 'qz-fb ' + (a.correct ? 'right' : 'wrong'), 'data-t': 'quiz-feedback', role: 'status' }, a.correct ? '○ 정답입니다' : '✕ 틀렸어요'));
     const ex = h('div', { class: 'qz-explain', 'data-t': 'quiz-explain' },
       h('div', { class: 'label' }, '정답'),
       h('div', { class: 'next-term', style: 'font-size:18px' }, a.item.term),
@@ -1180,7 +1195,7 @@ function renderQuiz() {
     box.append(ex);
     const last = qz.i + 1 >= total;
     const row = h('div', { class: 'btn-row', style: 'margin-top:12px' },
-      h('button', { class: 'btn primary', type: 'button', 'data-t': 'quiz-next', onclick: nextQuiz }, last ? '결과 보기' : '다음'));
+      h('button', { class: 'btn primary block', type: 'button', 'data-t': 'quiz-next', onclick: nextQuiz }, last ? '결과 보기' : '다음'));
     if (!a.correct) {
       const cur = itemById(a.item.id);
       const done = (qz.marked && qz.marked[a.item.id]) || (cur && cur.review_state === 'confused');

@@ -162,7 +162,8 @@ async function openConcept(items = CONCEPT_ITEMS, width = 390) {
   return page;
 }
 const termFromDef = d => d.replace('의 정의입니다.', '');
-const currentQuestion = page => page.eval(`(() => { const q = document.querySelector('[data-t=quiz-question]'); return { kind: q.dataset.kind, prompt: document.querySelector('[data-t=quiz-prompt]').textContent, options: [...document.querySelectorAll('[data-t=quiz-opt]')].map(b => b.textContent.replace(/^[○✕]/, '')) }; })()`);
+// 작업221: 보기에 번호 span이 생겨서 글자 span(마지막 자식)만 읽는다
+const currentQuestion = page => page.eval(`(() => { const q = document.querySelector('[data-t=quiz-question]'); return { kind: q.dataset.kind, prompt: document.querySelector('[data-t=quiz-prompt]').textContent, options: [...document.querySelectorAll('[data-t=quiz-opt]')].map(b => b.lastElementChild.textContent.trim()) }; })()`);
 const rightIndex = q => q.options.indexOf(q.kind === 'A' ? termFromDef(q.prompt) : q.prompt + '의 정의입니다.');
 
 test('217-3 concept 돌아보기 퀴즈 보기(.qz-opt)와 문제 영역(.qz-q): 박스 없는 행(구분선만), 오답 ✕+빨강+굵게+밑줄, 정답 ○+초록+굵게, 대비 4.5:1', { skip: SKIP }, async () => {

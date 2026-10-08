@@ -112,7 +112,7 @@ test('돌아보기 퀴즈의 변환 버튼(quiz-exit, quiz-skip, quiz-confuse)�
   await page.eval("S.quiz.error = null; renderQuiz();");
   await page.waitFor("!document.querySelector('[data-t=quiz-skip]') && !!document.querySelector('[data-t=quiz-question]')");
   // 틀린 답을 고르면 [헷갈림으로 표시]가 나타난다(모의 서버의 문제 형식: 정답 보기를 찾아 다른 보기를 누름)
-  const q = await page.eval(`(() => { const q = document.querySelector('[data-t=quiz-question]'); return { kind: q.dataset.kind, prompt: document.querySelector('[data-t=quiz-prompt]').textContent, options: [...document.querySelectorAll('[data-t=quiz-opt]')].map(b => b.textContent.trim()) }; })()`);
+  const q = await page.eval(`(() => { const q = document.querySelector('[data-t=quiz-question]'); return { kind: q.dataset.kind, prompt: document.querySelector('[data-t=quiz-prompt]').textContent, options: [...document.querySelectorAll('[data-t=quiz-opt]')].map(b => b.lastElementChild.textContent.trim()) }; })()`);
   const right = q.options.indexOf(q.kind === 'A' ? termFromDef(q.prompt) : q.prompt + '의 정의입니다.');
   await page.click(`[data-t="quiz-opt"][data-i="${(right + 1) % 4}"]`);
   await page.waitFor("!!document.querySelector('[data-t=quiz-confuse]')", 4000);

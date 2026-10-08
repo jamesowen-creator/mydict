@@ -30,7 +30,7 @@ async function openStudy(items, width = 390) {
 // 모의 서버의 규칙: 설명은 "X의 정의입니다."
 const termFromDef = d => d.replace('의 정의입니다.', '');
 async function currentQuestion(page) {
-  return page.eval(`(() => { const q = document.querySelector('[data-t=quiz-question]'); return { kind: q.dataset.kind, prompt: document.querySelector('[data-t=quiz-prompt]').textContent, options: [...document.querySelectorAll('[data-t=quiz-opt]')].map(b => b.textContent.replace(/^[✓✗]/, '')) }; })()`);
+  return page.eval(`(() => { const q = document.querySelector('[data-t=quiz-question]'); return { kind: q.dataset.kind, prompt: document.querySelector('[data-t=quiz-prompt]').textContent, options: [...document.querySelectorAll('[data-t=quiz-opt]')].map(b => b.lastElementChild.textContent.trim()) }; })()`);
 }
 const rightIndex = q => q.options.indexOf(q.kind === 'A' ? termFromDef(q.prompt) : q.prompt + '의 정의입니다.');
 const aiCalls = () => srv.state.log.filter(l => /\/explore$|\/respond$|\/suggestions\/refresh$/.test(l.url));
