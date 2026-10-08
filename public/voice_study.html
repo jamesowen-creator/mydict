@@ -140,8 +140,8 @@
   /* 작업220: 섹션 제목 규격 — 12px / 700 / --primary-dark(흰 바탕 5.38:1) / 아래 2px 코랄 선(장식) */
   .list-head h2 { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--primary-dark); padding-bottom: 4px; border-bottom: 2px solid var(--primary); }
   .note-item {
-    display: block; width: 100%; text-align: left;
-    padding: 18px 20px; margin-bottom: 0;
+    display: block; width: calc(100% + 32px); text-align: left;
+    padding: 18px 16px; margin: 0 -16px;   /* 작업222: 흰 면은 화면 가장자리까지, 글자는 16px에서 시작 */
     border-bottom: 1px solid var(--border);
     cursor: pointer; font-family: inherit; color: inherit;
   }
@@ -154,7 +154,7 @@
   .empty-state { text-align: center; color: var(--text2); font-size: 14px; line-height: 1.7; padding: 40px 0; }
 
   /* 녹음 */
-  .rec-box { padding: 20px; text-align: center; }
+  .rec-box { padding: 20px 16px; margin: 0 -16px; text-align: center; }   /* 작업222: 글자 시작 x 16px */
   .rec-time { font-size: 42px; font-weight: 700; color: var(--primary); font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; }
   .rec-sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
   .rec-dot {
@@ -195,7 +195,7 @@
   .quiz-progress-bar-wrap { height: 6px; background: var(--primary-light); border-radius: 3px; margin-bottom: 12px; overflow: hidden; }
   .quiz-progress-bar { height: 100%; background: var(--primary); border-radius: 3px; width: 0; }
   .quiz-card {
-    background: var(--card); border: none; border-radius: 0; box-shadow: none; padding: 20px;
+    background: var(--card); border: none; border-radius: 0; box-shadow: none; padding: 20px 16px; margin: 0 -16px;   /* 작업222: 글자 시작 x 16px */
   }
   .quiz-question {
     font-size: 17px; font-weight: 700; line-height: 1.6;   /* 작업221: 질문 글자 17px / 700 / 주 글자색 */
@@ -432,7 +432,7 @@
       </button>
       <h1 id="page-title" class="screen-bar-title">음성 학습</h1>
     </div>
-    <div class="notice-wrap">
+    <div class="notice-wrap" id="notice-wrap">
       <div class="msg notice">녹음은 글로 바꾸기 위해 외부 서비스(OpenAI)로 전송되며 서버에는 저장되지 않습니다.</div>
     </div>
   </div>
@@ -868,6 +868,8 @@ function showView(name) {
   for (const v of ['list', 'record', 'edit', 'quiz', 'chat', 'merge', 'wrong']) $('view-' + v).classList.toggle('active', v === name);
   $('page-title').textContent = TITLES[name];
   $('subbar').style.display = name === 'list' ? 'none' : '';
+  // 작업222: 녹음 전송 안내는 녹음·목록·상세 화면에서만 보이고, 퀴즈·대화 등 다른 화면에서는 숨긴다
+  $('notice-wrap').style.display = (name === 'list' || name === 'record' || name === 'edit') ? '' : 'none';
   autoGrowAll();   // 작업215-2: 숨겨져 있던 화면의 칸은 이제 보이므로 높이를 맞춘다
   window.scrollTo(0, 0);
 }
@@ -1547,7 +1549,7 @@ $('sum-make').addEventListener('click', async () => {
   if (data && data.subject && $('edit-subject').value === data.subject && !$('edit-subject-detail').value && data.subject_detail) {
     setSubject(data.subject, data.subject_detail);
   }
-  if (data && data.unverified_count >= 1) setMsg('sum-warn', '⚠ 표시는 원문에서 근거를 확인하지 못한 항목입니다. 원문과 대조해 보세요.', 'warn');
+  if (data && data.unverified_count >= 1) setMsg('sum-warn', '요약에서 "⚠"가 붙은 항목은 원문에서 근거를 확인하지 못한 것입니다. 원문과 대조해 보세요.', 'warn');   // 작업222: 안내 기호(!)와 문구 앞의 ⚠가 겹치지 않게 문구 속으로
   editDirty = true;
   updateCounter();
 });
