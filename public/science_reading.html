@@ -347,7 +347,7 @@
     background: var(--card); border: none; border-radius: 0; box-shadow: none; padding: 20px;
   }
   .quiz-question {
-    font-size: 16px; font-weight: 600; line-height: 1.6;
+    font-size: 17px; font-weight: 700; line-height: 1.6;   /* 작업221: 질문 글자 17px / 700 / 주 글자색 */
     margin-bottom: 20px; color: var(--text1);
     white-space: pre-line; word-break: keep-all;
   }
@@ -375,7 +375,7 @@
   .mcq-option.correct .mcq-text, .mcq-option.correct-hint .mcq-text { color: var(--success-dark); font-weight: 700; }
   .mcq-option.wrong .mcq-text { color: var(--error-dark); font-weight: 700; }
   .mcq-option.correct .mcq-text, .mcq-option.wrong .mcq-text { text-decoration: underline; text-underline-offset: 3px; }
-  .mcq-text { flex: 1; min-width: 0; font-size: 14px; line-height: 1.5; color: var(--text1); word-break: keep-all; }
+  .mcq-text { flex: 1; min-width: 0; font-size: 15px;   /* 작업221: 보기 글자 15px / 400 / 주 글자색 */ line-height: 1.5; color: var(--text1); word-break: keep-all; }
 
   .ox-buttons { display: flex; gap: 12px; margin-top: 4px; }
   /* 작업217-3: O/X는 박스 없이 큰 글자(32px 굵게)만, 눌림 영역은 높이 80px 그대로(투명). 고른 쪽은 밑줄, 채점 후 라벨 "○ 정답"(--success-dark) / "✕ 오답"(--error-dark) */
@@ -398,8 +398,13 @@
   /* 작업217-3: 해설 줄은 색 바탕 없이 기호(○/✕)+글자색 */
   .ox-feedback { margin-top: 12px; padding: 10px 0 0; font-size: 13px; font-weight: 500; line-height: 1.6; display: none; }
   .ox-feedback.show { display: block; }
-  .ox-feedback.correct-fb { color: var(--success-dark); }
-  .ox-feedback.wrong-fb { color: var(--error-dark); }
+  /* 작업221: 정오 한 줄(.fb-line)만 기호+초록/빨강, 해설은 주 글자색 */
+  .ox-feedback.correct-fb, .ox-feedback.wrong-fb { color: var(--text1); }
+  .ox-feedback.correct-fb::before { color: var(--success-dark); }
+  .ox-feedback.wrong-fb::before { color: var(--error-dark); }
+  .ox-feedback .fb-line { font-weight: 700; }
+  .ox-feedback.correct-fb .fb-line { color: var(--success-dark); }
+  .ox-feedback.wrong-fb .fb-line { color: var(--error-dark); }
   .ox-feedback.correct-fb::before { content: '○ '; font-weight: 700; }
   .ox-feedback.wrong-fb::before { content: '✕ '; font-weight: 700; }
 
@@ -423,7 +428,6 @@
     padding: 12px 0 24px; background: transparent;
     border: none; border-radius: 0; box-shadow: none; border-bottom: 1px solid var(--border);
   }
-  .result-emoji { font-size: 48px; margin-bottom: 12px; }
   .result-score { font-size: 42px; font-weight: 700; color: var(--primary-dark); font-family: 'Inter', sans-serif; }
   .result-score span { font-size: 20px; color: var(--text2); }
   .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
@@ -936,6 +940,14 @@ function answerMCQ(el, chosen) {
   document.getElementById('quiz-next').classList.add('visible');
 }
 
+function setOxFeedback(fb, text) {   // 작업221: 정오 한 줄(정답!/오답./맞습니다./아닙니다.)만 따로 감싸 색을 입힌다
+  const m = String(text).match(/^(정답!|오답\.|아닙니다\.|맞습니다\.)\s*/);
+  fb.textContent = '';
+  if (!m) { fb.textContent = text; return; }
+  const line = document.createElement('b'); line.className = 'fb-line'; line.textContent = m[1];
+  fb.appendChild(line); fb.appendChild(document.createTextNode(' ' + text.slice(m[0].length)));
+}
+
 function answerOX(answer) {
   const q = quizState.questions[quizState.currentIdx];
   if (!q || quizState.answered || q.graded) return;
@@ -949,13 +961,13 @@ function answerOX(answer) {
   if (answer === q.answer) {
     (answer ? oBtn : xBtn).classList.add('correct');
     quizState.score++;
-    fb.textContent = q.explanation;
+    setOxFeedback(fb, q.explanation);
     fb.className = 'ox-feedback show correct-fb';
   } else {
     (answer ? oBtn : xBtn).classList.add('wrong');
     (!answer ? oBtn : xBtn).classList.add('correct');
     // 작업175 F4: 틀렸을 때는 해설 앞의 "정답! "(참 문항)·"아닙니다. "(거짓 문항)을 떼고 "오답. "을 붙인다
-    fb.textContent = '오답. ' + q.explanation.replace(/^(정답! |아닙니다\. )/, '');
+    setOxFeedback(fb, '오답. ' + q.explanation.replace(/^(정답! |아닙니다\. )/, ''));
     fb.className = 'ox-feedback show wrong-fb';
     quizState.wrong.push({ q: q.statement, a: q.answer ? 'O (참)' : 'X (거짓)' });
   }
@@ -973,14 +985,13 @@ function showResult() {
   const score = quizState.score;
   const pct = total > 0 ? Math.round((score / total) * 100) : 0;
 
-  let emoji = '🎉', msg = '완벽해요!', sub = '모든 문항을 맞혔습니다.';
-  if (pct < 100) { emoji = '👍'; msg = '잘했어요!'; sub = '조금만 더 연습하면 완벽합니다.'; }
-  if (pct < 60) { emoji = '📚'; msg = '다시 도전해봐요!'; sub = '개념을 다시 읽고 퀴즈에 도전하세요.'; }
+  let msg = '완벽해요!', sub = '모든 문항을 맞혔습니다.';
+  if (pct < 100) { msg = '잘했어요!'; sub = '조금만 더 연습하면 완벽합니다.'; }
+  if (pct < 60) { msg = '다시 도전해봐요!'; sub = '개념을 다시 읽고 퀴즈에 도전하세요.'; }
 
   const root = document.getElementById('result-content');
   root.innerHTML = `
     <div class="result-score-wrap">
-      <div class="result-emoji"></div>
       <div class="result-score"></div>
       <div class="result-msg"></div>
       <div class="result-submsg"></div>
@@ -990,7 +1001,6 @@ function showResult() {
       <button class="result-btn result-btn-primary" onclick="startQuizFlow()">다시 풀기</button>
       <button class="result-btn result-btn-secondary" onclick="leaveQuiz(true)">개념 목록으로</button>
     </div>`;
-  root.querySelector('.result-emoji').textContent = emoji;
   const scoreEl = root.querySelector('.result-score');
   scoreEl.textContent = String(score);
   const tot = document.createElement('span'); tot.textContent = ' / ' + total; scoreEl.appendChild(tot);
