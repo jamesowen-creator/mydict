@@ -56,8 +56,9 @@
     align-items: center; justify-content: center;
     background: var(--bg); z-index: 999; gap: 16px;
   }
+  /* 작업220: 화면 로딩 스피너 32px, 버튼 안·인라인(.small)은 20px 두 규격 */
   .spinner {
-    width: 40px; height: 40px;
+    width: 32px; height: 32px;
     border: 3px solid var(--primary-light);
     border-top-color: var(--primary);
     border-radius: 50%;
@@ -78,7 +79,8 @@
 
   .view { display: none; padding: 20px 16px 40px; }
   .view.active { display: block; }
-  .view-title { font-size: 20px; font-weight: 700; color: var(--text1); margin-bottom: 4px; }
+  /* 작업220: 목록 첫 화면 제목 22px / 700 / 주 글자색 */
+  .view-title { font-size: 22px; font-weight: 700; color: var(--text1); margin-bottom: 4px; }
   .view-sub { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
 
   /* ── 안내/오류 메시지 (science_reading.html의 .ox-feedback 모양) ── */
@@ -98,9 +100,10 @@
   /* ── 버튼 (science_reading.html의 .result-btn / .quiz-next-btn 모양) ── */
   .btn {
     min-height: var(--ctl-min-h); display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    padding: 15px 20px;
+    /* 작업220: 주 버튼 규격 — 높이 최소 44px, 15px / 600, 좌우 padding 20px */
+    padding: 10px 20px;
     border: none; border-radius: var(--btn-radius);
-    font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: var(--btn-weight);
+    font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 600;
     cursor: pointer; background: var(--btn-primary-bg, #b8442e); color: #fff;
     transition: all 0.15s;
   }
@@ -109,10 +112,11 @@
   .btn.danger { background: var(--error-light); color: var(--error); }
   .btn.danger:hover:not(:disabled) { background: var(--error-light); }
   .btn.block { display: flex; width: 100%; }
-  .btn.small { min-height: var(--ctl-min-h); padding: 10px 14px; border-radius: var(--btn-radius); font-size: 13px; }
+  .btn.small { min-height: var(--ctl-min-h); padding: 10px 20px; border-radius: var(--btn-radius); font-size: 15px; }
   /* 작업216: 보조 동작은 박스 없이 텍스트로(concept_study.html의 .btn.text와 같은 모양). 터치 영역은 높이 44px(.btn) + 가로 44px 이상.
      글자색 --text2는 흰 배경 4.83:1, --bg 4.63:1(4.5:1 이상). 위험 글자색은 --error(3.93:1)가 부족해 더 진한 기존 토큰 --primary-dark(5.38:1)를 쓴다 */
-  .btn.text { background: transparent; border: none; padding: 10px 6px; min-width: var(--ctl-min-h); color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
+  /* 작업220: 텍스트 버튼 규격 — 15px / 600, 보조색, padding 0 8px, 최소 44×44px, 밑줄 */
+  .btn.text { background: transparent; border: none; padding: 0 8px; min-height: var(--ctl-min-h); min-width: var(--ctl-min-h); font-size: 15px; font-weight: 600; color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
   .btn.text:hover:not(:disabled), .btn.text:active:not(:disabled) { background: transparent; color: var(--text1); }
   .btn.text.danger { background: transparent; color: var(--primary-dark); }
   .btn.text.danger:hover:not(:disabled), .btn.text.danger:active:not(:disabled) { background: transparent; color: var(--btn-primary-bg-hover, #9c3a27); }
@@ -133,7 +137,8 @@
 
   /* 목록 */
   .list-head { display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px; }
-  .list-head h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #3A3A40; }
+  /* 작업220: 섹션 제목 규격 — 12px / 700 / --primary-dark(흰 바탕 5.38:1) / 아래 2px 코랄 선(장식) */
+  .list-head h2 { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--primary-dark); padding-bottom: 4px; border-bottom: 2px solid var(--primary); }
   .note-item {
     display: block; width: 100%; text-align: left;
     padding: 18px 20px; margin-bottom: 0;
@@ -167,7 +172,7 @@
   .convert-status { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14px; color: var(--text2); margin-top: 16px; }
 
   /* 편집 */
-  .field-label { display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #3A3A40; margin: 14px 0 8px; }
+  .field-label { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--primary-dark); padding-bottom: 4px; border-bottom: 2px solid var(--primary); margin: 14px 0 8px; }
   .field-label:first-child { margin-top: 0; }
   input[type=text], textarea {
     width: 100%; font-family: 'Noto Sans KR', sans-serif; font-size: 16px; color: var(--text1);
