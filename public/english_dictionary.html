@@ -39,6 +39,8 @@
     --text2: #4a5070;
     /* 작업220: 약한 글자색 #9398b5는 페이지 바탕 2.8:1·보조 바탕 2.5:1로 4.5:1에 못 미쳐서, 세 바탕(#f5f7ff, #eef1fb, 흰색) 모두에서 4.5:1 이상인 기존 색 --text2(#4a5070, 6.7:1 이상)와 같은 값으로 올림. 이 팔레트에는 더 연하면서 4.5:1을 넘는 색이 없음 */
     --text3: #4a5070;
+    --correct-text: #085041;   /* 작업221: 퀴즈 정답 글자(흰 바탕 약 10:1). 다른 화면의 --success-dark와 같은 값 */
+    --wrong-text: #B42318;     /* 작업221: 퀴즈 오답 글자(흰 바탕 6.57:1). 다른 화면의 --error-dark와 같은 값 */
     --accent-text: #b8442e;   /* 작업220: 섹션 제목 글자색(흰·페이지 바탕 위 5:1 이상). 값은 다른 화면의 --primary-dark 와 같음 */
     --correct: #16a34a;
     --wrong: #dc2626;
@@ -734,10 +736,11 @@
   .empty-state-text { font-size: 14px; line-height: 1.6; }
 
   /* QUIZ */
+  /* 작업221: 퀴즈 화면도 다른 화면과 같이 박스(테두리·둥근 모서리·색 바탕) 없이 흰 면 + 구분선만 */
   .quiz-start-card {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border: none;
+    border-radius: 0;
     padding: 32px 24px;
     text-align: center;
   }
@@ -750,20 +753,22 @@
   }
 
   .quiz-type-btn {
-    background: var(--surface2);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 14px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    padding: 12px 0;
+    min-height: 44px;
     text-align: left;
     cursor: pointer;
-    transition: all 0.2s;
     color: var(--text);
     font-family: 'Noto Sans KR', sans-serif;
   }
-  .quiz-type-btn:hover, .quiz-type-btn.selected {
-    border-color: var(--accent);
-    background: rgba(226,88,59,0.08);
-  }
+  .quiz-type-btn:last-child { border-bottom: none; }
+  .quiz-type-btn:hover .quiz-type-label { text-decoration: underline; text-underline-offset: 3px; }
+  /* 선택된 유형 = 짙은 코랄 글자 + 굵게 + 밑줄 (색만으로 구분하지 않음) */
+  .quiz-type-btn.selected .quiz-type-label { color: var(--accent-text); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+  .quiz-type-btn:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
 
   .quiz-type-label {
     font-size: 14px;
@@ -808,8 +813,8 @@
 
   .quiz-card {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border: none;
+    border-radius: 0;
     padding: 28px 24px;
     animation: fadeUp 0.25s ease;
   }
@@ -825,68 +830,64 @@
 
   .quiz-question {
     font-family: 'Sora', sans-serif;
-    font-size: 22px;
+    font-size: 17px;   /* 작업221: 질문 글자 17px / 700 / 주 글자색 */
     font-weight: 700;
     margin-bottom: 24px;
     line-height: 1.3;
     color: var(--text);
   }
 
+  /* 작업221: 4지선다 보기 = 번호 + 본문 텍스트 행(보기 사이는 아래 구분선). 상태는 색 하나로만 구분하지 않고 기호(○ ✕)와 굵기·밑줄을 함께 쓴다.
+     정답 ○+--correct-text(흰 바탕 약 10:1), 내가 고른 오답 ✕+--wrong-text(6.57:1), 고른 보기는 굵게+밑줄, 오답을 골라도 정답 보기에 ○가 보인다 */
   .quiz-options {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 0;
   }
 
   .quiz-option {
-    background: var(--surface2);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    padding: 12px 0;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 15px;
+    font-weight: 400;
     color: var(--text);
     text-align: left;
     font-family: 'Noto Sans KR', sans-serif;
-    transition: all 0.15s;
     line-height: 1.5;
   }
-  .quiz-option:hover:not(:disabled) {
-    border-color: var(--accent);
-    background: rgba(226,88,59,0.08);
-  }
-  .quiz-option.correct {
-    border-color: var(--correct);
-    background: rgba(74,222,128,0.1);
-    color: var(--correct);
-  }
-  .quiz-option.wrong {
-    border-color: var(--wrong);
-    background: rgba(248,113,113,0.1);
-    color: var(--wrong);
-  }
-  .quiz-option:disabled { cursor: not-allowed; }
+  .quiz-option:last-child { border-bottom: none; }
+  .quiz-option::before { content: ''; flex: none; width: 16px; text-align: center; font-size: 14px; font-weight: 700; line-height: 1.5; }
+  .quiz-option .mcq-num { flex: none; width: 20px; text-align: right; font-size: 13px; line-height: 1.5; color: var(--text2); }
+  .quiz-option .mcq-text { flex: 1; min-width: 0; }
+  .quiz-option:hover:not(:disabled) .mcq-text { text-decoration: underline; text-underline-offset: 3px; }
+  .quiz-option:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+  .quiz-option:disabled { cursor: default; }
+  .quiz-option.correct { color: var(--correct-text); font-weight: 700; }
+  .quiz-option.wrong { color: var(--wrong-text); font-weight: 700; }
+  .quiz-option.correct::before { content: '○'; }
+  .quiz-option.wrong::before { content: '✕'; }
+  .quiz-option.correct .mcq-num, .quiz-option.wrong .mcq-num { color: inherit; font-weight: 700; }
+  .quiz-option.picked .mcq-text { text-decoration: underline; text-underline-offset: 3px; }
 
+  /* 정오 한 줄: 박스 없이 기호 + 글자색 + 굵게 */
   .quiz-feedback {
     margin-top: 16px;
-    padding: 12px 16px;
-    border-radius: var(--radius-sm);
+    padding: 10px 0;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 700;
     display: none;
   }
-  .quiz-feedback.correct {
-    background: rgba(74,222,128,0.1);
-    color: var(--correct);
-    border: 1px solid rgba(74,222,128,0.3);
-    display: block;
-  }
-  .quiz-feedback.wrong {
-    background: rgba(248,113,113,0.1);
-    color: var(--wrong);
-    border: 1px solid rgba(248,113,113,0.3);
-    display: block;
-  }
+  .quiz-feedback.correct { color: var(--correct-text); display: block; }
+  .quiz-feedback.wrong { color: var(--wrong-text); display: block; }
 
   .quiz-next-btn {
     width: 100%;
@@ -897,8 +898,8 @@
   /* RESULT */
   .quiz-result-card {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border: none;
+    border-radius: 0;
     padding: 32px 24px;
     text-align: center;
     animation: fadeUp 0.3s ease;
@@ -906,12 +907,16 @@
 
   .result-score {
     font-family: 'Sora', sans-serif;
-    font-size: 56px;
+    font-size: 42px;   /* 작업221: 결과 점수 42px / 700 / 짙은 코랄(글꼴은 기존 유지) */
     font-weight: 700;
-    color: var(--accent);
+    color: var(--accent-text);
     line-height: 1;
     margin: 12px 0 4px;
   }
+  /* 작업221: 퀴즈 안의 보조 동작(퀴즈 메뉴로·오답 퀴즈 시작)은 텍스트 버튼: 15px / 600, 보조색, padding 0 8px, 최소 44×44px, 밑줄 */
+  .quiz-text-btn { background: transparent; border: none; padding: 0 8px; min-height: 44px; min-width: 44px; font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 600; color: var(--text2); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .quiz-text-btn:hover { color: var(--text); }
+  .quiz-text-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; border-radius: 4px; }
 
   .result-score-label {
     font-size: 14px;
@@ -3172,7 +3177,7 @@ function renderQuizStart(wrongMode) {
         `).join('')}
       </div>
       <button class="btn" style="width:100%" onclick="startQuiz()">퀴즈 시작</button>
-      ${wrongMode ? '' : `<button class="btn secondary" style="width:100%;margin-top:8px" onclick="renderQuizStart(true)">오답 퀴즈 시작</button>`}
+      ${wrongMode ? '' : `<button class="quiz-text-btn" style="width:100%;margin-top:8px" onclick="renderQuizStart(true)">오답 퀴즈 시작</button>`}
     </div>`;
 }
 
@@ -3260,7 +3265,7 @@ function renderQuizQuestion() {
       <div class="quiz-question">${questionText}</div>
       <div class="quiz-options">
         ${options.map((opt, i) => `
-          <button class="quiz-option" onclick="selectOption(this, ${i}, ${correctIndex})">${opt}</button>
+          <button class="quiz-option" onclick="selectOption(this, ${i}, ${correctIndex})"><span class="mcq-num">${i + 1}</span><span class="mcq-text">${opt}</span></button>
         `).join('')}
       </div>
       <div class="quiz-feedback" id="quiz-feedback"></div>
@@ -3274,11 +3279,11 @@ function selectOption(btn, selected, correct) {
   const options = document.querySelectorAll('.quiz-option');
   options.forEach(o => o.disabled = true);
   const isCorrect = selected === correct;
-  btn.classList.add(isCorrect ? 'correct' : 'wrong');
+  btn.classList.add(isCorrect ? 'correct' : 'wrong', 'picked');   // 작업221: 고른 보기는 밑줄
   options[correct].classList.add('correct');
   const feedback = document.getElementById('quiz-feedback');
   feedback.className = 'quiz-feedback ' + (isCorrect ? 'correct' : 'wrong');
-  feedback.textContent = isCorrect ? '✓ 정답입니다!' : '✗ 틀렸습니다.';
+  feedback.textContent = isCorrect ? '○ 정답입니다!' : '✕ 틀렸습니다.';
   if (isCorrect) {
     quizState.correct++;
     const qc = quizState.questions[quizState.current];
@@ -3309,25 +3314,23 @@ function renderQuizResult() {
   const { correct, questions, wrongWords } = quizState;
   const total = questions.length;
   const pct = Math.round(correct / total * 100);
-  const emoji = pct >= 80 ? '🎉' : pct >= 50 ? '👍' : '💪';
 
   document.getElementById('quiz-container').innerHTML = `
     <div class="quiz-result-card">
-      <div style="font-size:36px">${emoji}</div>
       <div class="result-score">${pct}%</div>
       <div class="result-score-label">${correct} / ${total} 정답</div>
       ${wrongWords.length > 0 ? `
-        <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:14px;margin-bottom:20px;text-align:left">
-          <div style="font-size:12px;color:var(--text3);margin-bottom:8px;font-weight:700">오답 단어 (${wrongWords.length}개)</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px">
-            ${wrongWords.map(w => `<span style="background:rgba(248,113,113,0.15);color:var(--wrong);padding:4px 10px;border-radius:20px;font-size:13px;font-family:'Sora',sans-serif;font-weight:600">${w.word}</span>`).join('')}
+        <div style="text-align:left;margin-bottom:20px">
+          <div style="font-size:12px;color:var(--accent-text);margin-bottom:8px;font-weight:700;letter-spacing:.03em;padding-bottom:4px;border-bottom:2px solid var(--accent)">오답 단어 (${wrongWords.length}개)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 16px">
+            ${wrongWords.map(w => `<span style="color:var(--wrong-text);font-size:15px;font-family:'Sora',sans-serif;font-weight:600;padding:6px 0">${w.word}</span>`).join('')}
           </div>
         </div>
       ` : ''}
       <div class="result-actions">
         <button class="btn" onclick="startQuiz()">다시 풀기</button>
-        <button class="btn secondary" onclick="renderQuizStart(false)">퀴즈 메뉴로</button>
-        ${wrongWords.length > 0 ? `<button class="btn" style="background:var(--accent2)" onclick="renderQuizStart(true)">오답 퀴즈 바로 시작</button>` : ''}
+        ${wrongWords.length > 0 ? `<button class="btn" onclick="renderQuizStart(true)">오답 퀴즈 바로 시작</button>` : ''}
+        <button class="quiz-text-btn" onclick="renderQuizStart(false)">퀴즈 메뉴로</button>
       </div>
     </div>`;
 }
