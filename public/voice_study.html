@@ -299,6 +299,56 @@
   .tts-row .btn.small { flex: none; }
   .tts-rate { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text2); margin-left: auto; }
   .tts-rate select { font-family: 'Noto Sans KR', sans-serif; font-size: 14px; padding: 6px 8px; border-radius: var(--input-radius); border: 1px solid var(--border); background: var(--card); color: var(--text1); }
+
+  /* ── 작업214-3: 자료 연결 지도 (개념 학습 지도 CSS를 복사해 음성 학습 토큰으로 바꾼 것. 이름은 vm-*) ── */
+  .vm-sheet { --vm-node-line: #868ca8; --vm-focus: #1a1f3c; }   /* 노드 테두리: 흰 배경 대비 3.3:1 */
+  html.vm-open, html.vm-open body { overflow: hidden; }
+  dialog.vm-sheet { padding: 0; border: none; border-radius: 0; margin: 0; max-width: none; max-height: none; width: 100vw; height: 100vh; height: 100dvh; overscroll-behavior: contain; overflow: hidden; background: var(--bg); color: var(--text1); }
+  dialog.vm-sheet[open] { display: flex; flex-direction: column; }
+  @media (min-width: 768px) {
+    dialog.vm-sheet { margin: auto; width: min(1200px, calc(100vw - 48px)); height: calc(100vh - 48px); height: calc(100dvh - 48px); border: 1px solid var(--border); border-radius: var(--card-radius); }
+  }
+  .vm-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 8px 16px; border-bottom: 1px solid var(--border); background: var(--card); }
+  .vm-head h2 { margin: 0; font-size: 17px; font-weight: 800; color: var(--text1); }
+  .vm-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 8px 12px 12px; }
+  .vm-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+  .vm-meta { font-size: 12px; color: var(--text2); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 2px 12px; }
+  .vm-meta:empty, .vm-meta span:empty { display: none; }
+  .vm-progress { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 6px; color: var(--text1); }
+  .vm-box { flex: 1 1 auto; min-height: 120px; margin-top: 8px; border: 1px solid var(--border); border-radius: var(--card-radius); background: var(--card); overflow: hidden; touch-action: none; position: relative; }
+  .vm-box svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  .vm-card { flex: 0 0 auto; margin-top: 8px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--card-radius); background: var(--card); max-height: 42vh; overflow-y: auto; }
+  .vm-card[hidden], #vm-empty[hidden] { display: none; }
+  .vm-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .vm-card-title { font-size: 15px; font-weight: 700; word-break: break-all; }
+  .vm-reason { font-size: 14px; line-height: 1.6; margin-top: 8px; word-break: break-all; }
+  .vm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .vm-actions .btn { flex: 1 1 auto; }
+  .vm-pick { margin-top: 8px; max-height: 160px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--btn-radius); }
+  .vm-pick-item { display: block; width: 100%; min-height: var(--ctl-min-h); text-align: left; padding: 8px 12px; border: none; border-bottom: 1px solid var(--border); background: var(--card); color: var(--text1); font-family: inherit; font-size: 14px; cursor: pointer; word-break: break-all; }
+  .vm-pick-item[aria-pressed=true] { background: var(--primary-light); color: var(--primary-dark); font-weight: 700; }
+  .vm-pick-empty { padding: 12px; font-size: 13px; color: var(--text2); }
+  .vm-edge path.line { fill: none; stroke: var(--text2); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  .vm-edge path.hit { fill: none; stroke: transparent; stroke-width: 28; cursor: pointer; vector-effect: non-scaling-stroke; pointer-events: stroke; }   /* 눈에 안 보이는 두꺼운 클릭 영역(화면 28px 고정) */
+  .vm-edge.sel path.line { stroke: var(--primary); stroke-width: 3; }
+  .vm-edge text { font-size: 11px; fill: var(--text2); text-anchor: middle; paint-order: stroke; stroke: var(--card); stroke-width: 4px; pointer-events: none; }
+  .vm-edge.sel text { fill: var(--primary-dark); font-weight: 700; }
+  .vm-small .vm-edge text { display: none; }
+  .vm-node { cursor: pointer; }
+  .vm-node rect { fill: var(--card); stroke: var(--vm-node-line); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  .vm-node text { font-size: 13px; fill: var(--text1); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+  .vm-node.iso { opacity: 0.6; }
+  .vm-node.sel rect { stroke: var(--primary); stroke-width: 3; }
+  .vm-node.sel text { font-weight: 800; }
+  .vm-node:focus-visible rect { outline: none; stroke: var(--vm-focus); stroke-width: 3; }
+  .vm-edge:focus-visible { outline: none; }
+  .vm-edge:focus-visible path.line { stroke: var(--vm-focus); stroke-width: 3; }
+  .vm-label { font-size: 12px; fill: var(--text2); font-weight: 700; }
+  dialog.vm-subject { border: 1px solid var(--border); border-radius: var(--card-radius); padding: 20px; width: min(360px, calc(100vw - 32px)); background: var(--card); color: var(--text1); }
+  dialog.vm-subject::backdrop { background: rgba(0, 0, 0, 0.45); }
+  dialog.vm-subject h2 { margin: 0 0 8px; font-size: 16px; }
+  .vm-subject-btn { display: flex; width: 100%; margin-top: 8px; }
+  .vm-subject-cancel { display: flex; width: 100%; margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -346,6 +396,7 @@
     <div class="list-head">
       <h2>내 자료</h2>
       <span id="list-count" style="font-size:12px;color:var(--text2);margin-left:auto;margin-right:10px"></span>
+      <button id="vm-open-btn" class="btn small secondary" type="button" data-t="vm-open-btn" style="margin-right:8px">지도 보기</button>
       <button id="sel-toggle" class="btn small secondary" type="button" style="display:none">선택</button>
     </div>
     <div id="sel-bar" class="sel-bar" style="display:none">
@@ -460,6 +511,7 @@
     </div>
     <div id="link-section" class="quiz-section" style="display:none">
       <div class="sum-head"><span class="field-label">연결된 자료</span></div>
+      <div class="btn-row" style="margin-top:0;margin-bottom:8px"><button id="link-map-open" class="btn small secondary" type="button" data-t="link-map-open">이 자료 중심으로 보기</button></div>
       <div id="link-note" class="msg warn" style="display:none"></div>
       <div id="link-status" class="convert-status" style="display:none;margin-top:8px"><div class="spinner small"></div><span>연결 분석 중…</span></div>
       <div id="link-list"></div>
@@ -577,6 +629,33 @@
   </div>
 </div>
 
+<!-- 작업214-3: 자료 연결 지도(과목별 팝업)와 과목 선택 -->
+<dialog id="vm-sheet" class="vm-sheet" aria-labelledby="vm-title">
+  <div class="vm-head">
+    <h2 id="vm-title">자료 연결 지도</h2>
+    <button id="vm-close" class="btn small secondary" type="button" data-t="vm-close" aria-label="지도 닫기">닫기</button>
+  </div>
+  <div class="vm-body">
+    <div class="vm-tools">
+      <button id="vm-build" class="btn small" type="button" data-t="vm-build">지도 그리기</button>
+      <button id="vm-zoom-in" class="btn small secondary" type="button" data-t="vm-zoom-in">확대</button>
+      <button id="vm-zoom-out" class="btn small secondary" type="button" data-t="vm-zoom-out">축소</button>
+      <button id="vm-zoom-fit" class="btn small secondary" type="button" data-t="vm-zoom-fit">화면 맞춤</button>
+    </div>
+    <div class="vm-meta"><span id="vm-build-hint" data-t="vm-build-hint"></span><span id="vm-built" data-t="vm-built"></span></div>
+    <div id="vm-progress" class="vm-progress" style="display:none" role="status"><div class="spinner small"></div><span id="vm-progress-text" data-t="vm-progress-text"></span></div>
+    <div id="vm-msg" class="msg" data-t="vm-msg"></div>
+    <div id="vm-empty" class="msg warn" data-t="vm-empty" hidden></div>
+    <div id="vm-box" class="vm-box" data-t="vm-box"></div>
+    <div id="vm-card" class="vm-card" data-t="vm-card" hidden></div>
+  </div>
+</dialog>
+<dialog id="vm-subject" class="vm-subject" aria-labelledby="vm-subject-title">
+  <h2 id="vm-subject-title">어느 과목의 지도를 볼까요?</h2>
+  <div id="vm-subject-list"></div>
+  <button id="vm-subject-cancel" class="btn small secondary vm-subject-cancel" type="button">취소</button>
+</dialog>
+
 <script>
 const TITLE_MAX = 100, SUMMARY_MAX = 5000, MAX_REC_SEC = 600, MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'];
@@ -636,7 +715,7 @@ async function api(method, url, body) {
   if (!res.ok) {
     // JSON 요청이 서버의 본문 크기 한도를 넘으면 413(녹음 파일 안내 문구는 맞지 않는다)
     const msg = res.status === 413 ? '저장할 내용이 너무 큽니다. 원문이나 요약을 줄여 주세요.' : apiErrorText(res.status, data && data.error);
-    const err = new Error(msg); err.status = res.status; throw err;
+    const err = new Error(msg); err.status = res.status; err.serverMsg = (data && typeof data.error === 'string') ? data.error : ''; throw err;
   }
   return data;
 }
@@ -728,6 +807,7 @@ window.addEventListener('orientationchange', growSoon);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(growSoon);
 
 function showView(name) {
+  if (vmap.open) vmapCloseUi(false);   // 작업214-3: 어떤 경로로든 화면이 바뀌면 지도 팝업과 진행 상태 조회를 멈춘다
   stopSpeech();   // 작업182: 화면 이동 시 읽어주기 즉시 정지
   if (name !== 'edit' && name !== 'quiz' && name !== 'chat') hideImage();   // 작업190: 상세를 떠나면 그림 조회 중단·blob 주소 해제
   if (name === 'edit') resumeImagePolling();
@@ -786,6 +866,7 @@ function requestBack() {
   history.back();
 }
 window.addEventListener('popstate', () => {
+  if (vmapHandlePop()) return;   // 작업214-3: 지도 팝업이 쌓은 기록이면 팝업만 닫고 화면은 유지
   if (currentView === 'list') return;
   if (currentView === 'quiz' || currentView === 'chat') { showView('edit'); return; }   // 작업185·186: 퀴즈·대화에서 뒤로가기 → 자료 상세로 복귀
   if (currentView === 'merge' || currentView === 'wrong') { showView('list'); return; }   // 작업192·193: 합치기 창·오답 노트에서 뒤로가기 → 목록
@@ -1486,12 +1567,13 @@ function renderLinks(data, analyzing) {
     badge.className = 'link-badge' + (grounded ? '' : ' bg');
     badge.textContent = grounded ? '✔ 근거 확인' : '◇ 배경지식 연결';
     const title = document.createElement('span'); title.className = 'link-title'; title.textContent = l.title || '(제목 없음)';
-    head.appendChild(badge); head.appendChild(title); b.appendChild(head);
+    if (l.kind !== 'manual') head.appendChild(badge);   // 작업214-3: 직접 만든 연결은 배지 없음
+    head.appendChild(title); b.appendChild(head);
     const rel = document.createElement('div'); rel.className = 'link-rel'; rel.textContent = l.relation; b.appendChild(rel);
     if (grounded) {
       const q1 = document.createElement('div'); q1.className = 'link-quote'; q1.textContent = '이 자료: “' + l.quote_self + '”'; b.appendChild(q1);
       const q2 = document.createElement('div'); q2.className = 'link-quote'; q2.textContent = '연결된 자료: “' + l.quote_other + '”'; b.appendChild(q2);
-    } else {
+    } else if (l.kind !== 'manual') {
       const c = document.createElement('div'); c.className = 'link-check'; c.textContent = '사실 확인 필요'; b.appendChild(c);
     }
     b.addEventListener('click', async () => {
@@ -2443,6 +2525,564 @@ window.addEventListener('resize', applyHeaderHeight);
   if (hdr && window.ResizeObserver) { try { new ResizeObserver(applyHeaderHeight).observe(hdr); } catch (e) {} }
   applyHeaderHeight();
 })();
+
+// ── 작업214-3: 자료 연결 지도 (과목별 팝업) ──
+// 개념 학습 지도(concept_study.html)의 지도 코드(배치·연결선 곡선·확대/축소/끌기/핀치/휠·연결선 클릭 영역·팝업)를 복사해 음성 학습용으로 고친 것이다.
+// 이름은 vmap*/VMAP*/vm-* 접두어로 구분한다. 지도를 여는 것은 GET /api/voice-notes/map 뿐이며 AI를 부르지 않는다.
+// AI는 [지도 그리기]에서 확인창을 거친 뒤 POST …/map/build 로만 쓴다(견적은 dry_run으로, 비용 없음).
+const VMAP_SVGNS = 'http://www.w3.org/2000/svg';
+const VMAPD = { W: 132, H: 44, COLW: 192, ROWH: 64, GAP: 48, COLS: 3 };
+const VMAP_MIN_SCALE = 0.05, VMAP_MAX_SCALE = 3;   // 자료 200개 지도도 낮은 화면에 전부 맞출 수 있는 하한
+const VMAP_REL_MAX = 80, VMAP_POLL_MS = 2500, VMAP_MIN_ELIGIBLE = 3;
+const vmap = {
+  open: false, subject: '', data: null, selNode: null, selEdge: null, adding: null, editingReason: null,
+  focusId: null, centerOnFocus: false, fit: true, scale: 1, tx: 0, ty: 0, cw: 0, ch: 0, scrollY: 0, origin: 'list', apply: null,
+  ignorePop: false, popWaiters: [], loadSeq: 0, buildSession: 0, buildTimer: null, building: false,
+};
+let vmapDrag = null;
+
+function vmapEl(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false) e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  return e;
+}
+const vmapBtn = (text, cls, onclick, dt) => vmapEl('button', { type: 'button', class: 'btn small ' + cls, 'data-t': dt, onclick }, text);
+function vmapSv(tag, attrs, ...kids) {
+  const e = document.createElementNS(VMAP_SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) if (v !== null && v !== undefined && v !== false) e.setAttribute(k, String(v));
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined) e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  return e;
+}
+function vmapClip(t, n) { const a = Array.from(t); return a.length > n ? a.slice(0, n - 1).join('') + '…' : t; }
+const vmapTitle = n => (n && n.title) || '(제목 없음)';
+const vmapNodeById = id => (vmap.data ? vmap.data.nodes.find(n => n.id === id) : null);
+const vmapMsg = (text, kind) => setMsg('vm-msg', text, kind);
+
+// 배치: 연결된 덩어리는 너비 우선 단계(열)로, 연결 없는 자료는 아래에 3열 격자로
+function vmapLayout(nodes, edges) {
+  const adj = new Map(nodes.map(n => [n, []]));
+  const order = new Map(nodes.map((n, i) => [n, i]));
+  for (const [a, b] of edges) { adj.get(a).push(b); adj.get(b).push(a); }
+  const seen = new Set(), pos = new Map(), singles = [];
+  let y0 = 0;
+  for (const root of nodes) {
+    if (seen.has(root)) continue;
+    seen.add(root);
+    if (!adj.get(root).length) { singles.push(root); continue; }
+    const levels = [];
+    let frontier = [root];
+    while (frontier.length) {
+      levels.push(frontier);
+      const next = [];
+      for (const n of frontier) {
+        for (const m of adj.get(n).slice().sort((a, b) => order.get(a) - order.get(b))) if (!seen.has(m)) { seen.add(m); next.push(m); }
+      }
+      frontier = next;
+    }
+    let rows = 0;
+    levels.forEach((lv, li) => { lv.forEach((n, ri) => pos.set(n, { x: li * VMAPD.COLW, y: y0 + ri * VMAPD.ROWH })); rows = Math.max(rows, lv.length); });
+    y0 += rows * VMAPD.ROWH + VMAPD.GAP;
+  }
+  let labelY = null;
+  if (singles.length) {
+    labelY = y0 + 12;
+    const gy = y0 + 28;
+    singles.forEach((n, i) => pos.set(n, { x: (i % VMAPD.COLS) * VMAPD.COLW, y: gy + Math.floor(i / VMAPD.COLS) * VMAPD.ROWH }));
+  }
+  return { pos, labelY };
+}
+function vmapEdgeGeom(pa, pb) {
+  const { W, H } = VMAPD;
+  const y1 = pa.y + H / 2, y2 = pb.y + H / 2;
+  if (pa.x === pb.x) {                      // 같은 열: 오른쪽으로 둥글게
+    const x = pa.x + W;
+    return { d: `M${x},${y1} C${x + 44},${y1} ${x + 44},${y2} ${x},${y2}`, mx: x + 33, my: (y1 + y2) / 2 };
+  }
+  const right = pb.x > pa.x;
+  const x1 = right ? pa.x + W : pa.x, x2 = right ? pb.x : pb.x + W;
+  const dx = Math.max(40, Math.abs(x2 - x1) / 2) * (right ? 1 : -1);
+  return { d: `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`, mx: (x1 + x2) / 2, my: (y1 + y2) / 2 };
+}
+
+// ── 진입: 목록 화면의 [지도 보기] → 과목 선택(자료가 있는 과목만) → 팝업 ──
+function vmapChooseSubject() {
+  setMsg('list-msg', '');
+  const counts = new Map();
+  for (const r of listRows) if (r.subject && Object.prototype.hasOwnProperty.call(SUBJECTS, r.subject)) counts.set(r.subject, (counts.get(r.subject) || 0) + 1);
+  if (!counts.size) { setMsg('list-msg', '과목이 지정된 자료가 없어 지도를 볼 수 없습니다. 자료에 과목을 지정해 주세요.', 'warn'); return; }
+  const list = $('vm-subject-list');
+  list.textContent = '';
+  for (const name of Object.keys(SUBJECTS)) {
+    if (!counts.has(name)) continue;
+    list.appendChild(vmapEl('button', { type: 'button', class: 'btn secondary vm-subject-btn', 'data-subject': name, onclick: () => { $('vm-subject').close(); vmapOpen(name, null); } }, name + ' · ' + counts.get(name) + '건'));
+  }
+  $('vm-subject').showModal();
+}
+$('vm-open-btn').addEventListener('click', vmapChooseSubject);
+$('vm-subject-cancel').addEventListener('click', () => $('vm-subject').close());
+// 상세 화면의 [이 자료 중심으로 보기]: 같은 과목 지도를 열고 이 자료를 선택해 가운데에 둔다
+$('link-map-open').addEventListener('click', () => {
+  const subject = $('edit-subject').value;
+  if (editMode !== 'detail' || editNoteId === null) return;
+  if (!subject || !Object.prototype.hasOwnProperty.call(SUBJECTS, subject)) { setMsg('link-msg', '과목을 지정하고 저장하면 지도를 볼 수 있습니다.', 'warn'); return; }
+  setMsg('link-msg', '');
+  vmapOpen(subject, editNoteId);
+});
+
+async function vmapOpen(subject, focusId) {
+  if (vmap.open) return;
+  Object.assign(vmap, { open: true, subject, data: null, selNode: focusId == null ? null : focusId, selEdge: null, adding: null, editingReason: null,
+    focusId: focusId == null ? null : focusId, centerOnFocus: focusId != null, fit: true, scrollY: window.scrollY, origin: currentView, building: false });
+  vmap.buildSession++;
+  document.documentElement.classList.add('vm-open');   // 배경 스크롤 잠금
+  $('vm-title').textContent = '자료 연결 지도 · ' + subject;
+  vmapMsg('');
+  $('vm-progress').style.display = 'none';
+  $('vm-box').textContent = '';
+  $('vm-card').hidden = true;
+  $('vm-empty').hidden = true;
+  const dlg = $('vm-sheet');
+  if (!dlg.open) dlg.showModal();
+  try { history.pushState({ v: currentView, vmapSheet: true }, ''); } catch (e) { /* 무시 */ }   // 브라우저 뒤로 가기로 지도만 닫기
+  await vmapLoad();
+}
+
+// 팝업을 닫고 화면을 원래 자리로 돌린다. 진행 상태 조회(폴링)도 여기서 멈춘다
+function vmapCloseUi(restore) {
+  if (!vmap.open) return;
+  vmap.open = false; vmap.building = false; vmap.apply = null; vmap.loadSeq++;
+  vmap.buildSession++;                    // 늦게 도착한 진행 상태 응답은 무시
+  clearTimeout(vmap.buildTimer); vmap.buildTimer = null;
+  const dlg = $('vm-sheet');
+  if (dlg.open) dlg.close();
+  $('vm-box').textContent = ''; $('vm-card').textContent = '';
+  document.documentElement.classList.remove('vm-open');
+  if (restore) window.scrollTo(0, vmap.scrollY);
+  const opener = currentView === 'edit' ? $('link-map-open') : $('vm-open-btn');
+  if (opener && opener.getClientRects().length) { try { opener.focus({ preventScroll: true }); } catch (e) { /* 무시 */ } }
+}
+function vmapClose() {
+  if (!vmap.open) return;
+  vmapCloseUi(true);
+  if (history.state && history.state.vmapSheet) { vmap.ignorePop = true; history.back(); }   // 우리가 쌓은 기록 한 칸을 되돌린다
+}
+// 닫고 나서 기록이 정리될 때까지 기다린다(다른 화면으로 이동하기 전에 쓴다)
+function vmapCloseAndWait() {
+  if (!vmap.open) return Promise.resolve();
+  const wait = new Promise(resolve => { vmap.popWaiters.push(resolve); setTimeout(resolve, 500); });
+  vmapClose();
+  return history.state && history.state.vmapSheet ? wait : Promise.resolve();
+}
+// 기존 popstate 처리기(go/leaveConfirmed)보다 먼저 호출된다: 지도가 만든 기록이면 여기서 끝내고, 화면은 그대로 둔다
+function vmapHandlePop() {
+  if (vmap.ignorePop) { vmap.ignorePop = false; vmap.popWaiters.splice(0).forEach(f => f()); return true; }
+  if (vmap.open) { vmapCloseUi(true); return true; }
+  return false;
+}
+$('vm-close').addEventListener('click', vmapClose);
+$('vm-sheet').addEventListener('cancel', ev => { ev.preventDefault(); vmapClose(); });   // ESC
+
+// ── 데이터 ──
+async function vmapLoad() {
+  const seq = ++vmap.loadSeq;
+  const subject = vmap.subject;
+  let data;
+  try { data = await api('GET', '/api/voice-notes/map?subject=' + encodeURIComponent(subject)); }
+  catch (e) { if (seq === vmap.loadSeq && vmap.open) vmapMsg(e.message, 'error'); return; }
+  if (seq !== vmap.loadSeq || !vmap.open) return;   // 닫았거나 더 새로운 요청이 있음
+  vmap.data = data;
+  if (vmap.selEdge != null && !data.links.some(l => l.id === vmap.selEdge)) vmap.selEdge = null;
+  if (vmap.selNode != null && !data.nodes.some(n => n.id === vmap.selNode)) vmap.selNode = null;
+  vmapRender();
+}
+
+// ── 그리기 ──
+function vmapRender() {
+  const box = $('vm-box');
+  box.textContent = '';
+  vmap.apply = null;
+  const data = vmap.data;
+  if (!data) return;
+  const nodesData = data.nodes, links = data.links;
+  const eligible = nodesData.filter(n => n.has_summary).length;
+  $('vm-build').disabled = vmap.building || eligible < VMAP_MIN_ELIGIBLE;
+  $('vm-build-hint').textContent = eligible < VMAP_MIN_ELIGIBLE ? '요약이 있는 자료가 3개 이상 필요합니다' : '';
+  $('vm-built').textContent = data.built_at ? '마지막 지도 그리기 ' + fmtDate(data.built_at) : '';
+  const empty = $('vm-empty');
+  if (!nodesData.length) {
+    empty.textContent = '이 과목에는 자료가 없습니다.'; empty.hidden = false;
+    vmapRenderCard();
+    return;
+  }
+  empty.textContent = '아직 연결이 없습니다. [지도 그리기]를 누르거나, 노드에서 직접 연결을 추가하세요.';
+  empty.hidden = links.length > 0;
+
+  const degree = new Map(nodesData.map(n => [n.id, 0]));
+  for (const l of links) { degree.set(l.from_note_id, degree.get(l.from_note_id) + 1); degree.set(l.to_note_id, degree.get(l.to_note_id) + 1); }
+  const ids = nodesData.map(n => n.id).sort((a, b) => a - b);
+  const { pos, labelY } = vmapLayout(ids, links.map(l => [l.from_note_id, l.to_note_id]));
+
+  const svg = vmapSv('svg', { role: 'group', 'aria-label': '자료 연결 지도', 'data-t': 'vm-svg' });
+  const gEdges = vmapSv('g'), gNodes = vmapSv('g');
+  svg.append(gEdges, gNodes);
+  for (const l of links) {
+    const a = vmapNodeById(l.from_note_id), b = vmapNodeById(l.to_note_id);
+    const g = vmapEdgeGeom(pos.get(l.from_note_id), pos.get(l.to_note_id));
+    const pick = () => { if (vmapDrag && vmapDrag.moved) return; vmapSelect('edge', l.id); };
+    // 지도에는 이유 문장만 쓴다(✔/◇ 배지나 AI·확인 필요 문구는 카드에서만)
+    const e = vmapSv('g', { class: 'vm-edge' + (l.id === vmap.selEdge ? ' sel' : ''), 'data-t': 'vm-edge', 'data-id': l.id, role: 'button', tabindex: 0, 'aria-label': `${vmapTitle(a)}와 ${vmapTitle(b)}의 연결${l.relation ? ': ' + l.relation : ''}` },
+      vmapSv('path', { class: 'line', d: g.d }), vmapSv('path', { class: 'hit', d: g.d }),
+      l.relation ? vmapSv('text', { x: g.mx, y: g.my - 4 }, vmapClip(l.relation, 12)) : null);
+    e.addEventListener('click', pick);
+    e.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(); } });
+    gEdges.append(e);
+  }
+  for (const id of ids) {
+    const p = pos.get(id), n = vmapNodeById(id);
+    const pick = () => { if (vmapDrag && vmapDrag.moved) return; vmapSelect('node', id); };
+    const g = vmapSv('g', { class: 'vm-node' + (degree.get(id) ? '' : ' iso') + (id === vmap.selNode ? ' sel' : ''), 'data-t': 'vm-node', 'data-id': id, role: 'button', tabindex: 0, 'aria-label': vmapTitle(n) + (degree.get(id) ? '' : ' (연결 없음)'), transform: `translate(${p.x},${p.y})` },
+      vmapSv('title', {}, vmapTitle(n)), vmapSv('rect', { width: VMAPD.W, height: VMAPD.H }), vmapSv('text', { x: VMAPD.W / 2, y: VMAPD.H / 2 }, vmapClip(vmapTitle(n), 9)));
+    g.addEventListener('click', pick);
+    g.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(); } });
+    gNodes.append(g);
+  }
+  if (labelY !== null) gNodes.append(vmapSv('text', { class: 'vm-label', x: 0, y: labelY }, '연결 없는 자료'));
+  box.append(svg);
+
+  // 보기 영역(viewBox): 열릴 때 전체를 화면에 맞추고(글자 크기 하한 없음), 이후 확대·이동 상태는 다시 그려도 유지한다
+  const cw = box.clientWidth || 358, ch = box.clientHeight || 300;
+  vmap.cw = cw; vmap.ch = ch;
+  function fitView() {
+    const r = ids.map(id => pos.get(id));
+    const b = { x0: Math.min(...r.map(q => q.x)) - 24, x1: Math.max(...r.map(q => q.x + VMAPD.W)) + 24, y0: Math.min(...r.map(q => q.y)) - 24, y1: Math.max(...r.map(q => q.y + VMAPD.H)) + 24 };
+    if (labelY !== null) b.y0 -= 16;
+    vmap.scale = Math.max(VMAP_MIN_SCALE, Math.min(cw / (b.x1 - b.x0), ch / (b.y1 - b.y0), 1.5));
+    vmap.tx = (b.x0 + b.x1) / 2 - cw / vmap.scale / 2;
+    vmap.ty = (b.y0 + b.y1) / 2 - ch / vmap.scale / 2;
+    vmap.fit = false;
+  }
+  const apply = () => {
+    svg.setAttribute('viewBox', `${vmap.tx} ${vmap.ty} ${cw / vmap.scale} ${ch / vmap.scale}`);
+    svg.classList.toggle('vm-small', vmap.scale < 0.45);   // 많이 줄이면 연결선 글자는 숨겨 겹침을 막는다
+  };
+  if (vmap.fit) fitView();
+  if (vmap.centerOnFocus && vmap.focusId != null && pos.has(vmap.focusId)) {   // [이 자료 중심으로 보기]: 그 자료를 읽을 수 있는 크기로 가운데에
+    vmap.scale = Math.min(VMAP_MAX_SCALE, Math.max(vmap.scale, 1));
+    const p = pos.get(vmap.focusId);
+    vmap.tx = p.x + VMAPD.W / 2 - cw / vmap.scale / 2;
+    vmap.ty = p.y + VMAPD.H / 2 - ch / vmap.scale / 2;
+  }
+  vmap.centerOnFocus = false;
+  vmap.apply = apply;
+  apply();
+
+  // 끌어서 이동(포인터 1개) / 핀치 확대(포인터 2개) / 마우스 휠
+  const ptrs = new Map();
+  let pinch = null;
+  svg.addEventListener('pointerdown', ev => {
+    ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (ptrs.size === 1) vmapDrag = { x: ev.clientX, y: ev.clientY, tx: vmap.tx, ty: vmap.ty, moved: false, id: ev.pointerId };
+    else if (ptrs.size === 2) {
+      const [p1, p2] = [...ptrs.values()];
+      const rect = svg.getBoundingClientRect();
+      const mx = (p1.x + p2.x) / 2 - rect.left, my = (p1.y + p2.y) / 2 - rect.top;
+      pinch = { dist: Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1, scale: vmap.scale, wx: vmap.tx + mx / vmap.scale, wy: vmap.ty + my / vmap.scale };
+      if (vmapDrag) vmapDrag.moved = true;
+    }
+  });
+  svg.addEventListener('pointermove', ev => {
+    if (!ptrs.has(ev.pointerId)) return;
+    ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (ptrs.size >= 2 && pinch) {
+      const [p1, p2] = [...ptrs.values()];
+      const rect = svg.getBoundingClientRect();
+      const mx = (p1.x + p2.x) / 2 - rect.left, my = (p1.y + p2.y) / 2 - rect.top;
+      vmap.scale = Math.max(VMAP_MIN_SCALE, Math.min(VMAP_MAX_SCALE, pinch.scale * (Math.hypot(p1.x - p2.x, p1.y - p2.y) / pinch.dist)));
+      vmap.tx = pinch.wx - mx / vmap.scale; vmap.ty = pinch.wy - my / vmap.scale;   // 두 손가락 가운데 아래의 지점이 제자리에
+      apply();
+      return;
+    }
+    if (!vmapDrag || ev.pointerId !== vmapDrag.id) return;
+    const dx = ev.clientX - vmapDrag.x, dy = ev.clientY - vmapDrag.y;
+    if (!vmapDrag.moved && Math.hypot(dx, dy) < 6) return;
+    if (!vmapDrag.moved) { vmapDrag.moved = true; try { svg.setPointerCapture(ev.pointerId); } catch (e) { /* 무시 */ } }
+    vmap.tx = vmapDrag.tx - dx / vmap.scale; vmap.ty = vmapDrag.ty - dy / vmap.scale;
+    apply();
+  });
+  const end = ev => {
+    ptrs.delete(ev.pointerId);
+    if (ptrs.size < 2) pinch = null;
+    if (ptrs.size === 1) {   // 핀치가 끝나고 한 손가락이 남으면 그 손가락으로 이어서 이동(튀지 않게 기준을 다시 잡는다)
+      const [id, q] = [...ptrs.entries()][0];
+      vmapDrag = { x: q.x, y: q.y, tx: vmap.tx, ty: vmap.ty, moved: true, id };
+    }
+    if (ptrs.size === 0 && vmapDrag) setTimeout(() => { vmapDrag = null; }, 0);
+  };
+  svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+  svg.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    const rect = svg.getBoundingClientRect();
+    const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+    const wx = vmap.tx + mx / vmap.scale, wy = vmap.ty + my / vmap.scale;
+    vmap.scale = Math.max(VMAP_MIN_SCALE, Math.min(VMAP_MAX_SCALE, vmap.scale * (ev.deltaY < 0 ? 1.15 : 1 / 1.15)));
+    vmap.tx = wx - mx / vmap.scale; vmap.ty = wy - my / vmap.scale;
+    apply();
+  }, { passive: false });
+  vmapRenderCard();
+}
+function vmapZoom(f) {
+  if (!vmap.apply) return;
+  const cx = vmap.tx + vmap.cw / vmap.scale / 2, cy = vmap.ty + vmap.ch / vmap.scale / 2;
+  vmap.scale = Math.max(VMAP_MIN_SCALE, Math.min(VMAP_MAX_SCALE, vmap.scale * f));
+  vmap.tx = cx - vmap.cw / vmap.scale / 2; vmap.ty = cy - vmap.ch / vmap.scale / 2;
+  vmap.fit = false;
+  vmap.apply();
+}
+$('vm-zoom-in').addEventListener('click', () => vmapZoom(1.25));
+$('vm-zoom-out').addEventListener('click', () => vmapZoom(0.8));
+$('vm-zoom-fit').addEventListener('click', () => { vmap.fit = true; vmapRender(); });
+// 화면 폭이 바뀌면(회전 등) 다시 맞춘다. 주소창 때문에 높이만 조금 바뀌는 경우는 보던 위치를 유지한다
+let vmapResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(vmapResizeTimer);
+  vmapResizeTimer = setTimeout(() => {
+    if (!vmap.open) return;
+    const box = $('vm-box');
+    if (box.clientWidth && Math.abs(box.clientWidth - vmap.cw) > 1) { vmap.fit = true; vmapRender(); }
+  }, 150);
+});
+
+// ── 선택과 카드 ──
+function vmapSelect(kind, id) {
+  vmap.selNode = kind === 'node' ? id : null;
+  vmap.selEdge = kind === 'edge' ? id : null;
+  vmap.adding = null; vmap.editingReason = null;
+  for (const n of document.querySelectorAll('#vm-box .vm-node')) n.classList.toggle('sel', kind === 'node' && Number(n.dataset.id) === id);
+  for (const e of document.querySelectorAll('#vm-box .vm-edge')) e.classList.toggle('sel', kind === 'edge' && Number(e.dataset.id) === id);
+  vmapRenderCard();
+}
+function vmapDeselect() { vmapSelect('none', null); }
+function vmapRenderCard() {
+  const card = $('vm-card');
+  card.textContent = '';
+  const data = vmap.data;
+  if (!data) { card.hidden = true; return; }
+  if (vmap.selEdge != null) {
+    const l = data.links.find(x => x.id === vmap.selEdge);
+    if (l) { vmapEdgeCard(card, l); card.hidden = false; return; }
+    vmap.selEdge = null;
+  }
+  if (vmap.selNode != null && vmapNodeById(vmap.selNode)) { vmapNodeCard(card, vmapNodeById(vmap.selNode)); card.hidden = false; return; }
+  card.hidden = true;
+}
+function vmapEdgeCard(card, l) {
+  const a = vmapNodeById(l.from_note_id), b = vmapNodeById(l.to_note_id);
+  const head = vmapEl('div', { class: 'vm-card-head' }, vmapEl('div', { class: 'vm-card-title', 'data-t': 'vm-edge-title' }, vmapTitle(a) + ' → ' + vmapTitle(b)));
+  if (l.kind === 'grounded' || l.kind === 'background') {   // kind='manual'(직접 만든 연결)은 배지 없음
+    head.append(vmapEl('span', { class: 'link-badge' + (l.kind === 'grounded' ? '' : ' bg'), 'data-t': 'vm-kind' }, l.kind === 'grounded' ? '✔ 근거 확인' : '◇ 배경지식'));
+  }
+  card.append(head);
+  if (vmap.editingReason === l.id) {
+    const input = vmapEl('input', { type: 'text', id: 'vm-reason-input', 'data-t': 'vm-reason-input', maxlength: VMAP_REL_MAX, autocomplete: 'off', 'aria-label': '연결한 이유' });
+    input.value = l.relation || '';
+    const counter = vmapEl('div', { class: 'counter', 'data-t': 'vm-reason-counter' });
+    const upd = () => { counter.textContent = Array.from(input.value).length + ' / ' + VMAP_REL_MAX; };
+    input.addEventListener('input', upd); upd();
+    const msg = vmapEl('div', { class: 'msg', role: 'alert', 'data-t': 'vm-card-msg' });
+    const save = vmapBtn('저장', '', () => vmapSaveReason(l, input, msg, save), 'vm-reason-save');
+    card.append(input, counter, msg, vmapEl('div', { class: 'vm-actions' }, save, vmapBtn('취소', 'secondary', () => { vmap.editingReason = null; vmapRenderCard(); }, 'vm-reason-cancel')));
+    input.focus();
+    return;
+  }
+  if (l.relation) card.append(vmapEl('div', { class: 'vm-reason', 'data-t': 'vm-reason' }, l.relation));
+  if (l.kind === 'grounded' && (l.quote_from || l.quote_to)) {
+    if (l.quote_from) card.append(vmapEl('div', { class: 'link-quote', 'data-t': 'vm-quote-from' }, vmapTitle(a) + ': “' + l.quote_from + '”'));
+    if (l.quote_to) card.append(vmapEl('div', { class: 'link-quote', 'data-t': 'vm-quote-to' }, vmapTitle(b) + ': “' + l.quote_to + '”'));
+  }
+  const msg = vmapEl('div', { class: 'msg', role: 'alert', 'data-t': 'vm-card-msg' });
+  card.append(msg, vmapEl('div', { class: 'vm-actions' },
+    vmapBtn('이유 수정', 'secondary', () => { vmap.editingReason = l.id; vmapRenderCard(); }, 'vm-edit-reason'),
+    vmapBtn('방향 바꾸기', 'secondary', () => vmapSwap(l, msg), 'vm-swap'),
+    vmapBtn('삭제', 'danger', () => vmapDelete(l, msg), 'vm-delete'),
+    vmapBtn('닫기', 'secondary', vmapDeselect, 'vm-card-close')));
+}
+function vmapNodeCard(card, n) {
+  card.append(vmapEl('div', { class: 'vm-card-head' }, vmapEl('div', { class: 'vm-card-title', 'data-t': 'vm-node-title' }, vmapTitle(n))));
+  if (vmap.adding && vmap.adding.from === n.id) { vmapAddPanel(card, n); return; }
+  card.append(vmapEl('div', { class: 'vm-actions' },
+    vmapBtn('이 자료 열기', '', () => vmapOpenNote(n.id), 'vm-open-note'),
+    vmapBtn('다른 자료와 연결 추가', 'secondary', () => { vmap.adding = { from: n.id, to: null, q: '', reason: '' }; vmapRenderCard(); }, 'vm-add-link'),
+    vmapBtn('닫기', 'secondary', vmapDeselect, 'vm-card-close')));
+}
+
+// 연결 추가: 같은 과목의 다른 자료를 검색해 고르고 이유(80자)를 적는다
+function vmapAddPanel(card, n) {
+  const st = vmap.adding;
+  const search = vmapEl('input', { type: 'text', id: 'vm-add-search', 'data-t': 'vm-add-search', autocomplete: 'off', placeholder: '연결할 자료 검색', 'aria-label': '연결할 자료 검색' });
+  search.value = st.q;
+  const list = vmapEl('div', { class: 'vm-pick', 'data-t': 'vm-add-list' });
+  const reason = vmapEl('input', { type: 'text', id: 'vm-add-reason', 'data-t': 'vm-add-reason', maxlength: VMAP_REL_MAX, autocomplete: 'off', placeholder: '연결한 이유 (선택)', 'aria-label': '연결한 이유' });
+  reason.value = st.reason;
+  const counter = vmapEl('div', { class: 'counter', 'data-t': 'vm-add-counter' });
+  const updC = () => { counter.textContent = Array.from(reason.value).length + ' / ' + VMAP_REL_MAX; };
+  const draw = () => {
+    list.textContent = '';
+    const q = search.value.trim().toLowerCase();
+    const rows = vmap.data.nodes.filter(o => o.id !== n.id && (!q || vmapTitle(o).toLowerCase().includes(q))).slice(0, 100);
+    if (!rows.length) { list.append(vmapEl('div', { class: 'vm-pick-empty' }, '검색 결과가 없습니다.')); return; }
+    for (const o of rows) {
+      list.append(vmapEl('button', { type: 'button', class: 'vm-pick-item', 'data-t': 'vm-add-item', 'data-id': o.id, 'aria-pressed': String(st.to === o.id), onclick: () => { st.to = o.id; draw(); } }, vmapTitle(o)));
+    }
+  };
+  search.addEventListener('input', () => { st.q = search.value; draw(); });
+  reason.addEventListener('input', () => { st.reason = reason.value; updC(); });
+  updC(); draw();
+  const msg = vmapEl('div', { class: 'msg', role: 'alert', 'data-t': 'vm-card-msg' });
+  const submit = vmapBtn('연결', '', () => vmapAddSubmit(st, msg, submit), 'vm-add-submit');
+  card.append(vmapEl('div', { class: 'field-label', style: 'margin-top:8px' }, '‘' + vmapTitle(n) + '’와 연결할 자료'), search, list,
+    vmapEl('label', { class: 'field-label', for: 'vm-add-reason', style: 'margin-top:8px' }, '연결한 이유'), reason, counter, msg,
+    vmapEl('div', { class: 'vm-actions' }, submit, vmapBtn('취소', 'secondary', () => { vmap.adding = null; vmapRenderCard(); }, 'vm-add-cancel')));
+  search.focus();
+}
+function vmapErrText(e, fallback) {
+  if (e.status === 404) return '이미 지워졌거나 찾을 수 없습니다. 지도를 새로 불러옵니다.';
+  if (e.status === 400 && e.serverMsg) return e.serverMsg;
+  return fallback || e.message;
+}
+async function vmapAddSubmit(st, msgEl, btn) {
+  if (st.to == null) { vmapSetMsg(msgEl, '연결할 자료를 선택해 주세요.', 'warn'); return; }
+  btn.disabled = true;
+  try {
+    const r = await api('POST', '/api/voice-notes/links', { from_note_id: st.from, to_note_id: st.to, relation: st.reason.trim() });
+    vmap.adding = null; vmap.selNode = null; vmap.selEdge = r.id;
+    await vmapLoad();
+  } catch (e) {
+    btn.disabled = false;
+    if (e.status === 404) { vmap.adding = null; await vmapLoad(); vmapMsg(vmapErrText(e), 'warn'); return; }
+    vmapSetMsg(msgEl, e.status === 409 ? '이미 연결되어 있습니다.' : vmapErrText(e, '연결하지 못했습니다. 잠시 후 다시 시도해 주세요.'), 'error');
+  }
+}
+function vmapSetMsg(el, text, kind) { el.textContent = text || ''; el.className = 'msg' + (kind ? ' ' + kind : ''); }
+async function vmapSaveReason(l, input, msgEl, btn) {
+  const text = input.value.replace(/\s+/g, ' ').trim();
+  if (Array.from(text).length > VMAP_REL_MAX) { vmapSetMsg(msgEl, '이유는 ' + VMAP_REL_MAX + '자 이하여야 합니다.', 'error'); return; }
+  if (text === (l.relation || '')) { vmap.editingReason = null; vmapRenderCard(); return; }
+  btn.disabled = true;
+  try { await api('PATCH', '/api/voice-notes/links/' + l.id, { relation: text }); vmap.editingReason = null; await vmapLoad(); }
+  catch (e) { btn.disabled = false; vmapSetMsg(msgEl, vmapErrText(e), 'error'); if (e.status === 404) { vmap.editingReason = null; await vmapLoad(); } }
+}
+async function vmapSwap(l, msgEl) {
+  try { await api('PATCH', '/api/voice-notes/links/' + l.id, { swap: true }); await vmapLoad(); }
+  catch (e) { vmapSetMsg(msgEl, vmapErrText(e), 'error'); if (e.status === 404) await vmapLoad(); }
+}
+async function vmapDelete(l, msgEl) {
+  // AI가 만든 연결은 실제로 지우지 않고 지도에서 숨긴다(다시 분석해도 되살아나지 않음). 직접 만든 연결은 삭제한다
+  const text = l.source === 'user'
+    ? '이 연결을 삭제합니다. 계속할까요?'
+    : '이 연결을 지도에서 숨깁니다. 다시 분석해도 나타나지 않습니다. 계속할까요?';
+  if (!(await metisConfirm(text, { danger: true, okText: l.source === 'user' ? '삭제' : '숨기기' }))) return;
+  try { await api('DELETE', '/api/voice-notes/links/' + l.id); vmap.selEdge = null; await vmapLoad(); }
+  catch (e) { vmapSetMsg(msgEl, vmapErrText(e), 'error'); if (e.status === 404) { vmap.selEdge = null; await vmapLoad(); } }
+}
+async function vmapOpenNote(id) {
+  const origin = vmap.origin;
+  if (origin === 'edit' && editNoteId === id) { vmapClose(); return; }
+  if (origin === 'edit' && editDirty && !(await metisConfirm('저장하지 않은 내용이 있습니다. 다른 자료를 열까요?'))) return;
+  await vmapCloseAndWait();
+  openDetail(id, origin === 'edit');   // 목록에서 왔으면 새 화면으로(뒤로가기 → 목록), 상세에서 왔으면 연결로 이동할 때처럼 기록을 쌓지 않는다
+}
+
+// ── 지도 그리기: dry_run 견적 → 확인창 → 시작 → 진행 상태 조회 → 새로 불러오기 ──
+function vmapBuildError(e) {
+  if (e.status === 409) return '이 과목의 지도를 이미 그리는 중입니다.';
+  if (e.status === 429) return e.serverMsg || '오늘 분석할 수 있는 횟수를 모두 사용했습니다. 내일 다시 시도해 주세요.';
+  if (e.status === 503) return 'AI를 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.';
+  if (e.status === 400) return e.serverMsg || '지도를 그릴 수 없습니다.';
+  return e.message;
+}
+async function vmapBuildClick() {
+  if (vmap.building || !vmap.open) return;
+  const subject = vmap.subject;
+  vmapMsg('');
+  $('vm-build').disabled = true;
+  let dry;
+  try { dry = await api('POST', '/api/voice-notes/map/build', { subject, dry_run: true }); }
+  catch (e) { if (vmap.open) { vmapMsg(vmapBuildError(e), 'error'); vmapRender(); } return; }
+  if (!vmap.open || subject !== vmap.subject) return;
+  vmapRender();   // 버튼 상태를 자료 수에 맞게 되돌린다
+  if (dry.eligible_notes < VMAP_MIN_ELIGIBLE) { vmapMsg('요약이 있는 자료가 3개 이상 필요합니다.', 'warn'); return; }
+  if (!dry.targets) { vmapMsg('새로 분석할 자료가 없습니다.', 'info'); return; }
+  if (!dry.est_calls) { vmapMsg('오늘 분석할 수 있는 횟수를 모두 사용했습니다. 내일 다시 시도해 주세요.', 'warn'); return; }
+  const lines = [
+    '분석할 자료 ' + dry.est_calls + '개',
+    '호출 횟수 ' + dry.est_calls + '회',
+    '오늘 남은 분석 건수 ' + dry.daily_link_remaining + '건',
+  ];
+  if (dry.carry_over > 0) lines.push('이번에 못 하는 자료 ' + dry.carry_over + '개는 다음 실행에서 이어서 처리됩니다.');
+  lines.push('', dry.est_cost_note);
+  if (!(await metisConfirm(lines.join('\n'), { okText: '지도 그리기' }))) return;
+  if (!vmap.open || subject !== vmap.subject) return;
+  vmap.building = true;
+  $('vm-build').disabled = true;
+  const session = ++vmap.buildSession;
+  let started;
+  try { started = await api('POST', '/api/voice-notes/map/build', { subject }); }
+  catch (e) {
+    vmapMsg(vmapBuildError(e), e.status === 409 ? 'info' : 'error');
+    if (e.status === 409 && vmap.open && session === vmap.buildSession) { vmapProgress('진행 상황을 확인하는 중…'); vmapPollSoon(session); return; }
+    vmap.building = false; if (vmap.open) vmapRender();
+    return;
+  }
+  if (!vmap.open || session !== vmap.buildSession) return;
+  if (!started || started.started === false) { vmap.building = false; vmapMsg('새로 분석할 자료가 없습니다.', 'info'); vmapRender(); return; }
+  vmapProgress('0/' + started.will_process + ' 분석 중…');
+  vmapPollSoon(session);
+}
+function vmapProgress(text) {
+  const p = $('vm-progress');
+  p.style.display = '';
+  $('vm-progress-text').textContent = text;
+}
+function vmapPollSoon(session) {
+  clearTimeout(vmap.buildTimer);
+  vmap.buildTimer = setTimeout(() => vmapPollOnce(session), VMAP_POLL_MS);
+}
+async function vmapPollOnce(session) {
+  if (session !== vmap.buildSession || !vmap.open) return;   // 닫았거나 다른 실행으로 넘어감: 더 부르지 않는다
+  let st;
+  try { st = await api('GET', '/api/voice-notes/map/build-status?subject=' + encodeURIComponent(vmap.subject)); }
+  catch (e) { if (session === vmap.buildSession && vmap.open) { vmapBuildEnd(); vmapMsg(vmapBuildError(e), 'error'); } return; }
+  if (session !== vmap.buildSession || !vmap.open) return;
+  if (st.status === 'running') {
+    vmapProgress((st.done || 0) + '/' + (st.total || 0) + ' 분석 중…');
+    vmapPollSoon(session);
+    return;
+  }
+  vmapBuildEnd();
+  let text, kind = 'info';
+  if (st.status === 'idle') text = '진행 상태를 확인할 수 없어 지도를 새로 불러왔습니다.';   // 서버가 다시 시작된 경우 등
+  else if (st.status === 'error') { text = '분석 중 오류가 있었습니다. 잠시 후 다시 시도해 주세요.'; kind = 'error'; }
+  else {
+    text = st.links_added > 0 ? st.links_added + '개 연결을 만들었습니다.' : '새로 만든 연결이 없습니다.';
+    if (st.stopped_reason === 'daily_link_limit') text += ' 오늘 분석 한도에 도달해 나머지는 다음에 이어서 처리됩니다.';
+    else if (st.carry_over > 0) text += ' 남은 ' + st.carry_over + '개는 다시 지도를 그릴 때 이어서 처리됩니다.';
+    if (st.errors > 0) text += ' (분석 중 오류 ' + st.errors + '건)';
+  }
+  await vmapLoad();   // 만들어진 연결을 지도에 반영
+  if (vmap.open) vmapMsg(text, kind);
+}
+function vmapBuildEnd() {
+  vmap.building = false;
+  clearTimeout(vmap.buildTimer); vmap.buildTimer = null;
+  $('vm-progress').style.display = 'none';
+}
+$('vm-build').addEventListener('click', vmapBuildClick);
 
 // ── Init (작업180: 권한 게이트) ──
 (async function init() {

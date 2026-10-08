@@ -3,6 +3,8 @@
 //   srv.seed({ topic, items: [...], links: [...], path: [...] })  → 학습 하나를 미리 만든다
 //   srv.state.explorePlan = [ { status: 429, body: {...} }, { aiError: true }, { network: true }, ... ]  // explore 호출마다 앞에서 하나씩 꺼내 씀
 //   srv.state.respondPlan / refreshPlan 도 같은 방식
+//   srv.seedVoiceMap({ nodes: [{ id, title, subject, has_summary }], links: [...], built_at }) → 음성 학습 자료 연결 지도(작업214-4). 자료 목록·상세도 같은 노드로 채운다
+//   srv.state.voiceBuild = { dry: {...dry_run 응답}, dryError: { status, msg }, error: { status, msg }(실행 POST의 오류), statusSeq: [{status,done,total,...}](조회마다 하나씩, 마지막은 반복) }
 //   explorePlan 항목의 extraLinks: ['용어', ...] → 새 개념과 그 기존 개념 사이에 AI 연결을 더 만든다(작업209, 응답의 links)
 //   seed의 links: [[from, to, { relation_type, label, detail, source, user_edited }]]  (detail: '' 이면 이유 없음)
 const http = require('http');
@@ -23,6 +25,8 @@ function freshState() {
     voicePlan: [],      // 음성 변환 응답 계획 [{ status, body }]. 비어 있으면 { text: '광합성' }
     voiceCalls: [],     // 음성 변환 호출 기록 { type, seconds, bytes }
     quizAnswers: [],    // 돌아보기 퀴즈 답안 기록(POST .../review/answer)
+    voiceMap: { nodes: [], links: [], built_at: null, nextId: 100 },   // 음성 학습 자료 연결 지도(작업214-4)
+    voiceBuild: { dry: { total_notes: 0, eligible_notes: 3, targets: 3, est_calls: 3, max_per_run: 50, carry_over: 0, daily_link_remaining: 27, est_input_chars: 12000, est_cost_note: '추정입니다. 상한 값은 약 $0.012이며 실제 비용은 이보다 적을 수 있습니다.' }, dryError: null, error: null, statusSeq: [], statusIdx: 0, willProcess: 3 },
     voiceNotes: [],     // 음성 학습 자료 목록(GET /api/voice-notes). 상세(GET /api/voice-notes/:id)도 같은 배열에서 찾는다(작업215-2)
     adminUsers: [],     // 관리자 화면 테스트용 사용자 목록(GET/PATCH /api/admin/users)
     networkDown: false, // true면 explore 요청의 연결을 끊음
@@ -74,7 +78,7 @@ async function startMockServer() {
   async function handleApi(req, res, url, body) {
     const u = url.pathname, m = req.method;
     let mm;
-    state.log.push({ method: m, url: u, body });
+    state.log.push({ method: m, url: u, body, search: url.search });
     const J = (status, obj) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
     if (u === '/api/admin/users' && m === 'GET') return J(200, state.adminUsers);
     if (u === '/api/admin/stats') return J(200, { users: { total: state.adminUsers.length, active: state.adminUsers.length, blocked: 0, pending: 0, admins: 1 }, usage: [], monthly: [], cost: { total: { anthropic: 0, openai: 0 }, monthly: { anthropic: 0, openai: 0 } } });
@@ -87,12 +91,70 @@ async function startMockServer() {
     if (u === '/api/me') return state.authed ? J(200, state.me) : J(401, { error: 'no' });
     if (!state.authed) return J(401, { error: '로그인이 필요합니다.' });
     if (u === '/api/voice-notes' && m === 'GET') return J(200, state.voiceNotes);   // 작업196: 음성 학습 목록 화면 테스트용
+    // 작업214-4: 음성 학습 자료 연결 지도(routes/voice_study.js 214-2의 응답 형태를 따른다)
+    if (u.startsWith('/api/voice-notes/map') || u === '/api/voice-notes/links' || u.startsWith('/api/voice-notes/links/')) {
+      const vm = state.voiceMap, vb = state.voiceBuild;
+      const SUBJ = ['국어', '영어', '수학', '과학', '사회', '역사', '기타'];
+      const linkOut = l => ({ id: l.id, from_note_id: l.from_note_id, to_note_id: l.to_note_id, kind: l.kind, relation: l.relation || '', quote_from: l.quote_from || '', quote_to: l.quote_to || '', source: l.source, user_edited: !!l.user_edited });
+      if (u === '/api/voice-notes/map' && m === 'GET') {
+        const subject = url.searchParams.get('subject');
+        if (!SUBJ.includes(subject)) return J(400, { error: '과목이 올바르지 않습니다.' });
+        const nodes = vm.nodes.filter(n => n.subject === subject);
+        const ids = new Set(nodes.map(n => n.id));
+        return J(200, { nodes: nodes.map(n => ({ id: n.id, title: n.title || '', subject: n.subject, has_summary: !!n.has_summary })), links: vm.links.filter(l => ids.has(l.from_note_id) && ids.has(l.to_note_id)).map(linkOut), built_at: vm.built_at });
+      }
+      if (u === '/api/voice-notes/links' && m === 'POST') {
+        const a = vm.nodes.find(n => n.id === body.from_note_id), b = vm.nodes.find(n => n.id === body.to_note_id);
+        if (typeof body.from_note_id !== 'number' || typeof body.to_note_id !== 'number' || body.from_note_id === body.to_note_id) return J(400, { error: 'from_note_id와 to_note_id가 필요합니다.' });
+        if (!a || !b) return J(404, { error: '자료를 찾을 수 없습니다.' });
+        if (typeof body.relation === 'string' && Array.from(body.relation).length > 80) return J(400, { error: '관계 설명은 80자 이하여야 합니다.' });
+        if (vm.links.some(l => (l.from_note_id === a.id && l.to_note_id === b.id) || (l.from_note_id === b.id && l.to_note_id === a.id))) return J(409, { error: '이미 연결되어 있습니다.' });
+        const l = { id: vm.nextId++, from_note_id: a.id, to_note_id: b.id, kind: 'manual', relation: (body.relation || '').trim(), quote_from: '', quote_to: '', source: 'user', user_edited: false };
+        vm.links.push(l);
+        return J(201, linkOut(l));
+      }
+      if ((mm = u.match(/^\/api\/voice-notes\/links\/(\d+)$/)) && (m === 'PATCH' || m === 'DELETE')) {
+        const l = vm.links.find(x => x.id === Number(mm[1]));
+        if (!l) return J(404, { error: '연결을 찾을 수 없습니다.' });
+        if (m === 'DELETE') { vm.links = vm.links.filter(x => x !== l); return J(200, l.source === 'user' ? { ok: true, deleted: true } : { ok: true, hidden: true }); }
+        if (body.relation !== undefined && Array.from(String(body.relation)).length > 80) return J(400, { error: '관계 설명은 80자 이하여야 합니다.' });
+        if (body.relation === undefined && body.swap !== true) return J(400, { error: '바꿀 내용이 없습니다.' });
+        if (body.relation !== undefined) l.relation = String(body.relation).trim();
+        if (body.swap === true) { const t = l.from_note_id; l.from_note_id = l.to_note_id; l.to_note_id = t; }
+        l.user_edited = true;
+        return J(200, linkOut(l));
+      }
+      if (u === '/api/voice-notes/map/build' && m === 'POST') {
+        if (!SUBJ.includes(body.subject)) return J(400, { error: '과목이 올바르지 않습니다.' });
+        if (body.dry_run === true) {
+          if (vb.dryError) return J(vb.dryError.status, { error: vb.dryError.msg || '오류' });
+          return J(200, { dry_run: true, subject: body.subject, ...vb.dry });
+        }
+        if (vb.error) return J(vb.error.status, { error: vb.error.msg || '오류' });
+        vb.statusIdx = 0;
+        return J(202, { ok: true, started: true, targets: vb.dry.targets, will_process: vb.willProcess, max_per_run: vb.dry.max_per_run, carry_over: vb.dry.carry_over });
+      }
+      if (u === '/api/voice-notes/map/build-status' && m === 'GET') {
+        if (!SUBJ.includes(url.searchParams.get('subject'))) return J(400, { error: '과목이 올바르지 않습니다.' });
+        if (!vb.statusSeq.length) return J(200, { status: 'idle', done: 0, total: 0, links_added: 0, built_at: null });
+        const item = vb.statusSeq[Math.min(vb.statusIdx, vb.statusSeq.length - 1)];
+        vb.statusIdx++;
+        return J(200, item);
+      }
+    }
     // 작업215-2: 자료 상세(GET /api/voice-notes/:id)와 상세 화면이 함께 부르는 연결·퀴즈·그림 조회. 필드는 routes/voice_study.js의 상세 응답과 같다
     const vn = u.match(/^\/api\/voice-notes\/(\d+)(?:\/(links|quiz|image))?$/);
     if (vn && m === 'GET') {
       const note = state.voiceNotes.find(n => n.id === Number(vn[1]));
       if (!note) return J(404, { error: '자료를 찾을 수 없습니다.' });
-      if (vn[2] === 'links') return J(200, { status: 'none', links: [], keywords: [] });
+      if (vn[2] === 'links') {
+        const id = note.id, vm = state.voiceMap;
+        const rows = vm.links.filter(l => l.from_note_id === id || l.to_note_id === id).map(l => {
+          const otherId = l.from_note_id === id ? l.to_note_id : l.from_note_id, other = vm.nodes.find(n => n.id === otherId) || {};
+          return { note_id: otherId, title: other.title || '', kind: l.kind, relation: l.relation || '', quote_self: (l.from_note_id === id ? l.quote_from : l.quote_to) || '', quote_other: (l.from_note_id === id ? l.quote_to : l.quote_from) || '' };
+        });
+        return J(200, { status: rows.length ? 'ready' : 'none', links: rows, keywords: [] });
+      }
       if (vn[2]) return J(404, { error: '없음' });   // 퀴즈·그림은 아직 없는 자료
       return J(200, {
         id: note.id, title: note.title || '', transcript: note.transcript || '', summary: note.summary || '', subject: note.subject || null,
@@ -307,6 +369,11 @@ async function startMockServer() {
     url: base,
     get state() { return state; },
     reset() { state = freshState(); },
+    // 음성 학습 지도 시드: 지도 노드와 연결을 넣고, 같은 노드로 자료 목록·상세도 채운다
+    seedVoiceMap({ nodes = [], links = [], built_at = null } = {}) {
+      state.voiceMap = { nodes: nodes.map(n => ({ subject: '과학', has_summary: true, ...n })), links: links.map(l => ({ kind: 'background', relation: '', quote_from: '', quote_to: '', source: 'ai', user_edited: false, ...l })), built_at, nextId: 1000 };
+      state.voiceNotes = state.voiceMap.nodes.map(n => ({ id: n.id, title: n.title, summary: n.has_summary ? '요약' : '', transcript: '원문', subject: n.subject, created_at: '2026-01-01T00:00:00Z' }));
+    },
     seed({ topic = '생물 · 세포', items = [], links = [], path: p = null }) {
       const s = { id: state.nextId++, topic, selected_item_id: null, path: [], created_at: '2026-05-01T00:00:00.000Z', updated_at: '2026-05-02T00:00:00.000Z' };
       state.studies.push(s);
