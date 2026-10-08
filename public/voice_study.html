@@ -82,12 +82,18 @@
   .view-sub { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
 
   /* ── 안내/오류 메시지 (science_reading.html의 .ox-feedback 모양) ── */
-  .msg { margin-top: 12px; padding: 10px 14px; border-radius: var(--msg-radius); font-size: 13px; font-weight: 500; line-height: 1.6; }
-  .msg.error { background: var(--error-light); color: var(--error); }
-  .msg.warn { background: var(--bg); color: var(--text1); border: 1px solid var(--border); }
-  .msg.info { background: var(--primary-light); color: var(--primary-dark); }
+  .msg { position: relative; margin-top: 12px; padding: 10px 0 10px 24px; font-size: 13px; font-weight: 500; line-height: 1.6; }
+  /* 작업217-4: 메시지는 색 바탕·테두리 없이 앞의 기호와 글자색으로 구분한다. ✕ 오류(--error-dark 흰 바탕 6.57:1) / ! 경고(--text1) / i 안내(--primary-dark 5.38:1) */
+  .msg::before { position: absolute; left: 2px; top: 10px; width: 16px; text-align: center; font-weight: 800; }
+  .msg.error { color: var(--error-dark); }
+  .msg.error::before { content: '✕'; }
+  .msg.warn { color: var(--text1); }
+  .msg.warn::before { content: '!'; }
+  .msg.info { color: var(--primary-dark); }
+  .msg.info::before { content: 'i'; }
   .msg:empty { display: none; }
-  .notice { margin: 0; background: var(--primary-light); color: var(--primary-dark); }
+  .notice { margin: 0; color: var(--primary-dark); }
+  .notice::before { content: 'i'; }
 
   /* ── 버튼 (science_reading.html의 .result-btn / .quiz-next-btn 모양) ── */
   .btn {
@@ -119,11 +125,10 @@
   .btn-row .btn { flex: 1; }
 
   /* ── 카드 (science_reading.html의 .science-section 모양) ── */
+  /* 작업217-4: 카드는 테두리·둥근 모서리·그림자 없이 흰 바탕 면만(영역은 여백과 구분선으로 나눔) */
   .note-item, .rec-box {
     background: var(--card);
-    border-radius: var(--card-radius);
-    border: 1px solid var(--border);
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    border: none; border-radius: 0; box-shadow: none;
   }
 
   /* 목록 */
@@ -131,9 +136,11 @@
   .list-head h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #3A3A40; }
   .note-item {
     display: block; width: 100%; text-align: left;
-    padding: 18px 20px; margin-bottom: 12px;
+    padding: 18px 20px; margin-bottom: 0;
+    border-bottom: 1px solid var(--border);
     cursor: pointer; font-family: inherit; color: inherit;
   }
+  .note-item:last-child { border-bottom: none; }
   .note-title { font-size: 17px; font-weight: 700; word-break: break-all; }
   .note-title.empty { color: var(--text2); font-weight: 400; }
   .note-sum { font-size: 13px; color: var(--text2); margin-top: 4px; line-height: 1.5; word-break: break-all; }
@@ -180,9 +187,7 @@
   .quiz-section { margin-top: 24px; }
   .quiz-question-counter { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
   .quiz-card {
-    background: var(--card); border-radius: var(--card-radius);
-    border: 1px solid var(--border); padding: 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    background: var(--card); border: none; border-radius: 0; box-shadow: none; padding: 20px;
   }
   .quiz-question {
     font-size: 16px; font-weight: 600; line-height: 1.6;
@@ -271,7 +276,7 @@
   .kw-chip.on { color: var(--primary-dark); font-weight: 700; text-decoration: underline; }
 
   /* 작업190: 연상 그림(실험) */
-  .img-card { background: var(--card); border-radius: var(--card-radius); border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,0.04); padding: 14px; margin-bottom: 12px; }
+  .img-card { background: var(--card); border: none; border-radius: 0; box-shadow: none; border-bottom: 1px solid var(--border); padding: 14px 0; margin-bottom: 12px; }
   .img-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
   .img-card-title { font-size: 15px; font-weight: 700; word-break: break-all; }
   .img-card-no { font-size: 12px; color: var(--text2); flex-shrink: 0; }
@@ -289,8 +294,9 @@
   .sel-item input[type=checkbox] { width: 22px; height: 22px; margin-top: 2px; flex-shrink: 0; accent-color: var(--primary); }
   .sel-body { min-width: 0; flex: 1; }
   .sel-bar { margin-bottom: 12px; }
-  .merge-row { display: flex; align-items: center; gap: 8px; padding: 12px 14px; margin-bottom: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
-  .merge-no { width: 24px; height: 24px; border-radius: 50%; background: var(--primary-light); color: var(--primary-dark); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .merge-row { display: flex; align-items: center; gap: 8px; padding: 12px 0; margin-bottom: 0; background: var(--card); border: none; border-bottom: 1px solid var(--border); border-radius: 0; }
+  /* 작업217-4: 순서 번호는 원형 채움 없이 일반 숫자(--primary-dark 5.38:1) */
+  .merge-no { width: 24px; color: var(--primary-dark); font-size: 13px; font-weight: 700; text-align: center; flex-shrink: 0; }
   .merge-text { flex: 1; min-width: 0; }
   .merge-title { font-size: 14px; font-weight: 700; word-break: break-all; }
   .merge-chars { font-size: 12px; color: var(--text2); margin-top: 2px; }
@@ -300,7 +306,7 @@
   .src-row .btn.small { max-width: 100%; text-align: left; word-break: break-all; }
 
   /* 작업193-3: 퀴즈 기록·오답 노트 */
-  .hist-row { display: flex; justify-content: space-between; gap: 8px; padding: 10px 14px; margin-bottom: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; font-size: 14px; }
+  .hist-row { display: flex; justify-content: space-between; gap: 8px; padding: 10px 0; margin-bottom: 0; background: var(--card); border: none; border-bottom: 1px solid var(--border); border-radius: 0; font-size: 14px; }
   .hist-row span:last-child { color: var(--text2); font-size: 12px; }
   .wrong-item { border-top: 1px solid var(--border); padding: 12px 0; }
   .wrong-item:first-of-type { border-top: none; }
@@ -342,9 +348,10 @@
   .vm-reason { font-size: 14px; line-height: 1.6; margin-top: 8px; word-break: break-all; }
   .vm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
   .vm-actions .btn { flex: 1 1 auto; }
-  .vm-pick { margin-top: 8px; max-height: 160px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--btn-radius); }
+  .vm-pick { margin-top: 8px; max-height: 160px; overflow-y: auto; border: none; border-radius: 0; }   /* 작업217-4: 목록 틀 없음(행 사이 구분선은 항목에 있음) */
   .vm-pick-item { display: block; width: 100%; min-height: var(--ctl-min-h); text-align: left; padding: 8px 12px; border: none; border-bottom: 1px solid var(--border); background: var(--card); color: var(--text1); font-family: inherit; font-size: 14px; cursor: pointer; word-break: break-all; }
-  .vm-pick-item[aria-pressed=true] { background: var(--primary-light); color: var(--primary-dark); font-weight: 700; }
+  /* 작업217-4: 고른 항목은 색 바탕 대신 --primary-dark(5.38:1)+굵게+밑줄 */
+  .vm-pick-item[aria-pressed=true] { color: var(--primary-dark); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
   .vm-pick-empty { padding: 12px; font-size: 13px; color: var(--text2); }
   .vm-edge path.line { fill: none; stroke: var(--text2); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
   .vm-edge path.hit { fill: none; stroke: transparent; stroke-width: 28; cursor: pointer; vector-effect: non-scaling-stroke; pointer-events: stroke; }   /* 눈에 안 보이는 두꺼운 클릭 영역(화면 28px 고정) */

@@ -161,7 +161,7 @@ test('지도 팝업·과목 선택의 보조 버튼과 JS 생성 버튼(이유 �
   await page.close();
 });
 
-test('작업217-2 이후 유지 목록: 주요 채움 버튼, select·카드 행은 박스 그대로(오답 노트·선택·다시 녹음·이어서 녹음·자료로 돌아가기는 텍스트 버튼으로 전환됨)', { skip: SKIP }, async () => {
+test('작업217-2 이후 유지 목록: 주요 채움 버튼, select는 박스 그대로, 카드 행은 217-4에서 박스 제거(오답 노트·선택·다시 녹음·이어서 녹음·자료로 돌아가기는 텍스트 버튼으로 전환됨)', { skip: SKIP }, async () => {
   const page = await open();
   await openDetail(page, 2);
   // 작업217-2: 옛 기대("secondary 박스 유지")를 새 기준으로 바꿈 — 이 5개는 이제 텍스트 버튼(박스 없음·44px·대비 4.5:1·밑줄)
@@ -177,7 +177,7 @@ test('작업217-2 이후 유지 목록: 주요 채움 버튼, select·카드 행
     const m = await page.eval(MEASURE('#' + id));
     assert.equal(m.bg, PRIMARY_FILL, id + ': 주요 채움 버튼 유지(이 테스트는 마우스를 쓰지 않아 기본색)'); assert.equal(m.radius, '10px'); assert.equal(m.weight, '600');
   }
-  // select·카드 행은 변환 대상이 아니다(칩은 217-2에서 전환)
+  // select는 입력 필드라 변환 대상이 아니다(칩은 217-2, 카드 행은 217-4에서 전환)
   await page.eval("showView('edit')");
   const others = await page.eval(`(() => {
     const host = document.querySelector('#view-edit'); const out = {};
@@ -191,7 +191,7 @@ test('작업217-2 이후 유지 목록: 주요 채움 버튼, select·카드 행
   })()`);
   assert.deepEqual(others.chip, { radius: '0px', bw: '0px' }, '작업217-2: 키워드 칩은 박스 없음(상세 검증은 voice_secondary_text.ui.test.js)');
   assert.equal(others.select.bw, '1px'); assert.equal(others.select.radius, '10px');
-  assert.deepEqual(others.card, { bw: '1px', radius: '16px' });
+  assert.deepEqual(others.card, { bw: '0px', radius: '0px' }, '작업217-4: 자료 목록 행(.note-item)은 테두리·둥근 모서리 없이 아래 구분선만(옛 기대: 1px·16px)');
   await page.close();
 });
 

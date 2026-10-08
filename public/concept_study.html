@@ -90,11 +90,14 @@
   .field { margin-top: 14px; }
   .field > .label { display: block; margin-bottom: 6px; }
   .counter { font-size: 12px; color: var(--text2); text-align: right; margin-top: 2px; }
-  .msg { margin-top: 12px; padding: 10px 14px; border-radius: var(--msg-radius); font-size: 13px; font-weight: 500; line-height: 1.6; }
+  .msg { position: relative; margin-top: 12px; padding: 10px 0 10px 24px; font-size: 13px; font-weight: 500; line-height: 1.6; }
+  /* 작업217-4: 메시지는 색 바탕·테두리 없이 앞의 기호와 글자색으로 구분한다. ✕ 오류(--danger 흰 바탕 6.57:1) / i 안내(--accent-text 5.38:1) */
+  .msg::before { position: absolute; left: 2px; top: 10px; width: 16px; text-align: center; font-weight: 800; }
   .msg:empty { display: none; }
-  .msg.error { background: var(--danger-bg); color: var(--danger); }
-  .msg.err-block { background: var(--danger-bg); color: var(--danger); }
-  .msg.info { background: var(--info-bg); color: var(--accent-text); }
+  .msg.error, .msg.err-block { color: var(--danger); }
+  .msg.error::before, .msg.err-block::before { content: '✕'; }
+  .msg.info { color: var(--accent-text); }
+  .msg.info::before { content: 'i'; }
   .busy-line { display: flex; align-items: center; gap: 10px; color: var(--text2); font-size: 14px; margin-top: 12px; }
   .busy-line .spinner { width: 16px; height: 16px; border-width: 2px; }
 
