@@ -5,7 +5,7 @@ const path = require('path');
 const passport = require('passport');
 const session = require('express-session');
 
-const { initDB } = require('./lib/db');
+const { initDB, createApiReadyGate } = require('./lib/db');
 
 const app = express();
 // Railway (and most PaaS) terminate TLS at an edge proxy and forward plain HTTP
@@ -15,8 +15,10 @@ const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
+// 작업211: initDB가 끝났는지(성공이든 실패든) 알 수 있는 Promise. /api 요청은 이 Promise를 최대 15초 기다린 뒤 처리한다
+let dbReady = null;
 if (process.env.DATABASE_URL) {
-  initDB().catch(err => console.error('DB init error:', err.message));
+  dbReady = initDB().catch(err => console.error('DB init error:', err.message));
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
@@ -50,6 +52,9 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 // ─── Routers ──────────────────────────────────────────────────────────────────
+
+// 정적 파일과 "/"(헬스체크)는 기다리지 않고, /api/*만 DB 준비를 기다린다(서버 시작 직후 컬럼이 아직 없는 순간의 500 방지)
+app.use('/api', createApiReadyGate(dbReady));
 
 app.use(require('./routes/auth'));
 app.use(require('./routes/dictionary'));
