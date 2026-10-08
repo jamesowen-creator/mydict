@@ -137,6 +137,284 @@ router.get('/api/voice-notes', guard, async (req, res) => {
 // 작업193-3: '/api/voice-notes/:id'보다 먼저 등록해야 'wrong-answers'가 :id로 잡히지 않는다
 router.get('/api/voice-notes/wrong-answers', guard, wrongAnswersHandler);
 
+// ─── 작업214-2: 자료 연결 지도(조회·편집·그리기) ─────────────────────────────────────────
+// 이 라우트들은 '/api/voice-notes/:id'보다 먼저 등록해야 'map'·'links'가 자료 번호로 해석되지 않는다.
+// 조회·편집 API는 Anthropic을 부르지 않는다. AI를 쓰는 것은 지도 그리기(build)뿐이며, 기존 연결 분석(analyzeLinks)을 그대로 쓴다.
+const MAP_NODE_MAX = 200;
+const LINK_API_COLS = 'id, from_note_id, to_note_id, kind, relation, quote_from, quote_to, source, user_edited, hidden';
+const LINK_BUILD_EVENT = 'link_build';   // 지도 그리기 시작 표시(일일 상한 계산용, 토큰 0). 실제 비용은 분석이 남기는 'link' 이벤트로 잡힌다
+
+function readSubject(raw) {
+  return typeof raw === 'string' && Object.prototype.hasOwnProperty.call(SUBJECTS, raw) ? raw : null;
+}
+const BAD_SUBJECT = { error: '과목이 올바르지 않습니다.' };
+const LINK_NOT_FOUND = { error: '연결을 찾을 수 없습니다.' };
+const linkIsKept = r => r.source === 'user' || r.user_edited === true;   // 사용자가 만들거나 고친 연결
+function linkJson(r) {
+  return {
+    id: r.id, from_note_id: r.from_note_id, to_note_id: r.to_note_id, kind: r.kind, relation: r.relation || '',
+    quote_from: r.quote_from || '', quote_to: r.quote_to || '', source: r.source || 'ai', user_edited: !!r.user_edited,
+  };
+}
+// 관계 문구: 공백을 정리하고 80자 이하만 허용. 오류면 { error }
+function readLinkRelation(v) {
+  if (v === undefined || v === null) return { value: '' };
+  if (typeof v !== 'string') return { error: '관계 설명이 올바르지 않습니다.' };
+  const t = v.replace(/\s+/g, ' ').trim();
+  if (charLen(t) > LINK_MAX_RELATION_CHARS) return { error: `관계 설명은 ${LINK_MAX_RELATION_CHARS}자 이하여야 합니다.` };
+  return { value: t };
+}
+
+// 과목 하나의 자료(노드)와 저장된 연결. 저장된 연결만 쓴다(AI 호출 없음).
+router.get('/api/voice-notes/map', guard, async (req, res) => {
+  const subject = readSubject(req.query.subject);
+  if (!subject) return res.status(400).json(BAD_SUBJECT);
+  try {
+    const notes = (await pool.query(
+      `SELECT id, title, subject, summary FROM voice_notes WHERE user_id = $1 AND subject = $2 ORDER BY id LIMIT ${MAP_NODE_MAX}`,
+      [req.user.id, subject]
+    )).rows;
+    const summaryOf = new Map(notes.map(n => [n.id, n.summary]));
+    const links = (await pool.query(
+      `SELECT id, from_note_id, to_note_id, from_hash, to_hash, kind, relation, quote_from, quote_to, source, user_edited, hidden, created_at
+       FROM voice_links WHERE user_id = $1 ORDER BY id`,
+      [req.user.id]
+    )).rows;
+    const out = [];
+    let builtAt = null;
+    for (const r of links) {
+      if (r.hidden || !summaryOf.has(r.from_note_id) || !summaryOf.has(r.to_note_id)) continue;
+      if (!linkIsKept(r)) {   // AI 연결은 양쪽 요약이 만들어질 때와 같을 때만 보인다
+        const fs = summaryOf.get(r.from_note_id), ts = summaryOf.get(r.to_note_id);
+        if (!fs || !ts || sha256Hex(fs) !== r.from_hash || sha256Hex(ts) !== r.to_hash) continue;
+        const at = r.created_at ? new Date(r.created_at).toISOString() : null;
+        if (at && (!builtAt || at > builtAt)) builtAt = at;
+      }
+      out.push(linkJson(r));
+    }
+    res.json({
+      nodes: notes.map(n => ({ id: n.id, title: n.title || '', subject: n.subject, has_summary: !!(n.summary && n.summary.trim()) })),
+      links: out,
+      built_at: builtAt,   // 보이는 AI 연결 중 가장 최근에 만들어진 시각(없으면 null). 서버를 다시 시작해도 유지된다
+    });
+  } catch (err) {
+    console.error('voice-notes map get error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+// 직접 연결 추가. 두 자료 모두 본인 것, 서로 달라야 하고 같은 과목이어야 한다(지도는 과목별이라 다른 과목 연결은 어디에도 안 보인다).
+router.post('/api/voice-notes/links', guard, async (req, res) => {
+  const src = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const from = typeof src.from_note_id === 'number' ? parseId(String(src.from_note_id)) : null;
+  const to = typeof src.to_note_id === 'number' ? parseId(String(src.to_note_id)) : null;
+  if (from === null || to === null) return res.status(400).json({ error: 'from_note_id와 to_note_id가 필요합니다.' });
+  if (from === to) return res.status(400).json({ error: '같은 자료끼리는 연결할 수 없습니다.' });
+  const rel = readLinkRelation(src.relation);
+  if (rel.error) return res.status(400).json({ error: rel.error });
+  try {
+    const noteSql = 'SELECT id, subject, summary FROM voice_notes WHERE id = $1 AND user_id = $2';
+    const a = (await pool.query(noteSql, [from, req.user.id])).rows[0];
+    const b = (await pool.query(noteSql, [to, req.user.id])).rows[0];
+    if (!a || !b) return res.status(404).json(NOT_FOUND);
+    if (!a.subject || a.subject !== b.subject) return res.status(400).json({ error: '같은 과목의 자료끼리만 연결할 수 있습니다.' });
+    const fromHash = sha256Hex(a.summary || ''), toHash = sha256Hex(b.summary || '');
+    const pairSql = `SELECT ${LINK_API_COLS}, from_hash, to_hash FROM voice_links WHERE user_id = $1 AND from_note_id = $2 AND to_note_id = $3`;
+    const found = [
+      ...(await pool.query(pairSql, [req.user.id, from, to])).rows,
+      ...(await pool.query(pairSql, [req.user.id, to, from])).rows,
+    ];
+    // 지금 지도에 보이는 연결(숨기지 않았고, 사용자 연결이거나 양쪽 요약 해시가 현재와 같은 AI 연결)이 있으면 중복
+    const visible = r => !r.hidden && (linkIsKept(r) || (r.from_note_id === from ? r.from_hash === fromHash && r.to_hash === toHash : r.from_hash === toHash && r.to_hash === fromHash));
+    if (found.some(visible)) return res.status(409).json({ error: '이미 연결되어 있습니다.' });
+    if (found.length) {   // 지웠던(숨긴) 연결이나 요약이 바뀌어 보이지 않던 옛 연결이면 되살려 사용자 연결로 만든다
+      const { rows } = await pool.query(
+        `UPDATE voice_links SET from_note_id = $3, to_note_id = $4, from_hash = $6, to_hash = $7, kind = 'manual', relation = $5, quote_from = '', quote_to = '', source = 'user', user_edited = true, hidden = false
+         WHERE id = $1 AND user_id = $2 RETURNING ${LINK_API_COLS}`,
+        [found[0].id, req.user.id, from, to, rel.value, fromHash, toHash]
+      );
+      return res.status(201).json(linkJson(rows[0]));
+    }
+    const { rows } = await pool.query(
+      `INSERT INTO voice_links (user_id, from_note_id, to_note_id, from_hash, to_hash, kind, relation, quote_from, quote_to, source, user_edited, hidden)
+       VALUES ($1, $2, $3, $4, $5, 'manual', $6, '', '', 'user', false, false) RETURNING ${LINK_API_COLS}`,
+      [req.user.id, from, to, fromHash, toHash, rel.value]
+    );
+    res.status(201).json(linkJson(rows[0]));
+  } catch (err) {
+    console.error('voice-notes link create error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+// 연결 수정: 관계 설명(80자)과 방향 바꾸기. 고치면 user_edited=true, source는 그대로 둔다.
+router.patch('/api/voice-notes/links/:id', guard, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(404).json(LINK_NOT_FOUND);
+  const src = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  let relation;
+  if (src.relation !== undefined) {
+    const rel = readLinkRelation(src.relation);
+    if (rel.error) return res.status(400).json({ error: rel.error });
+    relation = rel.value;
+  }
+  if (src.swap !== undefined && typeof src.swap !== 'boolean') return res.status(400).json({ error: 'swap이 올바르지 않습니다.' });
+  if (relation === undefined && src.swap !== true) return res.status(400).json({ error: '바꿀 내용이 없습니다.' });
+  try {
+    const cur = (await pool.query(`SELECT ${LINK_API_COLS} FROM voice_links WHERE id = $1 AND user_id = $2`, [id, req.user.id])).rows[0];
+    if (!cur || cur.hidden) return res.status(404).json(LINK_NOT_FOUND);
+    const next = {
+      relation: relation === undefined ? cur.relation : relation,
+      from_note_id: src.swap === true ? cur.to_note_id : cur.from_note_id,
+      to_note_id: src.swap === true ? cur.from_note_id : cur.to_note_id,
+    };
+    const { rows } = await pool.query(
+      `UPDATE voice_links SET relation = $3, from_note_id = $4, to_note_id = $5, user_edited = true WHERE id = $1 AND user_id = $2 RETURNING ${LINK_API_COLS}`,
+      [id, req.user.id, next.relation, next.from_note_id, next.to_note_id]
+    );
+    if (!rows.length) return res.status(404).json(LINK_NOT_FOUND);
+    res.json(linkJson(rows[0]));
+  } catch (err) {
+    console.error('voice-notes link update error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+// 연결 삭제: 사용자가 만든 연결(source='user')은 실제로 지우고, AI 연결은 숨겨서(hidden) 재분석이 되살리지 못하게 한다.
+router.delete('/api/voice-notes/links/:id', guard, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(404).json(LINK_NOT_FOUND);
+  try {
+    const cur = (await pool.query(`SELECT ${LINK_API_COLS} FROM voice_links WHERE id = $1 AND user_id = $2`, [id, req.user.id])).rows[0];
+    if (!cur || cur.hidden) return res.status(404).json(LINK_NOT_FOUND);
+    if (cur.source === 'user') {
+      await pool.query('DELETE FROM voice_links WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      return res.json({ ok: true, deleted: true });
+    }
+    await pool.query('UPDATE voice_links SET hidden = true WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    res.json({ ok: true, hidden: true });
+  } catch (err) {
+    console.error('voice-notes link delete error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+// ── 지도 그리기(과목 단위로 기존 연결 분석을 순서대로 돌린다) ──
+// 진행 상태는 서버 메모리(Map)에만 있다: 서버를 다시 시작하면 사라지고(status가 'idle'로 보임), 여러 서버로 늘리면 서로 보이지 않는다.
+// 이미 만들어진 연결은 DB에 있으므로 다시 시작해도 지도에는 영향이 없고, 끝나지 못한 자료는 다음 실행에서 다시 대상이 된다.
+const mapBuilds = new Map();   // `${userId}:${subject}` → { status, done, total, links_added, built_at, errors, stopped_reason, carry_over }
+const mapBuildKey = (userId, subject) => userId + ':' + subject;
+function envInt(name, def, min, max) {
+  const n = parseInt(process.env[name], 10);
+  return Number.isFinite(n) && n >= min && n <= max ? n : def;
+}
+const buildMaxNotes = () => envInt('VOICE_MAP_BUILD_MAX', 50, 1, 200);
+const buildDailyCap = () => envInt('VOICE_MAP_BUILD_DAILY_CAP', 5, 0, 1000);
+// claude-haiku-4-5 단가(USD/MTok): 입력 1.00, 출력 5.00 — routes/admin.js의 비용 집계와 같은 값
+const HAIKU_PRICE_IN = 1.0, HAIKU_PRICE_OUT = 5.0;
+const LINK_MAX_OUTPUT_TOKENS = 1500;   // analyzeLinks의 max_tokens
+
+// 이 자료가 분석 대상인가(요약이 있고, 마지막 분석 때의 요약과 다름)
+const needsLinkAnalysis = n => !!(n.summary && n.summary.trim() && n.subject) && n.link_hash !== sha256Hex(n.summary);
+
+// 같은 자료의 동시 분석을 막는 껍데기(자동 분석과 겹치면 그 실행에 맡기고 건너뜀)
+async function analyzeWithLock(noteId, userId, force) {
+  if (linkInFlight.has(noteId)) return { status: 'busy' };
+  linkInFlight.add(noteId);
+  try { return await analyzeLinks(noteId, userId, force); }
+  finally { linkInFlight.delete(noteId); }
+}
+
+async function runMapBuild(state, userId, ids) {
+  let failed = 0;
+  for (const noteId of ids) {
+    let r;
+    try { r = await analyzeWithLock(noteId, userId, false); }
+    catch (err) { failed++; state.errors = failed; console.error('voice-notes map build error:', err.name); r = { status: 'error' }; }
+    state.done++;
+    if (r.added) state.links_added += r.added;
+    if (r.status === 'limit') { state.stopped_reason = 'daily_link_limit'; break; }
+    if (r.status === 'no_key') { state.stopped_reason = 'no_api_key'; break; }
+  }
+  state.status = failed > 0 && failed >= state.done ? 'error' : 'done';
+  state.built_at = new Date().toISOString();
+}
+
+router.post('/api/voice-notes/map/build', guard, async (req, res) => {
+  const src = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const subject = readSubject(src.subject);
+  if (!subject) return res.status(400).json(BAD_SUBJECT);
+  if (src.dry_run !== undefined && typeof src.dry_run !== 'boolean') return res.status(400).json({ error: 'dry_run이 올바르지 않습니다.' });
+  const dryRun = src.dry_run === true;
+  try {
+    // dry_run은 AI를 부르지 않고 대상·호출 수·비용 추정만 돌려준다
+    if (!dryRun && !process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'AI를 사용할 수 없습니다.' });
+    const notes = (await pool.query(
+      'SELECT id, title, transcript, summary, subject, link_hash, merged_from FROM voice_notes WHERE user_id = $1 AND subject = $2',
+      [req.user.id, subject]
+    )).rows;
+    notes.sort((a, b) => a.id - b.id);
+    const eligible = notes.filter(n => n.summary && n.summary.trim());
+    const targets = eligible.filter(needsLinkAnalysis);
+    const used = await countToday(req.user.id, 'link');
+    const linkRemaining = Math.max(0, LINK_DAILY_LIMIT - used);
+    const maxRun = buildMaxNotes();
+    const runCount = Math.min(targets.length, maxRun, linkRemaining);
+
+    if (dryRun) {
+      let inChars = 0;
+      for (const t of targets.slice(0, runCount)) {
+        const others = eligible.filter(o => o.id !== t.id).filter(linkOthersFilter(t, t.id));
+        inChars += LINK_SYSTEM_PROMPT.length + buildLinkUserContent(t, pickLinkCandidates(t.summary, others)).length;
+      }
+      const maxCost = (inChars / 1e6) * HAIKU_PRICE_IN + (runCount * LINK_MAX_OUTPUT_TOKENS / 1e6) * HAIKU_PRICE_OUT;
+      return res.json({
+        dry_run: true, subject, total_notes: notes.length, eligible_notes: eligible.length, targets: targets.length,
+        est_calls: runCount, max_per_run: maxRun, carry_over: targets.length - runCount, daily_link_remaining: linkRemaining,
+        est_input_chars: inChars,
+        est_cost_note: `추정입니다. 기존 연결 분석 프롬프트의 실제 크기(입력 약 ${inChars}자, 글자 수를 토큰 수로 간주)와 Haiku 단가(입력 $${HAIKU_PRICE_IN}/백만 토큰, 출력 $${HAIKU_PRICE_OUT}/백만 토큰, 출력은 호출당 최대 ${LINK_MAX_OUTPUT_TOKENS}토큰으로 가정)로 계산한 상한 값은 약 $${maxCost.toFixed(3)}이며, 실제 비용은 이보다 적을 수 있습니다.`,
+      });
+    }
+
+    if (eligible.length < 3) return res.status(400).json({ error: '요약이 있는 자료가 3개 이상 필요합니다.' });
+    const key = mapBuildKey(req.user.id, subject);
+    if (mapBuilds.get(key) && mapBuilds.get(key).status === 'running') return res.status(409).json({ error: '이 과목의 지도를 이미 그리는 중입니다.' });
+    if (await countToday(req.user.id, LINK_BUILD_EVENT) >= buildDailyCap()) {
+      return res.status(429).json({ error: `하루 ${buildDailyCap()}번까지 지도를 그릴 수 있습니다.` });
+    }
+    if (!targets.length) {
+      return res.json({ ok: true, started: false, targets: 0, message: '새로 분석할 자료가 없습니다.' });
+    }
+    if (linkRemaining <= 0) {
+      return res.status(429).json({ error: `오늘 연결을 찾을 수 있는 횟수(하루 ${LINK_DAILY_LIMIT}건)를 모두 사용했습니다.` });
+    }
+    const ids = targets.slice(0, runCount).map(n => n.id);
+    const state = { status: 'running', done: 0, total: ids.length, links_added: 0, built_at: null, errors: 0, stopped_reason: null, carry_over: targets.length - ids.length };
+    mapBuilds.set(key, state);   // 응답 전에 등록해 두 번째 요청이 409를 받게 한다
+    await pool.query(
+      'INSERT INTO api_usage (user_id, event_type, model, input_tokens, output_tokens, char_count) VALUES ($1, $2, $3, $4, $5, $6)',
+      [req.user.id, LINK_BUILD_EVENT, null, 0, 0, 0]
+    );
+    res.status(202).json({
+      ok: true, started: true, targets: targets.length, will_process: ids.length, max_per_run: maxRun, carry_over: state.carry_over,
+      message: state.carry_over > 0 ? `이번에 ${ids.length}개를 처리하고 나머지 ${state.carry_over}개는 다음에 지도를 다시 그릴 때 이어서 처리합니다.` : undefined,
+    });
+    setImmediate(() => { runMapBuild(state, req.user.id, ids).catch(err => { state.status = 'error'; console.error('voice-notes map build fatal:', err.name); }); });
+  } catch (err) {
+    console.error('voice-notes map build error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
+router.get('/api/voice-notes/map/build-status', guard, (req, res) => {
+  const subject = readSubject(req.query.subject);
+  if (!subject) return res.status(400).json(BAD_SUBJECT);
+  const s = mapBuilds.get(mapBuildKey(req.user.id, subject));
+  if (!s) return res.json({ status: 'idle', done: 0, total: 0, links_added: 0, built_at: null });
+  res.json({ status: s.status, done: s.done, total: s.total, links_added: s.links_added, built_at: s.built_at, errors: s.errors, stopped_reason: s.stopped_reason, carry_over: s.carry_over });
+});
+
+
 router.get('/api/voice-notes/:id', guard, async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) return res.status(404).json(NOT_FOUND);
@@ -967,25 +1245,37 @@ function buildLinkUserContent(note, candidates) {
   return parts.join('\n');
 }
 
+// 합본과 그 원본은 서로 연결 후보에서 제외한다(어느 방향이든). analyzeLinks와 지도 그리기 견적(dry_run)이 같은 규칙을 쓴다
+function linkOthersFilter(note, noteId) {
+  const mySources = new Set(Array.isArray(note.merged_from) ? note.merged_from.map(m => m && m.id) : []);
+  return o => !mySources.has(o.id) && !(Array.isArray(o.merged_from) && o.merged_from.some(m => m && m.id === noteId));
+}
+
+// 사용자가 만들거나 고치거나 지운 연결, 그리고 지금도 화면에 보이는 AI 연결(양쪽 요약 해시가 현재와 같음)은 같은 쌍을 새로 만들지 못하게 막는다.
+// 요약이 바뀌어 이미 숨겨진 AI 연결은 막지 않는다(새로 분석한 연결이 들어갈 수 있게)
+function linkRowBlocks(row, hashOfNote) {
+  if (row.hidden || row.source === 'user' || row.user_edited) return true;
+  return hashOfNote.get(row.from_note_id) === row.from_hash && hashOfNote.get(row.to_note_id) === row.to_hash;
+}
+
 async function analyzeLinks(noteId, userId, force) {
   const { rows } = await pool.query(
     'SELECT id, title, transcript, summary, subject, link_hash, merged_from FROM voice_notes WHERE id = $1 AND user_id = $2',
     [noteId, userId]
   );
   const note = rows[0];
-  if (!note || !note.summary || !note.summary.trim() || !note.subject) return;
+  if (!note || !note.summary || !note.summary.trim() || !note.subject) return { status: 'invalid' };
   const hash = sha256Hex(note.summary);
-  if (!force && note.link_hash === hash) return;                    // 같은 요약은 다시 분석하지 않는다
-  if (await countToday(userId, 'link') >= LINK_DAILY_LIMIT) return;  // 한도 초과는 조용히 건너뜀
-  if (!process.env.ANTHROPIC_API_KEY) return;
+  if (!force && note.link_hash === hash) return { status: 'same_hash' };                    // 같은 요약은 다시 분석하지 않는다
+  if (await countToday(userId, 'link') >= LINK_DAILY_LIMIT) return { status: 'limit' };  // 한도 초과는 조용히 건너뜀
+  if (!process.env.ANTHROPIC_API_KEY) return { status: 'no_key' };
 
   // 합본과 그 원본은 서로 연결 후보에서 제외한다(어느 방향이든)
-  const mySources = new Set(Array.isArray(note.merged_from) ? note.merged_from.map(m => m && m.id) : []);
   const others = (await pool.query(
     `SELECT id, title, transcript, summary, merged_from FROM voice_notes
      WHERE user_id = $1 AND subject = $2 AND id <> $3 AND summary IS NOT NULL AND btrim(summary) <> ''`,
     [userId, note.subject, noteId]
-  )).rows.filter(o => !mySources.has(o.id) && !(Array.isArray(o.merged_from) && o.merged_from.some(m => m && m.id === noteId)));
+  )).rows.filter(linkOthersFilter(note, noteId));
   const candidates = pickLinkCandidates(note.summary, others);
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -1005,10 +1295,22 @@ async function analyzeLinks(noteId, userId, force) {
   const toHash = new Map(candidates.map(c => [c.id, sha256Hex(c.summary)]));
 
   const conn = await pool.connect();
+  let added = 0;
   try {
     await conn.query('BEGIN');
-    await conn.query('DELETE FROM voice_links WHERE from_note_id = $1', [noteId]);
+    // 작업214-2: AI가 만든 그대로인 연결만 지운다. 사용자가 만들거나 고치거나 지운 연결(source='user'·user_edited·hidden)은 남긴다
+    await conn.query("DELETE FROM voice_links WHERE from_note_id = $1 AND source = 'ai' AND user_edited = false AND hidden = false", [noteId]);
+    const pairCols = 'SELECT from_note_id, to_note_id, from_hash, to_hash, source, user_edited, hidden FROM voice_links WHERE user_id = $1 AND ';
+    const existing = [
+      ...(await conn.query(pairCols + 'from_note_id = $2', [userId, noteId])).rows,
+      ...(await conn.query(pairCols + 'to_note_id = $2', [userId, noteId])).rows,
+    ];
+    const hashOfNote = new Map([[noteId, hash], ...toHash]);
+    const blocked = new Set();
+    for (const r of existing) if (linkRowBlocks(r, hashOfNote)) blocked.add(r.from_note_id === noteId ? r.to_note_id : r.from_note_id);
     for (const l of result.links) {
+      if (blocked.has(l.target_id)) continue;   // 같은 쌍(양방향)이 이미 있으면 새로 만들지 않는다
+      added++;
       await conn.query(
         `INSERT INTO voice_links (user_id, from_note_id, to_note_id, from_hash, to_hash, kind, relation, quote_from, quote_to)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
@@ -1020,6 +1322,7 @@ async function analyzeLinks(noteId, userId, force) {
       [JSON.stringify(result.keywords), hash, noteId, userId]
     );
     await conn.query('COMMIT');
+    return { status: 'done', added };
   } catch (err) {
     try { await conn.query('ROLLBACK'); } catch (e) { /* 연결이 이미 끊긴 경우 */ }
     throw err;
@@ -1047,6 +1350,7 @@ async function runLinkAnalysis(noteId, userId, force) {
 }
 
 function scheduleLinkAnalysis(row, userId) {
+  if (process.env.VOICE_LINK_AUTO === 'off') return;   // 작업214-2: 'off'면 저장·수정 때 자동 분석을 예약하지 않는다(수동 '연결 다시 찾기'·지도 그리기는 이 값과 무관)
   if (!row || !row.summary || !row.summary.trim() || !row.subject) return;
   setImmediate(() => { runLinkAnalysis(row.id, userId, false); });
 }
@@ -1061,14 +1365,13 @@ router.get('/api/voice-notes/:id/links', guard, async (req, res) => {
     );
     if (!noteRes.rows.length) return res.status(404).json(NOT_FOUND);
     const note = noteRes.rows[0];
-    if (!note.summary || !note.summary.trim() || !note.subject) {
-      return res.json({ status: 'none', links: [], keywords: [] });
-    }
-    const hash = sha256Hex(note.summary);
-    const status = note.link_hash === hash ? 'ready' : 'pending';
+    const hasSummary = !!(note.summary && note.summary.trim() && note.subject);
+    const hash = hasSummary ? sha256Hex(note.summary) : null;
+    const status = !hasSummary ? 'none' : (note.link_hash === hash ? 'ready' : 'pending');
 
     const { rows } = await pool.query(
-      `SELECT l.from_note_id, l.to_note_id, l.from_hash, l.to_hash, l.kind, l.relation, l.quote_from, l.quote_to,
+      `SELECT l.id, l.from_note_id, l.to_note_id, l.from_hash, l.to_hash, l.kind, l.relation, l.quote_from, l.quote_to,
+              l.source, l.user_edited, l.hidden,
               n.id AS other_id, n.title AS other_title, n.summary AS other_summary
        FROM voice_links l
        JOIN voice_notes n ON n.id = CASE WHEN l.from_note_id = $1 THEN l.to_note_id ELSE l.from_note_id END
@@ -1076,14 +1379,21 @@ router.get('/api/voice-notes/:id/links', guard, async (req, res) => {
        ORDER BY l.created_at DESC, l.id DESC`,
       [id, req.user.id]
     );
-    // 양쪽 요약이 만들어질 때와 같은 것만 보여 준다(요약이 바뀌면 오래된 연결은 숨김). 같은 쌍은 근거 확인(grounded)을 우선해 하나만.
+    // 양쪽 요약이 만들어질 때와 같은 것만 보여 준다(요약이 바뀌면 오래된 AI 연결은 숨김). 같은 쌍은 사용자 연결을 먼저, 그다음 근거 확인(grounded)을 우선해 하나만.
+    // 작업214-2: 숨긴(hidden) 연결은 제외하고, 사용자가 만들거나 고친 연결은 요약 해시와 상관없이 항상 보인다
     const byOther = new Map();
+    const rankOf = new Map();
     for (const r of rows) {
+      if (r.hidden) continue;
       const isFrom = r.from_note_id === id;
       const selfHash = isFrom ? r.from_hash : r.to_hash;
       const otherHash = isFrom ? r.to_hash : r.from_hash;
-      if (selfHash !== hash || !r.other_summary || otherHash !== sha256Hex(r.other_summary)) continue;
+      const kept = r.source === 'user' || r.user_edited === true;
+      if (!kept && (!hasSummary || selfHash !== hash || !r.other_summary || otherHash !== sha256Hex(r.other_summary))) continue;
       const link = {
+        id: r.id,
+        source: r.source || 'ai',
+        user_edited: !!r.user_edited,
         note_id: r.other_id,
         title: r.other_title || '',
         kind: r.kind,
@@ -1091,8 +1401,8 @@ router.get('/api/voice-notes/:id/links', guard, async (req, res) => {
         quote_self: (isFrom ? r.quote_from : r.quote_to) || '',
         quote_other: (isFrom ? r.quote_to : r.quote_from) || '',
       };
-      const prev = byOther.get(r.other_id);
-      if (!prev || (prev.kind !== 'grounded' && link.kind === 'grounded')) byOther.set(r.other_id, link);
+      const rank = (kept ? 2 : 0) + (link.kind === 'grounded' ? 1 : 0);
+      if (!byOther.has(r.other_id) || rank > rankOf.get(r.other_id)) { byOther.set(r.other_id, link); rankOf.set(r.other_id, rank); }
     }
     const keywords = status === 'ready' && Array.isArray(note.keywords) ? note.keywords : [];
     res.json({ status, links: Array.from(byOther.values()), keywords });

@@ -11,9 +11,10 @@ const http = require('http');
 const express = require('express');
 const { recordInit } = require('./helpers/init_recorder');
 const baseline = require('./fixtures/init_sql_baseline.json');
+const baseline211 = require('./fixtures/init_sql_baseline_211.json');   // 작업211 시점의 기준(72문장)
 
 const STEPS = ['client_encoding', 'users', 'users_name_repair', 'wordbook', 'tts_cache', 'api_usage', 'review_log', 'voice_notes', 'voice_quizzes',
-  'voice_quiz_attempts', 'voice_concepts', 'voice_links', 'voice_images', 'concept_user_permission', 'concept_studies', 'concept_items', 'concept_links',
+  'voice_quiz_attempts', 'voice_concepts', 'voice_links', 'voice_links_user_edit', 'voice_images', 'concept_user_permission', 'concept_studies', 'concept_items', 'concept_links',
   'concept_links_user_edited', 'concept_quiz_attempts', 'concept_migrations_table', 'concept_migration_v1', 'concept_migration_v2'];
 const summaryOf = r => r.logs.filter(l => l.startsWith('[DB] init done:'));
 const failedLogs = r => r.logs.filter(l => l.startsWith('[DB] init step failed:'));
@@ -23,7 +24,7 @@ for (const scenario of ['fresh', 'v1done']) {
   test(`실행 SQL 목록 비교(${scenario}): 변경 후 initDB가 실행한 문장·순서·인자가 변경 전 기준과 완전히 같다`, async () => {
     const r = await recordInit({ scenario });
     assert.equal(r.error, null);
-    assert.equal(baseline[scenario].length, 72, '기준 문장 수');
+    assert.equal(baseline[scenario].length, 75, '기준 문장 수(211의 72 + 작업214-2의 voice_links 컬럼 3)');
     assert.equal(r.sqls.length, baseline[scenario].length, '문장 수');
     for (let i = 0; i < r.sqls.length; i++) {
       assert.deepEqual(r.sqls[i], baseline[scenario][i], `${i + 1}번째 문장 차이`);
@@ -31,13 +32,26 @@ for (const scenario of ['fresh', 'v1done']) {
   });
 }
 
-test('정상: 22단계 모두 성공, 요약 로그 "실패 0단계", 반환값, client 반환', async () => {
+for (const scenario of ['fresh', 'v1done']) {
+  test(`SQL 목록(${scenario}): 작업214-2가 추가한 voice_links 컬럼 3문장을 빼면 작업211 기준(72문장)과 완전히 같다 — 기존 SQL은 그대로`, async () => {
+    const r = await recordInit({ scenario });
+    const added = r.sqls.filter(x => /^ALTER TABLE voice_links ADD COLUMN IF NOT EXISTS (source TEXT NOT NULL DEFAULT 'ai'|user_edited BOOLEAN NOT NULL DEFAULT false|hidden BOOLEAN NOT NULL DEFAULT false)$/.test(x.sql));
+    assert.equal(added.length, 3);
+    assert.deepEqual(r.sqls.filter(x => !added.includes(x)), baseline211[scenario]);
+    // 새 문장은 voice_links 단계 바로 뒤(voice_images 앞)에 있다
+    const iLast = r.sqls.findIndex(x => /idx_voice_links_to/.test(x.sql));
+    assert.ok(r.sqls.findIndex(x => x === added[0]) > iLast);
+    assert.ok(r.sqls.findIndex(x => x === added[2]) < r.sqls.findIndex(x => /^CREATE TABLE IF NOT EXISTS voice_image_sets/.test(x.sql)));
+  });
+}
+
+test('정상: 23단계 모두 성공, 요약 로그 "실패 0단계", 반환값, client 반환', async () => {
   const r = await recordInit();
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 22단계, 실패 0단계']);
-  assert.deepEqual(r.result, { total: 22, failed: [], skipped: [] });
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 23단계, 실패 0단계']);
+  assert.deepEqual(r.result, { total: 23, failed: [], skipped: [] });
   assert.equal(failedLogs(r).length, 0);
   assert.equal(r.released, true);
-  assert.equal(STEPS.length, 22);
+  assert.equal(STEPS.length, 23);
 });
 
 test('중간 단계(voice_notes)가 실패해도 이후 단계가 계속 실행되고, 실패 이름과 요약이 로그에 남음', async () => {
@@ -47,7 +61,7 @@ test('중간 단계(voice_notes)가 실패해도 이후 단계가 계속 실행�
   const fl = failedLogs(r);
   assert.equal(fl.length, 1);
   assert.match(fl[0], /^\[DB\] init step failed: voice_notes: 주입된 오류/);
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 22단계, 실패 1단계 (실패: voice_notes)']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 23단계, 실패 1단계 (실패: voice_notes)']);
   const sqls = sqlText(r);
   assert.ok(sqls.some(s => /^ALTER TABLE concept_links ADD COLUMN IF NOT EXISTS user_edited/.test(s)), '뒤쪽 user_edited ALTER도 실행됨');
   assert.ok(sqls.some(s => /^CREATE TABLE IF NOT EXISTS concept_quiz_attempts/.test(s)));
@@ -65,7 +79,7 @@ test('이름 복구 단계의 조회가 실패해도 다음 단계(wordbook 이�
 test('여러 단계 실패: 요약에 실패 이름이 순서대로 나열됨', async () => {
   const r = await recordInit({ failOn: /^(CREATE TABLE IF NOT EXISTS tts_cache|CREATE TABLE IF NOT EXISTS concept_quiz_attempts)/ });
   assert.deepEqual(r.result.failed, ['tts_cache', 'concept_quiz_attempts']);
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 22단계, 실패 2단계 (실패: tts_cache, concept_quiz_attempts)']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 23단계, 실패 2단계 (실패: tts_cache, concept_quiz_attempts)']);
   assert.equal(failedLogs(r).length, 2);
   assert.ok(sqlText(r).some(s => /^CREATE TABLE IF NOT EXISTS concept_migrations/.test(s)));
 });
@@ -88,7 +102,7 @@ test('선행 DDL 단계가 실패하면 마이그레이션 v1·v2는 건너뛰�
   const sqls = sqlText(r);
   assert.ok(!sqls.includes('BEGIN'), '마이그레이션 트랜잭션을 시작하지 않음');
   assert.ok(!sqls.some(s => /FROM voice_concepts/.test(s)), '원본 voice_concepts를 읽지 않음');
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 22단계, 실패 1단계 (실패: concept_items), 건너뜀 2단계 (건너뜀: concept_migration_v1, concept_migration_v2)']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 23단계, 실패 1단계 (실패: concept_items), 건너뜀 2단계 (건너뜀: concept_migration_v1, concept_migration_v2)']);
 });
 
 test('선행 단계 중 하나(voice_concepts, concept_migrations_table)만 실패해도 마이그레이션 건너뜀', async () => {
