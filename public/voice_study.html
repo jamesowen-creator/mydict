@@ -106,8 +106,6 @@
   }
   .btn:hover:not(:disabled) { background: var(--btn-primary-bg-hover, #9c3a27); }
   .btn:disabled { opacity: 0.5; cursor: default; }
-  .btn.secondary { background: var(--card); color: var(--text1); border: 1.5px solid var(--border); }
-  .btn.secondary:hover:not(:disabled) { background: var(--bg); }
   .btn.danger { background: var(--error-light); color: var(--error); }
   .btn.danger:hover:not(:disabled) { background: var(--error-light); }
   .btn.block { display: flex; width: 100%; }
@@ -118,6 +116,8 @@
   .btn.text:hover:not(:disabled), .btn.text:active:not(:disabled) { background: transparent; color: var(--text1); }
   .btn.text.danger { background: transparent; color: var(--primary-dark); }
   .btn.text.danger:hover:not(:disabled), .btn.text.danger:active:not(:disabled) { background: transparent; color: var(--btn-primary-bg-hover, #9c3a27); }
+  /* 작업217-4: 기호만 있는 버튼(▲ ▼)은 밑줄 없이 기호 자체가 버튼 단서(터치 영역 44px는 그대로) */
+  .btn.text.sym { text-decoration: none; }
   .btn.text:focus-visible { outline: 2px solid var(--text1); outline-offset: 2px; border-radius: 4px; }
   /* 옅은 코랄 안내 상자(.msg.info, 바탕 #FDF0EC) 안의 텍스트 버튼은 --text2가 4.34:1이라 상자 글자색(--primary-dark, 4.83:1)을 쓴다 */
   .msg.info .btn.text { color: var(--primary-dark); }
@@ -288,6 +288,9 @@
   .img-save { margin-top: 10px; }
   .img-rate { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 4px; font-size: 13px; color: var(--text2); }
   .img-rate .kw-chip { font-size: 16px; padding: 6px 14px; }
+  /* 작업217-4: 👍/👎는 이모지라 굵기·밑줄이 보이지 않으므로 고른 쪽 앞에 "✓"를 붙여 구분한다(밑줄 없음, aria-pressed 유지) */
+  .img-rate .kw-chip.on { font-weight: 500; text-decoration: none; }
+  .img-rate .kw-chip[aria-pressed=true]::before { content: '✓ '; white-space: pre; font-size: 14px; font-weight: 800; color: var(--primary-dark); }
 
   /* 작업192: 자료 합치기 */
   .sel-item { display: flex; align-items: flex-start; gap: 12px; }
@@ -1092,10 +1095,10 @@ function renderMerge() {
     const t = document.createElement('div'); t.className = 'merge-title'; t.textContent = titleOf(id);
     const c = document.createElement('div'); c.className = 'merge-chars'; c.textContent = fmtN(charsOf(id)) + '자';
     text.appendChild(t); text.appendChild(c);
-    const up = document.createElement('button'); up.type = 'button'; up.className = 'btn small text'; up.textContent = '▲'; up.setAttribute('aria-label', '위로');
+    const up = document.createElement('button'); up.type = 'button'; up.className = 'btn small text sym'; up.textContent = '▲'; up.setAttribute('aria-label', '위로');
     up.disabled = i === 0 || mergeBusy;
     up.addEventListener('click', () => moveMerge(i, -1));
-    const down = document.createElement('button'); down.type = 'button'; down.className = 'btn small text'; down.textContent = '▼'; down.setAttribute('aria-label', '아래로');
+    const down = document.createElement('button'); down.type = 'button'; down.className = 'btn small text sym'; down.textContent = '▼'; down.setAttribute('aria-label', '아래로');
     down.disabled = i === mergeOrder.length - 1 || mergeBusy;
     down.addEventListener('click', () => moveMerge(i, 1));
     row.appendChild(no); row.appendChild(text); row.appendChild(up); row.appendChild(down);

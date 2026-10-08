@@ -103,7 +103,7 @@ test('217-2 literature .nav-btn: 테두리·배경 없는 ‹ › 글자, 44×44
   for (const [m, label, glyph] of [[prev, '#prev-btn', '‹'], [next, '#next-btn', '›']]) {
     assertNoBox(m, label); assertTouch(m, label);
     assert.ok(m.ratio >= 4.5, `${label}: 대비 ${m.ratio.toFixed(2)}`); assert.equal(m.text, glyph, label + ': 화살표 글자');
-    assert.ok(m.aria && m.aria.length > 0, label + ': aria-label');
+    assert.ok(m.aria && m.aria.length > 0, label + ': aria-label'); assert.equal(m.underline, false, label + ': 기호만 있는 버튼은 밑줄 없음(217-4)');
   }
   assert.equal(next.cursor, 'pointer'); assert.equal(prev.cursor, 'not-allowed', '비활성(첫 카드)에서는 not-allowed');
   assert.equal(await page.eval("document.getElementById('prev-btn').disabled"), true, '첫 카드에서 이전은 비활성');
@@ -124,7 +124,7 @@ test('217-2 science·digest .carousel-nav-btn: 테두리·배경 없는 ‹ › 
     for (const [m, label, glyph] of [[prev, file + ' 이전', '‹'], [next, file + ' 다음', '›']]) {
       assertNoBox(m, label); assertTouch(m, label);
       assert.ok(m.ratio >= 4.5, `${label}: 대비 ${m.ratio.toFixed(2)}`); assert.equal(m.text, glyph, label + ': 화살표 글자');
-      assert.ok(m.aria && m.aria.length > 0, label + ': aria-label'); assert.equal(m.cursor, 'pointer');
+      assert.ok(m.aria && m.aria.length > 0, label + ': aria-label'); assert.equal(m.underline, false, label + ': 기호만 있는 버튼은 밑줄 없음(217-4)'); assert.equal(m.cursor, 'pointer');
     }
     const before = await page.text('.carousel-nav-count');
     await page.click('.carousel-nav-btn[data-dir="1"]');

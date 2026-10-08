@@ -382,7 +382,32 @@ test('217-2 👍/👎(#img-up, #img-down): 테두리·배경 없음, 44×44px �
   const up = await page.eval(MEASURE('#img-up')), down = await page.eval(MEASURE('#img-down'));
   assert.equal(await page.eval("document.getElementById('img-up').getAttribute('aria-pressed')"), 'true');
   assert.equal(await page.eval("document.getElementById('img-down').getAttribute('aria-pressed')"), 'false');
-  assert.equal(up.weight, '700'); assert.equal(up.underline, true); assert.equal(down.weight, '500'); assert.equal(down.underline, false);
+  // 작업217-4: 옛 기대(굵기 700·밑줄)를 바꿈 — 이모지에는 굵기·밑줄이 보이지 않아, 고른 쪽 앞에 "✓ "를 붙이고 밑줄·굵기 변화는 없앰
+  assert.equal(up.underline, false); assert.equal(down.underline, false); assert.equal(up.weight, '500'); assert.equal(down.weight, '500');
+  assert.equal(await page.eval("getComputedStyle(document.getElementById('img-up'), '::before').content"), '"✓ "', '고른 쪽 앞의 ✓');
+  assert.equal(await page.eval("getComputedStyle(document.getElementById('img-down'), '::before').content"), 'none', '안 고른 쪽에는 없음');
   assert.ok(up.h >= 43.5 && up.w >= 43.5);
+  await page.eval("imgData = { rating: -1 }; updateRatingUi()");
+  assert.equal(await page.eval("getComputedStyle(document.getElementById('img-down'), '::before').content"), '"✓ "'); assert.equal(await page.eval("getComputedStyle(document.getElementById('img-up'), '::before').content"), 'none');
+  assert.equal(await page.eval("document.getElementById('img-down').getAttribute('aria-pressed')"), 'true', 'aria-pressed 유지');
+  await page.close();
+});
+
+test('217-4 보정: 합본 순서 ▲ ▼ 버튼은 밑줄 없는 기호(44px 유지), .btn.secondary 규칙은 삭제됨(‹ ›의 밑줄 없음은 reading_text_buttons.ui가 확인)', { skip: SKIP }, async () => {
+  const page = await open();
+  await page.eval("mergeOrder = [1, 2, 3]; renderMerge(); showView('merge');");
+  await settle217(page);
+  const rows = await page.count('.merge-row');
+  assert.equal(rows, 3);
+  for (let i = 0; i < rows; i++) {
+    for (const [lab, glyph] of [['위로', '▲'], ['아래로', '▼']]) {
+      const m = await page.eval(MEASURE(`.merge-row:nth-child(${i + 1}) .btn[aria-label="${lab}"]`));
+      assert.equal(m.underline, false, `${glyph}: 밑줄 없음`); assert.equal(m.bg, TRANSPARENT); assert.deepEqual(m.bw, ['0px', '0px', '0px', '0px']);
+      assert.ok(m.h >= 43.5 && m.w >= 43.5, `${glyph}: 터치 영역 ${m.w}x${m.h}`); assert.ok(m.ratio >= 4.5);
+    }
+  }
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'public', 'voice_study.html'), 'utf8');
+  assert.equal(/\.btn\.secondary/.test(src), false, '.btn.secondary CSS 규칙이 삭제됨');
+  assert.equal(/secondary/.test(src.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '')), false, '코드(주석 제외)에 secondary 문자열이 남아 있지 않음');
   await page.close();
 });
