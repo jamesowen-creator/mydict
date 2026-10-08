@@ -97,11 +97,10 @@ test('제안이 비어 있을 때의 [제안 다시 받기](refresh-suggest)도 
   await page.close();
 });
 
-test('돌아보기 퀴즈의 변환 버튼(quiz-exit, quiz-skip, quiz-confuse)이 텍스트 버튼이고 [돌아보기 퀴즈] 진입은 박스 유지', { skip: SKIP }, async () => {
+test('돌아보기 퀴즈의 변환 버튼(quiz-exit, quiz-skip, quiz-confuse)과 [돌아보기 퀴즈] 진입(작업217-2부터)이 텍스트 버튼', { skip: SKIP }, async () => {
   const page = await openStudy();
   const open = await page.eval(MEASURE('#quiz-open'));
-  assert.doesNotMatch(open.cls, /\btext\b/, '진입 버튼은 변환 대상이 아님(화면의 주요 선택지)');
-  assert.notEqual(open.bg, TRANSPARENT); assert.equal(open.bw[0], '1px'); assert.equal(open.radius, '10px');
+  assertTextButton(open, 'quiz-open');   // 작업217-2: 옛 기대(박스 유지)를 새 기준으로 바꿈
   await page.click('#quiz-open');
   await page.waitFor("!!document.querySelector('[data-t=quiz-question]')");
   await settle(page);
@@ -210,20 +209,15 @@ test('위험 텍스트 버튼은 모두 확인창을 거친 뒤에만 실행(개
 });
 
 // ───────────────────────── 유지 목록 ─────────────────────────
-test('유지: 주요 채움(.btn.primary), 마이크, 토글(이해함·목록 전환·전체 연결 보기), 반응 3종, 돌아보기 퀴즈, 세그먼트, 아이콘 버튼은 변환되지 않음', { skip: SKIP }, async () => {
+test('유지: 주요 채움(.btn.primary), 토글(이해함·목록 전환·전체 연결 보기), 세그먼트, 아이콘 버튼은 변환되지 않음(마이크·반응 3종·돌아보기 퀴즈는 작업217-2에서 박스 제거)', { skip: SKIP }, async () => {
   const page = await openStudy();
   for (const sel of ['#ask-submit']) {
     const m = await page.eval(MEASURE(sel));
     assert.ok(isPrimaryFill(m.bg), sel + ' 채움: ' + m.bg); assert.equal(m.radius, '10px'); assert.equal(m.weight, '600'); assert.match(m.cls, /primary/);
   }
-  for (const sel of ['#ask-mic']) {
-    const m = await page.eval(MEASURE(sel));
-    assert.match(m.cls, /mic/); assert.doesNotMatch(m.cls, /\btext\b/); assert.notEqual(m.bg, TRANSPARENT); assert.equal(m.bw[0], '1px'); assert.equal(m.radius, '10px');
-  }
-  for (const dt of ['react-easier', 'react-deeper', 'react-other']) {
-    const m = await page.eval(MEASURE(`[data-t=${dt}]`));
-    assert.doesNotMatch(m.cls, /\btext\b/, dt); assert.notEqual(m.bg, TRANSPARENT, dt + ': 박스 유지'); assert.equal(m.bw[0], '1px'); assert.equal(m.radius, '10px');
-  }
+  // 작업217-2: 옛 기대(마이크·반응 3종 박스 유지)를 새 기준으로 바꿈 — 반응 3종은 텍스트 버튼, 마이크는 박스 없는 아이콘 버튼
+  for (const dt of ['react-easier', 'react-deeper', 'react-other']) assertTextButton(await page.eval(MEASURE(`[data-t=${dt}]`)), dt);
+  { const m = await page.eval(MEASURE('#ask-mic')); assert.match(m.cls, /mic/); assert.equal(m.bg, TRANSPARENT); assert.deepEqual(m.bw, ['0px', '0px', '0px', '0px']); }
   const toggle = await page.eval(MEASURE('[data-t=understood]'));
   assert.match(toggle.cls, /toggle/); assert.equal(toggle.bw[0], '1px', '이해함 토글 테두리 유지');
   for (const id of ['seg-map', 'seg-list']) {
@@ -329,5 +323,47 @@ test('키보드 포커스·호버: Tab으로 텍스트 버튼에 닿으면 2px �
   assert.equal(hov.bg, TRANSPARENT, '호버해도 바탕 투명');
   assert.equal(hov.color, 'rgb(26, 31, 60)', '호버하면 글자만 --text로 진해짐');
   void pos;
+  await page.close();
+});
+
+// ───────────────────────── 작업217-2: 기본 .btn → .text, 마이크 상태 전환 ─────────────────────────
+test('217-2 (a)(b)(c) 반응 3종·돌아보기 퀴즈는 박스 없는 텍스트 버튼(44px, 대비 4.5:1), 주요 채움 버튼과 aria-pressed 토글(목록 전환·전체 연결 보기)은 그대로', { skip: SKIP }, async () => {
+  const page = await openStudy();
+  for (const sel of ['#quiz-open', '[data-t=react-easier]', '[data-t=react-deeper]', '[data-t=react-other]']) assertTextButton(await page.eval(MEASURE(sel)), sel);
+  assert.ok(isPrimaryFill((await page.eval(MEASURE('#ask-submit'))).bg), '주요 채움 유지');
+  await page.click('#seg-list');
+  await settle(page);
+  for (const dt of ['list-mode-flat', 'list-mode-group']) assert.equal(await page.eval(`document.querySelector('[data-t=${dt}]').hasAttribute('aria-pressed')`), true, dt + ': aria-pressed 유지');
+  assert.deepEqual(page.errors, []);
+  await page.close();
+});
+
+test('217-2 (a)(b)(c)(e) .btn.mic: 꺼짐·켜짐 모두 배경·테두리 없는 44×44px 아이콘, 켜짐(aria-pressed=true)=--danger 굵게+밑줄 선, 대비 4.5:1, 상태 전환과 aria 속성 유지', { skip: SKIP }, async () => {
+  const page = await openStudy();
+  for (const id of ['ask-mic', 'start-first-mic']) {
+    const off = await page.eval(MEASURE('#' + id));
+    assert.equal(off.bg, TRANSPARENT, id + ': 배경 투명'); assert.deepEqual(off.bw, ['0px', '0px', '0px', '0px'], id + ': 테두리 없음');
+    if (id === 'ask-mic') assert.ok(off.h >= 43.5 && off.w >= 43.5, `${id}: 44×44px 이상 (${off.w}x${off.h})`);   // start-first-mic은 시작 폼이 닫혀 있어 크기를 잴 수 없다(같은 .btn.mic CSS)
+    assert.ok(off.ratio >= 4.5, id + ': 대비 ' + off.ratio.toFixed(2));
+    assert.equal(await page.eval(`document.getElementById('${id}').getAttribute('aria-pressed')`), 'false');
+    assert.equal(off.underline, false); assert.equal(await page.eval(`getComputedStyle(document.getElementById('${id}'), '::after').content`), 'none');
+  }
+  // 켜짐: 앱의 micPaint가 aria-pressed·아이콘·aria-label을 바꾼다(실제 녹음 흐름은 concept_voice.ui가 확인)
+  await page.eval("micPaint(MIC_TARGETS[1], true)");
+  const on = await page.eval(MEASURE('#ask-mic'));
+  assert.equal(await page.eval("document.getElementById('ask-mic').getAttribute('aria-pressed')"), 'true', 'aria-pressed 유지');
+  assert.equal(await page.eval("document.getElementById('ask-mic').getAttribute('aria-label')"), '녹음 끝내기');
+  assert.equal(on.bg, TRANSPARENT); assert.deepEqual(on.bw, ['0px', '0px', '0px', '0px']);
+  assert.ok(on.h >= 43.5 && on.w >= 43.5); assert.ok(on.ratio >= 4.5, '켜짐 대비 ' + on.ratio.toFixed(2));
+  assert.equal(on.color, 'rgb(180, 35, 24)', '--danger'); assert.equal(on.weight, '800'); assert.equal(on.underline, true);
+  const bar = await page.eval(`(() => { const c = getComputedStyle(document.getElementById('ask-mic'), '::after'); return { content: c.content, h: c.height, bg: c.backgroundColor, bw: c.borderTopWidth }; })()`);
+  assert.deepEqual(bar, { content: '""', h: '2px', bg: 'rgb(180, 35, 24)', bw: '0px' }, '아이콘 아래 2px 밑줄 선(테두리 아님)');
+  // 다른 마이크는 영향 없음, 다시 꺼지면 원래대로
+  assert.equal(await page.eval("document.getElementById('start-first-mic').getAttribute('aria-pressed')"), 'false');
+  await page.eval("micPaint(MIC_TARGETS[1], false)");
+  const back = await page.eval(MEASURE('#ask-mic'));
+  assert.equal(back.underline, false); assert.notEqual(back.color, 'rgb(180, 35, 24)');
+  assert.equal(await page.eval("document.getElementById('ask-mic').getAttribute('aria-pressed')"), 'false');
+  assert.deepEqual(page.errors, []);
   await page.close();
 });

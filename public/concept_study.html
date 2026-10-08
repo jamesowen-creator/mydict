@@ -249,9 +249,12 @@
   /* 음성 입력 */
   .with-mic { display: flex; gap: 8px; }
   .with-mic input { flex: 1; min-width: 0; }
-  .btn.mic { width: 44px; padding: 0; flex: none; }
+  /* 작업217-2: 마이크는 박스 없이 아이콘만(44×44px 유지). 꺼짐=--text2(흰 바탕 7.86:1), 켜짐(aria-pressed=true)=--danger(흰 바탕 6.57:1)+굵게+밑줄.
+     아이콘이라 글자 밑줄이 보이지 않으므로 아래쪽 2px 선(::after)으로 밑줄을 그린다(테두리가 아님) */
+  .btn.mic { width: 44px; padding: 0; flex: none; position: relative; background: transparent; border: none; color: var(--text2); }
   .ask .btn.mic { padding: 0; }
-  .btn.mic[aria-pressed=true] { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
+  .btn.mic[aria-pressed=true] { color: var(--danger); font-weight: 800; text-decoration: underline; }
+  .btn.mic[aria-pressed=true]::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 6px; height: 2px; background: var(--danger); }
   /* 돌아보기 퀴즈 */
   .qz-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 14px; }
   .qz-q { margin-top: 10px; padding: 16px; border: 1px solid var(--line); border-radius: var(--card-radius); background: var(--surface); }
@@ -351,7 +354,7 @@
       <section id="record" class="record" aria-label="학습 기록" hidden>
         <div class="progress"><span class="label">이해</span><div id="progress-bar" class="bar" role="progressbar" aria-label="이해한 개념" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"><i></i></div><span id="progress-count" class="count"></span></div>
         <nav id="path-line" class="path-line" aria-label="선택 경로"></nav>
-        <div class="btn-row" style="margin-top:6px"><button id="quiz-open" class="btn" type="button">돌아보기 퀴즈</button></div>
+        <div class="btn-row" style="margin-top:6px"><button id="quiz-open" class="btn text" type="button">돌아보기 퀴즈</button></div>
       </section>
       <div id="study-msg" class="msg" role="alert"></div>
       <div id="study-busy" class="busy-line" role="status" hidden><span class="spinner"></span><span>설명을 만드는 중…</span></div>
@@ -1557,9 +1560,9 @@ function renderNext() {
     box.append(h('div', { class: 'react' },
       h('span', { class: 'label' }, '이 설명이 어땠나요?'),
       h('div', { class: 'btn-row', style: 'margin-top:6px' },
-        h('button', { class: 'btn', type: 'button', 'data-t': 'react-easier', onclick: () => respond(it, 'easier') }, '더 쉬운 설명'),
-        h('button', { class: 'btn', type: 'button', 'data-t': 'react-deeper', onclick: () => respond(it, 'deeper') }, '더 깊게'),
-        h('button', { class: 'btn', type: 'button', 'data-t': 'react-other', onclick: () => respond(it, 'other') }, '다른 길'))));
+        h('button', { class: 'btn text', type: 'button', 'data-t': 'react-easier', onclick: () => respond(it, 'easier') }, '더 쉬운 설명'),
+        h('button', { class: 'btn text', type: 'button', 'data-t': 'react-deeper', onclick: () => respond(it, 'deeper') }, '더 깊게'),
+        h('button', { class: 'btn text', type: 'button', 'data-t': 'react-other', onclick: () => respond(it, 'other') }, '다른 길'))));
   }
 }
 
