@@ -212,7 +212,8 @@ test('유지(변환 금지): literature의 사조 칩·타임라인 칩·탭, sc
 
   page = await open('science_reading');
   const card = await must(page, '.subject-card');
-  assert.equal(card.radius, '16px'); assert.ok(parseFloat(card.bw[0]) >= 1, '과목 카드 테두리 유지'); assert.equal(card.cursor, 'pointer'); assert.notEqual(card.bg, TRANSPARENT);
+  // 작업217-4: 과목 카드는 박스·틴트 없는 텍스트 행이 됨(옛 기대: radius 16px·테두리·색 배경). 눌림(cursor pointer)만 그대로
+  assert.equal(card.radius, '0px'); assert.equal(card.bg, TRANSPARENT); assert.equal(card.cursor, 'pointer');
   await step(page, 'showScience(DB.concepts[0].id)');
   const cq = await must(page, '.conquest-btn');
   assert.equal(cq.bg, TRANSPARENT); assert.equal(cq.bw[0], '0px'); assert.equal(cq.radius, '0px');   // 작업217-3: 옛 기대(radius 10px·weight 600·테두리 2px)를 박스 없음으로 바꿈

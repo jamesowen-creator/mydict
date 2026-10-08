@@ -85,26 +85,22 @@
   #view-subjects .content { padding: 20px 16px; }
   .subjects-title { font-size: 20px; font-weight: 700; color: var(--text1); margin-bottom: 4px; }
   .subjects-sub { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
-  .subject-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-  }
+  /* 작업217-4: 과목 선택은 박스·분야색 틴트 없이 텍스트 행(구분선, 오른쪽 "›", 높이 56px). 분야색은 분야 이름 글자색(--field-ink)으로만 */
+  .subject-grid { display: flex; flex-direction: column; gap: 0; }
   .subject-card {
-    display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
-    min-height: 120px; padding: 16px;
-    border-radius: var(--card-radius); border: 1.5px solid var(--field-tone, var(--border));
-    background: color-mix(in srgb, var(--field-tone, #8A8F99) 10%, #FFFFFF);
+    display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px;
+    width: 100%; min-height: 56px; padding: 10px 0;
+    border: none; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent;
     cursor: pointer; text-align: left;
     font-family: inherit;
-    transition: transform 0.1s, box-shadow 0.15s;
   }
-  .subject-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-  .subject-card:active { transform: scale(0.98); }
-  .subject-card .subject-name { font-size: 17px; font-weight: 700; color: var(--field-ink, var(--text1)); margin-bottom: 4px; }
+  .subject-card::after { content: '›'; grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 26px; line-height: 1; color: var(--text2); }
+  .subject-card:hover .subject-name { text-decoration: underline; text-underline-offset: 3px; }
+  .subject-card:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
+  .subject-card .subject-name { font-size: 17px; font-weight: 700; color: var(--field-ink, var(--text1)); }
   .subject-card .subject-count { font-size: 13px; color: var(--text2); }
-  .subject-card.disabled {
-    cursor: default; opacity: 0.55;
-    background: var(--bg); border-style: dashed;
-  }
+  .subject-card.disabled { cursor: default; opacity: 0.55; }
+  .subject-card.disabled::after { content: ''; }
   .subject-card.disabled .subject-name { color: var(--text2); }
 
   /* ── View 1: 과목별 캐러셀 (digest_reading.html 작업81의 3D 캐러셀과 동일 메커니즘) ── */
@@ -137,28 +133,20 @@
     position: absolute; inset: 0;
     transform-style: preserve-3d; -webkit-transform-style: preserve-3d;
   }
+  /* 작업217-4: 캐러셀 카드는 테두리·둥근 모서리·그림자·그라데이션 없이 평면 흰 배경(눌림·스와이프 동작은 그대로). 분야색은 글자색(--field-ink)과 왼쪽 선으로 표시 */
   .carousel-card {
-    --card-edge:
-      inset 0 4px 0 var(--field-ink),
-      inset 0 -2px 0 rgba(0,0,0,0.035),
-      0 0 0 1px rgba(0,0,0,0.07),
-      0 4px 0 -1px #E6E2DA,
-      0 5px 0 -1px rgba(0,0,0,0.07);
     position: absolute; top: 50%; left: 50%;
     display: flex; flex-direction: column;
     padding: 20px 18px 16px;
-    border-radius: 14px;
+    border-radius: 0;
     color: #1A1A1E;
-    background: linear-gradient(180deg, #FFFFFF 0%, #FBFAF8 100%);
-    box-shadow: var(--card-edge);
+    background: var(--card);
+    box-shadow: none;
     backface-visibility: hidden; -webkit-backface-visibility: hidden;
     cursor: pointer;
     overflow: hidden;
   }
   .carousel-track.moving .carousel-card { will-change: transform, opacity; }
-  .carousel-card.is-center {
-    box-shadow: var(--card-edge), 0 16px 30px -8px rgba(0,0,0,0.18), 0 4px 10px rgba(0,0,0,0.05);
-  }
   .carousel-card-meta {
     margin-bottom: 12px;
     font-size: 11px; letter-spacing: 0.08em; color: #6B7280;
@@ -200,9 +188,6 @@
   @media (max-height: 599px) {
     #view-list .content { padding-top: 10px; padding-bottom: 10px; }
     #list-carousel { padding: 0; }
-    .carousel-card.is-center {
-      box-shadow: var(--card-edge), 0 8px 16px -6px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.05);
-    }
     .carousel-nav { margin-top: 0; }
   }
 
@@ -216,22 +201,18 @@
 
   .science-work-header {
     background: var(--card);
-    border-radius: var(--card-radius);
-    border: 1px solid var(--border);
+    border: none; border-radius: 0; box-shadow: none;
     padding: 20px;
     margin-bottom: 14px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
   }
   .science-work-title { font-size: 24px; font-weight: 700; color: var(--text1); margin-bottom: 6px; line-height: 1.3; }
   .science-work-meta { font-size: 14px; color: var(--text2); font-family: 'Inter', sans-serif; }
 
   .science-section {
     background: var(--card);
-    border-radius: var(--card-radius);
-    border: 1px solid var(--border);
+    border: none; border-radius: 0; box-shadow: none;
     padding: 18px 20px;
     margin-bottom: 14px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
   }
   .science-section-label {
     font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
@@ -357,9 +338,7 @@
   }
   .quiz-question-counter { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
   .quiz-card {
-    background: var(--card); border-radius: var(--card-radius);
-    border: 1px solid var(--border); padding: 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    background: var(--card); border: none; border-radius: 0; box-shadow: none; padding: 20px;
   }
   .quiz-question {
     font-size: 16px; font-weight: 600; line-height: 1.6;

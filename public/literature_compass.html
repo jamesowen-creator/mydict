@@ -125,13 +125,12 @@
   .home-header h2 { font-size: 22px; font-weight: 700; color: var(--text1); margin-bottom: 4px; }
   .home-header p { font-size: 14px; color: var(--text2); line-height: 1.5; }
 
+  /* 작업217-4: 시대 영역은 테두리·둥근 모서리·그림자 없이 흰 바탕 면과 아래 구분선만 */
   .era-card {
     background: var(--card);
-    border-radius: var(--card-radius);
-    border: 1px solid var(--border);
+    border: none; border-radius: 0; box-shadow: none; border-bottom: 1px solid var(--border);
     padding: 20px;
-    margin-bottom: 16px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    margin-bottom: 0;
   }
   .era-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
   .era-name { font-size: 17px; font-weight: 700; color: var(--text1); }
@@ -209,10 +208,10 @@
     color: var(--primary); text-transform: uppercase;
     margin-bottom: 8px;
   }
+  /* 작업217-4: 설명 영역은 테두리·둥근 모서리 없이 흰 바탕 면만 */
   .section-box {
     background: var(--card);
-    border-radius: 12px;
-    border: 1px solid var(--border);
+    border: none; border-radius: 0;
     padding: 14px 16px;
     font-size: 14px; line-height: 1.7; color: var(--text1);
   }
@@ -333,12 +332,13 @@
   .back-section-body { font-size: 13px; line-height: 1.75; color: var(--text1); }
   .back-divider { height: 1px; background: var(--border); margin: 14px 0; }
   .related-list { display: flex; flex-direction: column; gap: 8px; }
+  /* 작업217-4: 연결 작품 항목은 색 바탕·둥근 모서리 없이 구분선 행 */
   .related-item {
     display: flex; align-items: flex-start; gap: 10px;
-    padding: 10px 12px;
-    background: var(--bg);
-    border-radius: 10px;
+    padding: 10px 0;
+    background: transparent; border: none; border-bottom: 1px solid var(--border); border-radius: 0;
   }
+  .related-list .related-item:last-child { border-bottom: none; }
   .related-item svg { width: 14px; height: 14px; color: var(--primary); flex-shrink: 0; margin-top: 2px; }
   .related-item-info { flex: 1; }
   .related-title { font-size: 13px; font-weight: 600; color: var(--text1); }
@@ -404,10 +404,8 @@
   .quiz-question-counter { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
   .quiz-card {
     background: var(--card);
-    border-radius: var(--card-radius);
-    border: 1px solid var(--border);
+    border: none; border-radius: 0; box-shadow: none;
     padding: 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
   }
 
   /* Round 1 — Matching */

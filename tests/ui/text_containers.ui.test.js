@@ -114,3 +114,71 @@ test('217-4 voice·concept 메시지(.msg, .notice): 색 바탕·테두리·둥�
   assert.equal(inf.mark, '"i"'); assert.equal(inf.color, CORAL_DARK); assert.ok(inf.ratio >= 4.5, '안내 대비 ' + inf.ratio.toFixed(2));
   await done(page);
 });
+
+// ───────────────────────── 읽기 3화면 ─────────────────────────
+const PICK = `(() => { const ms = DB.eras.flatMap(e => e.movements); return (ms.find(x => x.works && x.works.length >= 2) || ms[0]).id; })()`;
+
+test('217-4 literature 컨테이너: .era-card(구분선만), .section-box, .quiz-card, .related-item(구분선 행)은 테두리·둥근 모서리·그림자 없이 흰 바탕 면만. 뒤집기 카드는 그대로', { skip: SKIP }, async () => {
+  const page = await openReading('literature_compass');
+  const n = await page.count('.era-card');
+  assert.ok(n >= 1);   // 모의 데이터의 시대 수는 1개 이상
+  for (let i = 0; i < n; i++) assertFlatPanel(await page.eval(MEASURE('.era-card', null, i)), `.era-card ${i + 1}`, { bottomLine: true });
+  assert.equal((await page.eval(MEASURE('.era-card', null, 0))).bw[2], '1px', '시대 사이는 아래 구분선');
+  await step(page, `showBriefing(${JSON.stringify(await page.eval(PICK))});`);
+  assertFlatPanel(await page.eval(MEASURE('.section-box')), '.section-box');
+  await step(page, 'showCards();');
+  // 카드 앞면은 뒤집기 단서라서 그대로(유지 예외): 테두리·둥근 모서리 유지
+  const front = await page.eval(MEASURE('.flip-card-front')); assert.equal(front.radius, '20px'); assert.equal(front.bw[0], '1px');
+  await step(page, INJECT_REL);
+  const rel = await page.eval(MEASURE('#probe-host .related-item'));
+  assertNoBox(rel, '.related-item', { bottomLine: true }); assert.equal(rel.bw[2], '1px');
+  await step(page, "quizData = { rounds: [{ type: 'mcq', questions: [{ question: 'Q', options: ['가', '나', '다', '라'], answer: '다' }] }], currentRound: 0, currentQ: 0, score: 0, wrong: [], totalQ: 1 }; showView('view-quiz'); renderQuizRound();");
+  assertFlatPanel(await page.eval(MEASURE('.quiz-card')), 'literature .quiz-card');
+  await done(page);
+});
+const INJECT_REL = `(() => { const h = document.createElement('div'); h.id = 'probe-host'; h.innerHTML = '<div class="related-list"><div class="related-item"><div class="related-item-info"><div class="related-title">작품</div></div></div><div class="related-item"><div class="related-item-info"><div class="related-title">작품2</div></div></div></div>'; document.querySelector('.view.active').appendChild(h); })()`;
+
+test('217-4 science 과목 선택: 박스·틴트 없는 텍스트 행(구분선, 오른쪽 "›", 높이 44px 이상), 분야색은 분야 이름 글자색, 준비 중 행은 점선 박스 없음, 누르면 캐러셀로 이동', { skip: SKIP }, async () => {
+  const page = await openReading('science_reading');
+  const n = await page.count('.subject-card');
+  assert.ok(n >= 3);
+  const inks = { '물리': 'rgb(163, 62, 56)', '화학': 'rgb(44, 115, 115)', '생물': 'rgb(53, 112, 72)', '지구과학': 'rgb(66, 84, 160)' };
+  let enabled = 0;
+  for (let i = 0; i < n; i++) {
+    const m = await page.eval(MEASURE('.subject-card', null, i)), mark = await page.eval(MEASURE('.subject-card', '::after', i)), name = await page.eval(MEASURE('.subject-card .subject-name', null, i));
+    assertNoBox(m, `과목 행 ${i + 1}(${name.text})`, { bottomLine: true }); assert.equal(m.bw[2], '1px'); assert.ok(m.h >= 43.5, `높이 ${m.h}`);
+    const disabled = m.cls.includes('disabled');
+    if (!disabled) {
+      enabled++; assert.equal(m.cursor, 'pointer'); assert.equal(mark.mark, '"›"', '오른쪽 ›'); assert.ok(name.ratio >= 4.5, `${name.text} 이름 대비 ${name.ratio.toFixed(2)}`);
+      if (inks[name.text]) assert.equal(name.color, inks[name.text], name.text + ': 분야색은 글자색(--field-ink)');
+    } else assert.equal(mark.mark, '""', '준비 중에는 › 없음');
+  }
+  assert.ok(enabled >= 1);
+  const firstEnabled = await page.eval("[...document.querySelectorAll('.subject-card')].findIndex(c => !c.classList.contains('disabled'))");
+  await page.click('.subject-card', { index: firstEnabled });
+  await page.waitFor("document.getElementById('view-list').classList.contains('active')", 6000);
+  await done(page);
+});
+
+test('217-4 science·digest 캐러셀 카드(.carousel-card): 테두리·둥근 모서리·그림자·그라데이션 없이 평면 흰 배경, 눌러서 상세로 이동, 상세의 머리·구역도 박스 없음', { skip: SKIP }, async () => {
+  for (const [file, setup, detail, hdr, sec, view] of [['science_reading', 'openField(FIELD_ORDER[0])', 'showScience(DB.concepts[0].id)', '.science-work-header', '.science-section', 'view-science'],
+    ['digest_reading', null, 'showDigest(DB.works[0].id)', '.digest-work-header', '.digest-section', 'view-digest']]) {
+    const page = await openReading(file);
+    if (setup) await step(page, setup);
+    await page.waitFor("!!document.querySelector('.carousel-card.is-center')", 6000);
+    await settle(page);
+    const c = await page.eval(MEASURE('.carousel-card.is-center'));
+    assertFlatPanel(c, file + ' .carousel-card'); assert.equal(c.cursor, 'pointer');
+    assert.equal(c.bg, 'rgb(255, 255, 255)', '평면 흰 배경');
+    await page.click('.carousel-card.is-center');
+    await page.waitFor(`document.getElementById('${view}').classList.contains('active')`, 6000);
+    await settle(page);
+    assertFlatPanel(await page.eval(MEASURE(hdr)), file + ' ' + hdr);
+    assertFlatPanel(await page.eval(MEASURE(sec)), file + ' ' + sec);
+    // 퀴즈 카드
+    await step(page, file === 'science_reading' ? "quizState = { questions: [{ type: 'mcq', question: 'Q', options: ['가', '나', '다', '라'], answer: '다', roundLabel: 'r' }], currentIdx: 0, score: 0, wrong: [], answered: false }; showView('view-quiz'); renderQuestion();"
+      : "quizState = { questions: [{ type: 'mcq', question: 'Q', options: ['가', '나', '다', '라'], answer: '다', roundLabel: 'r' }], currentIdx: 0, score: 0, wrong: [], answered: false }; showView('view-quiz'); renderQuestion();");
+    assertFlatPanel(await page.eval(MEASURE('.quiz-card')), file + ' .quiz-card');
+    await done(page);
+  }
+});
