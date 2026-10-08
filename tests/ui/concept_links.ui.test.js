@@ -28,11 +28,12 @@ async function pickOption(page, selectSel, text) {
   await page.eval(`(() => { const s = document.querySelector(${JSON.stringify(selectSel)}); const o = [...s.options].find(o => o.textContent === ${JSON.stringify(text)}); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
 }
 
-test('연결 목록: 현재 개념의 연결만, AI 연결과 직접 연결을 구분해서 표시', { skip: SKIP }, async () => {
+test('연결 목록: 현재 개념의 연결만 표시, AI 연결·직접 연결을 구분하는 문구는 없음', { skip: SKIP }, async () => {
   const page = await openStudy();
   assert.equal(await page.count('[data-t="link"]'), 1);
   assert.match(await page.text('[data-t="link"] .lk-pair'), /세포 → 광합성/);
-  assert.equal(await page.text('[data-t="link-source"]'), 'AI 판단 · 확인 필요');
+  // 작업210: 출처 배지 제거(저장값 source는 그대로)
+  assert.equal(await page.count('[data-t="link-source"]'), 0);
   await page.click('[data-t="link-open"]');
   await pickOption(page, '#link-to', '엽록체');
   await pickOption(page, '#link-type', '순서');
@@ -44,8 +45,9 @@ test('연결 목록: 현재 개념의 연결만, AI 연결과 직접 연결을 �
   assert.equal(post.body.from_item_id, srv.state.items.find(i => i.term === '광합성').id, '현재 개념에서 이어짐');
   assert.equal(post.body.relation_type, '순서');
   assert.equal(post.body.label, '다음 단계');
-  const sources = await page.eval("[...document.querySelectorAll('[data-t=link-source]')].map(e => e.textContent)");
-  assert.deepEqual(sources.sort(), ['AI 판단 · 확인 필요', '직접 연결'].sort());
+  assert.equal(await page.count('[data-t="link-source"]'), 0);
+  assert.doesNotMatch(await page.text('#linksec'), /AI 판단|확인 필요|직접 연결|직접 수정/);
+  assert.deepEqual(srv.state.links.map(l => l.source).sort(), ['ai', 'user'], '저장값 source는 그대로');
   // 지도에는 코드 변경 없이 새 연결이 그려진다
   await openMap(page);   // 작업209-4: 지도는 팝업
   assert.equal(await page.count('[data-t="edge"]'), 2, '지도의 연결선 2개');

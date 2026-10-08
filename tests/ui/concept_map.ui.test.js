@@ -89,7 +89,7 @@ test('노드를 누르면 그 개념이 선택되고 경로가 늘어남(팝업�
   await done(page);
 });
 
-test('연결선을 누르면 관계 종류·문구·설명 대화상자(AI 연결은 확인 필요 표기)', { skip: SKIP }, async () => {
+test('연결선을 누르면 관계 종류·문구·이유 대화상자(상태 배지 없음)', { skip: SKIP }, async () => {
   const page = await openStudy(five);
   await openMap(page);
   await page.click('[data-t="map-full"]');
@@ -101,7 +101,7 @@ test('연결선을 누르면 관계 종류·문구·설명 대화상자(AI 연�
   assert.equal(await page.text('[data-t="rel-type"]'), '순서');
   assert.equal(await page.text('[data-t="rel-label"]'), '다음 단계');
   assert.equal(await page.text('[data-t="rel-detail"]'), '광합성은 엽록체에서 일어난다.');
-  assert.match(t, /AI 판단 · 확인 필요/);
+  assert.doesNotMatch(t, /AI 판단|확인 필요|직접 연결|직접 수정/, '작업210: 상태 배지 없음');
   await page.click('#edge-close');
   assert.equal(await page.eval("document.getElementById('edge-dialog').open"), false);
   await done(page);

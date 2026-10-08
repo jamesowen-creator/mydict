@@ -300,7 +300,7 @@ test('연결 카드는 팝업 위에 열리고 ESC는 카드부터 닫음(팝업
   await page.waitFor("document.getElementById('edge-dialog').open");
   assert.equal(await sheetOpen(page), true);
   assert.equal(await page.text('[data-t="rel-detail"]'), '광합성은 엽록체에서 일어난다.');
-  assert.equal(await page.text('[data-t="rel-source"]'), 'AI 판단 · 확인 필요');
+  assert.equal(await page.exists('[data-t="rel-source"]'), false, '작업210: 상태 배지 없음');
   // 카드가 지도 위(맨 앞)에 보이는가
   assert.equal(await page.eval("(() => { const r = document.getElementById('edge-body').getBoundingClientRect(); const e = document.elementFromPoint(r.left + 5, r.top + 5); return !!e && document.getElementById('edge-dialog').contains(e); })()"), true);
   await pressEsc(page);
