@@ -37,7 +37,9 @@
     --accent-zh: #c0392b;
     --text: #1a1f3c;
     --text2: #4a5070;
-    --text3: #9398b5;
+    /* 작업220: 약한 글자색 #9398b5는 페이지 바탕 2.8:1·보조 바탕 2.5:1로 4.5:1에 못 미쳐서, 세 바탕(#f5f7ff, #eef1fb, 흰색) 모두에서 4.5:1 이상인 기존 색 --text2(#4a5070, 6.7:1 이상)와 같은 값으로 올림. 이 팔레트에는 더 연하면서 4.5:1을 넘는 색이 없음 */
+    --text3: #4a5070;
+    --accent-text: #b8442e;   /* 작업220: 섹션 제목 글자색(흰·페이지 바탕 위 5:1 이상). 값은 다른 화면의 --primary-dark 와 같음 */
     --correct: #16a34a;
     --wrong: #dc2626;
     --radius: 16px;
@@ -654,16 +656,16 @@
     font-family: 'Sora', sans-serif;
     font-size: 12px;
     font-weight: 700;
-    color: var(--accent);
+    color: var(--accent-text);   /* 작업220: 글자색만 대비 개선(선 색은 그대로) */
     letter-spacing: 0.08em;
     padding: 6px 4px 4px;
     border-bottom: 2px solid var(--accent);
     margin-bottom: 6px;
   }
 
-  .alpha-header.ko { color: var(--accent-ko); border-bottom-color: var(--accent-ko); }
-  .alpha-header.ja { color: var(--accent-ja); border-bottom-color: var(--accent-ja); }
-  .alpha-header.zh { color: var(--accent-zh); border-bottom-color: var(--accent-zh); }
+  .alpha-header.ko { border-bottom-color: var(--accent-ko); }   /* 작업220: 글자색은 기본 --accent-text로 통일 */
+  .alpha-header.ja { border-bottom-color: var(--accent-ja); }   /* 작업220: 글자색은 기본 --accent-text로 통일 */
+  .alpha-header.zh { border-bottom-color: var(--accent-zh); }   /* 작업220: 글자색은 기본 --accent-text로 통일 */
 
   .alpha-words {
     display: flex;
