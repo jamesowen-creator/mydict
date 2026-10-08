@@ -14,7 +14,7 @@ const TABLE_DEFAULTS = {
     content_source: 'none', status: 'active', review_state: 'new', origin: null, note: null,
     suggestions: null, feedback: null, legacy_voice_concept_id: null, created_at: new Date(), updated_at: new Date(),
   }),
-  concept_links: () => ({ label: null, detail: null, created_at: new Date() }),
+  concept_links: () => ({ label: null, detail: null, user_edited: false, created_at: new Date() }),
   voice_concepts: () => ({}),
   concept_quiz_attempts: () => ({ created_at: new Date() }),
   concept_migrations: () => ({ done_at: new Date() }),

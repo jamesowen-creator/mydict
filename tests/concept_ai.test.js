@@ -127,7 +127,7 @@ test('서버 검증: 선택 항목은 길이 초과 시 자르지 않고 비움,
   anthropic.handler = () => good({
     english: 'e'.repeat(81), group_label: 'g'.repeat(31), definition: 'd'.repeat(300), example: 'x'.repeat(201),
     simple_text: 's'.repeat(251), deeper_text: 'p'.repeat(250),
-    relation: { relation_type: '없는관계', label: 'l'.repeat(41), detail: 't'.repeat(201) },
+    relation: { relation_type: '없는관계', label: 'l'.repeat(41), detail: 't'.repeat(301) },
     suggestions: [
       sug('t'.repeat(41)),                                                     // 용어 초과 → 제안 버림
       sug('가'.repeat(40), { reason: 'r'.repeat(121), relation_type: '??', relation_label: 'l'.repeat(41), load: '엄청' }),
