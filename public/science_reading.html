@@ -73,11 +73,11 @@
   /* 작업199: 제목 줄은 공용 /css/common/screenBar.css(.screen-bar) */
 
   /* 작업155: 과목별 캐러셀 상단의 현재 과목 칩 */
+  /* 작업216-6: 표시만 하는 분야 이름은 알약·채움 없이 글자. 색 의미(분야)는 글자색 --field-ink로 옮김(흰 바탕 5.52~6.98:1; 흰 글자+분야 색 바탕은 3.05~4.4:1이었음) */
   .subject-chip {
     display: inline-flex; align-items: center;
-    padding: 6px 14px; border-radius: 999px;
-    font-size: 14px; font-weight: 700;
-    background: var(--field-tone, #8A8F99); color: #fff;
+    font-size: 12px; font-weight: 700;
+    color: var(--field-ink, #5E6470);
   }
 
   /* ── View 0: Subject select (작업155) ── */
@@ -1227,6 +1227,7 @@ function renderFieldCarousel(field) {
   const chip = document.getElementById('subject-chip');
   chip.textContent = field;
   chip.style.setProperty('--field-tone', col.tone);
+  chip.style.setProperty('--field-ink', col.ink);
 }
 
 // home-wheel ThreeDWheelPicker.jsx → digest_reading.html Carousel을 그대로
