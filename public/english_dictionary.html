@@ -58,6 +58,10 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    /* 작업219: 태블릿 이상 폭에서 헤더(body 첫 자식)가 가운데에 오도록 다른 화면(문학 나침반·과학 읽기 등)과 같은 방식으로
+       화면 전체 열을 --content-max 폭으로 제한하고 가운데에 둔다 */
+    max-width: var(--content-max);
+    margin: 0 auto;
   }
 
   /* NAV - 작업12: 상단 sticky에서 하단 fixed로 이동. 활성 표시선은
@@ -74,8 +78,11 @@
     align-items: center;
     gap: 0;
     position: fixed;
-    left: 0;
-    right: 0;
+    /* 작업219: 하단 내비도 다른 화면의 .tab-bar와 같은 방식(left 50% + translateX + max-width)으로 가운데에 둔다 */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: var(--content-max);
     bottom: 0;
     z-index: 100;
     min-height: var(--navbar-h);
