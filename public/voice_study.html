@@ -158,6 +158,8 @@
   }
   textarea { min-height: 280px; line-height: 1.7; resize: vertical; }
   textarea.summary { min-height: 150px; }
+  /* 작업215-2: 원문·요약 칸은 내용 길이만큼 늘어난다(안쪽 스크롤·크기 조절 손잡이 없음). 높이는 autoGrow()가 맞춘다 */
+  textarea.auto-grow { overflow-y: hidden; resize: none; }
   input[type=text]:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
   .counter { font-size: 12px; color: var(--text2); text-align: right; margin-top: 4px; }
   .meta { font-size: 12px; color: var(--text2); margin-top: 10px; line-height: 1.6; }
@@ -395,12 +397,12 @@
       </div>
     </div>
     <label class="field-label" for="edit-text">원문 (수정할 수 있습니다)</label>
-    <textarea id="edit-text"></textarea>
+    <textarea id="edit-text" class="auto-grow"></textarea>
     <div id="edit-counter" class="counter">0자</div>
     <div id="autosave" class="msg info" style="display:none"><span id="autosave-text"></span><button id="undo-append" class="btn small secondary" type="button" style="display:none;margin-left:8px">되돌리기</button></div>
     <div id="over-box" style="display:none">
       <div id="over-msg" class="msg warn">이어 붙이면 한도를 넘어 추가하지 않았습니다. 변환된 글을 복사해 두고 새 자료로 나누어 주세요.</div>
-      <textarea id="over-text" class="summary" readonly aria-label="추가하지 못한 변환 결과"></textarea>
+      <textarea id="over-text" class="summary auto-grow" readonly aria-label="추가하지 못한 변환 결과"></textarea>
       <div class="btn-row"><button id="over-copy" class="btn small secondary" type="button">복사</button><button id="over-close" class="btn small secondary" type="button">닫기</button></div>
     </div>
     <div id="append-row" class="btn-row" style="display:none;flex-wrap:wrap">
@@ -418,7 +420,7 @@
       <select id="sum-type" class="sel"></select>
     </div>
     <div id="sum-status" class="convert-status" style="display:none;margin-top:8px"><div class="spinner small"></div><span>요약하는 중…</span></div>
-    <textarea id="edit-summary" class="summary" maxlength="5000" placeholder="요약이 여기에 표시됩니다. 직접 쓰거나 고칠 수도 있습니다."></textarea>
+    <textarea id="edit-summary" class="summary auto-grow" maxlength="5000" placeholder="요약이 여기에 표시됩니다. 직접 쓰거나 고칠 수도 있습니다."></textarea>
     <div id="sum-counter" class="counter">0 / 5000</div>
     <div id="sum-warn" class="msg warn"></div>
     <div id="tts-box" class="tts-box">
@@ -662,6 +664,69 @@ let editDirty = false;
 let pending = null;       // { blob, seconds, mime } - 변환 전/실패 시 메모리에만 유지
 
 const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료', quiz: '퀴즈', chat: '질문하기', merge: '자료 합치기', wrong: '오답 노트' };
+// ── 작업215-2: 원문·요약·추가하지 못한 변환 결과 칸 자동 높이 ──
+// el.style.height = 'auto' 후 scrollHeight로 맞춘다. min-height(CSS)는 그대로 유지된다.
+// 숨겨진 화면(display:none)에서는 scrollHeight가 0이라 건너뛰고, 그 화면이 보이게 될 때(showView) 다시 맞춘다.
+// CSS field-sizing: content는 쓰지 않는다(지원이 갈리고, 인라인 height가 있으면 어차피 JS 값이 이긴다 → iOS Safari에서도 같은 동작).
+const AUTO_GROW_IDS = ['edit-text', 'edit-summary', 'over-text'];
+function autoGrow(el) {
+  if (!el || el.getClientRects().length === 0) return;
+  const x = window.scrollX, y = window.scrollY;
+  const cs = getComputedStyle(el);
+  el.style.height = 'auto';
+  let h = el.scrollHeight;
+  if (cs.boxSizing === 'border-box') h += parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+  else h -= parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  el.style.height = h + 'px';
+  if (window.scrollY !== y || window.scrollX !== x) window.scrollTo(x, y);   // 높이를 줄였다 늘리는 사이에 문서가 짧아져 스크롤이 밀리는 것을 되돌린다
+}
+function autoGrowAll() { for (const id of AUTO_GROW_IDS) autoGrow($(id)); }
+
+// 입력 중 커서가 있는 줄이 화면(보이는 영역, 위쪽 고정 막대 아래) 밖으로 나가면 그만큼만 스크롤한다.
+// 브라우저가 이미 보여 줬다면 아무것도 하지 않는다. 글자 수만큼 가려진 미러 요소로 커서 위치를 잰다.
+const CARET_MIRROR_PROPS = ['boxSizing', 'width', 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight', 'wordSpacing', 'textIndent',
+  'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'borderStyle', 'tabSize', 'wordBreak'];
+function ensureCaretVisible(el) {
+  if (document.activeElement !== el || el.getClientRects().length === 0) return;
+  const cs = getComputedStyle(el);
+  const mirror = document.createElement('div');
+  for (const p of CARET_MIRROR_PROPS) mirror.style[p] = cs[p];
+  Object.assign(mirror.style, { position: 'absolute', left: '-9999px', top: '0', visibility: 'hidden', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', height: 'auto' });
+  mirror.textContent = el.value.slice(0, el.selectionEnd);
+  const mark = document.createElement('span');
+  mark.textContent = '\u200b';
+  mirror.appendChild(mark);
+  document.body.appendChild(mirror);
+  const lineBottom = el.getBoundingClientRect().top + parseFloat(cs.borderTopWidth) + mark.offsetTop + mark.offsetHeight;
+  mirror.remove();
+  const vv = window.visualViewport;
+  const bottomLimit = (vv ? vv.height : window.innerHeight) - 12;
+  const bar = $('subbar');
+  const topLimit = bar && bar.getClientRects().length ? bar.getBoundingClientRect().bottom + 8 : 0;
+  const lineHeight = parseFloat(cs.lineHeight) || mark.offsetHeight;
+  if (lineBottom > bottomLimit) window.scrollBy(0, lineBottom - bottomLimit);
+  else if (lineBottom - lineHeight < topLimit) window.scrollBy(0, lineBottom - lineHeight - topLimit);
+}
+// 입력 이벤트: 한글 조합 중(IME)에는 높이를 건드리지 않고, 조합이 끝난 뒤 한 번 맞춘다. 맞춘 다음 프레임에 커서 위치를 확인한다.
+const composing = new Set();
+function growOnInput(el, ev) {
+  if (composing.has(el) || (ev && ev.isComposing)) return;
+  autoGrow(el);
+  requestAnimationFrame(() => ensureCaretVisible(el));
+}
+for (const id of ['edit-text', 'edit-summary']) {
+  const el = $(id);
+  el.addEventListener('compositionstart', () => composing.add(el));
+  el.addEventListener('compositionend', () => { composing.delete(el); growOnInput(el); });
+  el.addEventListener('input', ev => growOnInput(el, ev));
+}
+// 창 크기·회전: 줄바꿈이 달라지므로 다시 맞춘다(프레임당 한 번). 웹폰트가 늦게 적용돼도 다시 맞춘다
+let growFrame = 0;
+const growSoon = () => { if (!growFrame) growFrame = requestAnimationFrame(() => { growFrame = 0; autoGrowAll(); }); };
+window.addEventListener('resize', growSoon);
+window.addEventListener('orientationchange', growSoon);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(growSoon);
+
 function showView(name) {
   stopSpeech();   // 작업182: 화면 이동 시 읽어주기 즉시 정지
   if (name !== 'edit' && name !== 'quiz' && name !== 'chat') hideImage();   // 작업190: 상세를 떠나면 그림 조회 중단·blob 주소 해제
@@ -671,6 +736,7 @@ function showView(name) {
   for (const v of ['list', 'record', 'edit', 'quiz', 'chat', 'merge', 'wrong']) $('view-' + v).classList.toggle('active', v === name);
   $('page-title').textContent = TITLES[name];
   $('subbar').style.display = name === 'list' ? 'none' : '';
+  autoGrowAll();   // 작업215-2: 숨겨져 있던 화면의 칸은 이제 보이므로 높이를 맞춘다
   window.scrollTo(0, 0);
 }
 function go(name) {
@@ -1255,6 +1321,7 @@ function resetSummaryUi() {
   hideLinks();
   hideImage();
   $('edit-summary').value = '';
+  autoGrow($('edit-summary'));
   $('sum-type').value = '';
   setMsg('sum-warn', '');
   setSubject('', '');
@@ -1339,6 +1406,7 @@ $('sum-make').addEventListener('click', async () => {
   $('sum-status').style.display = 'none';
   $('sum-make').disabled = false;
   $('edit-summary').value = (data && data.summary) || '';
+  autoGrow($('edit-summary'));
   setStale(false);   // 새 요약은 현재 원문을 기준으로 만들어졌다(저장하면 서버가 기준 원문을 갱신)
   setMsg('sum-warn', '');
   // 과목은 사용자가 아직 고르지 않았을 때만 채운다(이미 고른 값은 덮어쓰지 않음)
@@ -2190,8 +2258,9 @@ function resetAutoSaveUi() {
   autoSaving = false; undoState = null; justConverted = false;
   setAutosave('');
   setStale(false);
-  $('over-box').style.display = 'none';
   $('over-text').value = '';
+  autoGrow($('over-text'));   // 숨기기 전에 맞춘다(숨겨진 칸은 건너뛰어 옛 높이가 남기 때문)
+  $('over-box').style.display = 'none';
   $('edit-save').disabled = false;
 }
 function refreshAppendUi() {
@@ -2283,12 +2352,14 @@ async function appendConverted(text) {
     $('over-text').value = piece;
     $('over-msg').textContent = '이어 붙이면 ' + fmtN(textMax) + '자를 넘어 추가하지 않았습니다. 변환된 글을 복사해 두고 새 자료로 나누어 주세요.';
     $('over-box').style.display = '';
+    autoGrow($('over-text'));   // 상자를 보이게 한 직후 높이를 맞춘다(편집 화면이 가려져 있으면 showView가 다시 맞춤)
     history.back();
     setAutosave('원문이 ' + fmtN(textMax) + '자를 넘지 않도록 추가하지 않았습니다.', 'warn');
     return;
   }
   undoState = cur.trim() ? { prev: cur } : null;
   $('edit-text').value = next;
+  autoGrow($('edit-text'));
   $('over-box').style.display = 'none';
   justConverted = true;
   editDirty = true;
@@ -2301,6 +2372,7 @@ $('undo-append').addEventListener('click', async () => {
   const prev = undoState.prev;
   undoState = null;
   $('edit-text').value = prev;
+  autoGrow($('edit-text'));
   editDirty = true;
   updateCounter();
   await autoSaveExisting('되돌렸습니다. 자동 저장됨', false);
@@ -2311,7 +2383,7 @@ $('over-copy').addEventListener('click', async () => {
   box.focus(); box.select();
   setMsg('edit-msg', '글을 선택했습니다. 복사해 주세요.', 'info');
 });
-$('over-close').addEventListener('click', () => { $('over-box').style.display = 'none'; $('over-text').value = ''; });
+$('over-close').addEventListener('click', () => { $('over-text').value = ''; autoGrow($('over-text')); $('over-box').style.display = 'none'; });
 $('after-sum').addEventListener('click', () => { $('sum-make').click(); });
 $('after-list').addEventListener('click', requestBack);
 $('stale-remake').addEventListener('click', () => { $('sum-make').click(); });

@@ -23,7 +23,7 @@ function freshState() {
     voicePlan: [],      // 음성 변환 응답 계획 [{ status, body }]. 비어 있으면 { text: '광합성' }
     voiceCalls: [],     // 음성 변환 호출 기록 { type, seconds, bytes }
     quizAnswers: [],    // 돌아보기 퀴즈 답안 기록(POST .../review/answer)
-    voiceNotes: [],     // 음성 학습 자료 목록(GET /api/voice-notes)
+    voiceNotes: [],     // 음성 학습 자료 목록(GET /api/voice-notes). 상세(GET /api/voice-notes/:id)도 같은 배열에서 찾는다(작업215-2)
     adminUsers: [],     // 관리자 화면 테스트용 사용자 목록(GET/PATCH /api/admin/users)
     networkDown: false, // true면 explore 요청의 연결을 끊음
     delayMs: 0,         // 모든 concepts API 응답 지연(대기 표시 확인용)
@@ -87,6 +87,19 @@ async function startMockServer() {
     if (u === '/api/me') return state.authed ? J(200, state.me) : J(401, { error: 'no' });
     if (!state.authed) return J(401, { error: '로그인이 필요합니다.' });
     if (u === '/api/voice-notes' && m === 'GET') return J(200, state.voiceNotes);   // 작업196: 음성 학습 목록 화면 테스트용
+    // 작업215-2: 자료 상세(GET /api/voice-notes/:id)와 상세 화면이 함께 부르는 연결·퀴즈·그림 조회. 필드는 routes/voice_study.js의 상세 응답과 같다
+    const vn = u.match(/^\/api\/voice-notes\/(\d+)(?:\/(links|quiz|image))?$/);
+    if (vn && m === 'GET') {
+      const note = state.voiceNotes.find(n => n.id === Number(vn[1]));
+      if (!note) return J(404, { error: '자료를 찾을 수 없습니다.' });
+      if (vn[2] === 'links') return J(200, { status: 'none', links: [], keywords: [] });
+      if (vn[2]) return J(404, { error: '없음' });   // 퀴즈·그림은 아직 없는 자료
+      return J(200, {
+        id: note.id, title: note.title || '', transcript: note.transcript || '', summary: note.summary || '', subject: note.subject || null,
+        subject_detail: note.subject_detail || null, created_at: note.created_at || '2026-01-01T00:00:00Z', updated_at: note.updated_at || note.created_at || '2026-01-01T00:00:00Z',
+        summary_stale: false, merged_from: null,
+      });
+    }
     if (state.delayMs && u.startsWith('/api/concepts')) await new Promise(r => setTimeout(r, state.delayMs));
     if (u === '/api/concepts/studies' && m === 'GET') {
       return J(200, state.studies.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at)).map(({ path: p, ...s }) => {
