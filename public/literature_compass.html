@@ -52,8 +52,9 @@
     align-items: center; justify-content: center;
     background: var(--bg); z-index: 999; gap: 16px;
   }
+  /* 작업220: 화면 로딩 스피너 32px */
   .spinner {
-    width: 40px; height: 40px;
+    width: 32px; height: 32px;
     border: 3px solid var(--primary-light);
     border-top-color: var(--primary);
     border-radius: 50%;
@@ -203,9 +204,11 @@
   /* ── Briefing View ── */
   #view-briefing .content { padding: 20px 16px; }
   .briefing-section { margin-bottom: 20px; }
+  /* 작업220: 섹션 제목 규격 — 12px / 700 / --primary-dark(5.38:1) / 아래 2px 코랄 선(장식) */
   .section-label {
-    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
-    color: var(--primary); text-transform: uppercase;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--primary-dark); text-transform: uppercase;
+    padding-bottom: 4px; border-bottom: 2px solid var(--primary);
     margin-bottom: 8px;
   }
   /* 작업217-4: 설명 영역은 테두리·둥근 모서리 없이 흰 바탕 면만 */
@@ -240,9 +243,9 @@
     color: #fff;
     border: none;
     border-radius: var(--btn-radius);
-    padding: 16px;
+    padding: 10px 20px;   /* 작업220: 주 버튼 규격 — 높이 최소 44px, 15px / 600, 좌우 padding 20px */
     width: 100%;
-    font-size: 15px; font-weight: var(--btn-weight);
+    font-size: 15px; font-weight: 600;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center; gap: 8px;
     transition: background 0.15s; font-family: 'Noto Sans KR', sans-serif;
@@ -324,8 +327,9 @@
   /* Back face */
   .back-section { margin-bottom: 18px; }
   .back-section-title {
-    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
-    color: var(--primary); margin-bottom: 6px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--primary-dark); margin-bottom: 6px;
+    padding-bottom: 4px; border-bottom: 2px solid var(--primary);
     display: flex; align-items: center; gap: 6px;
   }
   .back-section-title svg { width: 13px; height: 13px; }
@@ -375,9 +379,9 @@
     color: #fff;
     border: none;
     border-radius: var(--btn-radius);
-    padding: 16px;
+    padding: 10px 20px;
     width: calc(100% - 32px);
-    font-size: 15px; font-weight: var(--btn-weight);
+    font-size: 15px; font-weight: 600;
     cursor: pointer;
     display: none; align-items: center; justify-content: center; gap: 8px;
     transition: background 0.15s; font-family: 'Noto Sans KR', sans-serif;
@@ -493,8 +497,8 @@
     min-height: var(--ctl-min-h); margin-top: 20px;
     background: var(--btn-primary-bg, #b8442e); color: #fff;
     border: none; border-radius: var(--btn-radius);
-    padding: 14px; width: 100%;
-    font-size: 15px; font-weight: var(--btn-weight); cursor: pointer;
+    padding: 10px 20px; width: 100%;
+    font-size: 15px; font-weight: 600; cursor: pointer;
     display: none; font-family: 'Noto Sans KR', sans-serif;
     transition: background 0.15s;
   }
@@ -515,7 +519,7 @@
   .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
   .result-submsg { font-size: 13px; color: var(--text2); margin-top: 4px; }
 
-  .result-section-label { font-size: 13px; font-weight: 700; color: var(--text2); margin-bottom: 12px; letter-spacing: 0.03em; }
+  .result-section-label { font-size: 12px; font-weight: 700; color: var(--primary-dark); margin-bottom: 12px; letter-spacing: 0.03em; padding-bottom: 4px; border-bottom: 2px solid var(--primary); }
   .result-wrong-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
   /* 작업217-3: 틀린 문항은 박스 없이 구분선 행. 정답 글자는 --success-dark(흰 바탕 약 10:1) */
   .result-wrong-item {
@@ -529,15 +533,16 @@
 
   .result-actions { display: flex; flex-direction: column; gap: 10px; }
   .result-btn {
-    min-height: var(--ctl-min-h); border-radius: var(--btn-radius); padding: 15px;
-    font-size: 15px; font-weight: var(--btn-weight); cursor: pointer;
+    min-height: var(--ctl-min-h); border-radius: var(--btn-radius); padding: 10px 20px;
+    font-size: 15px; font-weight: 600; cursor: pointer;
     border: none; transition: all 0.15s;
     font-family: 'Noto Sans KR', sans-serif;
   }
   .result-btn-primary { background: var(--btn-primary-bg, #b8442e); color: #fff; }
   .result-btn-primary:hover { background: var(--btn-primary-bg-hover, #9c3a27); }
   /* 작업217-2: 보조 결과 버튼은 박스 없이 밑줄 텍스트(높이 44px = .result-btn min-height, 가로 44px 이상). 글자 --text2는 페이지 바탕(#FAFAF9) 위 4.63:1 */
-  .result-btn-secondary { background: transparent; color: var(--text2); border: none; min-width: var(--ctl-min-h); text-decoration: underline; text-underline-offset: 3px; }
+  /* 작업220: 텍스트 버튼 규격 — 15px / 600, 보조색, padding 0 8px, 최소 44×44px, 밑줄 */
+  .result-btn-secondary { background: transparent; color: var(--text2); border: none; padding: 0 8px; min-height: var(--ctl-min-h); min-width: var(--ctl-min-h); font-size: 15px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
   .result-btn-secondary:hover { background: transparent; color: var(--text1); }
   .result-btn-secondary:focus-visible { outline: 2px solid var(--text1); outline-offset: 2px; border-radius: 4px; }
 
