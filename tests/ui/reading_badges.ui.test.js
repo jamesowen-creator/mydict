@@ -253,3 +253,107 @@ for (const w of [390, 768, 1024]) {
 }
 
 async function done(page) { assert.deepEqual(page.errors, [], '스크립트 오류 없음'); assert.equal(await page.hasHorizontalScroll(), false, '가로 스크롤 없음'); await page.close(); }
+
+// ───────────────────────── 작업216-8: 누락 보강 + 자동 훑기 ─────────────────────────
+test('literature 핵심 키워드(.keyword-tag): 박스·알약 없는 12px 보조색 글자, "·"로 구분(마지막 제외), 390px에서 줄바꿈되어도 넘침 없음', { skip: SKIP }, async () => {
+  const page = await open('literature_compass', 390);
+  const id = await page.eval(PICK_MOVEMENT);
+  await step(page, `showBriefing(${JSON.stringify(id)})`);
+  const m = await must(page, '.keyword-tag');
+  assertPlainText(m, '.keyword-tag');
+  assert.equal(m.weight, '500'); assert.equal(m.cursor, 'auto', '눌리지 않는 요소');
+  assert.equal(await page.eval("document.querySelector('.keyword-tag').closest('button, a, [onclick]')"), null, '눌리는 요소 안에 있지 않음');
+  const n = await page.count('.keyword-tag');
+  assert.ok(n >= 1);
+  assert.equal(await pseudo(page, '.keyword-tag:last-child', '::after'), 'none', '마지막 키워드에는 구분자 없음');
+  if (n >= 2) assert.equal(await pseudo(page, '.keyword-tag:first-child', '::after'), '"·"');
+  // 긴 키워드 12개로 강제 줄바꿈: 가로 넘침 없음, 각 키워드는 컨테이너 안, 구분자는 앞 키워드에 붙어 줄 맨 앞에 오지 않음
+  await step(page, `(() => { const box = document.querySelector('.keyword-tags'); box.innerHTML = Array.from({ length: 12 }, (_, i) => '<span class="keyword-tag">긴키워드번호' + i + '입니다</span>').join(''); })()`);
+  const geo = await page.eval(`(() => { const box = document.querySelector('.keyword-tags').getBoundingClientRect(); const tags = [...document.querySelectorAll('.keyword-tag')].map(e => e.getBoundingClientRect());
+    return { lines: new Set(tags.map(r => Math.round(r.top))).size, inside: tags.every(r => r.left >= box.left - 0.5 && r.right <= box.right + 0.5), docW: document.documentElement.scrollWidth, winW: innerWidth }; })()`);
+  assert.ok(geo.lines >= 2, '줄바꿈이 실제로 일어남');
+  assert.ok(geo.inside, '키워드가 컨테이너 밖으로 나가지 않음');
+  assert.ok(geo.docW <= geo.winW, '문서 가로 넘침 없음');
+  await done(page);
+});
+
+test('science .source-tier: 알약·채움 없이 11px 보조색 글자, 대비 4.5:1 이상, 눌리지 않음(출처 링크 밖)', { skip: SKIP }, async () => {
+  const page = await open('science_reading', 390);
+  await step(page, "openField(FIELD_ORDER[0])");
+  await step(page, "showScience(DB.concepts.find(c => c.sources && c.sources.length).id)");
+  const m = await must(page, '.source-tier');
+  assertPlainText(m, '.source-tier', { maxSize: 12 });
+  assert.equal(m.size, 11); assert.equal(m.cursor, 'auto');
+  assert.equal(await page.eval("document.querySelector('.source-tier').closest('button, a, [onclick]')"), null, '출처 링크(<a>) 안에 들어 있지 않음');
+  await done(page);
+});
+
+// 자동 훑기: 눌리지 않는 요소 중 radius ≥ 12px 이면서 (배경이 투명이 아니거나 테두리가 있는) 것은 허용 목록 밖에서 0개여야 한다.
+// 눌리는 요소(button, a, [onclick], [role=button])와 그 자손은 제외한다(칩·탭·선택지·토글은 유지 대상).
+// 허용 목록 = 표시 뱃지가 아닌 "장식·구조" 요소. 새 요소가 이 조건에 걸리면 뱃지 변환 여부를 먼저 따져 보게 하려는 장치다.
+const SWEEP_ALLOW = [
+  ['.era-card', '시대 구역 카드(컨테이너)'],
+  ['.section-box', '사조 설명의 본문 박스(컨테이너)'],
+  ['.flip-card, .flip-card-front, .flip-card-back', '작품 카드(컨테이너, 카드 전체가 눌려 뒤집힘)'],
+  ['.quiz-card', '퀴즈 카드(컨테이너)'],
+  ['.result-score-wrap', '결과 화면의 점수 카드: 이모지·점수·메시지를 담은 테두리·그림자 카드(컨테이너). 칩·알약 형태의 뱃지가 아니라 유지'],
+  ['.result-wrong-item', '결과 화면 틀린 문항 행 카드(컨테이너)'],
+  ['.science-work-header, .science-section, .digest-work-header, .digest-section', '상세 화면 구역 카드(컨테이너)'],
+  ['.carousel-card', '캐러셀 작품 카드(컨테이너)'],
+  ['.subject-card', '과목 선택 카드(컨테이너)'],
+  ['.spinner', '로딩 스피너'],
+  ['.dot, .dot-indicators *', '카드 위치 표시 점(진행 표시)'],
+  ['.quiz-progress-bar-wrap, .quiz-progress-bar', '퀴즈 진행 막대(진행 표시)'],
+];
+const SWEEP = `(() => {
+  const allow = ${JSON.stringify(SWEEP_ALLOW.map(a => a[0]).join(','))};
+  const out = [];
+  for (const e of document.querySelectorAll('.view.active *')) {
+    if (!e.getClientRects().length) continue;
+    if (e.closest('button, a, [onclick], [role=button]')) continue;
+    if (e.matches(allow)) continue;
+    const cs = getComputedStyle(e);
+    if (parseFloat(cs.borderTopLeftRadius) < 12 && !/%/.test(cs.borderTopLeftRadius)) continue;
+    if (cs.borderTopLeftRadius === '0px') continue;
+    const bg = cs.backgroundColor !== 'rgba(0, 0, 0, 0)' || cs.backgroundImage !== 'none';
+    const border = parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none';
+    if (bg || border) out.push((e.id ? '#' + e.id : '') + '.' + String(e.className).replace(/ /g, '.') + ' <' + e.tagName.toLowerCase() + '> "' + e.textContent.trim().slice(0, 12) + '"');
+  }
+  return out;
+})()`;
+const sweep = async (page, label) => assert.deepEqual(await page.eval(SWEEP), [], label + ': 눌리지 않는 요소 중 알약/원/둥근 박스(배경·테두리) 발견');
+
+test('자동 훑기: literature 홈·사조 설명·카드 앞/뒤·결과 화면에 눌리지 않는 알약/채움 박스가 없음(허용 목록 제외)', { skip: SKIP }, async () => {
+  const page = await open('literature_compass', 390);
+  await sweep(page, '홈');
+  const id = await page.eval(PICK_MOVEMENT);
+  await step(page, `showBriefing(${JSON.stringify(id)})`); await sweep(page, '사조 설명');
+  await step(page, 'showCards()'); await sweep(page, '카드 앞면');
+  await step(page, 'flipCard()'); await sweep(page, '카드 뒷면');
+  await step(page, "quizData = { rounds: [], currentRound: 0, currentQ: 0, score: 1, totalQ: 4, wrong: [{ q: '문항', a: '정답' }] }; showView('view-result'); showResult()");
+  assert.ok(await page.count('.result-score-wrap') === 1, '결과 화면이 그려짐');
+  await sweep(page, '결과 화면');
+  await done(page);
+});
+
+test('자동 훑기: science 과목 선택·캐러셀·개념 상세, digest 목록·작품 상세에 눌리지 않는 알약/채움 박스가 없음(허용 목록 제외)', { skip: SKIP }, async () => {
+  let page = await open('science_reading', 390);
+  await sweep(page, 'science 과목 선택');
+  await step(page, 'openField(FIELD_ORDER[0])'); await sweep(page, 'science 캐러셀');
+  await step(page, "showScience(DB.concepts.find(c => c.sources && c.sources.length).id)"); await sweep(page, 'science 개념 상세');
+  await done(page);
+  page = await open('digest_reading', 390);
+  await sweep(page, 'digest 목록');
+  await step(page, 'showDigest(DB.works[0].id)'); await sweep(page, 'digest 작품 상세');
+  await done(page);
+});
+
+test('자동 훑기 자체 검증: 허용 목록 밖의 알약 span을 넣으면 반드시 잡아낸다(훑기가 아무것도 못 잡는 상태가 아님)', { skip: SKIP }, async () => {
+  const page = await open('literature_compass', 390);
+  await step(page, "(() => { const s = document.createElement('span'); s.className = 'probe-pill'; s.textContent = '프로브'; s.style.cssText = 'display:inline-block;padding:4px 10px;border-radius:20px;background:#fee'; document.querySelector('.view.active').appendChild(s); })()");
+  const found = await page.eval(SWEEP);
+  assert.equal(found.length, 1); assert.match(found[0], /probe-pill/);
+  await step(page, "document.querySelector('.probe-pill').style.cssText = 'display:inline-block;border:1px solid #888;border-radius:50%'");
+  assert.equal((await page.eval(SWEEP)).length, 1, '테두리만 있는 원도 잡음');
+  await page.close();
+});

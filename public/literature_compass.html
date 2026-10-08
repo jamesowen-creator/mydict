@@ -204,14 +204,12 @@
     padding: 14px 16px;
     font-size: 14px; line-height: 1.7; color: var(--text1);
   }
-  .keyword-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .keyword-tags { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+  /* 작업216-8: 표시만 하는 핵심 키워드는 박스·알약 없이 작은 보조색 글자("·"로 구분, 마지막 제외). 글자 --text2는 페이지 바탕(#FAFAF9) 4.63:1 */
   .keyword-tag {
-    background: var(--primary-light);
-    color: var(--primary-dark);
-    border-radius: 20px;
-    padding: 5px 12px;
-    font-size: 13px; font-weight: 500;
+    font-size: 12px; font-weight: 500; color: var(--text2);
   }
+  .keyword-tag:not(:last-child)::after { content: '·'; margin-left: 8px; color: var(--text2); }
   .author-chips { display: flex; flex-wrap: wrap; gap: 6px 16px; }
   /* 작업216-6: 표시만 하는 작가 이름은 박스 없이 작은 보조색 글자(앞의 작은 점이 구분 표시). 글자 --text2는 흰 바탕 4.83:1 */
   .author-chip {
