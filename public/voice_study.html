@@ -105,6 +105,15 @@
   .btn.danger:hover:not(:disabled) { background: var(--error-light); }
   .btn.block { display: flex; width: 100%; }
   .btn.small { min-height: var(--ctl-min-h); padding: 10px 14px; border-radius: var(--btn-radius); font-size: 13px; }
+  /* 작업216: 보조 동작은 박스 없이 텍스트로(concept_study.html의 .btn.text와 같은 모양). 터치 영역은 높이 44px(.btn) + 가로 44px 이상.
+     글자색 --text2는 흰 배경 4.83:1, --bg 4.63:1(4.5:1 이상). 위험 글자색은 --error(3.93:1)가 부족해 더 진한 기존 토큰 --primary-dark(5.38:1)를 쓴다 */
+  .btn.text { background: transparent; border: none; padding: 10px 6px; min-width: var(--ctl-min-h); color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
+  .btn.text:hover:not(:disabled), .btn.text:active:not(:disabled) { background: transparent; color: var(--text1); }
+  .btn.text.danger { background: transparent; color: var(--primary-dark); }
+  .btn.text.danger:hover:not(:disabled), .btn.text.danger:active:not(:disabled) { background: transparent; color: var(--btn-primary-bg-hover, #9c3a27); }
+  .btn.text:focus-visible { outline: 2px solid var(--text1); outline-offset: 2px; border-radius: 4px; }
+  /* 옅은 코랄 안내 상자(.msg.info, 바탕 #FDF0EC) 안의 텍스트 버튼은 --text2가 4.34:1이라 상자 글자색(--primary-dark, 4.83:1)을 쓴다 */
+  .msg.info .btn.text { color: var(--primary-dark); }
   .btn-row { display: flex; gap: 10px; margin-top: 12px; }
   .btn-row .btn { flex: 1; }
 
@@ -242,8 +251,9 @@
   /* 작업188: 연결된 자료 · 연상 키워드 */
   .link-card { margin-bottom: 10px; padding: 14px 16px; }
   .link-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .link-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--primary-light); color: var(--primary-dark); }
-  .link-badge.bg { background: var(--bg); color: var(--text2); border: 1px solid var(--border); }
+  /* 작업216: 표시만 하는 뱃지는 박스·테두리·알약 없이 작은 보조색 텍스트(눌리는 버튼과 구분). 글자 대비 5.38:1 / 4.83:1 / 17.4:1 */
+  .link-badge { font-size: 12px; font-weight: 700; color: var(--primary-dark); cursor: default; }
+  .link-badge.bg { color: var(--text2); }
   .link-title { font-size: 15px; font-weight: 700; word-break: break-all; }
   .link-rel { font-size: 13px; color: var(--text1); margin-top: 8px; line-height: 1.6; word-break: break-all; }
   .link-quote { font-size: 12px; color: var(--text2); margin-top: 6px; line-height: 1.5; word-break: break-all; }
@@ -260,7 +270,7 @@
   .img-card img { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 12px; }
   .img-card img.stale { opacity: 0.4; }
   .img-card .link-badge { display: inline-block; margin-top: 10px; }
-  .link-badge.err { background: var(--error-light); color: var(--error); }
+  .link-badge.err { color: var(--text1); }   /* 실패는 ⚠ 기호와 문구로 구분(--error 글자는 3.93:1이라 쓰지 않음) */
   .img-ph { text-align: center; font-size: 13px; color: var(--text2); padding: 28px 0; }
   .img-save { margin-top: 10px; }
   .img-rate { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 4px; font-size: 13px; color: var(--text2); }
@@ -396,7 +406,7 @@
     <div class="list-head">
       <h2>내 자료</h2>
       <span id="list-count" style="font-size:12px;color:var(--text2);margin-left:auto;margin-right:10px"></span>
-      <button id="vm-open-btn" class="btn small secondary" type="button" data-t="vm-open-btn" style="margin-right:8px">지도 보기</button>
+      <button id="vm-open-btn" class="btn small text" type="button" data-t="vm-open-btn" style="margin-right:8px">지도 보기</button>
       <button id="sel-toggle" class="btn small secondary" type="button" style="display:none">선택</button>
     </div>
     <div id="sel-bar" class="sel-bar" style="display:none">
@@ -415,7 +425,7 @@
       <div id="rec-time" class="rec-time">00:00</div>
       <div id="rec-sub" class="rec-sub">최대 10분까지 녹음할 수 있습니다</div>
       <button id="rec-toggle" class="rec-btn" type="button">시작</button>
-      <div><button id="rec-pause" class="btn small secondary" type="button" style="display:none;margin-top:12px">일시정지</button></div>
+      <div><button id="rec-pause" class="btn small text" type="button" style="display:none;margin-top:12px">일시정지</button></div>
     </div>
     <div id="rec-long" class="msg info" style="display:none">녹음이 길어지고 있습니다. 여기서 끝내고 '이어서 녹음'으로 나누는 것을 권합니다.</div>
     <div id="rec-hint" class="msg warn" style="display:none">화면을 켜 둔 채 녹음하세요. 화면이 꺼지거나 다른 앱으로 이동하면 녹음이 중단될 수 있습니다.</div>
@@ -450,16 +460,16 @@
     <label class="field-label" for="edit-text">원문 (수정할 수 있습니다)</label>
     <textarea id="edit-text" class="auto-grow"></textarea>
     <div id="edit-counter" class="counter">0자</div>
-    <div id="autosave" class="msg info" style="display:none"><span id="autosave-text"></span><button id="undo-append" class="btn small secondary" type="button" style="display:none;margin-left:8px">되돌리기</button></div>
+    <div id="autosave" class="msg info" style="display:none"><span id="autosave-text"></span><button id="undo-append" class="btn small text" type="button" style="display:none;margin-left:8px">되돌리기</button></div>
     <div id="over-box" style="display:none">
       <div id="over-msg" class="msg warn">이어 붙이면 한도를 넘어 추가하지 않았습니다. 변환된 글을 복사해 두고 새 자료로 나누어 주세요.</div>
       <textarea id="over-text" class="summary auto-grow" readonly aria-label="추가하지 못한 변환 결과"></textarea>
-      <div class="btn-row"><button id="over-copy" class="btn small secondary" type="button">복사</button><button id="over-close" class="btn small secondary" type="button">닫기</button></div>
+      <div class="btn-row"><button id="over-copy" class="btn small text" type="button">복사</button><button id="over-close" class="btn small text" type="button">닫기</button></div>
     </div>
     <div id="append-row" class="btn-row" style="display:none;flex-wrap:wrap">
       <button id="append-rec" class="btn small secondary" type="button">＋ 이어서 녹음</button>
       <button id="after-sum" class="btn small" type="button" style="display:none">요약 만들기</button>
-      <button id="after-list" class="btn small secondary" type="button" style="display:none">목록으로</button>
+      <button id="after-list" class="btn small text" type="button" style="display:none">목록으로</button>
     </div>
     <div id="stale-banner" class="msg warn" style="display:none;margin-top:20px"><div>원문이 바뀌었습니다. 요약이 최신 원문을 반영하지 않습니다.</div><button id="stale-remake" class="btn small" type="button" style="margin-top:8px">요약 다시 만들기</button></div>
     <div class="sum-head">
@@ -478,8 +488,8 @@
       <div id="tts-unsupported" class="msg warn" style="display:none">이 브라우저는 읽어주기를 지원하지 않습니다.</div>
       <div id="tts-controls" class="tts-row">
         <button id="tts-play" class="btn small" type="button" disabled>▶ 요약 듣기</button>
-        <button id="tts-pause" class="btn small secondary" type="button" style="display:none">⏸ 일시정지</button>
-        <button id="tts-stop" class="btn small secondary" type="button" style="display:none">■ 정지</button>
+        <button id="tts-pause" class="btn small text" type="button" style="display:none">⏸ 일시정지</button>
+        <button id="tts-stop" class="btn small text" type="button" style="display:none">■ 정지</button>
         <label class="tts-rate" for="tts-rate">속도
           <select id="tts-rate">
             <option value="0.8">0.8x</option>
@@ -511,7 +521,7 @@
     </div>
     <div id="link-section" class="quiz-section" style="display:none">
       <div class="sum-head"><span class="field-label">연결된 자료</span></div>
-      <div class="btn-row" style="margin-top:0;margin-bottom:8px"><button id="link-map-open" class="btn small secondary" type="button" data-t="link-map-open">이 자료 중심으로 보기</button></div>
+      <div class="btn-row" style="margin-top:0;margin-bottom:8px"><button id="link-map-open" class="btn small text" type="button" data-t="link-map-open">이 자료 중심으로 보기</button></div>
       <div id="link-note" class="msg warn" style="display:none"></div>
       <div id="link-status" class="convert-status" style="display:none;margin-top:8px"><div class="spinner small"></div><span>연결 분석 중…</span></div>
       <div id="link-list"></div>
@@ -521,7 +531,7 @@
         <div id="kw-hint" class="msg info"></div>
       </div>
       <div id="link-actions" class="btn-row" style="display:none">
-        <button id="link-refresh" class="btn small secondary" type="button">연결 다시 찾기</button>
+        <button id="link-refresh" class="btn small text" type="button">연결 다시 찾기</button>
       </div>
       <div id="link-msg" class="msg"></div>
     </div>
@@ -548,8 +558,8 @@
     <div id="edit-meta" class="meta"></div>
     <div id="edit-msg" class="msg"></div>
     <div class="btn-row">
-      <button id="edit-delete" class="btn danger" type="button" style="display:none">삭제</button>
-      <button id="edit-cancel" class="btn secondary" type="button">취소</button>
+      <button id="edit-delete" class="btn text danger" type="button" style="display:none">삭제</button>
+      <button id="edit-cancel" class="btn text" type="button">취소</button>
       <button id="edit-save" class="btn" type="button">저장</button>
     </div>
   </div>
@@ -565,7 +575,7 @@
     <div id="merge-warn" class="msg warn" style="display:none"></div>
     <div id="merge-msg" class="msg"></div>
     <div class="btn-row">
-      <button id="merge-cancel" class="btn secondary" type="button">취소</button>
+      <button id="merge-cancel" class="btn text" type="button">취소</button>
       <button id="merge-go" class="btn" type="button">합본 만들기</button>
     </div>
   </div>
@@ -574,7 +584,7 @@
   <div id="view-chat" class="view">
     <div class="chat-top">
       <span id="chat-remaining" class="quiz-question-counter">남은 질문 10 / 10</span>
-      <button id="chat-reset" class="btn small secondary" type="button">새 대화 시작</button>
+      <button id="chat-reset" class="btn small text" type="button">새 대화 시작</button>
     </div>
     <div class="msg info" style="margin-top:0">이 자료의 내용만 근거로 답합니다. 자료에 없으면 '자료에 없습니다.'라고 답해요.</div>
     <div id="chat-list" class="chat-list"></div>
@@ -633,14 +643,14 @@
 <dialog id="vm-sheet" class="vm-sheet" aria-labelledby="vm-title">
   <div class="vm-head">
     <h2 id="vm-title">자료 연결 지도</h2>
-    <button id="vm-close" class="btn small secondary" type="button" data-t="vm-close" aria-label="지도 닫기">닫기</button>
+    <button id="vm-close" class="btn small text" type="button" data-t="vm-close" aria-label="지도 닫기">닫기</button>
   </div>
   <div class="vm-body">
     <div class="vm-tools">
       <button id="vm-build" class="btn small" type="button" data-t="vm-build">지도 그리기</button>
-      <button id="vm-zoom-in" class="btn small secondary" type="button" data-t="vm-zoom-in">확대</button>
-      <button id="vm-zoom-out" class="btn small secondary" type="button" data-t="vm-zoom-out">축소</button>
-      <button id="vm-zoom-fit" class="btn small secondary" type="button" data-t="vm-zoom-fit">화면 맞춤</button>
+      <button id="vm-zoom-in" class="btn small text" type="button" data-t="vm-zoom-in">확대</button>
+      <button id="vm-zoom-out" class="btn small text" type="button" data-t="vm-zoom-out">축소</button>
+      <button id="vm-zoom-fit" class="btn small text" type="button" data-t="vm-zoom-fit">화면 맞춤</button>
     </div>
     <div class="vm-meta"><span id="vm-build-hint" data-t="vm-build-hint"></span><span id="vm-built" data-t="vm-built"></span></div>
     <div id="vm-progress" class="vm-progress" style="display:none" role="status"><div class="spinner small"></div><span id="vm-progress-text" data-t="vm-progress-text"></span></div>
@@ -653,7 +663,7 @@
 <dialog id="vm-subject" class="vm-subject" aria-labelledby="vm-subject-title">
   <h2 id="vm-subject-title">어느 과목의 지도를 볼까요?</h2>
   <div id="vm-subject-list"></div>
-  <button id="vm-subject-cancel" class="btn small secondary vm-subject-cancel" type="button">취소</button>
+  <button id="vm-subject-cancel" class="btn small text vm-subject-cancel" type="button">취소</button>
 </dialog>
 
 <script>
@@ -2896,7 +2906,7 @@ function vmapEdgeCard(card, l) {
     input.addEventListener('input', upd); upd();
     const msg = vmapEl('div', { class: 'msg', role: 'alert', 'data-t': 'vm-card-msg' });
     const save = vmapBtn('저장', '', () => vmapSaveReason(l, input, msg, save), 'vm-reason-save');
-    card.append(input, counter, msg, vmapEl('div', { class: 'vm-actions' }, save, vmapBtn('취소', 'secondary', () => { vmap.editingReason = null; vmapRenderCard(); }, 'vm-reason-cancel')));
+    card.append(input, counter, msg, vmapEl('div', { class: 'vm-actions' }, save, vmapBtn('취소', 'text', () => { vmap.editingReason = null; vmapRenderCard(); }, 'vm-reason-cancel')));
     input.focus();
     return;
   }
@@ -2907,18 +2917,18 @@ function vmapEdgeCard(card, l) {
   }
   const msg = vmapEl('div', { class: 'msg', role: 'alert', 'data-t': 'vm-card-msg' });
   card.append(msg, vmapEl('div', { class: 'vm-actions' },
-    vmapBtn('이유 수정', 'secondary', () => { vmap.editingReason = l.id; vmapRenderCard(); }, 'vm-edit-reason'),
-    vmapBtn('방향 바꾸기', 'secondary', () => vmapSwap(l, msg), 'vm-swap'),
-    vmapBtn('삭제', 'danger', () => vmapDelete(l, msg), 'vm-delete'),
-    vmapBtn('닫기', 'secondary', vmapDeselect, 'vm-card-close')));
+    vmapBtn('이유 수정', 'text', () => { vmap.editingReason = l.id; vmapRenderCard(); }, 'vm-edit-reason'),
+    vmapBtn('방향 바꾸기', 'text', () => vmapSwap(l, msg), 'vm-swap'),
+    vmapBtn('삭제', 'text danger', () => vmapDelete(l, msg), 'vm-delete'),
+    vmapBtn('닫기', 'text', vmapDeselect, 'vm-card-close')));
 }
 function vmapNodeCard(card, n) {
   card.append(vmapEl('div', { class: 'vm-card-head' }, vmapEl('div', { class: 'vm-card-title', 'data-t': 'vm-node-title' }, vmapTitle(n))));
   if (vmap.adding && vmap.adding.from === n.id) { vmapAddPanel(card, n); return; }
   card.append(vmapEl('div', { class: 'vm-actions' },
     vmapBtn('이 자료 열기', '', () => vmapOpenNote(n.id), 'vm-open-note'),
-    vmapBtn('다른 자료와 연결 추가', 'secondary', () => { vmap.adding = { from: n.id, to: null, q: '', reason: '' }; vmapRenderCard(); }, 'vm-add-link'),
-    vmapBtn('닫기', 'secondary', vmapDeselect, 'vm-card-close')));
+    vmapBtn('다른 자료와 연결 추가', 'text', () => { vmap.adding = { from: n.id, to: null, q: '', reason: '' }; vmapRenderCard(); }, 'vm-add-link'),
+    vmapBtn('닫기', 'text', vmapDeselect, 'vm-card-close')));
 }
 
 // 연결 추가: 같은 과목의 다른 자료를 검색해 고르고 이유(80자)를 적는다
@@ -2947,7 +2957,7 @@ function vmapAddPanel(card, n) {
   const submit = vmapBtn('연결', '', () => vmapAddSubmit(st, msg, submit), 'vm-add-submit');
   card.append(vmapEl('div', { class: 'field-label', style: 'margin-top:8px' }, '‘' + vmapTitle(n) + '’와 연결할 자료'), search, list,
     vmapEl('label', { class: 'field-label', for: 'vm-add-reason', style: 'margin-top:8px' }, '연결한 이유'), reason, counter, msg,
-    vmapEl('div', { class: 'vm-actions' }, submit, vmapBtn('취소', 'secondary', () => { vmap.adding = null; vmapRenderCard(); }, 'vm-add-cancel')));
+    vmapEl('div', { class: 'vm-actions' }, submit, vmapBtn('취소', 'text', () => { vmap.adding = null; vmapRenderCard(); }, 'vm-add-cancel')));
   search.focus();
 }
 function vmapErrText(e, fallback) {
