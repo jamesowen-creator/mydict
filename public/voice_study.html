@@ -191,11 +191,14 @@
   /* 퀴즈 (science_reading.html의 퀴즈·결과 화면과 같은 모양) */
   .quiz-section { margin-top: 24px; }
   .quiz-question-counter { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
+  /* 작업221: 진행 표시 = 얇은 막대 + "n / N" 글자(읽기·사전 화면과 같은 방식) */
+  .quiz-progress-bar-wrap { height: 6px; background: var(--primary-light); border-radius: 3px; margin-bottom: 12px; overflow: hidden; }
+  .quiz-progress-bar { height: 100%; background: var(--primary); border-radius: 3px; width: 0; }
   .quiz-card {
     background: var(--card); border: none; border-radius: 0; box-shadow: none; padding: 20px;
   }
   .quiz-question {
-    font-size: 16px; font-weight: 600; line-height: 1.6;
+    font-size: 17px; font-weight: 700; line-height: 1.6;   /* 작업221: 질문 글자 17px / 700 / 주 글자색 */
     margin-bottom: 20px; color: var(--text1);
     white-space: pre-line; word-break: keep-all;
   }
@@ -223,12 +226,18 @@
   .mcq-option.correct .mcq-text, .mcq-option.correct-hint .mcq-text { color: var(--success-dark); font-weight: 700; }
   .mcq-option.wrong .mcq-text { color: var(--error-dark); font-weight: 700; }
   .mcq-option.correct .mcq-text, .mcq-option.wrong .mcq-text { text-decoration: underline; text-underline-offset: 3px; }
-  .mcq-text { flex: 1; min-width: 0; font-size: 14px; line-height: 1.5; color: var(--text1); word-break: keep-all; }
+  .mcq-text { flex: 1; min-width: 0; font-size: 15px;   /* 작업221: 보기 글자 15px / 400 / 주 글자색 */ line-height: 1.5; color: var(--text1); word-break: keep-all; }
+  /* 작업221: 정오 한 줄(.fb-line)만 기호+초록/빨강, 해설·근거(.fb-sub)는 주 글자색(--text1) */
+  .msg.quiz-feedback { color: var(--text1); }
+  .msg.quiz-feedback.info::before { content: '○'; color: var(--success-dark); }
+  .msg.quiz-feedback.error::before { content: '✕'; color: var(--error-dark); }
+  .msg.quiz-feedback.info .fb-line { color: var(--success-dark); }
+  .msg.quiz-feedback.error .fb-line { color: var(--error-dark); }
   .quiz-feedback .fb-line { font-weight: 700; }
   .quiz-feedback .fb-sub { font-weight: 500; margin-top: 6px; word-break: keep-all; }
   /* 작업217-3: 점수는 박스·테두리·그림자 없이 큰 숫자 글자(아래 구분선만) */
   .result-score-wrap {
-    text-align: center; margin-bottom: 20px;
+    text-align: center; margin-bottom: 28px;
     padding: 12px 0 20px; background: transparent;
     border: none; border-radius: 0; box-shadow: none; border-bottom: 1px solid var(--border);
   }
@@ -236,6 +245,14 @@
   .result-score { font-size: 42px; font-weight: 700; color: var(--primary-dark); font-family: 'Inter', sans-serif; }
   .result-score span { font-size: 20px; color: var(--text2); }
   .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
+  /* 작업221: 결과 화면 구성 = 큰 점수 + 한 줄 요약 + 틀린 문항 목록 + 버튼(읽기 화면과 같은 모양) */
+  .result-section-label { font-size: 12px; font-weight: 700; color: var(--primary-dark); margin-bottom: 12px; letter-spacing: 0.03em; padding-bottom: 4px; border-bottom: 2px solid var(--primary); }
+  .result-wrong-list { display: flex; flex-direction: column; gap: 0; margin-bottom: 24px; }
+  .result-wrong-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .result-wrong-list .result-wrong-item:last-child { border-bottom: none; }
+  .result-wrong-q { font-size: 13px; color: var(--text2); margin-bottom: 4px; white-space: pre-line; word-break: keep-all; }
+  .result-wrong-a { font-size: 14px; font-weight: 600; color: var(--success-dark); word-break: keep-all; }
+  .result-wrong-a::before { content: '정답: '; color: var(--text2); font-weight: 400; }
   .result-actions { display: flex; flex-direction: column; gap: 10px; }
 
   /* 질문하기(대화) */
@@ -628,6 +645,7 @@
   <!-- ⑤ 퀴즈 풀이 / 결과 (점수·답은 저장하지 않는다) -->
   <div id="view-quiz" class="view">
     <div id="quiz-run">
+      <div class="quiz-progress-bar-wrap"><div class="quiz-progress-bar" id="quiz-progress-bar"></div></div>
       <div id="quiz-progress" class="quiz-question-counter">1 / 5</div>
       <div class="quiz-card">
         <div id="quiz-q" class="quiz-question"></div>
@@ -641,6 +659,7 @@
         <div class="result-score"><span id="quiz-score-num" style="font-size:42px;color:var(--primary-dark)">0</span><span> / <span id="quiz-score-total" style="font-size:20px">5</span></span></div>
         <div id="quiz-result-msg" class="result-msg"></div>
       </div>
+      <div id="quiz-wrong" style="display:none"></div>
       <div id="quiz-saved" class="msg info" style="display:none"></div>
       <div class="result-actions">
         <button id="quiz-retry" class="btn block" type="button">다시 풀기</button>
@@ -2109,6 +2128,7 @@ function renderQuizQuestion() {
   const q = quizData[quizState.i];
   quizState.answered = false;
   $('quiz-progress').textContent = (quizState.i + 1) + ' / ' + quizData.length;
+  $('quiz-progress-bar').style.width = (quizState.i / quizData.length * 100) + '%';
   $('quiz-q').textContent = q.question;
   const box = $('quiz-options');
   box.textContent = '';
@@ -2157,9 +2177,28 @@ $('quiz-next').addEventListener('click', () => {
   $('quiz-score-total').textContent = String(quizData.length);
   $('quiz-result-msg').textContent = quizState.score === quizData.length ? '모두 맞혔어요!' : '다시 풀어 보면 더 잘 기억돼요.';
   $('quiz-result').style.display = '';
+  renderQuizWrong();
   window.scrollTo(0, 0);
   saveQuizAttempt();
 });
+// 작업221: 결과 화면의 틀린 문항 목록(방금 푼 문제와 고른 답에서 만든다. 서버·AI 호출 없음)
+function renderQuizWrong() {
+  const box = $('quiz-wrong');
+  box.textContent = '';
+  const wrong = (quizState.answers || []).filter(a => quizData[a.q] && a.chosen !== quizData[a.q].answer_index);
+  if (!wrong.length) { box.style.display = 'none'; return; }
+  const label = document.createElement('div'); label.className = 'result-section-label'; label.textContent = '틀린 문항'; box.appendChild(label);
+  const list = document.createElement('div'); list.className = 'result-wrong-list';
+  for (const a of wrong) {
+    const q = quizData[a.q];
+    const item = document.createElement('div'); item.className = 'result-wrong-item';
+    const qq = document.createElement('div'); qq.className = 'result-wrong-q'; qq.textContent = q.question;
+    const aa = document.createElement('div'); aa.className = 'result-wrong-a'; aa.textContent = q.choices[q.answer_index];
+    item.appendChild(qq); item.appendChild(aa); list.appendChild(item);
+  }
+  box.appendChild(list);
+  box.style.display = '';
+}
 // 채점이 끝나면 결과를 자동 저장한다(점수는 서버가 다시 계산해 돌려준다)
 async function saveQuizAttempt() {
   if (quizState.saved || editMode !== 'detail') return;

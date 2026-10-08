@@ -94,7 +94,7 @@ test('217-4 voice·concept 메시지(.msg, .notice): 색 바탕·테두리·둥�
   assert.equal((await page.eval(MEASURE('#probe-host .msg:not(.error):not(.warn):not(.info):not(.notice)', '::before'))).mark, 'none', '중립 메시지에는 기호 없음');
   // 실제 메시지 하나: 퀴즈 해설(.msg.quiz-feedback.error)
   await step(page, "quizData = [{ question: 'Q', choices: ['가', '나', '다', '라'], answer_index: 2, explanation: '해설', quote: '근거' }]; quizState = { i: 0, score: 0, answers: [], answered: false, saved: true }; showView('quiz'); renderQuizQuestion(); answerQuiz(0);");
-  const fb = await page.eval(MEASURE('#quiz-feedback', '::before')); assertNoBox(fb, '.quiz-feedback'); assert.equal(fb.mark, '"✕"'); assert.equal(fb.color, RED); assert.ok(fb.ratio >= 4.5);
+  const fb = await page.eval(MEASURE('#quiz-feedback', '::before')); assertNoBox(fb, '.quiz-feedback'); assert.equal(fb.mark, '"✕"'); assert.equal(fb.markColor, RED); assert.equal(fb.color, 'rgb(26, 26, 26)', '작업221: 해설·근거는 주 글자색(옛 기대: 전체 빨강)'); assert.ok(fb.ratio >= 4.5 && fb.markRatio >= 4.5);
   await done(page);
 
   // concept: 오류(✕), 안내(i)
