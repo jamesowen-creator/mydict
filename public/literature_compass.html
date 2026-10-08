@@ -68,7 +68,7 @@
   .view.active { display: block; }
 
   /* 작업199: 제목 줄은 공용 /css/common/screenBar.css(.screen-bar) */
-  .progress-text { font-size: 13px; font-weight: 600; color: var(--primary); font-family: 'Inter', sans-serif; }
+  .progress-text { font-size: 13px; font-weight: 600; color: var(--primary-dark); font-family: 'Inter', sans-serif; }
 
   /* ── Tab Bar ── */
   .tab-bar {
@@ -91,7 +91,7 @@
   /* 작업83: 활성 탭은 색 + 굵기 + 밑줄 (색 단독 구분 금지 원칙) - digest_reading.html과
      literature_compass.html의 탭바가 같은 복사본이라 두 파일 동일하게 유지 */
   .tab-btn.active {
-    color: var(--primary); font-weight: 700;
+    color: var(--primary-dark); font-weight: 700;   /* 작업220: 활성 탭 글자 대비 4.5:1 이상 */
     text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px;
   }
   .tab-btn svg { width: 22px; height: 22px; }
@@ -347,7 +347,7 @@
   .related-item-info { flex: 1; }
   .related-title { font-size: 13px; font-weight: 600; color: var(--text1); }
   .related-author { font-size: 12px; color: var(--text2); }
-  .related-relation { font-size: 11px; color: var(--primary); font-weight: 500; margin-top: 2px; }
+  .related-relation { font-size: 11px; color: var(--primary-dark); font-weight: 500; margin-top: 2px; }
 
   /* Card navigation */
   .card-nav {
@@ -403,7 +403,7 @@
   }
   .quiz-round-label {
     font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
-    color: var(--primary); margin-bottom: 6px;
+    color: var(--primary-dark); margin-bottom: 6px;   /* 작업220: 코랄 글자 대비 4.5:1 이상(--primary 3.5:1 → --primary-dark 5.38:1) */
   }
   .quiz-question-counter { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
   .quiz-card {

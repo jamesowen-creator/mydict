@@ -94,7 +94,7 @@
   /* 작업83: 활성 탭은 색 + 굵기 + 밑줄 (색 단독 구분 금지 원칙) - digest_reading.html과
      literature_compass.html의 탭바가 같은 복사본이라 두 파일 동일하게 유지 */
   .tab-btn.active {
-    color: var(--primary); font-weight: 700;
+    color: var(--primary-dark); font-weight: 700;   /* 작업220: 활성 탭 글자 대비 4.5:1 이상 */
     text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px;
   }
   .tab-btn svg { width: 22px; height: 22px; }
@@ -350,7 +350,7 @@
   }
   .quiz-round-label {
     font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
-    color: var(--primary); margin-bottom: 6px;
+    color: var(--primary-dark); margin-bottom: 6px;   /* 작업220: 코랄 글자 대비 4.5:1 이상(--primary 3.5:1 → --primary-dark 5.38:1) */
   }
   .quiz-question-counter { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
   .quiz-card {
