@@ -53,8 +53,9 @@
     align-items: center; justify-content: center;
     background: var(--bg); z-index: 999; gap: 16px;
   }
+  /* 작업220: 화면 로딩 스피너 32px */
   .spinner {
-    width: 40px; height: 40px;
+    width: 32px; height: 32px;
     border: 3px solid var(--primary-light);
     border-top-color: var(--primary);
     border-radius: 50%;
@@ -66,6 +67,9 @@
   /* ── Views ── */
   .view { display: none; min-height: 100dvh; padding-bottom: calc(var(--tab-height) + env(safe-area-inset-bottom, 0px)); }
   .view.active { display: block; }
+
+  /* 작업220: 상세 화면 상단 바 제목은 한 줄 말줄임(공용 screenBar.css의 두 줄 말줄임을 이 화면에서만 한 줄로) */
+  .screen-bar-title.one-line { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* 작업199: 제목 줄은 공용 /css/common/screenBar.css(.screen-bar) */
 
@@ -141,7 +145,7 @@
     display: flex; flex-direction: column;
     padding: 20px 18px 16px;
     border-radius: 0;
-    color: #1A1A1E;
+    color: var(--text1);
     background: var(--card);
     box-shadow: none;
     backface-visibility: hidden; -webkit-backface-visibility: hidden;
@@ -157,7 +161,7 @@
   .carousel-card-meta {
     margin-bottom: 12px;
     display: flex; justify-content: space-between; align-items: baseline;
-    font-size: 11px; letter-spacing: 0.08em; color: #6B7280;
+    font-size: 11px; letter-spacing: 0.08em; color: var(--text2);
   }
   .carousel-card-meta .g { color: var(--genre-ink); font-weight: 700; }
   .carousel-card-title {
@@ -169,17 +173,17 @@
   .carousel-card.is-center .carousel-card-title {
     font-weight: 700;
   }
-  .carousel-card-author { margin-top: 6px; font-size: 13px; color: #6B7280; }
+  .carousel-card-author { margin-top: 6px; font-size: 13px; color: var(--text2); }
   /* 인용 강조 규칙: 왼쪽 2px 세로선 (장르 색) */
   .carousel-card-line {
     flex-shrink: 0;
     margin-top: 14px; margin-bottom: auto; padding-left: 10px;
     border-left: 2px solid var(--genre-ink);
-    font-size: 13px; line-height: 1.6; color: #374151;
+    font-size: 13px; line-height: 1.6; color: var(--text1);
     display: -webkit-box; -webkit-line-clamp: var(--line-clamp, 4); -webkit-box-orient: vertical;
     overflow: hidden; word-break: keep-all;
   }
-  .carousel-card-done { color: #1A1A1E; font-weight: 700; letter-spacing: 0.02em; }
+  .carousel-card-done { color: var(--text1); font-weight: 700; letter-spacing: 0.02em; }
   .carousel-nav {
     display: flex; align-items: center; justify-content: center; gap: 18px;
     margin-top: 8px;
@@ -253,9 +257,10 @@
     margin-bottom: 14px;
   }
   /* 섹션 라벨: 색 강조 없이 짙은 회색, 본문(400)과는 굵기(700)로 구분 */
+  /* 작업220: 섹션 제목 규격 — 12px / 700 / --primary-dark(5.38:1) / 아래 2px 코랄 선(장식) */
   .digest-section-label {
-    font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
-    color: #3A3A40; margin-bottom: 10px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+    color: var(--primary-dark); padding-bottom: 4px; border-bottom: 2px solid var(--primary); margin-bottom: 10px;
   }
   /* 인용 강조 규칙: 배경 박스 없이 왼쪽 2px 코랄 세로선만 */
   .digest-one-line {
@@ -278,7 +283,7 @@
 
   /* 주제·정서: 알약 배지 대신 텍스트 - 주제는 굵게, 정서는 쉼표로 이어서 */
   .digest-theme { font-size: 15px; font-weight: 600; line-height: 1.6; color: var(--text1); }
-  .digest-emotion { margin-top: 6px; font-size: 14px; line-height: 1.6; color: #4B5563; }
+  .digest-emotion { margin-top: 6px; font-size: 14px; line-height: 1.6; color: var(--text2); }
 
   /* 연결 작품: 회색 박스 대신 1px 구분선으로 나눈 줄, 화살표·관계는 코랄 */
   .related-list { display: flex; flex-direction: column; }
@@ -413,8 +418,8 @@
     min-height: var(--ctl-min-h); margin-top: 20px;
     background: var(--btn-primary-bg, #b8442e); color: #fff;
     border: none; border-radius: var(--btn-radius);
-    padding: 14px; width: 100%;
-    font-size: 15px; font-weight: var(--btn-weight); cursor: pointer;
+    padding: 10px 20px; width: 100%;   /* 작업220: 주 버튼 규격 — 높이 최소 44px, 15px / 600, 좌우 padding 20px */
+    font-size: 15px; font-weight: 600; cursor: pointer;
     display: none; font-family: 'Noto Sans KR', sans-serif;
     transition: background 0.15s;
   }
@@ -434,7 +439,7 @@
   .result-score span { font-size: 20px; color: var(--text2); }
   .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
   .result-submsg { font-size: 13px; color: var(--text2); margin-top: 4px; }
-  .result-section-label { font-size: 13px; font-weight: 700; color: var(--text2); margin-bottom: 12px; letter-spacing: 0.03em; }
+  .result-section-label { font-size: 12px; font-weight: 700; color: var(--primary-dark); margin-bottom: 12px; letter-spacing: 0.03em; padding-bottom: 4px; border-bottom: 2px solid var(--primary); }
   .result-wrong-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
   /* 작업217-3: 틀린 문항은 박스 없이 구분선 행. 정답 글자는 --success-dark(흰 바탕 약 10:1) */
   .result-wrong-item {
@@ -447,15 +452,16 @@
   .result-wrong-a::before { content: '정답: '; color: var(--text2); font-weight: 400; }
   .result-actions { display: flex; flex-direction: column; gap: 10px; }
   .result-btn {
-    min-height: var(--ctl-min-h); border-radius: var(--btn-radius); padding: 15px;
-    font-size: 15px; font-weight: var(--btn-weight); cursor: pointer;
+    min-height: var(--ctl-min-h); border-radius: var(--btn-radius); padding: 10px 20px;
+    font-size: 15px; font-weight: 600; cursor: pointer;
     border: none; transition: all 0.15s;
     font-family: 'Noto Sans KR', sans-serif;
   }
   .result-btn-primary { background: var(--btn-primary-bg, #b8442e); color: #fff; }
   .result-btn-primary:hover { background: var(--btn-primary-bg-hover, #9c3a27); }
   /* 작업217-2: 보조 결과 버튼은 박스 없이 밑줄 텍스트(높이 44px = .result-btn min-height, 가로 44px 이상). 글자 --text2는 페이지 바탕(#FAFAF9) 위 4.63:1 */
-  .result-btn-secondary { background: transparent; color: var(--text2); border: none; min-width: var(--ctl-min-h); text-decoration: underline; text-underline-offset: 3px; }
+  /* 작업220: 텍스트 버튼 규격 — 15px / 600, 보조색, padding 0 8px, 최소 44×44px, 밑줄 */
+  .result-btn-secondary { background: transparent; color: var(--text2); border: none; padding: 0 8px; min-height: var(--ctl-min-h); min-width: var(--ctl-min-h); font-size: 15px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
   .result-btn-secondary:hover { background: transparent; color: var(--text1); }
   .result-btn-secondary:focus-visible { outline: 2px solid var(--text1); outline-offset: 2px; border-radius: 4px; }
 
@@ -501,6 +507,7 @@
         <polyline points="15 18 9 12 15 6"></polyline>
       </svg>
     </button>
+    <h1 class="screen-bar-title one-line" id="digest-bar-title"></h1>
   </div>
   <div class="content" id="digest-content"></div>
   <div class="conquest-bar">
@@ -1127,6 +1134,7 @@ function showDigest(workId) {
   if (!work) return;
   currentWorkId = workId;
   // 작업88: 제목은 본문 .digest-work-title 하나만 (상단 바 제목 제거)
+  document.getElementById('digest-bar-title').textContent = '「' + work.title + '」';   // 작업220: 상단 바 제목 = 개념/작품 이름(길면 말줄임)
 
   const relatedHtml = work.related_works.length > 0
     ? `<div class="digest-section">
