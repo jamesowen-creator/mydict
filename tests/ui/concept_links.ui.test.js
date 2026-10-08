@@ -31,7 +31,7 @@ test('연결 목록: 현재 개념의 연결만, AI 연결과 직접 연결을 �
   const page = await openStudy();
   assert.equal(await page.count('[data-t="link"]'), 1);
   assert.match(await page.text('[data-t="link"] .lk-pair'), /세포 → 광합성/);
-  assert.equal(await page.text('[data-t="link-source"]'), 'AI 연결 · 확인 필요');
+  assert.equal(await page.text('[data-t="link-source"]'), 'AI 판단 · 확인 필요');
   await page.click('[data-t="link-open"]');
   await pickOption(page, '#link-to', '엽록체');
   await pickOption(page, '#link-type', '순서');
@@ -44,7 +44,7 @@ test('연결 목록: 현재 개념의 연결만, AI 연결과 직접 연결을 �
   assert.equal(post.body.relation_type, '순서');
   assert.equal(post.body.label, '다음 단계');
   const sources = await page.eval("[...document.querySelectorAll('[data-t=link-source]')].map(e => e.textContent)");
-  assert.deepEqual(sources.sort(), ['AI 연결 · 확인 필요', '직접 연결'].sort());
+  assert.deepEqual(sources.sort(), ['AI 판단 · 확인 필요', '직접 연결'].sort());
   // 지도에는 코드 변경 없이 새 연결이 그려진다
   assert.equal(await page.count('[data-t="edge"]'), 2, '지도의 연결선 2개');
   assert.deepEqual(page.errors, []);

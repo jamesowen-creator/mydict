@@ -3,6 +3,8 @@
 //   srv.seed({ topic, items: [...], links: [...], path: [...] })  → 학습 하나를 미리 만든다
 //   srv.state.explorePlan = [ { status: 429, body: {...} }, { aiError: true }, { network: true }, ... ]  // explore 호출마다 앞에서 하나씩 꺼내 씀
 //   srv.state.respondPlan / refreshPlan 도 같은 방식
+//   explorePlan 항목의 extraLinks: ['용어', ...] → 새 개념과 그 기존 개념 사이에 AI 연결을 더 만든다(작업209, 응답의 links)
+//   seed의 links: [[from, to, { relation_type, label, detail, source, user_edited }]]  (detail: '' 이면 이유 없음)
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -152,10 +154,17 @@ async function startMockServer() {
       fill(it, plan.term || it.term);
       let link = null;
       if (body.from_item_id && body.from_item_id !== it.id && itemOf(body.from_item_id) && !linkExists(body.from_item_id, it.id)) {
-        link = { id: state.nextId++, study_id: s.id, from_item_id: body.from_item_id, to_item_id: it.id, relation_type: plan.relation || '포함', label: plan.label || '이어짐', detail: '관계 설명입니다.', source: 'ai', created_at: iso() };
+        link = { id: state.nextId++, study_id: s.id, from_item_id: body.from_item_id, to_item_id: it.id, relation_type: plan.relation || '포함', label: plan.label || '이어짐', detail: '관계 설명입니다.', source: 'ai', user_edited: false, created_at: iso() };
         state.links.push(link);
       }
-      return J(200, { item: publicItem(it, s), link });
+      const links = [];
+      for (const term of plan.extraLinks || []) {
+        const other = state.items.find(i => i.study_id === s.id && key(i.term) === key(term));
+        if (!other || other.id === it.id || linkExists(other.id, it.id)) continue;
+        const l = { id: state.nextId++, study_id: s.id, from_item_id: it.id, to_item_id: other.id, relation_type: '비슷함', label: '닮음', detail: term + '과(와) 닮은 점이 있습니다.', source: 'ai', user_edited: false, created_at: iso() };
+        state.links.push(l); links.push(l);
+      }
+      return J(200, { item: publicItem(it, s), link, links });
     }
     if ((mm = u.match(/^\/api\/concepts\/items\/(\d+)$/))) {
       const it = itemOf(Number(mm[1]));
@@ -200,9 +209,20 @@ async function startMockServer() {
       const s = studyOf(Number(mm[1]));
       if (!s) return J(404, { error: '학습을 찾을 수 없습니다.' });
       if (linkExists(body.from_item_id, body.to_item_id)) return J(409, { error: '이미 연결되어 있습니다.' });
-      const l = { id: state.nextId++, study_id: s.id, from_item_id: body.from_item_id, to_item_id: body.to_item_id, relation_type: body.relation_type || '기타 관련', label: body.label || null, detail: body.detail || null, source: 'user', created_at: iso() };
+      const l = { id: state.nextId++, study_id: s.id, from_item_id: body.from_item_id, to_item_id: body.to_item_id, relation_type: body.relation_type || '기타 관련', label: body.label || null, detail: body.detail || null, source: 'user', user_edited: false, created_at: iso() };
       state.links.push(l);
       return J(201, l);
+    }
+    if ((mm = u.match(/^\/api\/concepts\/links\/(\d+)$/)) && m === 'PATCH') {
+      const l = state.links.find(x => x.id === Number(mm[1]));
+      if (!l) return J(404, { error: '연결을 찾을 수 없습니다.' });
+      if (state.patchLinkPlan && state.patchLinkPlan.length) { const pl = state.patchLinkPlan.shift(); if (pl.status) return J(pl.status, pl.body || { error: '오류' }); }
+      if (body.relation_type !== undefined) l.relation_type = body.relation_type;
+      if (body.label !== undefined) l.label = String(body.label).trim() || null;
+      if (body.detail !== undefined) l.detail = String(body.detail).trim() || null;
+      if (body.swap === true) { const f = l.from_item_id; l.from_item_id = l.to_item_id; l.to_item_id = f; }
+      l.user_edited = true;
+      return J(200, l);
     }
     if ((mm = u.match(/^\/api\/concepts\/links\/(\d+)$/)) && m === 'DELETE') {
       const l = state.links.find(x => x.id === Number(mm[1]));
@@ -284,7 +304,7 @@ async function startMockServer() {
         return it;
       });
       for (const [a, b, rel] of links) {
-        state.links.push({ id: state.nextId++, study_id: s.id, from_item_id: made[a].id, to_item_id: made[b].id, relation_type: (rel && rel.relation_type) || '포함', label: (rel && rel.label) || '이어짐', detail: (rel && rel.detail) || '관계 설명', source: 'ai', created_at: iso() });
+        state.links.push({ id: state.nextId++, study_id: s.id, from_item_id: made[a].id, to_item_id: made[b].id, relation_type: (rel && rel.relation_type) || '포함', label: (rel && rel.label) || '이어짐', detail: rel && 'detail' in rel ? rel.detail : '관계 설명', source: (rel && rel.source) || 'ai', user_edited: !!(rel && rel.user_edited), created_at: iso() });
       }
       if (p) { s.path = p.map(i => made[i].id); s.selected_item_id = s.path[s.path.length - 1]; }
       else if (made.length) { s.selected_item_id = made[0].id; s.path = [made[0].id]; }

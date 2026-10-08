@@ -262,7 +262,7 @@ test('ai_error: 안내 문구와 [다시 받기]로 같은 이름을 다시 받�
   const [first, retry] = calls(/explore$/).map(c => c.body);
   assert.deepEqual(first, { text: '엽록체', via: 'input', from_item_id: fromId });
   assert.deepEqual(retry, { text: '엽록체', via: 'input', from_item_id: fromId });
-  assert.equal(await page.text('#study-msg'), '');
+  assert.equal(await page.text('#study-msg'), '1개 연결을 제안했습니다. 이유를 확인하고 필요하면 수정하세요.');   // 작업209: AI 연결 안내(오류 문구는 사라짐)
   assert.equal(srv.state.items.filter(i => i.term === '엽록체').length, 1);
   assert.equal(srv.state.links.filter(l => l.to_item_id === srv.state.items.find(i => i.term === '엽록체').id).length, 1, '다시 받은 뒤 연결 생성');
   await done(page);
@@ -298,7 +298,7 @@ test('하단 입력창: 검증, 429 서버 문구 그대로, 네트워크 오류
   await page.click('#ask-submit');
   await page.waitFor("document.querySelector('[data-t=term]').innerText === '리보솜'");
   assert.equal(await page.eval("document.getElementById('ask-input').value"), '');
-  assert.equal(await page.text('#study-msg'), '');
+  assert.equal(await page.text('#study-msg'), '1개 연결을 제안했습니다. 이유를 확인하고 필요하면 수정하세요.');   // 작업209: 성공하면 오류 문구 대신 AI 연결 안내
   await done(page);
 });
 

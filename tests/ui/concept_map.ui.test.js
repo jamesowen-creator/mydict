@@ -96,7 +96,7 @@ test('연결선을 누르면 관계 종류·문구·설명 대화상자(AI 연�
   assert.equal(await page.text('[data-t="rel-type"]'), '순서');
   assert.equal(await page.text('[data-t="rel-label"]'), '다음 단계');
   assert.equal(await page.text('[data-t="rel-detail"]'), '광합성은 엽록체에서 일어난다.');
-  assert.match(t, /AI가 만든 연결 · 확인 필요/);
+  assert.match(t, /AI 판단 · 확인 필요/);
   await page.click('#edge-close');
   assert.equal(await page.eval("document.getElementById('edge-dialog').open"), false);
   await done(page);
