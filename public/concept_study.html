@@ -31,6 +31,7 @@
     --node-line: #868ca8;   /* 지도 노드 테두리: 흰 배경 대비 3.3:1(비텍스트 3:1 이상) */
     --success: #1D9E75;     /* 의미색(퀴즈 정답) - 주제색 코랄과 분리 */
     --success-bg: #E1F5EE;
+    --success-dark: #085041;   /* 작업217-3: 정답 글자(흰 바탕 약 10:1). 음성 학습·읽기 화면의 --success-dark와 같은 값 */
     --danger-bg: #fcebeb;   /* 오류 박스 배경(음성 학습의 --error-light와 같은 값) */
     --info-bg: #fdf0ec;     /* 안내 박스 배경(코랄 연한 색) */
   }
@@ -131,10 +132,12 @@
   .sec.quote p { border-left: 2px solid var(--accent); padding-left: 12px; }
   .empty-explain { margin-top: 16px; color: var(--text2); }
   .state-note { margin-top: 10px; font-size: 13px; color: var(--text2); border-left: 2px solid var(--line); padding-left: 10px; }
-  .toggle { min-height: 44px; padding: 0 14px 0 10px; background: transparent; border: 1px solid var(--line); border-radius: var(--btn-radius); display: inline-flex; align-items: center; gap: 8px; font-weight: 500; color: var(--text2); }
-  .toggle[aria-pressed=true] { color: var(--text); font-weight: 800; border-color: var(--text); }
-  .toggle .ic { visibility: hidden; }
-  .toggle[aria-pressed=true] .ic { visibility: visible; color: var(--accent-text); }
+  /* 작업217-3: 이해함 토글은 박스 없이 글자. 평소 현재 레이블(--text2), 켜짐(aria-pressed=true)은 앞에 "✓ " + --accent-text(#b8442e) + 굵게 */
+  .toggle { min-height: 44px; padding: 0 8px; background: transparent; border: none; border-radius: 0; display: inline-flex; align-items: center; gap: 0; font-weight: 500; color: var(--text2); }
+  .toggle[aria-pressed=true] { color: var(--accent-text); font-weight: 800; }
+  .toggle[aria-pressed=true]::before { content: '✓ '; white-space: pre; }
+  .toggle .ic { display: none; }
+  .toggle:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; border-radius: 4px; }
   .save-state { font-size: 12px; color: var(--text2); min-height: 18px; margin-top: 2px; }
 
   /* 다음 한 단계 */
@@ -257,15 +260,22 @@
   .btn.mic[aria-pressed=true]::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 6px; height: 2px; background: var(--danger); }
   /* 돌아보기 퀴즈 */
   .qz-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 14px; }
-  .qz-q { margin-top: 10px; padding: 16px; border: 1px solid var(--line); border-radius: var(--card-radius); background: var(--surface); }
+  /* 작업217-3: 문제 영역은 테두리·둥근 모서리 없이 흰 바탕 면만 */
+  .qz-q { margin-top: 10px; padding: 16px; border: none; border-radius: 0; background: var(--surface); }
   .qz-prompt { margin-top: 6px; font-size: 17px; font-weight: 700; white-space: pre-wrap; word-break: break-word; }
-  .qz-opts { display: grid; gap: 8px; margin-top: 12px; }
-  .qz-opt { width: 100%; justify-content: flex-start; text-align: left; font-weight: 500; white-space: normal; word-break: break-word; }
-  .qz-opt.right { border-color: var(--success); background: var(--success-bg); }
-  .qz-opt.wrong { border-color: var(--danger); background: var(--danger-bg); }
-  .qz-mark { flex: none; font-weight: 800; }
+  /* 작업217-3: 보기는 박스 없이 행(보기 사이는 아래 구분선). 상태는 색 하나로만 구분하지 않고 기호(○ ✕)와 굵기·밑줄을 함께 쓴다.
+     정답 ○+--success-dark(흰 바탕 약 10:1), 내가 고른 오답 ✕+--danger(6.57:1), 고른 보기는 밑줄. 답한 뒤 버튼은 disabled라서 흐려지지 않게 opacity 1 */
+  .qz-opts { display: grid; gap: 0; margin-top: 12px; }
+  .btn.qz-opt { width: 100%; min-height: 44px; padding: 12px 0; align-items: flex-start; justify-content: flex-start; text-align: left; font-weight: 500; white-space: normal; word-break: break-word;
+    background: transparent; border: none; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--text); }
+  .qz-opts .btn.qz-opt:last-child { border-bottom: none; }
+  .btn.qz-opt:disabled { opacity: 1; }
+  .qz-opt.right { color: var(--success-dark); font-weight: 700; }
+  .qz-opt.wrong { color: var(--danger); font-weight: 700; }
+  .qz-opt.mine > span:last-child { text-decoration: underline; text-underline-offset: 3px; }
+  .qz-mark { flex: none; width: 16px; text-align: center; font-weight: 800; }
   .qz-fb { margin-top: 12px; font-weight: 800; }
-  .qz-fb.right { color: var(--success); }
+  .qz-fb.right { color: var(--success-dark); }
   .qz-fb.wrong { color: var(--danger); }
   .qz-explain { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
   .qz-explain p { white-space: pre-wrap; word-break: break-word; margin-top: 2px; }
@@ -1144,9 +1154,9 @@ function renderQuiz() {
   q.options.forEach((text, idx) => {
     const isRight = a && idx === a.correct_index;
     const isMine = a && idx === a.choice;
-    const cls = 'btn qz-opt' + (isRight ? ' right' : (isMine ? ' wrong' : ''));
+    const cls = 'btn qz-opt' + (isRight ? ' right' : (isMine ? ' wrong' : '')) + (isMine ? ' mine' : '');
     opts.append(h('button', { class: cls, type: 'button', 'data-t': 'quiz-opt', 'data-i': idx, disabled: a ? true : null, onclick: () => answerQuiz(idx) },
-      a ? h('span', { class: 'qz-mark', 'aria-hidden': 'true' }, isRight ? '✓' : (isMine ? '✗' : '')) : null,
+      h('span', { class: 'qz-mark', 'aria-hidden': 'true' }, a ? (isRight ? '○' : (isMine ? '✕' : '')) : ''),
       h('span', {}, text)));
   });
   card.append(opts);

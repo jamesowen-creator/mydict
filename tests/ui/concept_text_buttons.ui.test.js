@@ -219,7 +219,7 @@ test('유지: 주요 채움(.btn.primary), 토글(이해함·목록 전환·전�
   for (const dt of ['react-easier', 'react-deeper', 'react-other']) assertTextButton(await page.eval(MEASURE(`[data-t=${dt}]`)), dt);
   { const m = await page.eval(MEASURE('#ask-mic')); assert.match(m.cls, /mic/); assert.equal(m.bg, TRANSPARENT); assert.deepEqual(m.bw, ['0px', '0px', '0px', '0px']); }
   const toggle = await page.eval(MEASURE('[data-t=understood]'));
-  assert.match(toggle.cls, /toggle/); assert.equal(toggle.bw[0], '1px', '이해함 토글 테두리 유지');
+  assert.match(toggle.cls, /toggle/); assert.equal(toggle.bw[0], '0px', '작업217-3: 이해함 토글은 박스(테두리) 없음 — 옛 기대(1px 유지)를 새 기준으로 바꿈'); assert.equal(toggle.bg, TRANSPARENT);
   for (const id of ['seg-map', 'seg-list']) {
     const m = await page.eval(MEASURE('#' + id));
     assert.equal(m.bg, TRANSPARENT); assert.doesNotMatch(m.cls, /\btext\b/, id + ': 탭/세그먼트는 기존 방식(밑줄 선)');

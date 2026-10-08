@@ -143,3 +143,81 @@ test('217-3 voice 퀴즈 결과 점수: 박스·테두리·그림자 없이 큰 
   assert.ok(big.size >= 40, '큰 숫자: ' + big.size); assert.ok(big.ratio >= 4.5, '점수 대비 ' + big.ratio.toFixed(2));
   await done(page);
 });
+
+// ───────────────────────── concept_study: 돌아보기 퀴즈 보기(.qz-opt), 문제 영역(.qz-q), 이해함 토글 ─────────────────────────
+const CONCEPT_ITEMS = [
+  { term: '가', set: { review_state: 'understood' } }, { term: '나', set: { review_state: 'confused' } },
+  { term: '다', set: { review_state: 'new' } }, { term: '라', set: { review_state: 'confused' } }, { term: '마', set: { review_state: 'understood' } },
+];
+async function openConcept(items = CONCEPT_ITEMS, width = 390) {
+  srv.reset(); srv.state.me = me();
+  srv.seed({ topic: '퀴즈용', items });
+  const page = await browser.newPage({ width, height: 844 });
+  await page.goto(srv.url + '/concept_study.html');
+  await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('study-rows').hidden", 8000);
+  await page.eval(NO_MOTION);
+  await page.click('[data-t="open-study"]');
+  await page.waitFor("!!document.querySelector('[data-t=term]')");
+  await settle(page);
+  return page;
+}
+const termFromDef = d => d.replace('의 정의입니다.', '');
+const currentQuestion = page => page.eval(`(() => { const q = document.querySelector('[data-t=quiz-question]'); return { kind: q.dataset.kind, prompt: document.querySelector('[data-t=quiz-prompt]').textContent, options: [...document.querySelectorAll('[data-t=quiz-opt]')].map(b => b.textContent.replace(/^[○✕]/, '')) }; })()`);
+const rightIndex = q => q.options.indexOf(q.kind === 'A' ? termFromDef(q.prompt) : q.prompt + '의 정의입니다.');
+
+test('217-3 concept 돌아보기 퀴즈 보기(.qz-opt)와 문제 영역(.qz-q): 박스 없는 행(구분선만), 오답 ✕+빨강+굵게+밑줄, 정답 ○+초록+굵게, 대비 4.5:1', { skip: SKIP }, async () => {
+  const page = await openConcept();
+  await page.click('#quiz-open');
+  await page.waitFor("!!document.querySelector('[data-t=quiz-question]')");
+  await settle(page);
+  const q0 = await page.eval(MEASURE('[data-t=quiz-question]'));
+  assert.equal(q0.bw[0], '0px', '문제 영역 테두리 없음'); assert.equal(q0.radius, '0px', '문제 영역 둥근 모서리 없음'); assert.equal(q0.shadow, 'none');
+  for (let i = 0; i < 4; i++) {
+    const o = await page.eval(MEASURE('[data-t=quiz-opt]', null, i));
+    assertNoBox(o, `보기 ${i + 1}`, { bottomLine: true }); assert.equal(o.bw[2], i === 3 ? '0px' : '1px', `보기 ${i + 1} 구분선`); assert.ok(o.h >= 43.5, '높이 ' + o.h);
+    assert.equal((await page.eval(MEASURE('[data-t=quiz-opt] .qz-mark', null, i))).text, '', '답하기 전에는 기호 없음(자리만)');
+  }
+  const q = await currentQuestion(page);
+  const right = rightIndex(q), mine = (right + 1) % 4;
+  await page.click(`[data-t="quiz-opt"][data-i="${mine}"]`);
+  await page.waitFor("!!document.querySelector('[data-t=quiz-feedback]')");
+  await settle(page);
+  const wrong = await page.eval(MEASURE('.qz-opt.wrong')), wrongMark = await page.eval(MEASURE('.qz-opt.wrong .qz-mark')), wrongText = await page.eval(MEASURE('.qz-opt.wrong > span:last-child'));
+  const ok = await page.eval(MEASURE('.qz-opt.right')), okMark = await page.eval(MEASURE('.qz-opt.right .qz-mark')), okText = await page.eval(MEASURE('.qz-opt.right > span:last-child'));
+  assertNoBox(wrong, '오답 보기', { bottomLine: true }); assertNoBox(ok, '정답 보기', { bottomLine: true });
+  assert.equal(wrongMark.text, '✕'); assert.equal(wrong.color, RED); assert.equal(wrong.weight, '700'); assert.equal(wrongText.underline, true, '고른 보기는 밑줄'); assert.ok(wrong.ratio >= 4.5);
+  assert.equal(okMark.text, '○', '오답을 골라도 정답 보기에 ○'); assert.equal(ok.color, GREEN); assert.equal(ok.weight, '700'); assert.equal(okText.underline, false, '고르지 않은 정답은 밑줄 없음'); assert.ok(ok.ratio >= 4.5);
+  assert.equal(await page.eval("getComputedStyle(document.querySelector('.qz-opt.wrong')).opacity"), '1', '답한 뒤(disabled)에도 흐려지지 않음');
+  const fb = await page.eval(MEASURE('[data-t=quiz-feedback]')); assert.equal(fb.color, RED); assert.ok(fb.ratio >= 4.5, '오답 안내 대비');
+  await page.click('[data-t="quiz-next"]');
+  await settle(page);
+  const q2 = await currentQuestion(page);
+  await page.click(`[data-t="quiz-opt"][data-i="${rightIndex(q2)}"]`);
+  await page.waitFor("!!document.querySelector('.qz-opt.right.mine')");
+  const hit = await page.eval(MEASURE('.qz-opt.right > span:last-child')); assert.equal(hit.underline, true, '고른 정답은 밑줄');
+  assert.equal((await page.eval(MEASURE('[data-t=quiz-feedback]'))).color, GREEN); assert.ok((await page.eval(MEASURE('[data-t=quiz-feedback]'))).ratio >= 4.5, '정답 안내 대비');
+  assert.equal(await page.count('.qz-opt.wrong'), 0);
+  await done(page);
+});
+
+test('217-3 concept 이해함 토글(data-t=understood): 박스 없음, 평소 현재 레이블(--text2), 켜짐은 "✓ "+코랄 계열 굵게, 44px, aria-pressed·동작 유지', { skip: SKIP }, async () => {
+  const page = await openConcept([{ term: '가', set: { review_state: 'new' } }, { term: '나', set: { review_state: 'new' } }, { term: '다', set: { review_state: 'new' } }]);   // 첫 개념이 아직 "이해함"이 아닌 상태에서 시작
+  const off = await page.eval(MEASURE('[data-t=understood]'));
+  assertNoBox(off, '이해함(꺼짐)'); assert.ok(off.h >= 43.5 && off.w >= 43.5, `터치 영역 ${off.w}x${off.h}`);
+  assert.equal(off.text, '이해함'); assert.equal(off.weight, '500'); assert.ok(off.ratio >= 4.5, '꺼짐 대비 ' + off.ratio.toFixed(2));
+  assert.equal(await page.eval("document.querySelector('[data-t=understood]').getAttribute('aria-pressed')"), 'false');
+  assert.equal(await pseudoContent(page, '[data-t=understood]'), 'none', '꺼짐에는 체크 기호 없음');
+  await page.click('[data-t="understood"]');
+  await page.waitFor("document.querySelector('[data-t=understood]').getAttribute('aria-pressed') === 'true'");
+  await settle(page);
+  const on = await page.eval(MEASURE('[data-t=understood]', '::before'));
+  assertNoBox(on, '이해함(켜짐)'); assert.equal(on.markColor, 'rgb(184, 68, 46)', '--accent-text'); assert.equal(on.weight, '800'); assert.ok(on.ratio >= 4.5, '켜짐 대비 ' + on.ratio.toFixed(2));
+  assert.equal(on.mark, '"✓ "', '앞에 ✓'); assert.equal(on.text, '이해함', '레이블은 그대로');
+  assert.ok(on.h >= 43.5);
+  assert.equal(srv.state.items[0].review_state, 'understood', '기존 동작: 서버에 이해함 저장');
+  await page.click('[data-t="understood"]');
+  await page.waitFor("document.querySelector('[data-t=understood]').getAttribute('aria-pressed') === 'false'");
+  assert.notEqual(srv.state.items[0].review_state, 'understood', '다시 누르면 해제');
+  await done(page);
+});
+const pseudoContent = (page, sel) => page.eval(`getComputedStyle(document.querySelector(${JSON.stringify(sel)}), '::before').content`);
