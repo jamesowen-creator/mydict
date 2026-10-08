@@ -22,8 +22,8 @@ const DB_READY = "typeof DB !== 'undefined' && !!DB && getComputedStyle(document
 const SCREENS = [
   { name: 'english_dictionary', pre: { buttons: ['#search-btn'], inputs: ['#search-input'] }, noErrorCheck: true },
   { name: 'literature_compass', ready: DB_READY, go: 'showBriefing(DB.eras[0].movements[0].id)', post: { buttons: ['.briefing-cta'] } },
-  { name: 'digest_reading', ready: DB_READY, go: `showDigest(${WORK0})`, post: { buttons: ['.conquest-btn'] } },
-  { name: 'science_reading', ready: DB_READY, go: 'showScience(DB.concepts[0].id)', post: { buttons: ['.conquest-btn'] } },
+  { name: 'digest_reading', ready: DB_READY, go: `showDigest(${WORK0})`, post: { buttons: [] } },   // 작업217-3: 정복 버튼은 박스 없는 글자 버튼이 되어 '주요 버튼(반경 10px·굵기 600)' 검사에서 뺌(높이 44px는 text_choices.ui가 확인)
+  { name: 'science_reading', ready: DB_READY, go: 'showScience(DB.concepts[0].id)', post: { buttons: [] } },   // 작업217-3: 정복 버튼은 박스 없는 글자 버튼이 되어 '주요 버튼(반경 10px·굵기 600)' 검사에서 뺌(높이 44px는 text_choices.ui가 확인)
   { name: 'voice_study', ready: "document.getElementById('list-count').textContent === '0건'", setup: s => { s.state.voiceNotes = []; },
     pre: { buttons: ['#new-rec-btn'] }, go: "openEditNew('연습 문장입니다.')", post: { buttons: ['#sum-make'], inputs: ['#edit-title', '#edit-text'] } },
   { name: 'concept_study', ready: "!document.getElementById('app').hidden && !document.getElementById('study-rows').hidden", seed: true,

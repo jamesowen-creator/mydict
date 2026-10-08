@@ -189,7 +189,8 @@ test('digest_reading: 표시 전용 뱃지가 없음(변경 없음) — 목록·
   await step(page, 'showDigest(DB.works ? DB.works[0].id : DB[0].id)');
   assert.deepEqual(await page.eval(SCAN_DISPLAY_BOXES), [], '작품 상세');
   const c = await page.eval(MEASURE('.conquest-btn'));
-  assert.equal(c.radius, '10px'); assert.equal(c.weight, '600'); assert.equal(c.bw[0], '2px'); assert.ok(c.h >= 43.5);
+  // 작업217-3: 정복 버튼은 박스 없는 글자로 바뀜(옛 기대: radius 10px·weight 600·테두리 2px)
+  assert.equal(c.bg, TRANSPARENT); assert.equal(c.bw[0], '0px'); assert.equal(c.radius, '0px'); assert.ok(c.h >= 43.5);
   await done(page);
 });
 
@@ -214,13 +215,13 @@ test('유지(변환 금지): literature의 사조 칩·타임라인 칩·탭, sc
   assert.equal(card.radius, '16px'); assert.ok(parseFloat(card.bw[0]) >= 1, '과목 카드 테두리 유지'); assert.equal(card.cursor, 'pointer'); assert.notEqual(card.bg, TRANSPARENT);
   await step(page, 'showScience(DB.concepts[0].id)');
   const cq = await must(page, '.conquest-btn');
-  assert.equal(cq.radius, '10px'); assert.equal(cq.weight, '600'); assert.equal(cq.bw[0], '2px');
+  assert.equal(cq.bg, TRANSPARENT); assert.equal(cq.bw[0], '0px'); assert.equal(cq.radius, '0px');   // 작업217-3: 옛 기대(radius 10px·weight 600·테두리 2px)를 박스 없음으로 바꿈
   await page.close();
 
   page = await open('digest_reading');
   await step(page, 'showDigest(DB.works ? DB.works[0].id : DB[0].id)');
   const cq2 = await must(page, '.conquest-btn');
-  assert.equal(cq2.radius, '10px'); assert.equal(cq2.weight, '600'); assert.equal(cq2.bw[0], '2px');
+  assert.equal(cq2.bg, TRANSPARENT); assert.equal(cq2.bw[0], '0px'); assert.equal(cq2.radius, '0px');   // 작업217-3: 같은 이유
   await page.close();
 });
 

@@ -221,3 +221,162 @@ test('217-3 concept 이해함 토글(data-t=understood): 박스 없음, 평소 �
   await done(page);
 });
 const pseudoContent = (page, sel) => page.eval(`getComputedStyle(document.querySelector(${JSON.stringify(sel)}), '::before').content`);
+
+// ───────────────────────── 읽기 3화면: 4지선다 · O/X · 짝 맞추기 · 정복 버튼 · 결과 ─────────────────────────
+const MCQ_ITEMS = "[{ type: 'mcq', question: '문제 하나', options: ['가', '나', '다', '라'], answer: '다', explanation: '해설', roundLabel: '4지선다' }, { type: 'mcq', question: '문제 둘', options: ['A', 'B', 'C', 'D'], answer: 'A', explanation: '해설', roundLabel: '4지선다' }]";
+const OX_ITEMS = "[{ type: 'ox', statement: '참인 문장', answer: true, explanation: '정답! 해설입니다.', roundLabel: 'OX' }, { type: 'ox', statement: '거짓인 문장', answer: false, explanation: '아닙니다. 해설입니다.', roundLabel: 'OX' }]";
+const READING = [
+  { file: 'literature_compass',
+    mcq: `quizData = { rounds: [{ type: 'mcq', questions: [{ question: '문제 하나', options: ['가', '나', '다', '라'], answer: '다' }, { question: '문제 둘', options: ['A', 'B', 'C', 'D'], answer: 'A' }] }], currentRound: 0, currentQ: 0, score: 0, wrong: [], totalQ: 2 }; showView('view-quiz'); renderQuizRound();`,
+    ox: `quizData = { rounds: [{ type: 'ox', questions: [{ statement: '참인 문장', answer: true, explanation: '해설입니다.' }, { statement: '거짓인 문장', answer: false, explanation: '해설입니다.' }] }], currentRound: 0, currentQ: 0, score: 0, wrong: [], totalQ: 2 }; showView('view-quiz'); renderQuizRound();`,
+    fb: '#ox-feedback',
+    result: "quizData = { rounds: [], currentRound: 0, currentQ: 0, score: 1, totalQ: 4, wrong: [{ q: '첫 문항', a: '정답 하나' }, { q: '둘째 문항', a: '정답 둘' }] }; showResult()" },
+  { file: 'science_reading',
+    mcq: `quizState = { questions: ${MCQ_ITEMS}, currentIdx: 0, score: 0, wrong: [], answered: false }; showView('view-quiz'); renderQuestion();`,
+    ox: `quizState = { questions: ${OX_ITEMS}, currentIdx: 0, score: 0, wrong: [], answered: false }; showView('view-quiz'); renderQuestion();`,
+    fb: '#ox-fb',
+    result: "quizState = { questions: [{}, {}, {}, {}], currentIdx: 0, score: 1, wrong: [{ q: '첫 문항', a: '정답 하나' }, { q: '둘째 문항', a: '정답 둘' }], answered: false }; showResult()" },
+  { file: 'digest_reading',
+    mcq: `quizState = { questions: ${MCQ_ITEMS}, currentIdx: 0, score: 0, wrong: [], answered: false }; showView('view-quiz'); renderQuestion();`,
+    ox: `quizState = { questions: ${OX_ITEMS}, currentIdx: 0, score: 0, wrong: [], answered: false }; showView('view-quiz'); renderQuestion();`,
+    fb: '#ox-fb',
+    result: "quizState = { questions: [{}, {}, {}, {}], currentIdx: 0, score: 1, wrong: [{ q: '첫 문항', a: '정답 하나' }, { q: '둘째 문항', a: '정답 둘' }], answered: false }; showResult()" },
+];
+
+test('217-3 읽기 3화면 4지선다: 박스 없는 번호+본문 행(구분선만), 채점 후 정답 ○+초록 굵게 / 내가 고른 오답 ✕+빨강 굵게 밑줄, 오답이어도 정답에 ○, 대비 4.5:1', { skip: SKIP }, async () => {
+  for (const r of READING) {
+    const page = await openReading(r.file);
+    await step(page, r.mcq);
+    assert.equal(await page.count('.mcq-option'), 4, r.file);
+    for (let i = 0; i < 4; i++) {
+      const o = await page.eval(MEASURE('.mcq-option', null, i)), num = await page.eval(MEASURE('.mcq-option .mcq-num', null, i));
+      assertNoBox(o, `${r.file} 보기 ${i + 1}`, { bottomLine: true }); assert.equal(o.bw[2], i === 3 ? '0px' : '1px', r.file + ' 구분선'); assert.ok(o.h >= 43.5, r.file + ' 높이 ' + o.h);
+      assert.equal(num.bg, TRANSPARENT, r.file + ' 번호 원형 채움 없음'); assert.equal(num.radius, '0px'); assert.equal(num.color, TEXT2); assert.ok(num.ratio >= 4.5); assert.equal(num.w, 20);
+    }
+    await step(page, "document.querySelectorAll('.mcq-text')[0].textContent = '아주 긴 보기 문장입니다. 이 문장은 한 줄에 들어가지 않아서 두 줄 이상으로 줄바꿈되어야 하고 그래도 한 보기로 읽혀야 합니다.'");
+    assert.equal(new Set(await page.eval("[...document.querySelectorAll('.mcq-text')].map(e => Math.round(e.getBoundingClientRect().left))")).size, 1, r.file + ': 본문 들여쓰기 일정');
+    await step(page, r.mcq);
+    await page.click('.mcq-option', { index: 0 });          // 오답(정답은 "다")
+    await page.waitFor("!!document.querySelector('.mcq-option.wrong')");
+    await settle(page);
+    const wt = await page.eval(MEASURE('.mcq-option.wrong .mcq-text')), wm = await page.eval(MEASURE('.mcq-option.wrong', '::before'));
+    const ht = await page.eval(MEASURE('.mcq-option.correct-hint .mcq-text')), hm = await page.eval(MEASURE('.mcq-option.correct-hint', '::before'));
+    assert.equal(wm.mark, '"✕"', r.file); assert.equal(wt.color, RED); assert.equal(wt.weight, '700'); assert.equal(wt.underline, true); assert.ok(wt.ratio >= 4.5 && wm.markRatio >= 4.5);
+    assert.equal(hm.mark, '"○"', r.file + ': 오답이어도 정답 보기에 ○'); assert.equal(ht.color, GREEN); assert.equal(ht.weight, '700'); assert.equal(ht.underline, false); assert.ok(ht.ratio >= 4.5 && hm.markRatio >= 4.5);
+    assert.equal((await page.eval(MEASURE('.mcq-option', '::before', 1))).mark, '""', r.file + ': 나머지는 기본');
+    // 정답을 고르는 경우
+    await step(page, r.mcq);
+    await page.click('.mcq-option', { index: 2 });
+    await page.waitFor("!!document.querySelector('.mcq-option.correct')");
+    const ct = await page.eval(MEASURE('.mcq-option.correct .mcq-text')), cm = await page.eval(MEASURE('.mcq-option.correct', '::before'));
+    assert.equal(cm.mark, '"○"'); assert.equal(ct.color, GREEN); assert.equal(ct.weight, '700'); assert.equal(ct.underline, true); assert.ok(ct.ratio >= 4.5);
+    await done(page);
+  }
+});
+
+test('217-3 읽기 3화면 O/X: 박스 없는 큰 글자 O X(32px 굵게, 좌우, 높이 80px 유지), 채점 후 "○ 정답"+초록 / "✕ 오답"+빨강, 고른 쪽 밑줄, 해설 줄은 색 바탕 없이 기호+글자색', { skip: SKIP }, async () => {
+  for (const r of READING) {
+    const page = await openReading(r.file);
+    await step(page, r.ox);
+    const o = await page.eval(MEASURE('#ox-o')), x = await page.eval(MEASURE('#ox-x'));
+    for (const [m, label] of [[o, 'O'], [x, 'X']]) {
+      assertNoBox(m, `${r.file} ${label}`); assert.equal(m.size, 32); assert.equal(m.weight, '700'); assert.ok(m.h >= 79.5 && m.w >= 43.5, `${label} 눌림 영역 ${m.w}x${m.h}`); assert.ok(m.ratio >= 4.5);
+    }
+    assert.ok(o.left < x.left, 'O는 왼쪽, X는 오른쪽');
+    assert.equal(o.underline, false); assert.equal((await page.eval(MEASURE('#ox-o', '::after'))).mark, '""', '채점 전 라벨 없음');
+    await page.click('#ox-x');                               // 첫 문제 정답은 O → 오답
+    await page.waitFor("document.getElementById('ox-x').classList.contains('wrong')");
+    await settle(page);
+    const wx = await page.eval(MEASURE('#ox-x', '::after')), cx = await page.eval(MEASURE('#ox-o', '::after'));
+    const xm = await page.eval(MEASURE('#ox-x')), om = await page.eval(MEASURE('#ox-o'));
+    assert.equal(wx.mark, '"✕ 오답"', r.file); assert.equal(xm.color, RED); assert.equal(wx.markColor, RED); assert.equal(xm.underline, true, '고른 쪽 밑줄'); assert.ok(wx.markRatio >= 4.5);
+    assert.equal(cx.mark, '"○ 정답"'); assert.equal(om.color, GREEN); assert.equal(cx.markColor, GREEN); assert.equal(om.underline, false, '고르지 않은 정답은 밑줄 없음'); assert.ok(cx.markRatio >= 4.5);
+    assert.equal(await page.eval("document.getElementById('ox-x').disabled && document.getElementById('ox-o').disabled"), true);
+    const fb = await page.eval(MEASURE(r.fb, '::before')); assert.equal(fb.bg, TRANSPARENT); assert.equal(fb.radius, '0px'); assert.equal(fb.color, RED); assert.equal(fb.mark, '"✕ "'); assert.ok(fb.ratio >= 4.5);
+    // 정답을 고르는 경우(두 번째 문제의 정답은 X)
+    await page.click('.quiz-next-btn.visible, #quiz-next');
+    await page.waitFor("!document.getElementById('ox-x').disabled");
+    await settle(page);
+    await page.click('#ox-x');
+    await page.waitFor("document.getElementById('ox-x').classList.contains('correct')");
+    const ok = await page.eval(MEASURE('#ox-x')), okm = await page.eval(MEASURE('#ox-x', '::after')), fb2 = await page.eval(MEASURE(r.fb, '::before'));
+    assert.equal(ok.color, GREEN); assert.equal(ok.underline, true); assert.equal(okm.mark, '"○ 정답"');
+    assert.equal(fb2.color, GREEN); assert.equal(fb2.mark, '"○ "'); assert.ok(fb2.ratio >= 4.5);
+    assert.equal(await page.count('.ox-btn.wrong'), 0);
+    await done(page);
+  }
+});
+
+test('217-3 literature 짝 맞추기(.match-item): 박스 없는 구분선 행, 고른 항목 --primary-dark+굵게+밑줄, 맞음 ○+초록, 틀림 ✕+빨강, 동작 유지', { skip: SKIP }, async () => {
+  const page = await openReading('literature_compass');
+  await step(page, "quizData = { rounds: [{ type: 'matching', pairs: [{ id: 'a', work: '작품일', author: '작가일' }, { id: 'b', work: '작품이', author: '작가이' }, { id: 'c', work: '작품삼', author: '작가삼' }] }], currentRound: 0, currentQ: 0, score: 0, wrong: [], totalQ: 3 }; showView('view-quiz'); renderQuizRound();");
+  assert.equal(await page.count('.match-item'), 6);
+  for (let i = 0; i < 6; i++) {
+    const m = await page.eval(MEASURE('.match-item', null, i));
+    assertNoBox(m, `짝 맞추기 항목 ${i + 1}`, { bottomLine: true }); assert.ok(m.h >= 43.5, '높이 ' + m.h); assert.ok(m.ratio >= 4.5); assert.equal(m.cursor, 'pointer');
+  }
+  const lines = await page.eval("[...document.querySelectorAll('.match-col')].map(c => [...c.querySelectorAll('.match-item')].map(e => getComputedStyle(e).borderBottomWidth))");
+  assert.deepEqual(lines, [['1px', '1px', '0px'], ['1px', '1px', '0px']], '열마다 마지막 항목만 아래 선 없음');
+  // 작품 하나를 고름 → 선택됨
+  await page.click('#mw-a');
+  await page.waitFor("document.getElementById('mw-a').classList.contains('selected')");
+  const sel = await page.eval(MEASURE('#mw-a'));
+  assert.equal(sel.color, 'rgb(184, 68, 46)'); assert.equal(sel.weight, '700'); assert.equal(sel.underline, true); assert.ok(sel.ratio >= 4.5, '선택 대비 ' + sel.ratio.toFixed(2));
+  // 다른 짝의 작가를 고름 → 틀림(✕+빨강)
+  await page.click('#ma-b');
+  await page.waitFor("document.getElementById('ma-b').classList.contains('wrong')");
+  const wr = await page.eval(MEASURE('#ma-b')), wrm = await page.eval(MEASURE('#ma-b', '::before')), wrw = await page.eval(MEASURE('#mw-a', '::before'));
+  assert.equal(wrm.mark, '"✕ "'); assert.equal(wr.color, RED); assert.equal(wr.weight, '700'); assert.ok(wr.ratio >= 4.5 && wrm.markRatio >= 4.5); assert.equal(wrw.mark, '"✕ "', '짝이 된 작품 쪽도 틀림 표시');
+  await page.waitFor("!document.getElementById('ma-b').classList.contains('wrong')", 3000);   // 기존 동작: 0.8초 뒤 선택 해제
+  // 이번에는 맞는 짝: 작품일 + 작가일 → 맞음(○+초록), 점수 +1
+  await page.click('#mw-a');
+  await page.click('#ma-a');
+  await page.waitFor("document.getElementById('ma-a').classList.contains('correct')");
+  const ok = await page.eval(MEASURE('#ma-a')), okm = await page.eval(MEASURE('#ma-a', '::before')), okw = await page.eval(MEASURE('#mw-a', '::before'));
+  assert.equal(okm.mark, '"○ "'); assert.equal(okw.mark, '"○ "'); assert.equal(ok.color, GREEN); assert.equal(ok.weight, '700'); assert.ok(ok.ratio >= 4.5 && okm.markRatio >= 4.5);
+  assert.equal(await page.eval('quizData.score'), 1, '기존 동작: 맞으면 점수 +1');
+  assert.equal(await page.eval("document.getElementById('ma-a').classList.contains('correct') && document.getElementById('mw-a').classList.contains('correct')"), true);
+  await done(page);
+});
+
+test('217-3 science·digest 정복 버튼(.conquest-btn): 박스 없음, 정복 전 "정복하기"(--text2) / 후 "✓ 정복함"(코랄 계열 굵게), 44px, 대비 4.5:1, aria-pressed·동작 유지', { skip: SKIP }, async () => {
+  for (const [file, go] of [['science_reading', 'showScience(DB.concepts[0].id)'], ['digest_reading', 'showDigest(DB.works[0].id)']]) {
+    const page = await openReading(file);
+    await step(page, go);
+    const off = await page.eval(MEASURE('#conquest-btn'));
+    assertNoBox(off, file + ' 정복 전'); assert.equal(off.text, '정복하기'); assert.ok(off.h >= 43.5 && off.w >= 43.5, `${off.w}x${off.h}`); assert.equal(off.color, TEXT2); assert.ok(off.ratio >= 4.5, '정복 전 대비 ' + off.ratio.toFixed(2));
+    assert.equal(off.weight, '500');
+    assert.equal(await page.eval("document.getElementById('conquest-btn').getAttribute('aria-pressed')"), 'false');
+    await page.click('#conquest-btn');
+    await page.waitFor("document.getElementById('conquest-btn').classList.contains('conquered')");
+    const on = await page.eval(MEASURE('#conquest-btn'));
+    assertNoBox(on, file + ' 정복 후'); assert.equal(on.text, '✓ 정복함', '기호 ✓ + 글자'); assert.equal(on.color, 'rgb(184, 68, 46)'); assert.equal(on.weight, '700'); assert.ok(on.ratio >= 4.5, '정복 후 대비 ' + on.ratio.toFixed(2)); assert.ok(on.h >= 43.5);
+    assert.equal(await page.eval("document.getElementById('conquest-btn').getAttribute('aria-pressed')"), 'true');
+    assert.equal(await page.eval("Object.keys(localStorage).filter(k => /conquest_/.test(k) && localStorage.getItem(k) === 'true').length"), 1, '기존 동작: 정복 상태가 저장됨');
+    await page.click('#conquest-btn');
+    await page.waitFor("!document.getElementById('conquest-btn').classList.contains('conquered')");
+    assert.equal(await page.eval("document.getElementById('conquest-btn').textContent"), '정복하기');
+    assert.equal(await page.eval("document.getElementById('conquest-btn').getAttribute('aria-pressed')"), 'false');
+    assert.equal(await page.eval("Object.keys(localStorage).filter(k => /conquest_/.test(k) && localStorage.getItem(k) === 'true').length"), 0, '다시 누르면 해제');
+    // 정복 바(.conquest-bar)는 구조라서 유지: 위 선 + 흰 바탕
+    const bar = await page.eval(MEASURE('.conquest-bar')); assert.equal(bar.bw[0], '1px'); assert.notEqual(bar.bg, TRANSPARENT);
+    await done(page);
+  }
+});
+
+test('217-3 퀴즈 결과 3화면: 점수는 박스 없는 큰 숫자(대비 4.5:1), 틀린 문항은 구분선 행, 정답 글자 초록', { skip: SKIP }, async () => {
+  for (const r of READING) {
+    const page = await openReading(r.file);
+    await step(page, r.result);
+    const w = await page.eval(MEASURE('.result-score-wrap'));
+    assertNoBox(w, r.file + ' 점수 영역', { bottomLine: true }); assert.equal(w.bw[2], '1px');
+    const sc = await page.eval(MEASURE('.result-score')); assert.ok(sc.size >= 40); assert.ok(sc.ratio >= 4.5, r.file + ' 점수 대비 ' + sc.ratio.toFixed(2)); assert.equal(sc.color, 'rgb(184, 68, 46)');
+    assert.equal(await page.count('.result-wrong-item'), 2);
+    for (let i = 0; i < 2; i++) {
+      const m = await page.eval(MEASURE('.result-wrong-item', null, i));
+      assertNoBox(m, `${r.file} 틀린 문항 ${i + 1}`, { bottomLine: true }); assert.equal(m.bw[2], i === 1 ? '0px' : '1px', '마지막 행만 아래 선 없음');
+    }
+    const a = await page.eval(MEASURE('.result-wrong-a')); assert.equal(a.color, GREEN); assert.ok(a.ratio >= 4.5);
+    await done(page);
+  }
+});
