@@ -60,3 +60,37 @@ function assertFlatPanel(m, label, { bottomLine = false } = {}) {
 const done = async page => { assert.deepEqual(page.errors, [], '스크립트 오류 없음'); assert.equal(await page.hasHorizontalScroll(), false, '가로 스크롤 없음'); await page.close(); };
 
 module.exports = { TRANSPARENT, WHITE, GREEN, RED, TEXT2, CORAL_DARK, NO_MOTION, DB_READY, me, settle, step, MEASURE, assertNoBox, assertFlatPanel, done };
+
+// ── 자동 훑기(computed style 기준) ───────────────────────────────────────────────
+// "박스"의 기준(클래스 이름이 아니라 계산된 스타일): 아래 중 하나라도 해당하면 박스
+//  ① 테두리가 2면 이상  ② 그림자  ③ 그라데이션/배경 이미지  ④ 둥근 모서리가 있고 (배경이나 테두리가 있음)
+//  ⑤ 배경색이 있고 (흰색 평면도, 페이지 바탕색도, 주 동작 채움색도 아님)
+// 예외(박스가 아니거나 의도적으로 유지): 흰색 평면 면(테두리 1면 이하·둥근 모서리/그림자 없음), 페이지 바탕색과 같은 면, 주 동작 코랄 채움 버튼,
+// 입력 필드(input/textarea/select), 허용 목록(allow)의 선택자와 그 자손.
+const SWEEP = allow => `(() => {
+  const allow = ${JSON.stringify(allow)};
+  const num = c => (c.match(/[\\d.]+/g) || []).map(Number);
+  const pageBg = getComputedStyle(document.body).backgroundColor;
+  const PRIMARY_FILLS = ['rgb(184, 68, 46)', 'rgb(156, 58, 39)', 'rgb(134, 49, 31)'];
+  const out = [];
+  for (const e of document.body.querySelectorAll('*')) {
+    if (!e.getClientRects().length) continue;
+    if (/^(SCRIPT|STYLE|INPUT|TEXTAREA|SELECT|OPTION|SVG|PATH|LINE|POLYLINE|CIRCLE|RECT|G|IMG|CANVAS|LINK|META)$/i.test(e.tagName) || e.namespaceURI === 'http://www.w3.org/2000/svg') continue;
+    if (allow.length && e.closest(allow.join(','))) continue;
+    const cs = getComputedStyle(e), box = e.getBoundingClientRect();
+    if (box.height <= 2 || box.width <= 2) continue;   // 구분선(1~2px 높이·너비의 선)은 박스가 아님
+    if (PRIMARY_FILLS.includes(cs.backgroundColor) && /^(BUTTON|A)$/.test(e.tagName)) continue;   // 주 동작 코랄 채움 버튼은 유지 대상
+    const sides = ['Top', 'Right', 'Bottom', 'Left'].filter(s => parseFloat(cs['border' + s + 'Width']) > 0 && cs['border' + s + 'Style'] !== 'none' && (num(cs['border' + s + 'Color'])[3] === undefined || num(cs['border' + s + 'Color'])[3] > 0)).length;
+    const bgc = cs.backgroundColor, hasBg = num(bgc).length < 4 || num(bgc)[3] > 0;
+    const radius = cs.borderTopLeftRadius !== '0px' || cs.borderTopRightRadius !== '0px';
+    const why = [];
+    if (sides >= 2) why.push('테두리 ' + sides + '면');
+    if (cs.boxShadow !== 'none') why.push('그림자');
+    if (cs.backgroundImage !== 'none') why.push('그라데이션/배경 이미지');
+    if (radius && (hasBg || sides >= 1)) why.push('둥근 모서리+' + (hasBg ? '배경' : '테두리'));
+    if (hasBg && bgc !== 'rgb(255, 255, 255)' && bgc !== pageBg && !(PRIMARY_FILLS.includes(bgc) && /^(BUTTON|A)$/.test(e.tagName))) why.push('배경색 ' + bgc);
+    if (why.length) out.push((e.id ? '#' + e.id : '') + '.' + String(e.className && e.className.baseVal !== undefined ? e.className.baseVal : e.className).trim().replace(/\\s+/g, '.') + ' <' + e.tagName.toLowerCase() + '> [' + why.join(', ') + '] "' + e.textContent.trim().slice(0, 10) + '"');
+  }
+  return out;
+})()`;
+module.exports.SWEEP = SWEEP;
