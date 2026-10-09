@@ -45,6 +45,9 @@
     overflow-x: hidden;
     line-height: 1.6;
     font-size: var(--body-font-size);
+    /* 작업223: 문학 나침반·음성 학습·한입 독서와 같은 방식 — 본문 열(--content-max)을 가운데에 두어, 공용 헤더·제목 바도 같은 열 안에 오게 함(태블릿 폭에서 왼쪽으로 쏠리던 문제) */
+    max-width: var(--content-max);
+    margin: 0 auto;
   }
   button, input, textarea { font-family: inherit; font-size: inherit; color: inherit; }
   button { cursor: pointer; }
@@ -305,7 +308,7 @@
   dialog .rel-detail { margin-top: 10px; white-space: pre-wrap; }
 
   /* 하단 고정 입력창 */
-  .bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 120; background: var(--bg); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+  .bottom-bar { position: fixed; left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--content-max); bottom: 0; z-index: 120; background: var(--bg); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
   .bottom-bar .wrap { padding-top: 8px; padding-bottom: 8px; }
   .ask { display: flex; gap: 8px; }
   .ask input { flex: 1; min-width: 0; }
