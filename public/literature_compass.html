@@ -689,12 +689,12 @@
   <div class="content" id="qlist-content"></div>
 </div>
 
-<!-- 하단 내비 (작업226-2). 사전 탭은 기존 "어휘 사전" 링크와 같은 곳(/ = METIS 홈)으로 이동하며 활성 표시가 없다 -->
+<!-- 하단 내비 (작업226-2). 사전 탭은 기존 "어휘 사전" 링크와 같은 곳(사전 화면 /english_dictionary.html)으로 이동하며 활성 표시가 없다 -->
 <nav id="bottom-nav" class="bottom-nav" aria-label="문학 나침반 메뉴">
   <div class="bottom-nav-tabs">
     <button type="button" class="bottom-nav-tab" id="nav-home" data-tab="home">홈</button>
     <button type="button" class="bottom-nav-tab" id="nav-quiz" data-tab="quiz">퀴즈</button>
-    <a class="bottom-nav-tab" id="nav-dict" href="/">사전</a>
+    <a class="bottom-nav-tab" id="nav-dict" href="/english_dictionary.html">사전</a>
   </div>
 </nav>
 
@@ -936,7 +936,7 @@ function renderHome() {
     <h2>한국 문학 탐구</h2>
     <p>시대별 문학 사조와 작품을 배경지식과 함께 깊이 있게 알아보세요.</p>
   </div>
-  <a class="dict-link" href="/" aria-label="어휘 사전 — METIS 단어장으로 돌아가기">어휘 사전 →</a>`;
+  <a class="dict-link" href="/english_dictionary.html" aria-label="어휘 사전 — METIS 단어장으로 돌아가기">어휘 사전 →</a>`;
 
   DB.eras.forEach(era => {
     const tabsHtml = GENRE_TABS.map(g =>

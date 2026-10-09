@@ -105,10 +105,10 @@ for (const w of [320, 768]) {
 }
 
 // ───────────────────────── 문학 ─────────────────────────
-test('문학: 활성 규칙(홈=홈·브리핑·카드 / 퀴즈=퀴즈 탭·풀이·결과), 사전 탭은 "/" 로 가는 링크이며 활성 표시 없음', { skip: SKIP }, async () => {
+test('문학: 활성 규칙(홈=홈·브리핑·카드 / 퀴즈=퀴즈 탭·풀이·결과), 사전 탭은 "/english_dictionary.html" 로 가는 링크이며 활성 표시 없음', { skip: SKIP }, async () => {
   const page = await open('lit');
-  assert.equal(await page.eval("document.getElementById('nav-dict').getAttribute('href')"), '/');
-  assert.equal(await page.eval("document.querySelector('.dict-link').getAttribute('href')"), '/', '기존 "어휘 사전" 링크와 같은 이동 대상');
+  assert.equal(await page.eval("document.getElementById('nav-dict').getAttribute('href')"), '/english_dictionary.html');   // 사전 화면 경로(server.js 정적 서빙, '/' 는 METIS 홈)
+  assert.equal(await page.eval("document.querySelector('.dict-link').getAttribute('href')"), '/english_dictionary.html', '기존 "어휘 사전" 링크와 같은 이동 대상');
   await page.eval("showBriefing(DB.eras[0].movements[0].id)"); await sleep(200);
   assert.deepEqual(await currentTab(page), ['홈'], '브리핑');
   await page.eval("showCards()"); assert.deepEqual(await currentTab(page), ['홈'], '카드');

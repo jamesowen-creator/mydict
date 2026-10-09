@@ -134,17 +134,17 @@ test('217-2 science·digest .carousel-nav-btn: 테두리·배경 없는 ‹ › 
   }
 });
 
-test('217-2 literature 홈 "어휘 사전" 링크: 그라데이션 박스 없이 한 줄 밑줄 텍스트, 높이 44px, 대비 4.5:1, 목적지 "/" 그대로, 눌러서 이동', { skip: SKIP }, async () => {
+test('217-2 literature 홈 "어휘 사전" 링크: 그라데이션 박스 없이 한 줄 밑줄 텍스트, 높이 44px, 대비 4.5:1, 목적지 "/english_dictionary.html"(작업226-2b: 옛 "/" = METIS 홈에서 사전 화면으로 정정), 눌러서 이동', { skip: SKIP }, async () => {
   const page = await open('literature_compass');
   const m = await page.eval(MEASURE('.dict-link'));
   assertTextBtn(m, '.dict-link');
   assert.equal(m.text, '어휘 사전 →'); assert.ok(m.aria && m.aria.startsWith('어휘 사전'), 'aria-label이 보이는 글자로 시작');
-  assert.equal(await page.eval("document.querySelector('.dict-link').getAttribute('href')"), '/');
+  assert.equal(await page.eval("document.querySelector('.dict-link').getAttribute('href')"), '/english_dictionary.html');
   assert.equal(await page.eval("getComputedStyle(document.querySelector('.dict-link')).backgroundImage"), 'none', '그라데이션 없음');
   assert.equal(await page.count('#home-content a[style*="gradient"]'), 0, '옛 배너(인라인 그라데이션)가 남아 있지 않음');
   assert.ok(m.h < 60, '한 줄 높이(옛 배너는 약 70px): ' + m.h);
   await page.click('.dict-link');
-  await page.waitFor("location.pathname === '/'", 6000);
+  await page.waitFor("location.pathname === '/english_dictionary.html'", 6000);
   assert.deepEqual(page.errors, []);
   await page.close();
 });
