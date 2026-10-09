@@ -20,7 +20,8 @@ const SCENARIOS = {
   },
 };
 
-async function recordInit({ scenario = 'fresh', failOn = null, delayMs = 0, connectError = null, dbPath = DB_PATH } = {}) {
+// respond(sql, params): 작업227-9 — 특정 SQL 에 가짜 응답을 줄 때 쓴다(undefined 를 돌려주면 시나리오 기본 응답)
+async function recordInit({ scenario = 'fresh', failOn = null, delayMs = 0, connectError = null, dbPath = DB_PATH, respond: override = null } = {}) {
   const sqls = [], logs = [];
   const respond = SCENARIOS[scenario];
   const client = {
@@ -31,6 +32,7 @@ async function recordInit({ scenario = 'fresh', failOn = null, delayMs = 0, conn
       if (delayMs) await new Promise(r => setTimeout(r, delayMs));
       if (failOn && failOn.test(sql)) throw new Error('주입된 오류: ' + sql.slice(0, 40));
       if (/^SELECT id, name FROM users WHERE name IS NOT NULL ORDER BY id$/.test(sql)) return { rows: [{ id: 1, name: '테스트' }], rowCount: 1 };
+      if (override) { const o = override(sql, params); if (o) return o; }
       return respond(sql, params);
     },
     release() { this.released = true; },

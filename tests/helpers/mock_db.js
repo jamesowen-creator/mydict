@@ -39,7 +39,8 @@ const CHECKS = {
   },
   concept_quiz_attempts: { kind: ['A', 'B'] },
   concept_links: {
-    relation_type: ['포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련'], source: ['ai', 'user'],
+    // 작업227-9: lib/db.js 의 concept_links_relation_types_v2 와 같은 11값(옛 6종 + 새 5종). 이 모의 DB 의 CHECK 는 실제 PG 제약을 흉내 낸 것일 뿐이다
+    relation_type: ['포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련', '사용', '일부', '종류', '일으킴', '구별'], source: ['ai', 'user'],
   },
 };
 const NOT_NULL = {
@@ -172,6 +173,8 @@ function createMockDb() {
       });
       return { rows, rowCount: rows.length };
     }],
+    // 작업227-9: initDB 의 CHECK 확장 단계가 제약 목록을 조회한다(모의 DB 에는 제약 카탈로그가 없으니 빈 결과 = 아직 새 제약 없음)
+    [/^SELECT c\.conname, pg_get_constraintdef\(c\.oid\) AS def FROM pg_constraint c WHERE c\.conrelid = 'concept_links'::regclass/, () => ({ rows: [], rowCount: 0 })],
     [/^SELECT id, name FROM users WHERE name IS NOT NULL/, () => ({ rows: [], rowCount: 0 })],
     [/^SELECT id, user_id, term, explanation, subject, subject_detail, topic, subtopic, last_rating, created_at FROM voice_concepts WHERE NOT EXISTS/, () => {
       const used = new Set(db.tables.concept_items.map(i => i.legacy_voice_concept_id).filter(x => x !== null));
@@ -272,7 +275,7 @@ function createMockDb() {
     }
 
     // CREATE/ALTER 같은 스키마 문장은 기록만 하고 통과(initDB 흉내용)
-    if (/^(CREATE|ALTER|SET|DROP) /i.test(sql)) return { rows: [], rowCount: 0 };
+    if (/^(CREATE|ALTER|SET|DROP|LOCK) /i.test(sql)) return { rows: [], rowCount: 0 };   // 작업227-9: initDB 의 LOCK TABLE 도 통과
     throw new Error('mock_db: 지원하지 않는 SQL ' + sql.slice(0, 120));
   }
 
