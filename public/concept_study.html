@@ -34,6 +34,7 @@
     --success-dark: #085041;   /* 작업217-3: 정답 글자(흰 바탕 약 10:1). 음성 학습·읽기 화면의 --success-dark와 같은 값 */
     --danger-bg: #fcebeb;   /* 오류 박스 배경(음성 학습의 --error-light와 같은 값) */
     --info-bg: #fdf0ec;     /* 안내 박스 배경(코랄 연한 색) */
+    --navbar-h: 78px;       /* 작업226-3: 하단 내비 높이(음성 학습·사전과 같은 값) */
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html { -webkit-text-size-adjust: 100%; }
@@ -57,8 +58,10 @@
   svg.ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
   .wrap { max-width: var(--content-max); margin: 0 auto; padding: 0 16px; }
-  #app { padding-bottom: 24px; }
-  #app.in-study { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  /* 작업226-3: 하단 내비(78px) 위에 입력 바가 얹히므로 학습 화면의 하단 여백 = 내비 + 입력 바(--ask-h, 실제 높이를 측정해 넣음) + 여유. 퀴즈 중에는 입력 바가 없으니 내비만 */
+  #app { padding-bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom) + 16px); }
+  #app.in-study { padding-bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom) + var(--ask-h, 76px) + 16px); }
+  #app.in-study.in-quiz { padding-bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom) + 16px); }
 
   /* 로딩·권한 없음 */
   #loading, #access-denied { position: fixed; inset: 0; z-index: 999; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; }
@@ -307,8 +310,46 @@
   dialog .rel-type { margin-top: 10px; }
   dialog .rel-detail { margin-top: 10px; white-space: pre-wrap; }
 
+  /* ── 하단 내비 (작업226-3): 음성 학습·언어 사전의 하단 내비(작업224-2)와 같은 구조·크기. 색은 이 화면의 팔레트 ── */
+  .bottom-nav {
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -2px 8px rgba(226,88,59,0.07);
+    padding: 0 16px max(8px, env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 0;
+    position: fixed;
+    left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--content-max);
+    bottom: 0; z-index: 100;
+    min-height: var(--navbar-h);
+  }
+  .bottom-nav-tabs { display: flex; flex: 1; gap: 0; }
+  .bottom-nav-tab {
+    display: flex; flex-direction: row; align-items: baseline; justify-content: center; gap: 2px;
+    flex: 1 1 0; min-width: 0; min-height: 44px;
+    padding: 10px 0;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 500; line-height: normal;
+    color: var(--text2); cursor: pointer;
+    border-top: 3px solid transparent; border-bottom: none; border-left: none; border-right: none;
+    background: none; white-space: nowrap;
+  }
+  .bottom-nav-tab:hover:not(.active) { color: var(--text); }
+  .bottom-nav-tab.active { color: var(--accent-text); border-top-color: var(--accent); }
+  .bottom-nav-tab:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  @media (max-width: 460px) { .bottom-nav-tab { font-size: 13px; } }
+  /* 퀴즈·지도를 학습 목록에서 누르면 뜨는 "어떤 학습으로 할까요?" 고르기(음성 학습의 과목 고르기와 같은 dialog 방식, 텍스트 행) */
+  dialog.study-picker { padding: 20px; }
+  dialog.study-picker h2 { font-size: 16px; font-weight: 800; margin-bottom: 8px; }
+  .pick-row {
+    display: flex; align-items: center; width: 100%; min-height: 44px; padding: 10px 0; text-align: left;
+    background: none; border: none; border-bottom: 1px solid var(--line); border-radius: 0; cursor: pointer;
+    font-size: 15px; font-weight: 500; color: var(--text); word-break: break-all;
+  }
+  .pick-row:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .pick-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .study-picker-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+
   /* 하단 고정 입력창 */
-  .bottom-bar { position: fixed; left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--content-max); bottom: 0; z-index: 120; background: var(--bg); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+  .bottom-bar { position: fixed; left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--content-max); bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom)); z-index: 120; background: var(--bg); border-top: 1px solid var(--line); }   /* 작업226-3: 하단 내비 위에 붙음(안전영역은 내비가 맡음) */
   .bottom-bar .wrap { padding-top: 8px; padding-bottom: 8px; }
   .ask { display: flex; gap: 8px; }
   .ask input { flex: 1; min-width: 0; }
@@ -410,7 +451,22 @@
       </div>
     </div>
   </section>
+
+  <!-- 작업226-3: 하단 내비(3탭: 학습 / 퀴즈 / 지도). 지도는 화면 전환 없이 지도 시트만 연다 -->
+  <nav id="bottom-nav" class="bottom-nav" aria-label="개념 학습 메뉴">
+    <div class="bottom-nav-tabs">
+      <button type="button" class="bottom-nav-tab" id="nav-study" data-tab="study">학습</button>
+      <button type="button" class="bottom-nav-tab" id="nav-quiz" data-tab="quiz">퀴즈</button>
+      <button type="button" class="bottom-nav-tab" id="nav-map" data-tab="map">지도</button>
+    </div>
+  </nav>
 </div>
+
+<dialog id="study-picker" class="study-picker" aria-labelledby="study-picker-title">
+  <h2 id="study-picker-title">어떤 학습으로 할까요?</h2>
+  <div id="study-picker-list"></div>
+  <div class="study-picker-actions"><button id="study-picker-cancel" class="btn text" type="button">닫기</button></div>
+</dialog>
 
 <dialog id="map-sheet" class="map-sheet" aria-labelledby="map-sheet-title">
   <div class="sheet-head">
@@ -553,6 +609,8 @@ function showView(name) {
   el('view-list').hidden = name !== 'list';
   el('view-study').hidden = name !== 'study';
   el('app').classList.toggle('in-study', name === 'study');
+  if (name !== 'study') el('app').classList.remove('in-quiz');   // 작업226-3: 목록으로 나가면 퀴즈 중 표시도 함께 내림(활성 탭·하단 여백)
+  updateNav();
 }
 async function route() {
   if (S.sheet.open) closeSheetUi(false);   // 해시로 다른 화면에 가면 지도 팝업은 닫는다
@@ -695,6 +753,7 @@ function renderStudy() {
   el('quiz-box').hidden = !inQuiz;
   if (!inQuiz) el('quiz-box').textContent = '';   // 닫은 퀴즈의 옛 내용이 남지 않게
   el('app').classList.toggle('in-quiz', inQuiz);
+  updateNav();
   el('study-empty').hidden = hasItems;
   el('detail-wrap').hidden = !hasItems || inQuiz;
   el('seg-map').setAttribute('aria-pressed', String(S.explorePane === 'map'));
@@ -1823,6 +1882,93 @@ for (const o of MIC_TARGETS) {
 }
 window.addEventListener('hashchange', micCancel);
 window.addEventListener('pagehide', micCancel);
+
+// ── 하단 내비 (작업226-3) ──
+// 활성 탭: 학습 = 목록·학습 화면(퀴즈 중이 아닐 때) / 퀴즈 = 학습 화면에서 돌아보기 퀴즈 진행 중 / 지도 = 활성 표시 없음(시트만 열기)
+function updateNav() {
+  const quiz = el('app').classList.contains('in-quiz');
+  for (const b of document.querySelectorAll('#bottom-nav [data-tab]')) {
+    const on = b.dataset.tab === (quiz ? 'quiz' : 'study');
+    b.classList.toggle('active', on);
+    if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  }
+}
+// 입력 바 높이를 측정해 하단 여백에 반영한다(안내 줄이 생겨 높이가 바뀌어도 가려지지 않게)
+(function watchAskBar() {
+  const bar = document.querySelector('.bottom-bar');
+  if (!bar || !window.ResizeObserver) return;
+  new ResizeObserver(() => document.documentElement.style.setProperty('--ask-h', bar.offsetHeight + 'px')).observe(bar);
+})();
+// 한 문제라도 답했고 결과 화면 전인 퀴즈 풀이 중
+const quizInProgress = () => !!S.quiz && S.quiz.questions.length > 0 && S.quiz.i < S.quiz.questions.length && (S.quiz.results.length > 0 || !!S.quiz.answered);
+// 마이크 녹음·변환 중이면 확인 후 녹음을 버린다(해시가 안 바뀌는 지도 탭도 같음). false = 이동하지 않음
+async function micConfirmLeave() {
+  if (Mic.state === 'recording' || Mic.state === 'stopping') {
+    if (!(await metisConfirm('녹음 중입니다. 이동하면 녹음이 취소됩니다. 이동할까요?'))) return false;
+    micCancel();
+  } else if (Mic.state === 'transcribing') {
+    if (!(await metisConfirm('음성을 글로 바꾸는 중입니다. 이동하면 변환 결과를 받지 못할 수 있어요. 이동할까요?'))) return false;
+  }
+  return true;
+}
+// 탭 전환은 기록을 쌓지 않고 해시만 교체한 뒤 route() 를 직접 부른다(hashchange 는 replaceState 로는 일어나지 않음)
+async function goStudyPage(id) {
+  S.quiz = null;
+  history.replaceState(null, '', location.pathname + location.search + '#s=' + id);
+  await route();
+}
+async function goListPage() {
+  S.quiz = null;
+  history.replaceState(null, '', location.pathname + location.search);
+  await route();
+}
+// 목록에서 퀴즈·지도를 누르면 "어떤 학습으로 할까요?" 고르기. 선택한 학습 id(없으면 null)
+function pickStudy() {
+  return new Promise(resolve => {
+    const dlg = el('study-picker'), box = el('study-picker-list');
+    box.textContent = '';
+    let picked = null;
+    if (!S.studies.length) box.append(h('p', { class: 'muted', 'data-t': 'picker-empty' }, '아직 학습이 없어요'));
+    for (const st of S.studies) box.append(h('button', { type: 'button', class: 'pick-row', 'data-t': 'pick-study', 'data-id': String(st.id), onclick: () => { picked = st.id; dlg.close(); } }, st.topic));
+    dlg.addEventListener('close', () => resolve(picked), { once: true });
+    dlg.showModal();
+  });
+}
+async function onTab(tab) {
+  const inStudy = !el('view-study').hidden;
+  if (tab === 'study') {
+    if (!inStudy) { window.scrollTo(0, 0); return; }   // 목록 첫 화면 재클릭 = 맨 위로
+    if (!(await micConfirmLeave())) return;
+    if (quizInProgress() && !(await metisConfirm('퀴즈를 그만할까요? 지금까지의 답은 저장되지 않습니다.'))) return;
+    await goListPage();
+    return;
+  }
+  if (tab === 'quiz') {
+    if (inStudy && el('app').classList.contains('in-quiz')) return;   // 퀴즈 재클릭은 무동작
+    if (!(await micConfirmLeave())) return;
+    if (!inStudy) {
+      const id = await pickStudy();
+      if (id === null) return;
+      await goStudyPage(id);
+    }
+    if (S.items.length) await startQuiz();
+    return;
+  }
+  // 지도: 화면 전환 없이 시트만 연다
+  if (!(await micConfirmLeave())) return;
+  if (inStudy && el('app').classList.contains('in-quiz')) {
+    if (quizInProgress() && !(await metisConfirm('퀴즈를 그만할까요? 지금까지의 답은 저장되지 않습니다.'))) return;
+    S.quiz = null; renderStudy();
+  }
+  if (!inStudy) {
+    const id = await pickStudy();
+    if (id === null) return;
+    await goStudyPage(id);
+  }
+  if (S.items.length) openMapSheet(); else showMsg('지도로 볼 개념이 아직 없어요. 입력창에 개념을 하나 넣어 보세요.');
+}
+for (const b of document.querySelectorAll('#bottom-nav [data-tab]')) b.addEventListener('click', () => onTab(b.dataset.tab));
+el('study-picker-cancel').addEventListener('click', () => el('study-picker').close());
 
 // ── 시작 ──
 function applyHeaderHeight() {
