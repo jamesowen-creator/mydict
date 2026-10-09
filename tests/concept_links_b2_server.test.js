@@ -222,3 +222,57 @@ test('legacy 관계·제안·연결은 새 5종을 받지 않는다(AI 가 낸 �
   assert.equal(r.body.item.suggestions[0].relation_type, '기타 관련');
   await close();
 });
+
+// ───────────────────────── 작업227-22: 후보별 현재 연결 수, 조회 실패, 레거시 지문 ─────────────────────────
+const crypto = require('node:crypto');
+const dataIn = call => JSON.parse(call.messages[0].content.slice(call.messages[0].content.indexOf('{')));
+
+test('b2: 후보 입력에 현재 연결 수(links) — 양끝이 모두 활성 개념인 연결만, 주어·목적어 모두 센다', { skip: false }, async () => {
+  const { anthropic, call, close, sid, add } = await setup('b2');
+  const cur = await add('세포');
+  const chl = await add('엽록체', CHL_DEF), x = await add('핵', '핵은 세포의 유전 정보를 담고 있는 부분이다. 세포의 활동을 조절한다.'), y = await add('미토콘드리아', '미토콘드리아는 세포가 쓸 에너지를 만들어 내는 부분이다. 세포 안에 여러 개 있다.');
+  const held = await add('보류 개념', '보류 중인 개념의 설명이다. 지도에는 나오지 않는다.');
+  const L = (a, b) => call('POST', `${S}/${sid}/links`, { from_item_id: a.id, to_item_id: b.id, relation_type: '사용' });
+  for (const [a, b] of [[chl, x], [y, chl], [x, y], [x, cur], [chl, held]]) assert.equal((await L(a, b)).status, 201);
+  assert.equal((await call('PATCH', `/api/concepts/items/${held.id}`, { status: 'held' })).status, 200);
+  const explainWith = JSON.stringify({ links: [] });
+  route(anthropic, explainWith);
+  const r = await call('POST', `${S}/${sid}/explore`, { text: '광합성', from_item_id: cur.id });
+  assert.equal(r.status, 200);
+  assert.equal(anthropic.calls.length, 2);
+  const cands = dataIn(anthropic.calls[1])['연결 후보'];
+  // 엽록체: 핵·미토콘드리아 (보류 개념과의 연결은 뺌) = 2, 핵: 엽록체·미토콘드리아·세포 = 3, 미토콘드리아: 엽록체·핵 = 2
+  assert.deepEqual(cands.map(c => [c.term, c.links]), [['엽록체', 2], ['핵', 3], ['미토콘드리아', 2]]);
+  assert.deepEqual(Object.keys(cands[0]), ['id', 'term', 'description', 'links']);
+  assert.equal(anthropic.calls[1].system, b2.SYSTEM_PROMPT);
+  await close();
+});
+
+test('b2: 연결 수 조회가 실패하면 연결 생성만 건너뜀(개념은 정상 저장, 연결 호출 없음, 오류 없음)', async () => {
+  const { db, anthropic, call, close, sid, add } = await setup('b2');
+  const cur = await add('세포'), chl = await add('엽록체', CHL_DEF);
+  void chl;
+  route(anthropic, JSON.stringify({ links: [b2Link(NEW_ID, chl.id)] }));
+  db.failOn = /^SELECT from_item_id, to_item_id FROM concept_links WHERE study_id = \$1 AND user_id = \$2/;   // 연결 수 조회만 실패(linkExists 의 조회는 해당 없음)
+  const r = await call('POST', `${S}/${sid}/explore`, { text: '광합성', from_item_id: cur.id });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.ai_error, undefined);
+  assert.equal(r.body.item.content_source, 'ai');
+  assert.deepEqual(r.body.links, []);
+  assert.equal(anthropic.calls.length, 1, '설명 호출만');
+  assert.deepEqual(events(db), ['concept']);
+  await close();
+});
+
+test('legacy 호출 지문 그대로: 모델, temperature 0.3, max_tokens 1500, 시스템 프롬프트 해시 d21024a7de985f69', async () => {
+  const { anthropic, call, close, sid, add } = await setup(undefined);
+  const cur = await add('세포'), chl = await add('엽록체', CHL_DEF);
+  anthropic.handler = () => explainJson({ links: [{ to_item_id: chl.id, direction: 'from_new', relation_type: '포함', label: '', reason: '엽록체 안에서 일어난다' }] });
+  await call('POST', `${S}/${sid}/explore`, { text: '광합성', from_item_id: cur.id });
+  assert.equal(anthropic.calls.length, 1);
+  const p = anthropic.calls[0];
+  assert.deepEqual([p.model, p.temperature, p.max_tokens], ['claude-haiku-4-5-20251001', 0.3, 1500]);
+  assert.equal(crypto.createHash('sha256').update(p.system).digest('hex').slice(0, 16), 'd21024a7de985f69');
+  assert.doesNotMatch(p.messages[0].content, /"links": \d/, 'legacy 입력에는 연결 수 필드가 없음');
+  await close();
+});

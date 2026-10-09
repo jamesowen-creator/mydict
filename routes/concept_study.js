@@ -838,6 +838,21 @@ async function createB2Links(req, studyId, study, items, saved, existingPairs) {
     const candidates = items.filter(i => i.status === 'active' && i.id !== saved.id && i.definition && i.definition.trim())
       .slice(-PROMPT_MAX_LINK_CANDIDATES).map(i => ({ id: i.id, term: i.term, description: i.definition }));
     if (!candidates.length) return out;
+    // 작업227-22: 후보마다 현재 연결 수(그 개념이 주어 또는 목적어이고 양끝이 모두 활성 개념인 연결, 이 사용자의 이 학습)를 한 번의 조회로 구해 입력에 넣는다.
+    // 조회가 실패하면 연결 수 없이 부르지 않고(프롬프트 규칙 6 이 연결 수를 전제로 하므로) 연결 생성만 건너뛴다. 개념 추가는 이미 끝나 있다.
+    try {
+      const { rows: lk } = await pool.query('SELECT from_item_id, to_item_id FROM concept_links WHERE study_id = $1 AND user_id = $2', [studyId, req.user.id]);
+      const activeIds = new Set(items.filter(i => i.status === 'active').map(i => i.id)), deg = new Map();
+      for (const r of lk) {
+        if (!activeIds.has(r.from_item_id) || !activeIds.has(r.to_item_id)) continue;
+        deg.set(r.from_item_id, (deg.get(r.from_item_id) || 0) + 1);
+        deg.set(r.to_item_id, (deg.get(r.to_item_id) || 0) + 1);
+      }
+      for (const c of candidates) c.links = deg.get(c.id) || 0;
+    } catch (err) {
+      console.error('concepts b2 links degree error:', err.message);
+      return out;
+    }
     const newConcept = { id: saved.id, term: saved.term, description: saved.definition };
     const ai = await callConceptAI(req.user.id, null, linksB2.buildLinkInput(newConcept, candidates, study.topic), 1200, { system: linksB2.SYSTEM_PROMPT, event: CONCEPT_LINK_EVENT });
     if (ai.parsed === undefined) { console.error('concepts b2 links ai failed'); return out; }
