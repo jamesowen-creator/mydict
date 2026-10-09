@@ -38,6 +38,8 @@ const MEASURE = (sel, pseudo = null, idx = 0) => `(() => {
   return { text: e.textContent.trim(), cls: e.className, w: r.width, h: r.height, left: r.left, top: r.top, bg: cs.backgroundColor, bgImage: cs.backgroundImage, shadow: cs.boxShadow,
     bw: [cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth], radius: cs.borderTopLeftRadius, color: cs.color, bgEff, ratio: ratio(cs.color),
     underline: cs.textDecorationLine.includes('underline'), weight: cs.fontWeight, size: parseFloat(cs.fontSize), cursor: cs.cursor, pad: cs.padding,
+    padL: parseFloat(cs.paddingLeft), padR: parseFloat(cs.paddingRight), minH: parseFloat(cs.minHeight) || 0, family: cs.fontFamily,
+    parentInnerW: e.parentElement ? e.parentElement.clientWidth - parseFloat(getComputedStyle(e.parentElement).paddingLeft) - parseFloat(getComputedStyle(e.parentElement).paddingRight) : null,
     mark: ps ? ps.content : null, markColor: ps ? ps.color : null, markRatio: ps ? ratio(ps.color) : null, markWeight: ps ? ps.fontWeight : null };
 })()`;
 
