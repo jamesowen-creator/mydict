@@ -40,6 +40,10 @@ const vb = page => page.eval("document.querySelector('[data-t=map-svg]').getAttr
 const scaleOf = page => page.eval("(() => { const v = document.querySelector('[data-t=map-svg]').getAttribute('viewBox').split(' ').map(Number); return document.querySelector('[data-t=map-box]').clientWidth / v[2]; })()");
 // 모든 노드(와 다음 제안)가 지도 상자 안에 있는가
 const allInside = page => page.eval(`(() => { const b = document.querySelector('[data-t=map-box]').getBoundingClientRect(); return [...document.querySelectorAll('[data-t=node],[data-t=ghost]')].every(n => { const r = n.getBoundingClientRect(); return r.left >= b.left - 0.5 && r.right <= b.right + 0.5 && r.top >= b.top - 0.5 && r.bottom <= b.bottom + 0.5; }); })()`);
+// 작업227-16: 열릴 때 보기는 전체가 아니라 초점(선택한 개념)과 이웃이므로, 초점 노드가 상자 안에 있는지 본다
+const selInside = page => page.eval(`(() => { const b = document.querySelector('[data-t=map-box]').getBoundingClientRect(); const r = document.querySelector('[data-t=node].sel').getBoundingClientRect(); return r.left >= b.left - 1 && r.right <= b.right + 1 && r.top >= b.top - 1 && r.bottom <= b.bottom + 1; })()`);
+// 작업227-16: 열릴 때 보기가 초점 중심이라 일부 노드는 화면 밖일 수 있어, 좌표 클릭 대신 클릭 이벤트를 보낸다
+const tapNode = (page, id) => page.eval(`document.querySelector('[data-t=node][data-id="${id}"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
 const pressEsc = async page => {
   await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
   await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
@@ -165,24 +169,27 @@ test('다음 제안(점선) 노드를 누르면 팝업을 닫고 다음 단계 �
   await done(page);
 });
 
-test('자동 맞춤: 열릴 때 전체 지도가 화면 안에 들어오고 글자 크기 하한(0.75)을 적용하지 않음', { skip: SKIP }, async () => {
+test('자동 맞춤: 열릴 때 노드 글자 12px 이상(배율 12/13 이상)으로 초점이 화면 안에 오고, 전체가 안 들어와도 줄이지 않음', { skip: SKIP }, async () => {
   let page = await openStudy(sixty);
   await openMap(page);
-  assert.equal(await allInside(page), true, '60개 노드와 다음 제안이 모두 상자 안');
+  assert.equal(await selInside(page), true, '초점 노드가 상자 안');
+  assert.equal(await allInside(page), false, '60개 전체는 한 화면에 안 들어오고 끌어서 본다');
   const sc = await scaleOf(page);
-  assert.ok(sc < 0.75, '하한 0.75보다 작게 줄어듦: ' + sc);
-  assert.ok(sc >= 0.05, '지도 하한 이상');
+  assert.ok(sc >= 12 / 13 - 1e-3, '작업227-16: 배율 하한 12/13(노드 글자 12px): ' + sc);
+  assert.ok(sc <= 1.5 + 1e-6);
   // 확대 후 화면 맞춤으로 복귀
   const v0 = await vb(page);
   await page.click('[data-t="zoom-in"]'); await page.click('[data-t="zoom-in"]');
   assert.ok((await scaleOf(page)) > sc);
   await page.click('[data-t="zoom-fit"]');
   const v1 = await vb(page);
-  assert.ok(v1.every((n, i) => Math.abs(n - v0[i]) < 0.01), '화면 맞춤은 열릴 때의 보기로 복귀');
+  assert.ok(v1.every((n, i) => Math.abs(n - v0[i]) < 0.01), '화면 맞춤은 열릴 때의 보기(초점 중심)로 복귀');
+  await page.click('[data-t="zoom-out"]'); await page.click('[data-t="zoom-out"]'); await page.click('[data-t="zoom-out"]');
+  assert.ok((await scaleOf(page)) < 12 / 13, '사용자가 직접 축소하는 것은 기존 범위(12px 아래도 가능)');
   await done(page);
   page = await openStudy(five);
   await openMap(page);
-  assert.equal(await allInside(page), true);
+  assert.equal(await selInside(page), true);
   assert.ok((await scaleOf(page)) <= 1.5 + 1e-6, '작은 지도는 1.5배까지만 키움');
   await done(page);
 });
@@ -209,7 +216,7 @@ test('전체 연결 보기를 바꿔도 확대·이동 상태를 유지, 선택 
   const v = await vb(page);
   await page.click('[data-t="map-full"]');
   assert.deepEqual(await vb(page), v, '토글해도 보기 유지');
-  await page.click(`[data-t="node"][data-id="${srv.state.items[1].id}"]`);
+  await tapNode(page, srv.state.items[1].id);
   await page.waitFor("document.querySelector('[data-t=term]').innerText === '광합성'");
   assert.deepEqual(await vb(page), v, '선택해도 보기 유지');
   await done(page);
@@ -311,14 +318,15 @@ test('연결 카드는 팝업 위에 열리고 ESC는 카드부터 닫음(팝업
   await done(page);
 });
 
-test('회전(폭이 바뀜): 팝업이 열린 채 다시 전체에 맞춤', { skip: SKIP }, async () => {
+test('회전(폭이 바뀜): 팝업이 열린 채 초점 중심으로 다시 맞춤', { skip: SKIP }, async () => {
   const page = await openStudy(sixty);
   await openMap(page);
   await page.click('[data-t="zoom-in"]');
   await page.resize(844, 390);
   await page.waitFor("(() => { const b = document.querySelector('[data-t=map-box]').getBoundingClientRect(); return b.width > 700; })()");
   await sleep(400);
-  assert.equal(await allInside(page), true, '가로로 돌려도 전체가 상자 안');
+  assert.equal(await selInside(page), true, '가로로 돌려도 초점 노드가 상자 안');
+  assert.ok((await scaleOf(page)) >= 12 / 13 - 1e-3, '돌린 뒤에도 노드 글자 12px 이상');
   assert.equal(await sheetOpen(page), true);
   await page.close();
 });
@@ -340,7 +348,7 @@ for (const [w, h, big] of [[390, 844, false], [768, 1024, true], [1024, 800, tru
     assert.ok(box.h > r.h * 0.6, '지도 상자가 팝업 높이의 대부분: ' + JSON.stringify([box, r.h]));
     const small = await page.eval(`[...document.querySelectorAll('#map-sheet button')].filter(b => { const x = b.getBoundingClientRect(); return x.height < 43.5 || x.width < 43.5; }).map(b => b.getAttribute('data-t') || b.id)`);
     assert.deepEqual(small, [], '44px 미만 요소');
-    assert.equal(await allInside(page), true);
+    assert.equal(await selInside(page), true);
     assert.equal(await page.hasHorizontalScroll(), false);
     assert.equal(await page.eval("document.getElementById('map-sheet').scrollWidth <= document.getElementById('map-sheet').clientWidth + 1"), true);
     await closeMap(page);

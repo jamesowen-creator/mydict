@@ -219,6 +219,8 @@
   .m-node.sel rect { stroke: var(--accent); stroke-width: 3; }
   .m-node.sel text { font-weight: 800; }
   .m-node.dim { opacity: 0.35; }
+  .m-node.path { opacity: 0.75; }
+  .map-box marker path { fill: var(--text); }
   .m-node.ghost rect { stroke: var(--accent); stroke-dasharray: 5 4; fill: transparent; }
   .m-node.ghost text { fill: var(--accent-text); font-weight: 700; }
   .m-node:focus-visible rect { outline: none; stroke: var(--focus); stroke-width: 3; }
@@ -972,7 +974,12 @@ function renderMapSheetBody() {
   drawMap(body);
 }
 
-const MAP_MIN_SCALE = 0.05, MAP_MAX_SCALE = 3;   // 60개 지도를 가로 화면의 낮은 상자에도 전부 맞출 수 있는 하한
+const MAP_MIN_SCALE = 0.05, MAP_MAX_SCALE = 3;
+// 작업227-16: 열 때 노드 글자의 화면 크기 하한(px)과 노드 글자의 SVG 단위 크기(CSS .m-node text 와 같게). 허브·간선 라벨 기준은 작업227-15 시안과 같다
+const MAP_READ_PX = 12, MAP_FONT_UNITS = 13;
+const HUB_MIN_DEG = 5;           // 허브 = 연결 수 상위 15% 이면서 이 값 이상
+const EDGE_LABEL_MAX = 8;        // 진한 선이 이 수 이하일 때만 선 위에 종류 단어를 쓴다
+const EDGE_DASH = { '일부': '7 4', '종류': '2 4', '구별': '8 3 2 3' };   // 새 5종의 선 모양(사용·일으킴 = 실선, 진한 선의 새 5종에는 화살표)   // 60개 지도를 가로 화면의 낮은 상자에도 전부 맞출 수 있는 하한
 let mapDrag = null;
 // 지도 그리기(배치·경로 강조·전체 보기 토글은 기존 그대로). 팝업의 body 안에 도구 줄 + 지도 상자 + 안내를 만든다
 function drawMap(pane) {
@@ -986,6 +993,18 @@ function drawMap(pane) {
   const { pos, labelY } = layoutMap(nodes, edges);
   const pathSet = new Set(((S.study.path || []).filter(id => activeIds.has(id))).concat(sel ? [sel.id] : []));
   const full = S.map.full;
+  // 작업227-16(안1 이웃 보기): 초점 = 선택한 활성 개념, 없으면 경로의 마지막 활성 개념, 그것도 없으면 연결이 가장 많은 개념. 초점과 1단계 이웃(+다음 제안 점선 노드)을 진하게 보여 준다
+  const degOf = new Map(nodes.map(id => [id, 0]));
+  for (const l of links) { degOf.set(l.from_item_id, degOf.get(l.from_item_id) + 1); degOf.set(l.to_item_id, degOf.get(l.to_item_id) + 1); }
+  const pathActive = (S.study.path || []).filter(id => activeIds.has(id));
+  const focusId = sel && activeIds.has(sel.id) ? sel.id : pathActive.length ? pathActive[pathActive.length - 1]
+    : nodes.filter(id => id !== 'ghost').slice().sort((a, b) => degOf.get(b) - degOf.get(a) || a - b)[0];
+  const nbrs = new Set([focusId]);
+  for (const [a, b] of edges) { if (a === focusId) nbrs.add(b); if (b === focusId) nbrs.add(a); }   // ghost 가 있으면 함께
+  // 허브: 연결 수 상위 15% 이면서 5개 이상인 개념(시안 값). 허브에 닿은 선은 초점이 아니면 더 연하게 그린다
+  const degSorted = nodes.filter(id => id !== 'ghost').map(id => degOf.get(id)).sort((a, b) => a - b);
+  const hubDeg = Math.max(HUB_MIN_DEG, degSorted[Math.floor(degSorted.length * 0.85)] || 0);
+  const isHub = id => degOf.get(id) >= hubDeg;
 
   pane.append(h('div', { class: 'map-tools' },
     h('button', { class: 'btn', type: 'button', 'data-t': 'map-full', 'aria-pressed': String(full), onclick: () => { S.map.full = !S.map.full; renderExplorePane(); } }, '전체 연결 보기'),
@@ -994,20 +1013,27 @@ function drawMap(pane) {
     h('button', { class: 'btn text', type: 'button', 'data-t': 'zoom-fit', onclick: () => { S.sheet.fit = true; renderMapSheetBody(); } }, '화면 맞춤')));
   const box = h('div', { class: 'map-box', 'data-t': 'map-box' });
   pane.append(box);
-  pane.append(h('p', { class: 'map-hint' }, full ? '모든 연결을 보여 줍니다. 개념을 누르면 선택하고, 선을 누르면 연결한 이유를 볼 수 있어요.' : '지금까지의 경로와 다음 한 단계만 진하게 보여 줍니다. 점선은 다음 제안이에요. 두 손가락으로 확대·축소할 수 있어요.'));
+  pane.append(h('p', { class: 'map-hint' }, full ? '모든 연결을 보여 줍니다. 개념을 누르면 선택하고, 선을 누르면 연결한 이유를 볼 수 있어요.' : '선택한 개념과 바로 이어진 개념을 진하게 보여 줍니다. 점선은 다음 제안이에요. 선을 눌러 이유를 보세요.'));
 
   const termOf = id => (itemById(id) || {}).term || '';
   const svg = sv('svg', { role: 'group', 'aria-label': '개념 지도', 'data-t': 'map-svg' });
   const gEdges = sv('g'), gNodes = sv('g');
-  svg.append(gEdges, gNodes);
+  svg.append(sv('defs', {}, sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto' }, sv('path', { d: 'M0,0 L10,5 L0,10 z' }))), gEdges, gNodes);
+  // 간선 단계: 진함(초점에 닿은 선 + 경로 안의 선) / 중간(초점의 이웃끼리) / 연함(그 밖, 허브에 닿으면 더 연함). 전체 보기에서는 연한 선도 더 잘 보이게 한다
+  const strong = l => l.from_item_id === focusId || l.to_item_id === focusId || (pathSet.has(l.from_item_id) && pathSet.has(l.to_item_id));
+  const nStrong = links.filter(strong).length;
   for (const l of links) {
-    const hl = pathSet.has(l.from_item_id) && pathSet.has(l.to_item_id);
+    const hl = strong(l);
+    const mid = !hl && nbrs.has(l.from_item_id) && nbrs.has(l.to_item_id);
+    const hub = !hl && (isHub(l.from_item_id) || isHub(l.to_item_id));
+    const op = hl ? 1 : full ? (mid ? 0.9 : hub ? 0.35 : 0.5) : (mid ? 0.35 : hub ? 0.12 : 0.2);
     const g = geom(l.from_item_id, l.to_item_id);
     const rel = String(l.label || l.relation_type || '');
     const open = () => openEdge(l);
-    const e = sv('g', { class: 'm-edge' + (hl ? ' hl' : '') + (!full && !hl ? ' dim' : ''), 'data-t': 'edge', 'data-id': l.id, 'data-hl': hl ? '1' : '0', role: 'button', tabindex: 0, 'aria-label': `${termOf(l.from_item_id)}와 ${termOf(l.to_item_id)}의 관계: ${rel}` },
-      sv('path', { class: 'line', d: g.d }), sv('path', { class: 'hit', d: g.d }),
-      (hl || full) && rel ? sv('text', { x: g.mx, y: g.my - 4 }, clipText(rel, 8)) : null);
+    const isNew = NEW_RELATION_TYPES.includes(l.relation_type);
+    const e = sv('g', { class: 'm-edge' + (hl ? ' hl' : '') + (op < 0.5 ? ' dim' : ''), 'data-t': 'edge', 'data-id': l.id, 'data-hl': hl ? '1' : '0', 'data-hub': hub ? '1' : '0', style: op < 1 ? 'opacity:' + op : null, role: 'button', tabindex: 0, 'aria-label': `${termOf(l.from_item_id)}와 ${termOf(l.to_item_id)}의 관계: ${rel}` },
+      sv('path', { class: 'line', d: g.d, 'stroke-dasharray': EDGE_DASH[l.relation_type] || null, 'marker-end': hl && isNew ? 'url(#m-arrow)' : null }), sv('path', { class: 'hit', d: g.d }),
+      hl && nStrong <= EDGE_LABEL_MAX && rel ? sv('text', { x: g.mx, y: g.my - 4 }, clipText(rel, 8)) : null);   // 라벨은 진한 선이 적을 때만(많으면 선 모양과 눌러서 보는 카드)
     e.addEventListener('click', () => { if (!mapDrag || !mapDrag.moved) open(); });
     e.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); } });
     gEdges.append(e);
@@ -1030,8 +1056,8 @@ function drawMap(pane) {
       continue;
     }
     const it = itemById(id);
-    const hl = pathSet.has(id), isSel = id === S.selId;
-    const n = sv('g', { class: 'm-node' + (hl ? ' hl' : '') + (isSel ? ' sel' : '') + (!full && !hl ? ' dim' : ''), 'data-t': 'node', 'data-id': id, 'data-hl': hl ? '1' : '0', role: 'button', tabindex: 0, 'aria-label': it.term + (isSel ? ' (현재 개념)' : ''), transform: `translate(${p.x},${p.y})` },
+    const inNb = nbrs.has(id), hl = inNb || pathSet.has(id), isSel = id === S.selId;
+    const n = sv('g', { class: 'm-node' + (hl ? ' hl' : '') + (isSel ? ' sel' : '') + (!full && !hl ? ' dim' : '') + (hl && !inNb && !full ? ' path' : ''), 'data-t': 'node', 'data-id': id, 'data-hl': hl ? '1' : '0', role: 'button', tabindex: 0, 'aria-label': it.term + (isSel ? ' (현재 개념)' : ''), transform: `translate(${p.x},${p.y})` },
       sv('title', {}, it.term), sv('rect', { width: MAPD.W, height: MAPD.H }), sv('text', { x: MAPD.W / 2, y: MAPD.H / 2 }, clipText(it.term, 9)));
     const go = () => { if (!mapDrag || !mapDrag.moved) selectItem(id); };
     n.addEventListener('click', go);
@@ -1048,9 +1074,25 @@ function drawMap(pane) {
     const r = nodes.map(id => pos.get(id));
     const b = { x0: Math.min(...r.map(q => q.x)) - 24, x1: Math.max(...r.map(q => q.x + MAPD.W)) + 24, y0: Math.min(...r.map(q => q.y)) - 24, y1: Math.max(...r.map(q => q.y + MAPD.H)) + 24 };
     if (labelY !== null) b.y0 -= 16;
-    sh.scale = Math.max(MAP_MIN_SCALE, Math.min(cw / (b.x1 - b.x0), ch / (b.y1 - b.y0), 1.5));
-    sh.tx = (b.x0 + b.x1) / 2 - cw / sh.scale / 2;
-    sh.ty = (b.y0 + b.y1) / 2 - ch / sh.scale / 2;
+    const fit = Math.min(cw / (b.x1 - b.x0), ch / (b.y1 - b.y0), 1.5);
+    // 작업227-16: 열 때 기본 배율은 노드 글자가 화면에서 12px 이상이 되는 값(12/13)을 하한으로 한다. 전체가 안 들어오면 줄이지 않고 끌어서 본다(직접 축소는 기존 범위)
+    const floor = MAP_READ_PX / MAP_FONT_UNITS;
+    const vw = () => cw / sh.scale, vh = () => ch / sh.scale;
+    if (full) {
+      sh.scale = Math.max(floor, fit);
+      sh.tx = (b.x1 - b.x0) <= vw() ? (b.x0 + b.x1) / 2 - vw() / 2 : b.x0 - 8 / sh.scale;   // 안 들어오면 왼쪽 위부터
+      sh.ty = (b.y1 - b.y0) <= vh() ? (b.y0 + b.y1) / 2 - vh() / 2 : b.y0;
+    } else {
+      const fp = [...nbrs].map(id => pos.get(id)).filter(Boolean);
+      const fb = { x0: Math.min(...fp.map(q => q.x)) - 16, x1: Math.max(...fp.map(q => q.x + MAPD.W)) + 16, y0: Math.min(...fp.map(q => q.y)) - 16, y1: Math.max(...fp.map(q => q.y + MAPD.H)) + 16 };
+      const want = Math.min(cw / (fb.x1 - fb.x0), ch / (fb.y1 - fb.y0), 1.2);
+      sh.scale = Math.max(floor, want);
+      const c = want >= floor ? { x: (fb.x0 + fb.x1) / 2, y: (fb.y0 + fb.y1) / 2 } : (q => ({ x: q.x + MAPD.W / 2, y: q.y + MAPD.H / 2 }))(pos.get(focusId));
+      sh.tx = c.x - vw() / 2; sh.ty = c.y - vh() / 2;
+      // 지도 바깥의 빈 곳이 보이지 않게 보이는 영역을 지도 범위 안으로 맞춘다(지도가 더 작으면 가운데)
+      sh.tx = (b.x1 - b.x0) <= vw() ? (b.x0 + b.x1) / 2 - vw() / 2 : Math.min(Math.max(sh.tx, b.x0), b.x1 - vw());
+      sh.ty = (b.y1 - b.y0) <= vh() ? (b.y0 + b.y1) / 2 - vh() / 2 : Math.min(Math.max(sh.ty, b.y0), b.y1 - vh());
+    }
     sh.fit = false;
   }
   function apply() { svg.setAttribute('viewBox', `${sh.tx} ${sh.ty} ${cw / sh.scale} ${ch / sh.scale}`); }

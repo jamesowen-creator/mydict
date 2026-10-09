@@ -34,6 +34,8 @@ const five = s => s.seed({
   path: [0, 1, 2],
 });
 
+// 작업227-16: 열릴 때 보기가 초점 중심이라 일부 노드는 화면 밖일 수 있어, 좌표 클릭 대신 클릭 이벤트를 보낸다
+const tapNode = (page, id) => page.eval(`document.querySelector('[data-t=node][data-id="${id}"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
 const nodeRect = async (page, sel) => page.eval(`(() => { const g = document.querySelector(${JSON.stringify(sel)}); const m = /translate\\(([-\\d.]+),([-\\d.]+)\\)/.exec(g.getAttribute('transform')); return { x: +m[1], y: +m[2] }; })()`);
 
 test('지도 강조: 경로 노드·경로 연결선·다음 제안(점선)만 진하고 나머지는 연함', { skip: SKIP }, async () => {
@@ -52,7 +54,7 @@ test('지도 강조: 경로 노드·경로 연결선·다음 제안(점선)만 �
   assert.equal(await page.count('[data-t="ghost"]'), 1);
   assert.equal(await page.eval("document.querySelector('[data-t=ghost]').dataset.term"), '엽록체 다음 A');
   assert.equal(await page.count('[data-t="ghost-edge"]'), 1);
-  assert.match(await page.text('.map-hint'), /경로와 다음 한 단계만 진하게/);
+  assert.match(await page.text('.map-hint'), /선택한 개념과 바로 이어진 개념을 진하게/);   // 작업227-16: 이웃 보기
   await done(page);
 });
 
@@ -63,7 +65,7 @@ test('전체 연결 보기 토글: 모든 노드·연결선이 같은 진하기�
   await page.click('[data-t="map-full"]');
   assert.equal(await page.eval("document.querySelector('[data-t=map-full]').getAttribute('aria-pressed')"), 'true');
   assert.equal(await page.count('.m-node.dim, .m-edge.dim'), 0);
-  assert.equal(await page.count('[data-t="edge"] text'), 3, '모든 연결선에 관계 문구');
+  assert.equal(await page.count('[data-t="edge"] text'), 2, '작업227-16: 문구는 진한 선(초점·경로)에만, 연한 선은 문구 없음(예전에는 모든 선 3개)');
   assert.match(await page.text('.map-hint'), /모든 연결을 보여 줍니다/);
   await page.click('[data-t="map-full"]');
   assert.ok(await page.count('.m-node.dim') >= 2);
@@ -74,16 +76,16 @@ test('노드를 누르면 그 개념이 선택되고 경로가 늘어남(팝업�
   const page = await openStudy(five);
   await openMap(page);
   const photo = srv.state.items[1], cell = srv.state.items[0];
-  // (작업209-4) 이전에는 인라인 지도가 글자 크기 하한 때문에 첫 노드를 화면 밖에 두었지만, 팝업은 하한 없이 전체를 맞춘다
-  assert.equal(await page.eval(`(() => { const r = document.querySelector('[data-t=node][data-id="${cell.id}"]').getBoundingClientRect(); const b = document.querySelector('[data-t=map-box]').getBoundingClientRect(); return r.left >= b.left && r.right <= b.right && r.top >= b.top && r.bottom <= b.bottom; })()`), true, '열릴 때 첫 노드도 화면 안');
+  // 작업227-16: 열릴 때는 전체가 아니라 초점(선택한 개념 = 엽록체)과 이웃이 글자 12px 이상으로 보인다. 그래서 초점 노드가 화면 안에 있는지 본다(예전에는 첫 노드)
+  assert.equal(await page.eval(`(() => { const r = document.querySelector('[data-t=node].sel').getBoundingClientRect(); const b = document.querySelector('[data-t=map-box]').getBoundingClientRect(); return r.left >= b.left && r.right <= b.right && r.top >= b.top && r.bottom <= b.bottom; })()`), true, '열릴 때 초점 노드가 화면 안');
   await page.click('[data-t="map-full"]');
-  await page.click(`[data-t="node"][data-id="${photo.id}"]`);
+  await tapNode(page, photo.id);
   await page.waitFor("document.querySelector('[data-t=term]').innerText === '광합성'");
   assert.deepEqual(calls(/studies\/\d+$/, 'PATCH').pop().body, { selected_item_id: photo.id });
   assert.equal(srv.state.studies[0].path.length, 4);
   assert.equal(await page.eval("document.querySelector('.m-node.sel').dataset.id"), String(photo.id));
   assert.equal(await page.count('[data-t="path-item"]'), 4);
-  await page.click(`[data-t="node"][data-id="${cell.id}"]`);
+  await tapNode(page, cell.id);
   await page.waitFor("document.querySelector('[data-t=term]').innerText === '세포'");
   assert.equal(srv.state.studies[0].path.length, 5);
   await done(page);
@@ -268,7 +270,8 @@ for (const [w, h] of [[390, 844], [768, 1024], [1024, 800]]) {
     const box = await page.eval("(() => { const r = document.querySelector('[data-t=map-box]').getBoundingClientRect(); return [r.left, r.right, innerWidth]; })()");
     assert.ok(box[0] >= 0 && box[1] <= box[2], '지도 상자가 화면 안: ' + box);
     await page.click('[data-t="map-full"]');
-    await page.click('[data-t="edge"] path.hit');
+    for (let i = 0; i < 3; i++) await page.click('[data-t="zoom-out"]');   // 전체가 보이게 축소(직접 축소는 기존 범위)
+    await page.click('[data-t="edge"][data-hl="1"] path.hit');   // 작업227-16: 열릴 때 화면 안에 있는 진한 선(초점·경로)을 누른다
     await page.waitFor("document.getElementById('edge-dialog').open");
     const dlg = await page.eval("(() => { const r = document.getElementById('edge-dialog').getBoundingClientRect(); return [r.left, r.right, innerWidth]; })()");
     assert.ok(dlg[0] >= 0 && dlg[1] <= dlg[2], '대화상자가 화면 안');
