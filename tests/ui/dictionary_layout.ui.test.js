@@ -21,14 +21,14 @@ const NO_MOTION = `(() => { const s = document.createElement('style'); s.id = 't
 const DB_READY = "typeof DB !== 'undefined' && !!DB && getComputedStyle(document.getElementById('loading')).display === 'none'";
 const SCREENS = {
   dict: { file: '/english_dictionary.html', ready: "!!document.querySelector('.metis-app-header-logo') && !!document.querySelector('nav')", token: true, bar: 'nav', tab: '.nav-tab' },
-  lit: { file: '/literature_compass.html', ready: DB_READY + " && !!document.querySelector('.metis-app-header-logo')", bar: '.tab-bar', tab: '.tab-btn' },
+  lit: { file: '/literature_compass.html', ready: DB_READY + " && !!document.querySelector('.metis-app-header-logo')", bar: '.bottom-nav', tab: '.bottom-nav-tab' }   // 작업226-2: 문학의 하단 탭바가 하단 내비로 바뀜(옛 기대: .tab-bar/.tab-btn),
 };
 
 async function settle(page) {
   await page.waitFor("document.fonts.status === 'loaded'", 5000);
   let last = '', same = 0;
   for (let i = 0; i < 100 && same < 4; i++) {
-    const now = await page.eval("[...document.querySelectorAll('.metis-app-header, .metis-app-header-logo, nav, .tab-bar, .nav-tab, .tab-btn, main')].filter(e => e.getClientRects().length).map(e => { const r = e.getBoundingClientRect(); return Math.round(r.left * 10) + ':' + Math.round(r.right * 10); }).join('|')");
+    const now = await page.eval("[...document.querySelectorAll('.metis-app-header, .metis-app-header-logo, nav, .bottom-nav, .nav-tab, .bottom-nav-tab, main')].filter(e => e.getClientRects().length).map(e => { const r = e.getBoundingClientRect(); return Math.round(r.left * 10) + ':' + Math.round(r.right * 10); }).join('|')");
     same = now === last ? same + 1 : 0; last = now;
     await sleep(50);
   }

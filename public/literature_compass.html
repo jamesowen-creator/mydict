@@ -28,7 +28,7 @@
     --error-light: #FCEBEB;
     --error-dark: #B42318;   /* 작업217-3: 오답 글자(흰 바탕 6.57:1). 프로젝트의 위험색(개념 학습 --danger, 다이얼로그 위험 버튼)과 같은 값 */
     --success-dark: #085041;   /* 작업217-3: 정답 글자(흰 바탕 약 10:1). 다른 읽기 화면의 --success-dark와 같은 값 */
-    --tab-height: 64px;
+    --navbar-h: 78px;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -64,38 +64,50 @@
   #loading p { color: var(--text2); font-size: 14px; }
 
   /* ── Views ── */
-  .view { display: none; min-height: 100dvh; padding-bottom: calc(var(--tab-height) + env(safe-area-inset-bottom, 0px)); }
+  .view { display: none; min-height: 100dvh; padding-bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom, 0px) + 16px); }
   .view.active { display: block; }
 
   /* 작업199: 제목 줄은 공용 /css/common/screenBar.css(.screen-bar) */
   .progress-text { font-size: 13px; font-weight: 600; color: var(--primary-dark); font-family: 'Inter', sans-serif; }
 
-  /* ── Tab Bar ── */
-  .tab-bar {
-    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: var(--content-max);
-    height: calc(var(--tab-height) + env(safe-area-inset-bottom, 0px));
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* ── 하단 내비 (작업226-2): 음성 학습·언어 사전의 하단 내비(작업224-2)와 같은 구조·크기. 색은 이 화면의 팔레트 ── */
+  .bottom-nav {
     background: var(--card);
     border-top: 1px solid var(--border);
-    display: flex; z-index: 200;
+    box-shadow: 0 -2px 8px rgba(226,88,59,0.07);
+    padding: 0 16px max(8px, env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 0;
+    position: fixed;
+    left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--content-max);
+    bottom: 0; z-index: 100;
+    min-height: var(--navbar-h);
   }
-  .tab-btn {
-    flex: 1; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 4px; background: none; border: none; cursor: pointer;
-    color: var(--text2); font-size: 11px; font-weight: 500;
-    transition: color 0.15s;
-    font-family: 'Noto Sans KR', sans-serif;
+  .bottom-nav-tabs { display: flex; flex: 1; gap: 0; }
+  .bottom-nav-tab {
+    display: flex; flex-direction: row; align-items: baseline; justify-content: center; gap: 2px;
+    flex: 1 1 0; min-width: 0; min-height: var(--ctl-min-h);
+    padding: 10px 0;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 500; line-height: normal;
+    color: var(--text2); cursor: pointer; text-decoration: none;
+    border-top: 3px solid transparent; border-bottom: none; border-left: none; border-right: none;
+    background: none; white-space: nowrap;
   }
-  /* 작업83: 활성 탭은 색 + 굵기 + 밑줄 (색 단독 구분 금지 원칙) - digest_reading.html과
-     literature_compass.html의 탭바가 같은 복사본이라 두 파일 동일하게 유지 */
-  .tab-btn.active {
-    color: var(--primary-dark); font-weight: 700;   /* 작업220: 활성 탭 글자 대비 4.5:1 이상 */
-    text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px;
+  .bottom-nav-tab:hover:not(.active) { color: var(--text1); }
+  .bottom-nav-tab.active { color: var(--primary-dark); border-top-color: var(--primary); }
+  .bottom-nav-tab:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
+  @media (max-width: 460px) { .bottom-nav-tab { font-size: 13px; } }
+
+  /* 퀴즈 탭: 사조 고르기 목록(시대별 묶음, 텍스트 행 + 구분선) */
+  #view-qlist .content { padding: 20px 16px; }
+  .qlist-era { margin-bottom: 20px; }
+  .qlist-row {
+    display: flex; align-items: center; width: 100%; min-height: var(--ctl-min-h); padding: 10px 0; text-align: left;
+    background: none; border: none; border-bottom: 1px solid var(--border); border-radius: 0; cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 500; color: var(--text1);
   }
-  .tab-btn svg { width: 22px; height: 22px; }
-  .tab-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+  .qlist-era .qlist-row:last-child { border-bottom: none; }
+  .qlist-row:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .qlist-row:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
 
   /* ── App Link Pill ── */
   /* 작업216-6: 눌리는 링크지만 박스·알약 없이 밑줄 텍스트로(터치 영역 44px 이상). 글자 --primary-dark는 흰 바탕 5.38:1 */
@@ -605,7 +617,7 @@
 <!-- View 2: Briefing -->
 <div id="view-briefing" class="view">
   <div class="screen-bar">
-    <button class="screen-bar-back" onclick="goHome()">
+    <button class="screen-bar-back" onclick="goBack('briefing', goHome)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="15 18 9 12 15 6"></polyline>
       </svg>
@@ -618,7 +630,7 @@
 <!-- View 3: Cards -->
 <div id="view-cards" class="view">
   <div class="screen-bar">
-    <button class="screen-bar-back" onclick="showBriefing(currentMovement)">
+    <button class="screen-bar-back" onclick="goBack('cards', () => showBriefing(currentMovement))">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="15 18 9 12 15 6"></polyline>
       </svg>
@@ -640,7 +652,7 @@
     <div style="flex:1"></div>
     <button class="nav-btn" id="next-btn" onclick="nextCard()" aria-label="다음 카드">›</button>
   </div>
-  <button class="quiz-start-btn" id="quiz-start-btn" onclick="startQuiz()">
+  <button class="quiz-start-btn" id="quiz-start-btn" onclick="quizOrigin = null; startQuiz()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <polygon points="5 3 19 12 5 21 5 3"></polygon>
     </svg>
@@ -651,7 +663,7 @@
 <!-- View 4: Quiz -->
 <div id="view-quiz" class="view">
   <div class="screen-bar">
-    <button class="screen-bar-back" onclick="showCards()">
+    <button class="screen-bar-back" onclick="goBack('quiz', () => (quizOrigin === 'qlist' ? showQlist() : showCards()))">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="15 18 9 12 15 6"></polyline>
       </svg>
@@ -669,24 +681,22 @@
   <div class="content" id="result-content"></div>
 </div>
 
-<!-- Tab Bar -->
-<div class="tab-bar">
-  <button class="tab-btn active" id="tab-home" onclick="goHome()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-      <polyline points="9 22 9 12 15 12 15 22"></polyline>
-    </svg>
-    홈
-  </button>
-  <button class="tab-btn disabled" id="tab-quiz" title="학습 후 퀴즈 이용 가능">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="10"></circle>
-      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-      <line x1="12" y1="17" x2="12.01" y2="17"></line>
-    </svg>
-    퀴즈
-  </button>
+<!-- View 6: 퀴즈 탭 — 사조 고르기(조회만, AI 호출·저장 없음) -->
+<div id="view-qlist" class="view">
+  <div class="screen-bar">
+    <h1 class="screen-bar-title">퀴즈</h1>
+  </div>
+  <div class="content" id="qlist-content"></div>
 </div>
+
+<!-- 하단 내비 (작업226-2). 사전 탭은 기존 "어휘 사전" 링크와 같은 곳(/ = METIS 홈)으로 이동하며 활성 표시가 없다 -->
+<nav id="bottom-nav" class="bottom-nav" aria-label="문학 나침반 메뉴">
+  <div class="bottom-nav-tabs">
+    <button type="button" class="bottom-nav-tab" id="nav-home" data-tab="home">홈</button>
+    <button type="button" class="bottom-nav-tab" id="nav-quiz" data-tab="quiz">퀴즈</button>
+    <a class="bottom-nav-tab" id="nav-dict" href="/">사전</a>
+  </div>
+</nav>
 
 <script>
 // ── State ──
@@ -707,16 +717,83 @@ function shuffle(arr) {
   return a;
 }
 
+// 하단 내비의 활성 탭: 홈 = 홈·브리핑·카드 / 퀴즈 = 퀴즈 탭·퀴즈 풀이·결과
+const NAV_TAB_OF = { 'view-home': 'home', 'view-briefing': 'home', 'view-cards': 'home', 'view-qlist': 'quiz', 'view-quiz': 'quiz', 'view-result': 'quiz' };
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  const tabHome = document.getElementById('tab-home');
-  tabHome.classList.toggle('active', id === 'view-home');
-  // 작업222: 퀴즈 풀이·결과 화면에서는 "퀴즈" 탭이 활성(과학 읽기·한입 독서와 같게)
-  const inQuiz = id === 'view-quiz' || id === 'view-result';
-  const tabQuiz = document.getElementById('tab-quiz');
-  tabQuiz.classList.toggle('active', inQuiz);
-  tabQuiz.classList.toggle('disabled', !inQuiz);
+  const a = NAV_TAB_OF[id];
+  for (const b of document.querySelectorAll('#bottom-nav [data-tab]')) {
+    const on = b.dataset.tab === a;
+    b.classList.toggle('active', on);
+    if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  }
+}
+
+// ── History (작업226-2) ──
+// 화면 전환마다 기록을 남겨 뒤로가기가 직전 화면으로 돌아가게 한다(홈에서 뒤로가기는 기존대로 페이지를 떠남).
+// 홈 → 브리핑 → 카드 → 퀴즈는 쌓고, 결과는 퀴즈 칸을 교체한다. 탭 전환은 홈에서 처음 나갈 때만 쌓고 나머지는 교체한다(음성 학습 224-2 방식).
+let _navFromPop = false;
+function navState(state, mode) {
+  if (_navFromPop) return;
+  const cur = history.state || {};
+  const same = cur.view === state.view && cur.id === state.id;
+  if (mode === 'push') history.pushState(state, '');
+  else if (mode === 'replace' || same || state.view === 'result' || (state.view === 'quiz' && cur.view === 'result')) history.replaceState(state, '');
+  else history.pushState(state, '');
+}
+// 화면 안 ‹ 버튼: 기록이 그 화면에 맞으면 뒤로가기와 같게, 아니면 직접 이동
+function goBack(expected, fallback) {
+  if (history.state && history.state.view === expected) history.back(); else fallback();
+}
+window.addEventListener('popstate', e => {
+  if (!DB) return;
+  const st = e.state || { view: 'home' };
+  _navFromPop = true;
+  try {
+    if (st.view === 'briefing' && findMovement(st.id)) showBriefing(st.id);
+    else if (st.view === 'cards' && findMovement(st.id)) { currentMovement = st.id; showCards(); }
+    else if (st.view === 'qlist') showQlist();
+    else if (st.view === 'result' && quizData.totalQ) showResult();
+    else if (st.view === 'quiz' && findMovement(currentMovement)) showCards();   // 풀이 중이던 퀴즈는 복원하지 않고 ‹ 와 같게 카드로
+    else goHome();
+  } finally { _navFromPop = false; }
+});
+
+// ── 하단 내비 동작 ──
+const quizInProgress = () => document.getElementById('view-quiz').classList.contains('active') && (quizData.score + quizData.wrong.length > 0 || getAnsweredSoFar() > 0);
+function tabNav(tab) {
+  const mode = document.getElementById('view-home').classList.contains('active') ? 'push' : 'replace';   // 홈에서 처음 나갈 때만 쌓음
+  quizOrigin = null;
+  if (tab === 'home') { goHome(); navState({ view: 'home' }, mode); }
+  else { showQlist(); navState({ view: 'qlist' }, mode); }
+}
+async function onTab(tab) {
+  const active = document.querySelector('.view.active').id;
+  if (NAV_TAB_OF[active] === tab && active === (tab === 'home' ? 'view-home' : 'view-qlist')) { window.scrollTo(0, 0); return; }   // 첫 화면 재클릭 = 맨 위로
+  if (quizInProgress() && !(await metisConfirm('퀴즈를 그만할까요? 지금까지의 답은 저장되지 않습니다.'))) return;
+  tabNav(tab);
+}
+for (const b of document.querySelectorAll('#bottom-nav button[data-tab]')) b.addEventListener('click', () => onTab(b.dataset.tab));
+
+// ── 퀴즈 탭: 사조 고르기 ──
+let quizOrigin = null;   // 'qlist' = 퀴즈 탭에서 시작한 퀴즈(‹ 가 퀴즈 탭으로)
+function showQlist() {
+  const box = document.getElementById('qlist-content');
+  const eras = (DB && DB.eras) || [];
+  box.innerHTML = '<div class="home-header"><p>사조를 고르면 퀴즈가 바로 시작돼요.</p></div>' + eras.map(era => `
+    <div class="qlist-era">
+      <div class="section-label">${era.name} · ${era.range}</div>
+      ${era.movements.map(m => `<button type="button" class="qlist-row" data-movement="${m.id}" onclick="startQuizFrom('${m.id}')">${m.name}</button>`).join('')}
+    </div>`).join('');
+  showView('view-qlist');
+  window.scrollTo(0, 0);
+}
+function startQuizFrom(id) {
+  if (!findMovement(id)) return;
+  currentMovement = id;
+  quizOrigin = 'qlist';
+  startQuiz();
 }
 
 // ── Permission Check ──
@@ -746,6 +823,7 @@ async function loadDB() {
     document.getElementById('loading').style.display = 'none';
     renderHome();
     showView('view-home');
+    history.replaceState({ view: 'home' }, '');
   } catch (e) {
     document.getElementById('loading').innerHTML =
       `<div class="error-msg">데이터를 불러오지 못했습니다.<br>${e.message}</div>`;
@@ -891,6 +969,7 @@ function showBriefing(movementId) {
   const movement = findMovement(movementId);
   if (!movement) return;
   currentMovement = movementId;
+  if (!_navFromPop) quizOrigin = null;
 
   document.getElementById('briefing-title').textContent = movement.name;
   const b = movement.briefing;
@@ -927,6 +1006,7 @@ function showBriefing(movementId) {
 
   document.getElementById('briefing-content').innerHTML = html;
   showView('view-briefing');
+  navState({ view: 'briefing', id: movementId });
   window.scrollTo(0, 0);
 }
 
@@ -940,6 +1020,7 @@ function showCards() {
   document.getElementById('cards-title').textContent = movement.name;
   renderCard();
   showView('view-cards');
+  navState({ view: 'cards', id: currentMovement });
   window.scrollTo(0, 0);
 }
 
@@ -1182,6 +1263,7 @@ function startQuiz() {
   quizData = { rounds, currentRound: 0, currentQ: 0, score: 0, wrong: [], totalQ: countTotalQ(rounds) };
   document.getElementById('quiz-title').textContent = findMovement(currentMovement).name + ' 퀴즈';
   showView('view-quiz');
+  navState({ view: 'quiz' });
   renderQuizRound();
   window.scrollTo(0, 0);
 }
@@ -1477,10 +1559,11 @@ function showResult() {
     ${wrongHtml}
     <div class="result-actions">
       <button class="result-btn result-btn-primary" onclick="retryQuiz()">다시 풀기</button>
-      <button class="result-btn result-btn-secondary" onclick="goHome()">홈으로</button>
+      <button class="result-btn result-btn-secondary" onclick="tabNav('home')">홈으로</button>
     </div>`;
 
   showView('view-result');
+  navState({ view: 'result' });
   window.scrollTo(0, 0);
 }
 
