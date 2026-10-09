@@ -866,6 +866,30 @@ function sv(tag, attrs, ...kids) {
 }
 function clipText(t, n) { const a = Array.from(t); return a.length > n ? a.slice(0, n - 1).join('') + '…' : t; }
 
+// 작업227-17: 열(BFS 단계) 안의 순서를 바꿔 선 교차를 줄인다. 이웃(바로 옆 열)의 평균 행 위치(barycenter) 순으로 정렬하고,
+// 왼쪽→오른쪽, 오른쪽→왼쪽을 번갈아 MAP_LAYOUT_SWEEPS 번 되풀이한다. 같은 입력이면 항상 같은 결과(동점은 입력 순서 = 개념 id 오름차순).
+// 열에 넣는 개념(열 번호)은 그대로라 배치 칸·겹침 없음은 변하지 않는다. 0 이면 예전 배치(BFS 발견 순서)다.
+let MAP_LAYOUT_SWEEPS = 6;
+function sortLevels(levels, adj, order) {
+  if (!MAP_LAYOUT_SWEEPS || levels.length < 2) return;
+  const lvOf = new Map(), idx = new Map();
+  levels.forEach((lv, li) => lv.forEach((n, i) => { lvOf.set(n, li); idx.set(n, i); }));
+  const bary = (n, towards) => {
+    const v = adj.get(n).filter(m => lvOf.get(m) === towards).map(m => idx.get(m));
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : idx.get(n);   // 옆 열에 이웃이 없으면 지금 자리 유지
+  };
+  const li = levels.map((_, i) => i);
+  for (let pass = 0; pass < MAP_LAYOUT_SWEEPS; pass++) {
+    const down = pass % 2 === 0;
+    for (const l of down ? li.slice(1) : li.slice(0, -1).reverse()) {
+      const t = down ? l - 1 : l + 1;
+      const key = new Map(levels[l].map(n => [n, bary(n, t)]));
+      levels[l].sort((a, b) => key.get(a) - key.get(b) || order.get(a) - order.get(b));
+      levels[l].forEach((n, i) => idx.set(n, i));
+    }
+  }
+}
+
 function layoutMap(nodes, edges) {
   const adj = new Map(nodes.map(n => [n, []]));
   const order = new Map(nodes.map((n, i) => [n, i]));
@@ -886,6 +910,7 @@ function layoutMap(nodes, edges) {
       }
       frontier = next;
     }
+    sortLevels(levels, adj, order);
     let rows = 0;
     levels.forEach((lv, li) => { lv.forEach((n, ri) => pos.set(n, { x: li * MAPD.COLW, y: y0 + ri * MAPD.ROWH })); rows = Math.max(rows, lv.length); });
     y0 += rows * MAPD.ROWH + MAPD.GAP;
