@@ -616,6 +616,7 @@ async function route() {
   if (S.sheet.open) closeSheetUi(false);   // 해시로 다른 화면에 가면 지도 팝업은 닫는다
   await flushNote();
   const id = currentStudyIdFromHash();
+  S.cameFromList = id !== null && !el('view-list').hidden;   // 작업226-4: 이 학습을 목록에서 열었는지(하단 "학습" 탭이 기록을 어떻게 되돌릴지 정함). 주소로 바로 들어오면 false
   if (id === null) { showView('list'); await loadList(); return; }
   showView('study');
   await loadStudy(id);
@@ -1911,14 +1912,17 @@ async function micConfirmLeave() {
   }
   return true;
 }
-// 탭 전환은 기록을 쌓지 않고 해시만 교체한 뒤 route() 를 직접 부른다(hashchange 는 replaceState 로는 일어나지 않음)
+// 작업226-4: 목록에서 고르기로 학습을 열 때는 목록 카드를 눌러 여는 것과 같게 새 history 칸을 쌓아(뒤로가기 = 목록) route() 를 직접 부른다(pushState 는 hashchange 를 일으키지 않음)
 async function goStudyPage(id) {
   S.quiz = null;
-  history.replaceState(null, '', location.pathname + location.search + '#s=' + id);
+  history.pushState(null, '', location.pathname + location.search + '#s=' + id);
   await route();
 }
+// 학습 → 목록: 학습을 목록에서 열었다면(S.cameFromList) history.back() 으로 그 칸을 되돌려 목록이 두 칸 쌓이지 않게 한다 — hashchange 가 route() 를 불러 목록을 그리므로 flushNote 흐름 그대로.
+// 주소(#s=id)로 바로 들어왔다면 되돌릴 목록 칸이 없으니 그 칸의 해시만 교체하고 route() 를 직접 부른다.
 async function goListPage() {
   S.quiz = null;
+  if (S.cameFromList) { history.back(); return; }
   history.replaceState(null, '', location.pathname + location.search);
   await route();
 }

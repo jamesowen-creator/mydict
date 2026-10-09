@@ -132,7 +132,7 @@ test('목록에서 퀴즈 탭: "어떤 학습으로 할까요?" 고르기(텍스
   assert.match(await hash(page), /^#s=\d+$/);
   assert.equal(await page.eval("document.getElementById('app').classList.contains('in-quiz')"), true);
   assert.deepEqual(await currentTab(page), ['퀴즈']);
-  assert.equal(await page.eval("history.length"), len, '탭 전환은 기록을 쌓지 않음(replaceState)');
+  assert.equal(await page.eval("history.length"), len + 1, '목록에서 고르기로 열면 새 history 칸을 쌓음(작업226-4, 카드로 여는 것과 같게)');
   assert.deepEqual(nonGet(), [], '요청 중 GET 아닌 것 없음');
   assert.equal(srv.state.log.filter(l => /\/explore$|\/respond$|\/suggestions\/refresh$|voice\/transcribe/.test(l.url)).length, 0, 'AI 호출 없음');
   assert.ok(srv.state.log.some(l => /\/review$/.test(l.url) && l.search === '?count=5'), '기존 GET /review 사용');
@@ -266,4 +266,90 @@ test('가로 스크롤 없음·스크립트 오류 없음 (320/390/768/1024px, �
     assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), [], `${w}px`);
     await page.close();
   }
+});
+
+// ───────────────────────── 작업226-4: 뒤로가기 정정 ─────────────────────────
+// 앱 앞에 다른 페이지를 하나 두어 "이전 페이지"로 나가는지 구별한다
+async function openAfter(prevPath, hashStudyIdx = null) {
+  srv.reset(); srv.state.me = me();
+  srv.seed({ topic: '생물', items: FIVE }); srv.seed({ topic: '화학', items: FIVE });
+  const page = await browser.newPage({ width: 390, height: 844 });
+  await page.send('Emulation.setScrollbarsHidden', { hidden: true });
+  await page.goto(srv.url + prevPath);
+  const hash = hashStudyIdx === null ? '' : '#s=' + srv.state.studies[hashStudyIdx].id;
+  await page.goto(srv.url + '/concept_study.html' + hash);
+  await page.waitFor("!document.getElementById('app').hidden && (!document.getElementById('view-list').hidden || !document.getElementById('view-study').hidden)", 8000);
+  await page.eval(NO_MOTION);
+  await sleep(400); await settle(page);
+  return page;
+}
+const pathOf = page => page.eval('location.pathname + location.hash');
+const viewOf = page => page.eval("!document.getElementById('view-list').hidden ? 'list' : !document.getElementById('view-study').hidden ? 'study' : 'none'");
+
+test('226-4 (가) 목록 → 퀴즈 탭 → 학습 선택 → 뒤로가기 = 목록', { skip: SKIP }, async () => {
+  const page = await openAfter('/manifest.json');
+  await page.click('#bottom-nav [data-tab="quiz"]'); await page.waitFor("document.getElementById('study-picker').open");
+  await page.click('.pick-row'); await page.waitFor("!!document.querySelector('[data-t=quiz-question]')", 8000);
+  assert.match(await pathOf(page), /^\/concept_study\.html#s=\d+$/);
+  await page.eval("history.back()"); await sleep(600); await settle(page);
+  assert.equal(await viewOf(page), 'list', '뒤로가기 = 목록'); assert.equal(await pathOf(page), '/concept_study.html');
+  await page.close();
+});
+
+test('226-4 (나) 목록 → 학습 카드 → 학습 탭 → 목록 → 뒤로가기 = 이전 페이지(목록이 두 번 나오지 않음)', { skip: SKIP }, async () => {
+  const page = await openAfter('/manifest.json');
+  const len = await page.eval("history.length");
+  await page.click('[data-t="open-study"]'); await page.waitFor("!!document.querySelector('[data-t=term]')"); await settle(page);
+  assert.equal(await page.eval("S.cameFromList"), true);
+  await tap(page, 'study');
+  assert.equal(await viewOf(page), 'list'); assert.equal(await pathOf(page), '/concept_study.html');
+  assert.equal(await page.eval("history.length"), len + 1, '카드로 연 칸 하나뿐(되돌리기라 늘지 않음)');
+  await page.eval("history.back()"); await sleep(600);
+  assert.equal(await page.eval("location.pathname"), '/manifest.json', '다음 뒤로가기는 이전 페이지(목록이 두 번 나오지 않음)');
+  await page.close();
+});
+
+test('226-4 (다) 목록 → 지도 탭 → 학습 선택 → 지도 시트 → 뒤로가기 = 시트만 닫힘 → 뒤로가기 = 목록', { skip: SKIP }, async () => {
+  const page = await openAfter('/manifest.json');
+  await page.click('#bottom-nav [data-tab="map"]'); await page.waitFor("document.getElementById('study-picker').open");
+  await page.click('.pick-row'); await page.waitFor("document.getElementById('map-sheet').open", 8000); await sleep(300);
+  await page.eval("history.back()"); await sleep(500);
+  assert.equal(await page.eval("document.getElementById('map-sheet').open"), false, '시트만 닫힘');
+  assert.equal(await viewOf(page), 'study'); assert.match(await pathOf(page), /#s=\d+$/);
+  await page.eval("history.back()"); await sleep(600); await settle(page);
+  assert.equal(await viewOf(page), 'list', '다음 뒤로가기 = 목록'); assert.equal(await pathOf(page), '/concept_study.html');
+  await page.close();
+});
+
+test('226-4 (라) 학습 주소(#s=id)로 바로 들어와 학습 탭 → 목록, 뒤로가기 = 이전 페이지(해시만 교체했으므로 목록 칸이 따로 없음)', { skip: SKIP }, async () => {
+  const page = await openAfter('/manifest.json', 0);
+  assert.equal(await viewOf(page), 'study'); assert.equal(await page.eval("S.cameFromList"), false);
+  const len = await page.eval("history.length");
+  await tap(page, 'study');
+  assert.equal(await viewOf(page), 'list'); assert.equal(await pathOf(page), '/concept_study.html');
+  assert.equal(await page.eval("history.length"), len, '기록을 쌓지 않음(replace)');
+  await page.eval("history.back()"); await sleep(600);
+  assert.equal(await page.eval("location.pathname"), '/manifest.json', '뒤로가기 = 이전 페이지');
+  await page.close();
+});
+
+test('226-4 (마) 퀴즈 풀이 중 학습 탭 확인창 흐름 그대로(취소=유지, 확인=목록), 학습 안에서 퀴즈 탭은 기록을 쌓지 않음', { skip: SKIP }, async () => {
+  const page = await openAfter('/manifest.json');
+  await page.click('#bottom-nav [data-tab="quiz"]'); await page.waitFor("document.getElementById('study-picker').open");
+  await page.click('.pick-row'); await page.waitFor("!!document.querySelector('[data-t=quiz-question]')", 8000); await settle(page);
+  const len = await page.eval("history.length");
+  await page.click('[data-t="quiz-opt"]', { index: 0 }); await page.waitFor("!!document.querySelector('[data-t=quiz-feedback]')");
+  await page.click('#bottom-nav [data-tab="study"]'); await page.waitFor("!!document.querySelector('[data-t=dialog-msg]')");
+  assert.match(await page.text('[data-t="dialog-msg"]'), /퀴즈를 그만할까요\? 지금까지의 답은 저장되지 않습니다/);
+  await page.click('[data-t="dialog-cancel"]'); await sleep(300);
+  assert.equal(await viewOf(page), 'study'); assert.equal(await page.eval("S.quiz.results.length"), 1);
+  assert.equal(await page.eval("history.length"), len, '확인창 중 기록 변화 없음');
+  await page.click('#bottom-nav [data-tab="study"]'); await page.waitFor("!!document.querySelector('[data-t=dialog-ok]')");
+  await page.click('[data-t="dialog-ok"]'); await sleep(700); await settle(page);
+  assert.equal(await viewOf(page), 'list', '확인하면 목록'); assert.equal(await pathOf(page), '/concept_study.html');
+  await page.click('[data-t="open-study"]'); await page.waitFor("!!document.querySelector('[data-t=term]')"); await settle(page);
+  const n = await page.eval("history.length");
+  await tap(page, 'quiz'); await page.waitFor("!!document.querySelector('[data-t=quiz-question]')");
+  assert.equal(await page.eval("history.length"), n, '학습 안의 퀴즈 탭은 칸을 쌓지 않음');
+  await page.close();
 });
