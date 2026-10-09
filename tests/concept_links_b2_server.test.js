@@ -276,3 +276,85 @@ test('legacy 호출 지문 그대로: 모델, temperature 0.3, max_tokens 1500, 
   assert.doesNotMatch(p.messages[0].content, /"links": \d/, 'legacy 입력에는 연결 수 필드가 없음');
   await close();
 });
+
+// ───────────────────────── 작업227-23(4a): 현재 개념의 연결 수 → explore 입력, 6 이상이면 나누기 제안 규칙 ─────────────────────────
+// 현재 개념 = 사용자가 고른(이미 저장된) 개념(from_item_id). cur 에 k 개의 연결을 만들어 둔다
+async function withLinks(mode, k) {
+  const env = await setup(mode);
+  const cur = await env.add('세포');
+  for (let i = 0; i < k; i++) {
+    const o = await env.add('개념' + i);
+    assert.equal((await env.call('POST', `${S}/${env.sid}/links`, { from_item_id: cur.id, to_item_id: o.id, relation_type: '사용' })).status, 201);
+  }
+  env.anthropic.handler = () => explainJson();
+  return { ...env, cur };
+}
+const exploreInput = c => dataIn(c);
+
+test('b2 explore: 현재 개념의 연결 수가 입력에 한 줄로 들어가고(현재 개념 바로 뒤), 현재 개념이 없으면 넣지 않음', async () => {
+  const { anthropic, call, close, sid, cur } = await withLinks('b2', 3);
+  const r = await call('POST', `${S}/${sid}/explore`, { text: '광합성', from_item_id: cur.id });
+  assert.equal(r.status, 200);
+  const d = exploreInput(anthropic.calls[0]);
+  assert.equal(d['현재 개념의 연결 수'], 3);
+  const keys = Object.keys(d);
+  assert.equal(keys[keys.indexOf('현재 개념') + 1], '현재 개념의 연결 수');
+  await call('POST', `${S}/${sid}/explore`, { text: '리보솜' });   // 현재 개념 없이 새 용어만
+  assert.equal('현재 개념의 연결 수' in exploreInput(anthropic.calls[anthropic.calls.length - 1]), false);
+  await close();
+});
+
+test('연결 수 계산은 227-22 와 같은 정의: 보류 개념과의 연결은 세지 않음', async () => {
+  const { anthropic, call, close, sid, cur, add } = await withLinks('b2', 2);
+  const held = await add('보류');
+  await call('POST', `${S}/${sid}/links`, { from_item_id: held.id, to_item_id: cur.id, relation_type: '사용' });
+  await call('PATCH', `/api/concepts/items/${held.id}`, { status: 'held' });
+  await call('POST', `${S}/${sid}/explore`, { text: '광합성', from_item_id: cur.id });
+  assert.equal(exploreInput(anthropic.calls[0])['현재 개념의 연결 수'], 2);
+  await close();
+});
+
+test('나누기 규칙: 연결 수 5 는 기존 프롬프트 그대로, 6 부터 규칙 문구가 더해짐(그 밖은 글자 그대로 같음)', async () => {
+  const five = await withLinks('b2', 5);
+  await five.call('POST', `${S}/${five.sid}/explore`, { text: '광합성', from_item_id: five.cur.id });
+  const sysBelow = five.anthropic.calls[0].system;
+  assert.doesNotMatch(sysBelow, /나누기 제안/);
+  await five.close();
+  const six = await withLinks('b2', 6);
+  await six.call('POST', `${S}/${six.sid}/explore`, { text: '광합성', from_item_id: six.cur.id });
+  const sysAt = six.anthropic.calls[0].system;
+  assert.match(sysAt, /\[나누기 제안\]/);
+  assert.match(sysAt, /지금 6 이상입니다/);
+  assert.match(sysAt, /연결이 N개 몰려 있어/);
+  assert.match(sysAt, /조언 말투는 쓰지 않습니다/);
+  assert.match(sysAt, /relation_type은 "포함"/);
+  const rule = sysAt.slice(sysAt.indexOf('[나누기 제안]'), sysAt.indexOf('JSON만 출력한다:', sysAt.indexOf('[나누기 제안]')));
+  assert.equal(sysAt.replace(rule, ''), sysBelow, '규칙 문단만 더해지고 나머지는 같음');
+  assert.equal(exploreInput(six.anthropic.calls[0])['현재 개념의 연결 수'], 6);
+  // 응답 형식·제안 개수·관계 종류 상한은 그대로(같은 JSON 형식 줄, MAX_SUGGESTIONS 3)
+  assert.ok(sysAt.endsWith(sysBelow.slice(sysBelow.indexOf('JSON만 출력한다:'))));
+  await six.close();
+});
+
+test('연결 수 조회가 실패해도 explore 는 정상: 연결 수 없이, 기존 프롬프트 그대로', async () => {
+  const { db, anthropic, call, close, sid, cur } = await withLinks('b2', 7);
+  db.failOn = /^SELECT from_item_id, to_item_id FROM concept_links WHERE study_id = \$1 AND user_id = \$2/;
+  const r = await call('POST', `${S}/${sid}/explore`, { text: '광합성', from_item_id: cur.id });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.ai_error, undefined);
+  assert.equal(r.body.item.content_source, 'ai');
+  assert.equal('현재 개념의 연결 수' in exploreInput(anthropic.calls[0]), false);
+  assert.doesNotMatch(anthropic.calls[0].system, /나누기 제안/);
+  await close();
+});
+
+test('legacy 는 연결이 많아도 그대로: 입력에 연결 수 없음, 나누기 규칙 없음, 시스템 해시 d21024a7de985f69', async () => {
+  const { anthropic, call, close, sid, cur } = await withLinks(undefined, 8);
+  await call('POST', `${S}/${sid}/explore`, { text: '광합성', from_item_id: cur.id });
+  const p = anthropic.calls[0];
+  assert.deepEqual([p.model, p.temperature, p.max_tokens], ['claude-haiku-4-5-20251001', 0.3, 1500]);
+  assert.equal(crypto.createHash('sha256').update(p.system).digest('hex').slice(0, 16), 'd21024a7de985f69');
+  assert.equal('현재 개념의 연결 수' in exploreInput(p), false);
+  assert.doesNotMatch(p.system, /나누기 제안/);
+  await close();
+});

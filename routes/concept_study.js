@@ -627,6 +627,9 @@ const LINKS_RULE =
   ' [연결 규칙] links는 새 개념과 [연결 후보]에 있는 기존 개념 사이의 연결 제안입니다(최대 3개). to_item_id는 반드시 [연결 후보]의 id여야 합니다. ' +
   '일반적으로 합의된 관계만 쓰고, 확신이 없으면 연결하지 말고 links를 비우거나 줄입니다. reason에는 두 개념이 왜 그렇게 이어지는지 한두 문장으로 쓰며, 두 개념의 저장된 설명 또는 일반 상식에 근거해야 합니다. 근거를 모르면 그 연결은 만들지 않습니다. ' +
   'direction은 관계 종류의 뜻에 맞게 정합니다: "from_new"는 새 개념 → 기존 개념, "to_new"는 기존 개념 → 새 개념입니다(예: 원인→결과에서 원인이 새 개념이면 from_new, 포함에서 기존 개념이 큰 쪽이면 to_new).';
+// 작업227-23(4a): b2 모드에서 현재 개념(탐색을 시작한 기존 개념)의 연결 수가 이 값 이상이면 explore 제안 중 하나를 "현재 개념을 더 작게 나누는" 제안으로 한다.
+// 6 은 실험(20개 개념 지도에서 상위 허브의 연결이 7~13개, 상위 3 허브 밖 개념은 대부분 6개 미만)에서 가져온 추정값이라 상수로 둔다.
+const SPLIT_HINT_MIN_LINKS = 6;
 const LINKS_SCHEMA = '"links":[{"to_item_id":0,"direction":"","relation_type":"","label":"","reason":""}]';
 const SUGGEST_SCHEMA = '"suggestions":[{"term":"","reason":"","relation_type":"","relation_label":"","load":""}]';
 const CONCEPT_PROMPT_TAILS = {
@@ -637,6 +640,8 @@ const CONCEPT_PROMPT_TAILS = {
   explore_b2:
     '[작업] 사용자 입력(text)은 개념 하나이거나 짧은 질문입니다. 질문이면 핵심 개념 용어 하나를 뽑아 term에 씁니다(term은 정리된 개념 이름). 그 개념을 설명하고, [현재 개념]이 있으면 그 개념과 새 개념의 관계를 relation에 씁니다(없으면 relation의 값은 모두 빈 문자열). 제안은 새 개념 다음에 배울 개념입니다.\n' +
     'JSON만 출력한다: {"term":"","english":"","group_label":"","definition":"","example":"","simple_text":"","deeper_text":"","relation":{"relation_type":"","label":"","detail":""},' + SUGGEST_SCHEMA + '}',
+  // 작업227-23: 현재 개념의 연결 수가 SPLIT_HINT_MIN_LINKS 이상일 때만 쓰는 꼬리(explore_b2 + 나누기 규칙). 기준 미만이면 explore_b2 그대로
+  explore_b2_split: null,
   easier:
     '[작업] [현재 개념]의 simple_text를 이전보다 더 쉽게 다시 씁니다(짧은 문장, 쉬운 비유). 다른 필드는 만들지 않습니다.\nJSON만 출력한다: {"simple_text":""}',
   deeper:
@@ -645,6 +650,10 @@ const CONCEPT_PROMPT_TAILS = {
     '[작업] [현재 개념] 다음에 배울 제안만 새로 만듭니다. [이전 제안 용어]에 있는 용어는 다시 제안하지 말고, 이전과 다른 방향의 개념을 고릅니다. 다른 필드는 만들지 않습니다.\nJSON만 출력한다: {' + SUGGEST_SCHEMA + '}',
 };
 
+const SPLIT_RULE =
+  '[나누기 제안] 입력 데이터의 "현재 개념의 연결 수"는 [현재 개념]에 이미 붙어 있는 연결 수이고, 지금 ' + SPLIT_HINT_MIN_LINKS + ' 이상입니다. 그래서 제안(suggestions) 중 하나는 [현재 개념]을 더 구체적인 부분이나 갈래로 나눈 개념으로 합니다(예: 큰 개념의 한 구성 요소나 한 종류). ' +
+  '그 제안의 relation_type은 "포함"으로 쓰고, reason에는 "연결이 N개 몰려 있어"처럼 현재 개념의 연결 수를 사실 그대로 적습니다. "~하세요", "~하는 게 좋아요" 같은 조언 말투는 쓰지 않습니다. 제안 개수와 나머지 규칙은 그대로입니다.\n';
+CONCEPT_PROMPT_TAILS.explore_b2_split = CONCEPT_PROMPT_TAILS.explore_b2.replace('JSON만 출력한다:', SPLIT_RULE + 'JSON만 출력한다:');
 function buildConceptPrompt(mode) { return CONCEPT_PROMPT_HEAD + '\n\n' + CONCEPT_PROMPT_TAILS[mode]; }
 
 function uniqueTerms(rows, n) { return Array.from(new Set(rows.map(r => r.term))).slice(-n); }
@@ -657,11 +666,12 @@ function linkCandidates(items, currentId, selfId) {
     .map(i => ({ id: i.id, term: i.term, summary: Array.from(i.definition || '').slice(0, LINK_CANDIDATE_SUMMARY).join('') }));
 }
 
-function buildConceptInput({ study, current, items, text, feedback, prevSuggestionTerms, selfId, withLinkCandidates }) {
+function buildConceptInput({ study, current, items, text, feedback, prevSuggestionTerms, selfId, withLinkCandidates, currentLinks }) {
   const others = items.filter(i => i.id !== (current ? current.id : null) && i.id !== selfId);   // selfId: 지금 설명을 채우는 새 개념
   const data = {
     '분야': study.topic,
     '현재 개념': current ? { term: current.term, definition: current.definition || '' } : null,
+    ...(current && Number.isInteger(currentLinks) ? { '현재 개념의 연결 수': currentLinks } : {}),   // 작업227-23: b2 모드 explore 만 넘김(레거시 입력은 그대로)
     '학습 중인 개념': uniqueTerms(others.filter(i => i.status === 'active'), PROMPT_MAX_LEARNING),
     '제외·보류 용어': uniqueTerms(others.filter(i => i.status !== 'active'), PROMPT_MAX_SIDELINED),
     '기존 그룹': Array.from(new Set(items.map(i => i.group_label).filter(Boolean))).slice(0, PROMPT_MAX_GROUPS),
@@ -830,6 +840,17 @@ async function clientItem(item, userId) {
 
 // 작업227-10: B2 연결 생성. 설명 저장이 끝난 새 개념과 [연결 후보](활성 개념 최근 60개, 설명 전체)로 별도 호출 1회.
 // 모든 실패(한도·호출·파싱·검증·저장)는 연결만 건너뛰고 개념 추가는 그대로 둔다. 거절 사유는 개수만 로그에 남긴다.
+// 작업227-22·23: 개념별 현재 연결 수 = 그 개념이 주어 또는 목적어이고 양끝이 모두 활성 개념인 연결의 수(이 사용자의 이 학습). 한 번의 조회. 실패하면 던진다
+async function linkDegrees(studyId, userId, items) {
+  const { rows } = await pool.query('SELECT from_item_id, to_item_id FROM concept_links WHERE study_id = $1 AND user_id = $2', [studyId, userId]);
+  const active = new Set(items.filter(i => i.status === 'active').map(i => i.id)), deg = new Map();
+  for (const r of rows) {
+    if (!active.has(r.from_item_id) || !active.has(r.to_item_id)) continue;
+    deg.set(r.from_item_id, (deg.get(r.from_item_id) || 0) + 1);
+    deg.set(r.to_item_id, (deg.get(r.to_item_id) || 0) + 1);
+  }
+  return deg;
+}
 async function createB2Links(req, studyId, study, items, saved, existingPairs) {
   const out = [];
   try {
@@ -838,16 +859,9 @@ async function createB2Links(req, studyId, study, items, saved, existingPairs) {
     const candidates = items.filter(i => i.status === 'active' && i.id !== saved.id && i.definition && i.definition.trim())
       .slice(-PROMPT_MAX_LINK_CANDIDATES).map(i => ({ id: i.id, term: i.term, description: i.definition }));
     if (!candidates.length) return out;
-    // 작업227-22: 후보마다 현재 연결 수(그 개념이 주어 또는 목적어이고 양끝이 모두 활성 개념인 연결, 이 사용자의 이 학습)를 한 번의 조회로 구해 입력에 넣는다.
-    // 조회가 실패하면 연결 수 없이 부르지 않고(프롬프트 규칙 6 이 연결 수를 전제로 하므로) 연결 생성만 건너뛴다. 개념 추가는 이미 끝나 있다.
+    // 작업227-22: 후보마다 현재 연결 수를 한 번의 조회로 구해 입력에 넣는다. 조회가 실패하면 연결 수 없이 부르지 않고(프롬프트 규칙 6 이 연결 수를 전제로 하므로) 연결 생성만 건너뛴다. 개념 추가는 이미 끝나 있다.
     try {
-      const { rows: lk } = await pool.query('SELECT from_item_id, to_item_id FROM concept_links WHERE study_id = $1 AND user_id = $2', [studyId, req.user.id]);
-      const activeIds = new Set(items.filter(i => i.status === 'active').map(i => i.id)), deg = new Map();
-      for (const r of lk) {
-        if (!activeIds.has(r.from_item_id) || !activeIds.has(r.to_item_id)) continue;
-        deg.set(r.from_item_id, (deg.get(r.from_item_id) || 0) + 1);
-        deg.set(r.to_item_id, (deg.get(r.to_item_id) || 0) + 1);
-      }
+      const deg = await linkDegrees(studyId, req.user.id, items);
       for (const c of candidates) c.links = deg.get(c.id) || 0;
     } catch (err) {
       console.error('concepts b2 links degree error:', err.message);
@@ -916,9 +930,15 @@ router.post('/api/concepts/studies/:id/explore', guard, async (req, res) => {
     const linkFrom = from && from.id !== item.id ? from : null;
     await selectItem(study, req.user.id, item.id);   // 새로 만든(또는 다시 채우는) 개념을 선택하고 경로에 붙인다
 
-    const input = buildConceptInput({ study, current: linkFrom, items, text: text.value, feedback: linkFrom ? linkFrom.feedback : null, selfId: item.id, withLinkCandidates: true });
     const b2 = conceptLinkMode() === 'b2';   // 작업227-10: b2 면 설명 호출에서 links 를 받지 않는다
-    const ai = await callConceptAI(req.user.id, b2 ? 'explore_b2' : 'explore', input, 1500);
+    // 작업227-23(4a): "현재 개념" = 사용자가 고른(이미 저장된) 개념 linkFrom. 연결 수를 넣는 것은 b2 모드이고 현재 개념이 있을 때만이며, 조회가 실패하면 연결 수 없이 그대로 진행한다
+    let currentLinks;
+    if (b2 && linkFrom) {
+      try { currentLinks = (await linkDegrees(id, req.user.id, items)).get(linkFrom.id) || 0; }
+      catch (err) { console.error('concepts explore degree error:', err.message); }
+    }
+    const input = buildConceptInput({ study, current: linkFrom, items, text: text.value, feedback: linkFrom ? linkFrom.feedback : null, selfId: item.id, withLinkCandidates: true, currentLinks });
+    const ai = await callConceptAI(req.user.id, b2 ? (currentLinks >= SPLIT_HINT_MIN_LINKS ? 'explore_b2_split' : 'explore_b2') : 'explore', input, 1500);
     let v = null;
     if (ai.parsed !== undefined) {
       v = validateExplore(ai.parsed, new Set(items.map(i => termKey(i.term))));
