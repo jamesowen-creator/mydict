@@ -75,7 +75,7 @@ test('관계 문구는 40자까지, 개념이 1개뿐이면 연결 추가 버튼
   const page = await openStudy();
   await page.click('[data-t="link-open"]');
   assert.equal(await page.eval("document.getElementById('link-label').maxLength"), 40);
-  assert.deepEqual(await page.eval("[...document.getElementById('link-type').options].map(o => o.value)"), ['포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련']);
+  assert.deepEqual(await page.eval("[...document.getElementById('link-type').options].map(o => o.value)"), ['사용', '일부', '종류', '일으킴', '구별', '포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련']);   // 작업227-11: 새 5종이 위, 옛 6종은 아래("이전 종류" 묶음)
   await page.close();
   srv.reset();
   srv.seed({ topic: '하나뿐', items: [{ term: '혼자' }] });

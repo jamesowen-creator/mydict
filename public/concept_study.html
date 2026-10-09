@@ -1003,7 +1003,7 @@ function drawMap(pane) {
   for (const l of links) {
     const hl = pathSet.has(l.from_item_id) && pathSet.has(l.to_item_id);
     const g = geom(l.from_item_id, l.to_item_id);
-    const rel = l.label || l.relation_type;
+    const rel = String(l.label || l.relation_type || '');
     const open = () => openEdge(l);
     const e = sv('g', { class: 'm-edge' + (hl ? ' hl' : '') + (!full && !hl ? ' dim' : ''), 'data-t': 'edge', 'data-id': l.id, 'data-hl': hl ? '1' : '0', role: 'button', tabindex: 0, 'aria-label': `${termOf(l.from_item_id)}와 ${termOf(l.to_item_id)}의 관계: ${rel}` },
       sv('path', { class: 'line', d: g.d }), sv('path', { class: 'hit', d: g.d }),
@@ -1139,7 +1139,7 @@ function openEdge(l) {
   const a = itemById(l.from_item_id), b = itemById(l.to_item_id);
   const body = el('edge-body');
   body.textContent = '';
-  body.append(h('div', { id: 'edge-pair', class: 'rel-pair' }, (a ? a.term : '') + ' → ' + (b ? b.term : '')));
+  body.append(h('div', { id: 'edge-pair', class: 'rel-pair' }, linkPairText(l, a ? a.term : '', b ? b.term : '')));
   body.append(h('div', { class: 'rel-type' }, h('span', { class: 'label' }, '관계 종류'), h('div', { 'data-t': 'rel-type' }, l.relation_type)));
   if (l.label) body.append(h('div', { class: 'rel-type' }, h('span', { class: 'label' }, '관계 문구'), h('div', { 'data-t': 'rel-label' }, l.label)));
   if (l.detail) body.append(h('div', { class: 'rel-detail' }, h('span', { class: 'label' }, '연결한 이유'), h('div', { 'data-t': 'rel-detail' }, l.detail)));
@@ -1270,7 +1270,47 @@ function renderQuiz() {
 }
 
 // ── 연결(작업203): 현재 개념과 이어진 연결 목록, 직접 연결 추가·삭제 ──
-const RELATION_TYPES = ['포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련'];
+const OLD_RELATION_TYPES = ['포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련'];   // 이전 종류(표시는 기존 그대로)
+const NEW_RELATION_TYPES = ['사용', '일부', '종류', '일으킴', '구별'];                       // 작업227-11: 문장으로 보여 주는 새 5종
+const isNewRel = t => NEW_RELATION_TYPES.includes(t);
+
+// 아래 pickJosa·formatSentence 는 lib/concept_links_b2.js 의 같은 이름 함수를 그대로 복사한 것이다(작업227-8, 서버 파일은 require 하지 않음). 고치면 원본도 함께 고칠 것.
+// 단어의 마지막 글자(괄호·기호·공백은 건너뜀)로 받침 여부를 판단해 [받침 있음, 받침 없음] 중 하나를 고른다.
+// 한글: 받침 유무. 영문: 한국어 읽기 기준으로 L·M·N·R만 받침 있음. 숫자: 0·1·3·6·7·8 받침 있음. 그 밖의 글자는 받침 없음으로 본다.
+function pickJosa(word, withBatchim, withoutBatchim) {
+  const chars = Array.from(String(word == null ? '' : word));
+  let last = '';
+  for (let i = chars.length - 1; i >= 0; i--) { if (/[가-힣A-Za-z0-9]/.test(chars[i])) { last = chars[i]; break; } }
+  let has = false;
+  if (/[가-힣]/.test(last)) has = (last.charCodeAt(0) - 0xAC00) % 28 !== 0;
+  else if (/[A-Za-z]/.test(last)) has = 'LMNR'.indexOf(last.toUpperCase()) >= 0;
+  else if (/[0-9]/.test(last)) has = '013678'.indexOf(last) >= 0;
+  return has ? withBatchim : withoutBatchim;
+}
+// 사용 "A는 B를 사용한다" / 일부 "A는 B의 일부이다" / 종류 "A는 B의 한 종류이다" / 일으킴 "A는 B를 일으킨다" / 구별 "A와 B는 구별해야 한다"
+// 옛 관계 종류(포함·원인→결과·순서·대비·비슷함·기타 관련)는 "A → B (종류)" 로 돌려준다.
+function formatSentence(predicate, subjectTerm, objectTerm) {
+  const a = String(subjectTerm == null ? '' : subjectTerm).trim(), b = String(objectTerm == null ? '' : objectTerm).trim();
+  if (predicate === '사용') return a + pickJosa(a, '은', '는') + ' ' + b + pickJosa(b, '을', '를') + ' 사용한다';
+  if (predicate === '일부') return a + pickJosa(a, '은', '는') + ' ' + b + '의 일부이다';
+  if (predicate === '종류') return a + pickJosa(a, '은', '는') + ' ' + b + '의 한 종류이다';
+  if (predicate === '일으킴') return a + pickJosa(a, '은', '는') + ' ' + b + pickJosa(b, '을', '를') + ' 일으킨다';
+  if (predicate === '구별') return a + pickJosa(a, '과', '와') + ' ' + b + pickJosa(b, '은', '는') + ' 구별해야 한다';
+  return a + ' → ' + b + (predicate ? ' (' + predicate + ')' : '');
+}
+
+// 연결 l 의 문장: 새 5종이면 "A는 B를 사용한다", 그 밖(옛 6종·모르는 값)이면 기존 화살표 표시. from = 주어, to = 목적어
+function linkPairText(l, fromTerm, toTerm) {
+  return isNewRel(l.relation_type) ? formatSentence(l.relation_type, fromTerm, toTerm) : fromTerm + ' → ' + toTerm;
+}
+// 관계 종류 select 의 option 들: 새 5종 위, 옛 6종은 "이전 종류" 묶음, 모르는 값이 현재 값이면 그 값을 따로 둔다
+function relationOptions(current) {
+  const opt = t => h('option', { value: t }, t);
+  const out = NEW_RELATION_TYPES.map(opt);
+  out.push(h('optgroup', { label: '이전 종류' }, OLD_RELATION_TYPES.map(opt)));
+  if (typeof current === 'string' && current && !isNewRel(current) && !OLD_RELATION_TYPES.includes(current)) out.push(h('optgroup', { label: '현재 값' }, opt(current)));
+  return out;
+}
 const LABEL_MAX = 40;
 const REASON_MAX = 300;
 // 작업210: 연결에는 상태 배지·라벨을 붙이지 않고 이유 문장만 보여 준다(없으면 줄 자체를 숨김). source·user_edited는 저장만 하고 화면에는 쓰지 않는다
@@ -1287,13 +1327,13 @@ function renderLinks() {
   if (!mine.length) box.append(h('p', { class: 'muted', 'data-t': 'no-links', style: 'margin-top:8px' }, '이 개념과 이어진 연결이 아직 없습니다.'));
   for (const l of mine) {
     const a = itemById(l.from_item_id), b = itemById(l.to_item_id);
-    const pairText = (a ? a.term : '') + ' → ' + (b ? b.term : '');
+    const pairText = linkPairText(l, a ? a.term : '', b ? b.term : '');
     const entry = h('div', { class: 'lk', 'data-t': 'link', 'data-id': l.id });
     entry.append(
       h('div', { class: 'lk-row' },
         h('div', { style: 'flex:1;min-width:0' },
           h('div', { class: 'lk-pair' }, pairText),
-          h('div', { class: 'lk-meta' }, [l.relation_type, l.label].filter(Boolean).join(' · '))),
+          h('div', { class: 'lk-meta' }, [l.relation_type, l.label].filter(Boolean).map(String).join(' · '))),
         h('button', { class: 'btn text', type: 'button', 'data-t': 'link-edit', 'aria-label': pairText + ' 연결 수정', onclick: () => openLinkEdit(l, entry) }, '수정'),
         h('button', { class: 'btn text danger', type: 'button', 'data-t': 'link-delete', 'aria-label': pairText + ' 연결 삭제', onclick: () => deleteLink(l) }, '삭제')),
       reasonNode(l, 'link-reason'));
@@ -1311,10 +1351,11 @@ function openLinkEdit(l, entry) {
   const a = itemById(l.from_item_id), b = itemById(l.to_item_id);
   let swapped = false;
   const pair = h('div', { class: 'lk-pair', 'data-t': 'edit-pair' });
-  const showPair = () => { pair.textContent = ((swapped ? b : a) || { term: '' }).term + ' → ' + ((swapped ? a : b) || { term: '' }).term; };
+  const typeSel = h('select', { id: 'le-type', 'aria-label': '관계 종류', 'data-t': 'edit-type' }, relationOptions(l.relation_type));
+  typeSel.value = l.relation_type;   // 옛 값이면 그 값이 선택된 채로 열린다
+  const showPair = () => { pair.textContent = linkPairText({ relation_type: typeSel.value }, ((swapped ? b : a) || { term: '' }).term, ((swapped ? a : b) || { term: '' }).term); };
   showPair();
-  const typeSel = h('select', { id: 'le-type', 'aria-label': '관계 종류', 'data-t': 'edit-type' }, RELATION_TYPES.map(t => h('option', { value: t }, t)));
-  typeSel.value = l.relation_type;
+  typeSel.addEventListener('change', showPair);
   const label = h('input', { id: 'le-label', type: 'text', maxlength: LABEL_MAX, autocomplete: 'off', 'aria-label': '관계 문구', 'data-t': 'edit-label' });
   label.value = l.label || '';
   const detail = h('textarea', { id: 'le-detail', maxlength: REASON_MAX, 'aria-label': '연결한 이유', 'data-t': 'edit-reason' });
@@ -1365,7 +1406,7 @@ function openLinkForm(it, host, openBtn) {
   host.textContent = '';
   const toSel = h('select', { id: 'link-to', 'aria-label': '이어 줄 개념' },
     S.items.filter(i => i.id !== it.id).map(i => h('option', { value: String(i.id) }, i.term)));
-  const typeSel = h('select', { id: 'link-type', 'aria-label': '관계 종류' }, RELATION_TYPES.map(t => h('option', { value: t }, t)));
+  const typeSel = h('select', { id: 'link-type', 'aria-label': '관계 종류' }, relationOptions());   // 기본 선택 = 새 5종의 첫째(사용)
   const label = h('input', { id: 'link-label', type: 'text', maxlength: LABEL_MAX, autocomplete: 'off', 'aria-label': '관계 문구', placeholder: '예: 때문에 (선택)' });
   const msg = h('div', { class: 'msg error', role: 'alert' });
   const close = () => { host.textContent = ''; openBtn.hidden = false; };
@@ -1448,7 +1489,12 @@ function placeText(it) {
     if (l.from_item_id !== it.id && l.to_item_id !== it.id) continue;
     const other = itemById(l.from_item_id === it.id ? l.to_item_id : l.from_item_id);
     if (!other) continue;
-    const rel = [l.label, l.relation_type].filter(Boolean).join(' · ');
+    if (isNewRel(l.relation_type)) {   // 작업227-11: 새 5종은 문장 그대로(주어 = from, 목적어 = to)
+      const fa = itemById(l.from_item_id), ta = itemById(l.to_item_id);
+      parts.push(formatSentence(l.relation_type, fa ? fa.term : '', ta ? ta.term : ''));
+      continue;
+    }
+    const rel = [l.label, l.relation_type].filter(Boolean).map(String).join(' · ');
     parts.push(l.to_item_id === it.id ? `‘${other.term}’에서 이어짐 (${rel || '관련'})` : `‘${other.term}’로 이어짐 (${rel || '관련'})`);
   }
   return parts.slice(0, 3).join(' / ');
@@ -1614,7 +1660,7 @@ async function deleteItem(it) {
 const LOAD_TEXT = { '가벼움': '가벼움', '보통': '보통', '무거움': '무거움' };
 
 function suggestionBlock(sg, big) {
-  const rel = [sg.relation_label, sg.relation_type].filter(Boolean).join(' · ');
+  const rel = [sg.relation_label, sg.relation_type].filter(Boolean).map(String).join(' · ');   // 모르는 값(새 5종 포함)도 값 그대로 표시
   const kv = (label, text) => text ? h('div', { class: 'kv' }, h('span', { class: 'label' }, label), h('div', {}, text)) : null;
   return h('div', { class: big ? 'next-main' : 'alt', 'data-t': big ? 'suggest-main' : 'suggest-alt', 'data-term': sg.term },
     h('div', { class: big ? 'next-term' : 'alt-term' }, sg.term),

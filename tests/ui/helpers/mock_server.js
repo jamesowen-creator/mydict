@@ -7,6 +7,7 @@
 //   srv.state.voiceBuild = { dry: {...dry_run 응답}, dryError: { status, msg }, error: { status, msg }(실행 POST의 오류), statusSeq: [{status,done,total,...}](조회마다 하나씩, 마지막은 반복) }
 //   explorePlan 항목의 extraLinks: ['용어', ...] → 새 개념과 그 기존 개념 사이에 AI 연결을 더 만든다(작업209, 응답의 links)
 //   seed의 links: [[from, to, { relation_type, label, detail, source, user_edited }]]  (detail: '' 이면 이유 없음)
+//   (작업227-11) relation_type 에는 새 5종(사용·일부·종류·일으킴·구별)이나 모르는 값도 그대로 넣을 수 있고, label: null 이면 문구 없음
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -388,7 +389,7 @@ async function startMockServer() {
         return it;
       });
       for (const [a, b, rel] of links) {
-        state.links.push({ id: state.nextId++, study_id: s.id, from_item_id: made[a].id, to_item_id: made[b].id, relation_type: (rel && rel.relation_type) || '포함', label: (rel && rel.label) || '이어짐', detail: rel && 'detail' in rel ? rel.detail : '관계 설명', source: (rel && rel.source) || 'ai', user_edited: !!(rel && rel.user_edited), created_at: iso() });
+        state.links.push({ id: state.nextId++, study_id: s.id, from_item_id: made[a].id, to_item_id: made[b].id, relation_type: (rel && rel.relation_type) || '포함', label: rel && 'label' in rel ? rel.label : '이어짐', detail: rel && 'detail' in rel ? rel.detail : '관계 설명', source: (rel && rel.source) || 'ai', user_edited: !!(rel && rel.user_edited), created_at: iso() });
       }
       if (p) { s.path = p.map(i => made[i].id); s.selected_item_id = s.path[s.path.length - 1]; }
       else if (made.length) { s.selected_item_id = made[0].id; s.path = [made[0].id]; }
