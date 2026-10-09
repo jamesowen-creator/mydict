@@ -204,6 +204,16 @@
   .sheet-body .map-hint { margin: 6px 0 0; }
   .map-box svg { width: 100%; height: 100%; display: block; cursor: grab; }
   .map-hint { font-size: 12px; color: var(--text2); margin-top: 6px; }
+  /* 작업227-18: 지도 인사이트 패널(접힘이 기본). 박스 없이 구분선 행으로 */
+  .map-ins { flex: 0 0 auto; border-top: 1px solid var(--line); margin-top: 6px; }
+  .map-ins-toggle { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: transparent; border: 0; padding: 0 4px; font-weight: 700; color: var(--text); cursor: pointer; }
+  .map-ins-list { list-style: none; margin: 0; padding: 0; max-height: min(30vh, 220px); overflow-y: auto; }
+  .map-ins-list li { border-top: 1px solid var(--line); }
+  .map-ins-row { display: block; width: 100%; min-height: 44px; text-align: left; background: transparent; border: 0; padding: 8px 4px; font-size: 14px; line-height: 1.5; color: var(--text); cursor: pointer; }
+  .map-ins-row[aria-pressed=true] { font-weight: 800; box-shadow: inset 3px 0 0 var(--accent); padding-left: 10px; }
+  .map-ins-row .on { display: block; font-size: 12px; font-weight: 700; color: var(--accent-text); }
+  div.map-ins-row { cursor: default; }
+  .sheet-body .map-box { min-height: 160px; }
   .m-edge path.line { fill: none; stroke: var(--text2); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
   .m-edge path.hit { fill: none; stroke: transparent; stroke-width: 28; cursor: pointer; vector-effect: non-scaling-stroke; pointer-events: stroke; }   /* 눈에 안 보이는 두꺼운 클릭 영역(화면 28px 고정) */
   .m-edge.hl path.line { stroke: var(--text); stroke-width: 2.5; }
@@ -570,7 +580,7 @@ const S = {
   studies: [],
   study: null, items: [], links: [], selId: null,
   explorePane: 'map',      // 'map' | 'list'
-  map: { full: false },
+  map: { full: false, hi: null, insOpen: false },   // hi: 작업227-18 인사이트 문장을 눌러 강조 중인 것({ key }), insOpen: 인사이트 패널 펼침
   sheet: { open: false, fit: true, scale: 1, tx: 0, ty: 0, scrollY: 0, cw: 0, ignorePop: false },   // 지도 팝업(작업209-4)
   slOpen: { held: false, excluded: false },   // 보류·제외 목록을 펼쳐 둔 상태(다시 그려도 유지)
   notice: null,            // { studyId, itemId|null, text, retryFn|null } — 안내·오류 한 줄(다시 받기 버튼 포함)
@@ -959,6 +969,7 @@ function openMapSheet() {
   const sh = S.sheet;
   if (sh.open) return;
   sh.open = true; sh.fit = true; sh.scrollY = window.scrollY;
+  S.map.hi = null; S.map.insOpen = false;   // 열 때마다 인사이트는 접힌 채, 강조 없음
   document.documentElement.classList.add('map-open');   // 배경 스크롤 잠금
   const dlg = el('map-sheet');
   if (!dlg.open) dlg.showModal();
@@ -999,6 +1010,58 @@ function renderMapSheetBody() {
   drawMap(body);
 }
 
+// ── 작업227-18: 지도 인사이트(클라이언트 전용). 활성 개념과 그 사이의 연결, group_label·review_state 만으로 계산한 사실을 한 줄씩 보여 준다 ──
+// 문장 5종: hub 허브 / iso 고립 / bridge 다리 / conf 헷갈림 몰림 / und 이해 비율. 해당 없으면 그 문장은 없다. ids = 문장을 누르면 초점으로 강조할 개념
+function computeInsights() {
+  const { active, links } = mapParts();
+  const out = [];
+  if (active.length < 3) return out;
+  const q = t => '‘' + t + '’';
+  const byId = new Map(active.map(i => [i.id, i]));
+  const nb = new Map(active.map(i => [i.id, new Set()]));
+  for (const l of links) { nb.get(l.from_item_id).add(l.to_item_id); nb.get(l.to_item_id).add(l.from_item_id); }
+  const ordered = active.slice().sort((a, b) => a.id - b.id);
+  const hub = ordered.reduce((best, i) => (nb.get(i.id).size > nb.get(best.id).size ? i : best), ordered[0]);   // 동점이면 id 가 작은 개념(앞에서부터 보므로 처음 것 유지)
+  const hubN = nb.get(hub.id).size;
+  if (hubN >= 3) out.push({ key: 'hub', text: q(hub.term) + pickJosa(hub.term, '은', '는') + ' 연결이 ' + hubN + '개로 가장 많아요.', ids: [hub.id] });
+  const iso = ordered.filter(i => nb.get(i.id).size === 0);
+  if (iso.length) out.push({ key: 'iso', ids: iso.map(i => i.id),
+    text: iso.length <= 3 ? '아직 연결이 없는 개념: ' + iso.map(i => q(i.term)).join(', ') + '.' : '아직 연결이 없는 개념이 ' + iso.length + '개 있어요(' + iso.slice(0, 2).map(i => q(i.term)).join(', ') + ' 외).' });
+  let bridge = null;
+  for (const i of ordered) {
+    const gs = [...new Set([...nb.get(i.id)].map(id => byId.get(id).group_label).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+    if (gs.length >= 2 && (!bridge || gs.length > bridge.gs.length)) bridge = { i, gs };
+  }
+  if (bridge) out.push({ key: 'bridge', ids: [bridge.i.id],
+    text: q(bridge.i.term) + pickJosa(bridge.i.term, '은', '는') + ' ' + bridge.gs.slice(0, 3).map(q).join('·') + (bridge.gs.length > 3 ? ' 외 ' + (bridge.gs.length - 3) + '개' : '') + ' 그룹을 이어 줘요.' });
+  const groups = new Map();
+  for (const i of ordered) if (i.group_label) { if (!groups.has(i.group_label)) groups.set(i.group_label, []); groups.get(i.group_label).push(i); }
+  let conf = null;
+  for (const [g, m] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], 'ko'))) {
+    const c = m.filter(i => i.review_state === 'confused').length;
+    if (m.length >= 3 && c / m.length >= 0.5 && (!conf || c / m.length > conf.c / conf.m.length || (c / m.length === conf.c / conf.m.length && c > conf.c))) conf = { g, m, c };
+  }
+  if (conf) out.push({ key: 'conf', ids: conf.m.map(i => i.id), text: q(conf.g) + ' 그룹에 헷갈림이 몰려 있어요(' + conf.c + '/' + conf.m.length + ').' });
+  const und = ordered.filter(i => i.review_state === 'understood');
+  out.push({ key: 'und', ids: und.map(i => i.id), text: '전체 ' + active.length + '개 중 ' + und.length + '개를 이해했어요(' + Math.round(und.length / active.length * 100) + '%).' });
+  return out;
+}
+// 패널: 기본 접힘. 문장을 누르면 그 개념(들)을 초점으로 강조하고, 같은 문장을 다시 누르면 해제한다
+function insightPanel(insights) {
+  if (!insights.length) return null;
+  const open = S.map.insOpen;
+  const list = open ? h('ul', { class: 'map-ins-list', 'data-t': 'ins-list' }, insights.map(ins => {
+    const on = !!(S.map.hi && S.map.hi.key === ins.key);
+    const toggle = () => { S.map.hi = on ? null : { key: ins.key }; S.sheet.fit = true; renderMapSheetBody(); };
+    return h('li', {}, ins.ids.length
+      ? h('button', { class: 'map-ins-row', type: 'button', 'data-t': 'ins-row', 'data-key': ins.key, 'aria-pressed': String(on), onclick: toggle }, ins.text, on ? h('span', { class: 'on' }, '지도에서 강조 중 · 다시 누르면 해제') : null)
+      : h('div', { class: 'map-ins-row', 'data-t': 'ins-row', 'data-key': ins.key }, ins.text));
+  })) : null;
+  return h('div', { class: 'map-ins', 'data-t': 'insights' },
+    h('button', { class: 'map-ins-toggle', type: 'button', 'data-t': 'ins-toggle', 'aria-expanded': String(open), onclick: () => { S.map.insOpen = !S.map.insOpen; renderMapSheetBody(); } }, h('span', {}, '지도에서 읽기'), h('span', { 'aria-hidden': 'true' }, open ? '접기' : '펼치기')),
+    list);
+}
+
 const MAP_MIN_SCALE = 0.05, MAP_MAX_SCALE = 3;
 // 작업227-16: 열 때 노드 글자의 화면 크기 하한(px)과 노드 글자의 SVG 단위 크기(CSS .m-node text 와 같게). 허브·간선 라벨 기준은 작업227-15 시안과 같다
 const MAP_READ_PX = 12, MAP_FONT_UNITS = 13;
@@ -1022,10 +1085,15 @@ function drawMap(pane) {
   const degOf = new Map(nodes.map(id => [id, 0]));
   for (const l of links) { degOf.set(l.from_item_id, degOf.get(l.from_item_id) + 1); degOf.set(l.to_item_id, degOf.get(l.to_item_id) + 1); }
   const pathActive = (S.study.path || []).filter(id => activeIds.has(id));
-  const focusId = sel && activeIds.has(sel.id) ? sel.id : pathActive.length ? pathActive[pathActive.length - 1]
+  // 작업227-18: 인사이트 문장을 눌러 강조 중이면(S.map.hi) 그 개념들이 초점이다. 개념이 바뀌어 문장이 사라졌거나 대상이 없어졌으면 강조를 푼다
+  const insights = computeInsights();
+  const hiIns = S.map.hi ? insights.find(i => i.key === S.map.hi.key && i.ids.length) : null;
+  if (S.map.hi && !hiIns) S.map.hi = null;
+  const hiSet = hiIns ? new Set(hiIns.ids) : null;
+  const focusId = hiIns ? hiIns.ids[0] : sel && activeIds.has(sel.id) ? sel.id : pathActive.length ? pathActive[pathActive.length - 1]
     : nodes.filter(id => id !== 'ghost').slice().sort((a, b) => degOf.get(b) - degOf.get(a) || a - b)[0];
-  const nbrs = new Set([focusId]);
-  for (const [a, b] of edges) { if (a === focusId) nbrs.add(b); if (b === focusId) nbrs.add(a); }   // ghost 가 있으면 함께
+  const nbrs = new Set(hiSet || [focusId]);
+  if (!hiSet || hiSet.size === 1) for (const [a, b] of edges) { if (a === focusId) nbrs.add(b); if (b === focusId) nbrs.add(a); }   // 한 개념이 초점이면 그 이웃까지(ghost 가 있으면 함께)
   // 허브: 연결 수 상위 15% 이면서 5개 이상인 개념(시안 값). 허브에 닿은 선은 초점이 아니면 더 연하게 그린다
   const degSorted = nodes.filter(id => id !== 'ghost').map(id => degOf.get(id)).sort((a, b) => a - b);
   const hubDeg = Math.max(HUB_MIN_DEG, degSorted[Math.floor(degSorted.length * 0.85)] || 0);
@@ -1040,12 +1108,17 @@ function drawMap(pane) {
   pane.append(box);
   pane.append(h('p', { class: 'map-hint' }, full ? '모든 연결을 보여 줍니다. 개념을 누르면 선택하고, 선을 누르면 연결한 이유를 볼 수 있어요.' : '선택한 개념과 바로 이어진 개념을 진하게 보여 줍니다. 점선은 다음 제안이에요. 선을 눌러 이유를 보세요.'));
 
+  const insPanel = insightPanel(insights);
+  if (insPanel) pane.append(insPanel);
+
   const termOf = id => (itemById(id) || {}).term || '';
   const svg = sv('svg', { role: 'group', 'aria-label': '개념 지도', 'data-t': 'map-svg' });
   const gEdges = sv('g'), gNodes = sv('g');
   svg.append(sv('defs', {}, sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto' }, sv('path', { d: 'M0,0 L10,5 L0,10 z' }))), gEdges, gNodes);
   // 간선 단계: 진함(초점에 닿은 선 + 경로 안의 선) / 중간(초점의 이웃끼리) / 연함(그 밖, 허브에 닿으면 더 연함). 전체 보기에서는 연한 선도 더 잘 보이게 한다
-  const strong = l => l.from_item_id === focusId || l.to_item_id === focusId || (pathSet.has(l.from_item_id) && pathSet.has(l.to_item_id));
+  const strong = hiSet && hiSet.size > 1 ? (l => hiSet.has(l.from_item_id) && hiSet.has(l.to_item_id))
+    : hiSet ? (l => l.from_item_id === focusId || l.to_item_id === focusId)
+    : (l => l.from_item_id === focusId || l.to_item_id === focusId || (pathSet.has(l.from_item_id) && pathSet.has(l.to_item_id)));
   const nStrong = links.filter(strong).length;
   for (const l of links) {
     const hl = strong(l);
@@ -1081,10 +1154,10 @@ function drawMap(pane) {
       continue;
     }
     const it = itemById(id);
-    const inNb = nbrs.has(id), hl = inNb || pathSet.has(id), isSel = id === S.selId;
+    const inNb = nbrs.has(id), hl = inNb || (!hiSet && pathSet.has(id)), isSel = id === S.selId;
     const n = sv('g', { class: 'm-node' + (hl ? ' hl' : '') + (isSel ? ' sel' : '') + (!full && !hl ? ' dim' : '') + (hl && !inNb && !full ? ' path' : ''), 'data-t': 'node', 'data-id': id, 'data-hl': hl ? '1' : '0', role: 'button', tabindex: 0, 'aria-label': it.term + (isSel ? ' (현재 개념)' : ''), transform: `translate(${p.x},${p.y})` },
       sv('title', {}, it.term), sv('rect', { width: MAPD.W, height: MAPD.H }), sv('text', { x: MAPD.W / 2, y: MAPD.H / 2 }, clipText(it.term, 9)));
-    const go = () => { if (!mapDrag || !mapDrag.moved) selectItem(id); };
+    const go = () => { if (!mapDrag || !mapDrag.moved) { S.map.hi = null; selectItem(id); } };   // 개념을 직접 고르면 인사이트 강조는 해제
     n.addEventListener('click', go);
     n.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); } });
     gNodes.append(n);
