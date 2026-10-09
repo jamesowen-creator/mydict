@@ -61,7 +61,6 @@ app.use(require('./routes/dictionary'));
 app.use(require('./routes/wordbook'));
 app.use(require('./routes/tts'));
 app.use(require('./routes/admin'));
-app.use('/api/metacong', require('./routes/metacong'));
 app.use(require('./routes/voice_study'));
 app.use(require('./routes/concept_study'));
 
