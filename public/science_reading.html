@@ -33,7 +33,7 @@
     --error: #E24B4A;
     --error-light: #FCEBEB;
     --error-dark: #B42318;   /* 작업217-3: 오답 글자(흰 바탕 6.57:1). 프로젝트의 위험색(개념 학습 --danger, 다이얼로그 위험 버튼)과 같은 값 */
-    --tab-height: 64px;
+    --navbar-h: 78px;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -69,7 +69,7 @@
   #loading p { color: var(--text2); font-size: 14px; }
 
   /* ── Views ── */
-  .view { display: none; min-height: 100dvh; padding-bottom: calc(var(--tab-height) + env(safe-area-inset-bottom, 0px)); }
+  .view { display: none; min-height: 100dvh; padding-bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom, 0px) + 16px); }
   .view.active { display: block; }
 
   /* 작업220: 상세 화면 상단 바 제목은 한 줄 말줄임(공용 screenBar.css의 두 줄 말줄임을 이 화면에서만 한 줄로) */
@@ -278,48 +278,55 @@
 
   .error-msg { text-align: center; padding: 40px 24px; color: var(--error); font-size: 14px; }
 
-  /* ── 하단 탭바 (작업173: digest_reading.html 82-105와 같은 모양) ── */
-  .tab-bar {
-    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: var(--content-max);
-    height: calc(var(--tab-height) + env(safe-area-inset-bottom, 0px));
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* ── 하단 내비 (작업226-2): 음성 학습·언어 사전의 하단 내비(작업224-2)와 같은 구조·크기. 색은 이 화면의 팔레트 ── */
+  .bottom-nav {
     background: var(--card);
     border-top: 1px solid var(--border);
-    display: flex; z-index: 200;
+    box-shadow: 0 -2px 8px rgba(226,88,59,0.07);
+    padding: 0 16px max(8px, env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 0;
+    position: fixed;
+    left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--content-max);
+    bottom: 0; z-index: 100;
+    min-height: var(--navbar-h);
   }
-  .tab-btn {
-    flex: 1; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 4px; background: none; border: none; cursor: pointer;
-    color: var(--text2); font-size: 11px; font-weight: 500;
-    transition: color 0.15s;
-    font-family: 'Noto Sans KR', sans-serif;
+  .bottom-nav-tabs { display: flex; flex: 1; gap: 0; }
+  .bottom-nav-tab {
+    display: flex; flex-direction: row; align-items: baseline; justify-content: center; gap: 2px;
+    flex: 1 1 0; min-width: 0; min-height: var(--ctl-min-h);
+    padding: 10px 0;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 500; line-height: normal;
+    color: var(--text2); cursor: pointer; text-decoration: none;
+    border-top: 3px solid transparent; border-bottom: none; border-left: none; border-right: none;
+    background: none; white-space: nowrap;
   }
-  /* 활성 탭은 색 + 굵기 + 밑줄 (색 단독 구분 금지 원칙) */
-  .tab-btn.active {
-    color: var(--primary-dark); font-weight: 700;   /* 작업220: 활성 탭 글자 대비 4.5:1 이상 */
-    text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px;
-  }
-  .tab-btn svg { width: 22px; height: 22px; }
-  .tab-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+  .bottom-nav-tab:hover:not(.active) { color: var(--text1); }
+  .bottom-nav-tab.active { color: var(--primary-dark); border-top-color: var(--primary); }
+  .bottom-nav-tab:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
+  @media (max-width: 460px) { .bottom-nav-tab { font-size: 13px; } }
 
-  /* ── 개념 정복 버튼 (작업173: digest_reading.html 344-367와 같은 모양) ── */
-  .conquest-bar {
-    position: fixed; bottom: var(--tab-height); left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: var(--content-max);
-    padding: 10px 16px;
-    background: var(--card);
-    border-top: 1px solid var(--border);
-    z-index: 150;
+  /* 정복 탭: 정복한 항목을 묶음별 텍스트 행(구분선)으로 모아 보기 */
+  #view-conq .content { padding: 20px 16px; }
+  .conq-title { font-size: 22px; font-weight: 700; color: var(--text1); margin-bottom: 4px; }
+  .conq-sub { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
+  .conq-group { margin-bottom: 20px; }
+  .conq-group-label { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--primary-dark); padding-bottom: 4px; border-bottom: 2px solid var(--primary); margin-bottom: 4px; }
+  .conq-row {
+    display: flex; align-items: center; width: 100%; min-height: var(--ctl-min-h); padding: 10px 0; text-align: left;
+    background: none; border: none; border-bottom: 1px solid var(--border); border-radius: 0; cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 500; color: var(--text1);
   }
-  /* 작업217-3: 정복 버튼은 박스 없이 글자. 정복 전 "정복하기"(--text2, 흰 바탕 4.83:1), 정복 후 "✓ 정복함"(코랄 계열 --coral-ink #b8442e 5.38:1, 굵게). 높이 44px 이상, aria-pressed로 상태 전달 */
+  .conq-group .conq-row:last-child { border-bottom: none; }
+  .conq-row:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .conq-row:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
+  .conq-empty { padding: 24px 0; font-size: 14px; color: var(--text2); }
+
+  /* 작업226-2: 정복 토글은 상세 화면 제목 줄 오른쪽(.screen-bar-end)에 둔다(하단 고정 바 없음). 박스 없는 글자: 정복 전 "정복하기"(--text2, 흰 바탕 4.83:1), 정복 후 "✓ 정복함"(코랄 계열 --coral-ink #b8442e 5.38:1, 굵게). 높이 44px 이상, aria-pressed로 상태 전달 */
   .conquest-btn {
-    min-height: var(--ctl-min-h); width: 100%; padding: 10px 0;
+    flex: none; min-height: var(--ctl-min-h); padding: 10px 8px; margin-right: -8px;
     border: none; border-radius: 0; background: transparent; cursor: pointer;
-    font-size: 15px; font-weight: 500;
+    font-size: 15px; font-weight: 500; white-space: nowrap;
     font-family: 'Noto Sans KR', sans-serif;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
     color: var(--text2);
   }
   .conquest-btn.conquered { color: var(--coral-ink); font-weight: 700; }
@@ -513,11 +520,9 @@
       </svg>
     </button>
     <h1 class="screen-bar-title one-line" id="science-bar-title"></h1>
+    <button class="conquest-btn screen-bar-end" id="conquest-btn" aria-pressed="false" onclick="toggleConquest()">정복하기</button>
   </div>
   <div class="content" id="science-content"></div>
-  <div class="conquest-bar">
-    <button class="conquest-btn" id="conquest-btn" aria-pressed="false" onclick="toggleConquest()">정복하기</button>
-  </div>
 </div>
 
 <!-- View 3: Quiz (작업174) -->
@@ -539,24 +544,23 @@
   <div class="content" id="result-content"></div>
 </div>
 
-<!-- Tab Bar (작업173) -->
-<div class="tab-bar">
-  <button class="tab-btn active" id="tab-concepts" onclick="goConceptsTab()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-      <polyline points="9 22 9 12 15 12 15 22"></polyline>
-    </svg>
-    홈
-  </button>
-  <button class="tab-btn disabled" id="tab-quiz" onclick="onQuizTab()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="10"></circle>
-      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-      <line x1="12" y1="17" x2="12.01" y2="17"></line>
-    </svg>
-    퀴즈
-  </button>
+<!-- 정복 탭: 정복한 개념 모아보기(localStorage 조회만) -->
+<div id="view-conq" class="view">
+  <div class="content">
+    <div class="conq-title">정복</div>
+    <div class="conq-sub" id="conq-sub"></div>
+    <div id="conq-list"></div>
+  </div>
 </div>
+
+<!-- 하단 내비 (작업226-2): 홈 / 정복 / 퀴즈 -->
+<nav id="bottom-nav" class="bottom-nav" aria-label="과학 읽기 메뉴">
+  <div class="bottom-nav-tabs">
+    <button type="button" class="bottom-nav-tab" id="nav-home" data-tab="home">홈</button>
+    <button type="button" class="bottom-nav-tab" id="nav-conq" data-tab="conq">정복</button>
+    <button type="button" class="bottom-nav-tab" id="nav-quiz" data-tab="quiz" aria-disabled="true">퀴즈</button>
+  </div>
+</nav>
 
 <script>
 // ── State ──
@@ -578,10 +582,13 @@ const FIELD_ORDER = ['물리', '화학', '생물', '지구과학'];
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  // 작업174: 퀴즈·결과 화면에서는 "퀴즈" 탭, 그 외에는 "개념" 탭이 활성
-  const inQuiz = id === 'view-quiz' || id === 'view-result';
-  document.getElementById('tab-concepts').classList.toggle('active', !inQuiz);
-  document.getElementById('tab-quiz').classList.toggle('active', inQuiz);
+  // 작업226-2: 활성 탭 — 홈 = 과목 선택·과목별 목록·개념 상세 / 정복 = 정복 모아보기 / 퀴즈 = 퀴즈·결과
+  const tab = (id === 'view-quiz' || id === 'view-result') ? 'quiz' : id === 'view-conq' ? 'conq' : 'home';
+  for (const b of document.querySelectorAll('#bottom-nav [data-tab]')) {
+    const on = b.dataset.tab === tab;
+    b.classList.toggle('active', on);
+    if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  }
 }
 
 // ── Conquest (작업173) ──
@@ -629,7 +636,7 @@ function toggleConquest() {
 
 // "퀴즈" 탭: 정복 개념이 1개 이상이면 disabled 해제(0개면 흐리게, 클릭은 가능)
 function updateTabQuizState() {
-  document.getElementById('tab-quiz').classList.toggle('disabled', getConqueredConcepts().length === 0);
+  document.getElementById('nav-quiz').setAttribute('aria-disabled', String(getConqueredConcepts().length === 0));   // 작업226-2: 0개여도 눌러 안내를 볼 수 있음(흐림 대신 aria-disabled)
 }
 
 // ── Quiz (작업174) ──
@@ -823,6 +830,54 @@ function buildQuestions(conquered) {
 
 // "퀴즈" 탭 (작업175 F2): 이미 퀴즈·결과 화면이면 아무 동작도 하지 않는다
 // (진행 중인 퀴즈가 새 문항으로 바뀌어 버리는 것을 막음). 그 외 화면은 새로 시작.
+// ── 하단 내비 (작업226-2) ──
+const CONQ_URL = '/science_reading.html?tab=conq';
+// 퀴즈 풀이 중: 한 문제라도 답했고 결과 화면 전
+const quizInProgress = () => document.getElementById('view-quiz').classList.contains('active')
+  && (quizState.score + quizState.wrong.length > 0 || quizState.currentIdx > 0 || quizState.answered);
+async function onTab(tab) {
+  const active = document.querySelector('.view.active').id;
+  if (tab === 'quiz') { onQuizTab(); return; }
+  if (active === (tab === 'home' ? 'view-subjects' : 'view-conq')) { window.scrollTo(0, 0); return; }   // 첫 화면 재클릭 = 맨 위로
+  if (quizInProgress() && !(await metisConfirm('퀴즈를 그만할까요? 지금까지의 답은 저장되지 않습니다.'))) return;
+  if (tab === 'home') goConceptsTab(); else goConq();
+}
+for (const b of document.querySelectorAll('#bottom-nav [data-tab]')) b.addEventListener('click', () => onTab(b.dataset.tab));
+
+// 정복 탭: 정복한 개념을 과목별로(localStorage 조회만)
+function renderConq() {
+  const list = getConqueredConcepts();
+  document.getElementById('conq-sub').textContent = list.length ? '정복한 개념 ' + list.length + '개' : '';
+  const box = document.getElementById('conq-list');
+  if (!list.length) { box.innerHTML = '<div class="conq-empty">아직 정복한 항목이 없어요</div>'; return; }
+  box.innerHTML = FIELD_ORDER.filter(f => list.some(c => c.field === f)).map(f => `
+    <div class="conq-group">
+      <div class="conq-group-label">${f}</div>
+      ${list.filter(c => c.field === f).map(c => `<button type="button" class="conq-row" data-concept-id="${c.id}" onclick="openConquered('${c.id}')">${c.title}</button>`).join('')}
+    </div>`).join('');
+}
+function renderAndShowConq() {
+  renderConq();
+  showView('view-conq');
+  window.scrollTo(0, 0);
+}
+function goConq() {
+  resetQuizState();
+  renderAndShowConq();
+  if (!_navFromPop) {
+    const cur = history.state && history.state.view;
+    if (cur === 'conq') history.replaceState({ view: 'conq' }, '', CONQ_URL); else history.pushState({ view: 'conq' }, '', CONQ_URL);
+  }
+}
+// 정복 목록의 행: 그 개념의 과목을 맞춰 두고 상세로(상세의 ‹ 는 기록상 직전 화면 = 정복 탭으로 돌아옴)
+function openConquered(id) {
+  const c = DB.concepts.find(x => x.id === id);
+  if (!c) return;
+  currentField = c.field;
+  renderFieldCarousel(currentField);
+  showScience(id);
+}
+
 function onQuizTab() {
   const active = document.querySelector('.view.active');
   if (active && (active.id === 'view-quiz' || active.id === 'view-result')) return;
@@ -1116,6 +1171,8 @@ window.addEventListener('popstate', e => {
       showResult();
     } else if (st.view === 'list' && st.field && fieldHasConcepts(st.field)) {
       renderAndShowFieldList(st.field);
+    } else if (st.view === 'conq') {
+      renderAndShowConq();
     } else {
       renderAndShowSubjects();
     }
@@ -1172,10 +1229,13 @@ async function loadDB() {
       return;
     }
 
-    // 히스토리 상태가 없는 첫 진입(또는 새로고침) - URL의 ?field= 로 판단
+    // 히스토리 상태가 없는 첫 진입(또는 새로고침) - URL의 ?field= / ?tab=conq 로 판단
     const params = new URLSearchParams(location.search);
     const f = params.get('field');
-    if (f && FIELD_ORDER.includes(f) && fieldHasConcepts(f)) {
+    if (params.get('tab') === 'conq' || (st && st.view === 'conq')) {
+      renderAndShowConq();
+      history.replaceState({ view: 'conq' }, '', CONQ_URL);
+    } else if (f && FIELD_ORDER.includes(f) && fieldHasConcepts(f)) {
       currentField = f;
       renderFieldCarousel(f);
       showView('view-list');
@@ -1634,7 +1694,7 @@ function showScience(conceptId) {
   if (!_navFromPop) {
     const cur = history.state && history.state.view;
     const state = { view: 'science', id: conceptId, field: currentField };
-    if (!cur || cur === 'list') history.pushState(state, '');
+    if (!cur || cur === 'list' || cur === 'conq') history.pushState(state, '');
     else history.replaceState(state, '');
   }
 }

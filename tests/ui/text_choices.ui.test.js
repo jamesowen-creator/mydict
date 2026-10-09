@@ -360,8 +360,9 @@ test('217-3 science·digest 정복 버튼(.conquest-btn): 박스 없음, 정복 
     assert.equal(await page.eval("document.getElementById('conquest-btn').textContent"), '정복하기');
     assert.equal(await page.eval("document.getElementById('conquest-btn').getAttribute('aria-pressed')"), 'false');
     assert.equal(await page.eval("Object.keys(localStorage).filter(k => /conquest_/.test(k) && localStorage.getItem(k) === 'true').length"), 0, '다시 누르면 해제');
-    // 정복 바(.conquest-bar)는 구조라서 유지: 위 선 + 흰 바탕
-    const bar = await page.eval(MEASURE('.conquest-bar')); assert.equal(bar.bw[0], '1px'); assert.notEqual(bar.bg, TRANSPARENT);
+    // 작업226-2: 하단 정복 바는 없어지고, 정복 토글은 상세 화면 제목 줄 오른쪽(.screen-bar-end)에 있다(옛 기대: .conquest-bar 위 선 1px + 흰 바탕)
+    assert.equal(await page.exists('.conquest-bar'), false, '하단 정복 바 없음');
+    assert.equal(await page.exists('.view.active .screen-bar #conquest-btn.screen-bar-end'), true, '정복 토글은 제목 줄 안');
     await done(page);
   }
 });

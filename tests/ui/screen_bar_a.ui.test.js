@@ -64,13 +64,13 @@ for (const [file, views] of Object.entries(VIEWS)) {
           const view = document.querySelector('.view.active');
           let el = view.querySelector('.content') || view;
           while (el.lastElementChild && el.lastElementChild.getBoundingClientRect().height > 0 && getComputedStyle(el.lastElementChild).position !== 'fixed') el = el.lastElementChild;
-          const tab = document.querySelector('.tab-bar').getBoundingClientRect();
+          const tab = document.querySelector('.bottom-nav').getBoundingClientRect();   // 작업226-2: 하단 탭바 → 하단 내비
           const cq = document.querySelector('.conquest-bar');
           const cqr = cq && getComputedStyle(cq).display !== 'none' && view.contains(cq) ? cq.getBoundingClientRect() : null;
           return { lastBottom: el.getBoundingClientRect().bottom, tabTop: tab.top, tabW: Math.round(tab.width), cqTop: cqr ? cqr.top : null, bodyW: Math.round(document.body.getBoundingClientRect().width) };
         })()`);
         assert.ok(m.lastBottom <= m.tabTop + 1, label + ': 마지막 내용이 하단 탭에 가림 ' + JSON.stringify(m));
-        if (v.conquest) assert.ok(m.cqTop !== null && m.lastBottom <= m.cqTop + 1, label + ': 마지막 내용이 정복 바에 가림 ' + JSON.stringify(m));
+        if (v.conquest) assert.equal(m.cqTop, null, label + ': 정복 바는 없어짐(작업226-2: 정복 토글은 제목 줄 오른쪽으로 이동)');
         assert.ok(m.tabW <= 680, label + ': 하단 탭 최대 폭 680px ' + m.tabW);
         assert.equal(m.tabW, m.bodyW, label + ': 하단 탭 폭이 본문 폭과 같음');
         assert.equal(await page.hasHorizontalScroll(), false, label + ': 가로 스크롤 없음');

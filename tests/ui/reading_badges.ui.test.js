@@ -199,7 +199,7 @@ test('유지(변환 금지): literature의 사조 칩·타임라인 칩·탭, sc
   let page = await open('literature_compass');
   const bar = await must(page, '.tl-bar');
   assert.equal(bar.radius, '8px'); assert.notEqual(bar.bg, TRANSPARENT); assert.equal(bar.cursor, 'pointer');
-  for (const sel of ['.genre-tab', '.tab-btn']) await must(page, sel);
+  for (const sel of ['.genre-tab', '.bottom-nav-tab']) await must(page, sel);
   // .movement-pill을 만드는 renderPills는 현재 홈 화면에서 호출되지 않는다(타임라인 renderTimeline만 씀). CSS가 그대로인지 직접 렌더해서 확인.
   // 같은 컨테이너(#pills-<시대>)를 쓰므로 타임라인 막대 측정을 마친 뒤에 렌더한다
   await page.eval("(() => { const era = DB.eras[0]; if (!document.getElementById('pills-' + era.id)) throw new Error('pills 컨테이너 없음'); renderPills(era, '전체'); })()");
