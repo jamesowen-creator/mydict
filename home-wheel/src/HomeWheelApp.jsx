@@ -12,7 +12,6 @@ const OPTIONS = [
   { id: 'science', name: '과학', description: '오해를 바로잡는 과학 상식', url: '/science_reading.html' },
   { id: 'voice', name: '음성 학습', description: '소리 내어 읽은 공부를 글과 요약으로', url: '/voice_study.html' },
   { id: 'concept', name: '개념학습', description: '개념 하나에서 시작해 한 걸음씩 넓히기', url: '/concept_study.html' },
-  { id: 'metacong', name: 'MetaCong', description: '한국사·세계사 음성 학습 퀴즈', url: '/metacong/' },
 ];
 
 export default function HomeWheelApp() {

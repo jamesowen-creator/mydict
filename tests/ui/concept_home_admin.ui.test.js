@@ -24,9 +24,9 @@ test('홈 메뉴: 개념학습 항목이 음성 학습 다음에 있고, 가운�
   srv.reset();
   const page = await browser.newPage({ width: 390, height: 844, token: null });
   await page.goto(srv.url + '/');
-  await page.waitFor("document.querySelectorAll('[role=option]').length >= 7", 8000);
+  await page.waitFor("document.querySelectorAll('[role=option]').length >= 6", 8000);
   const labels = await page.eval("[...document.querySelectorAll('[role=option]')].map(o => o.getAttribute('aria-label').split(' — ')[0])");
-  assert.deepEqual(labels, ['언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '개념학습', 'MetaCong']);
+  assert.deepEqual(labels, ['언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '개념학습']);   // 작업227-13: MetaCong 항목 제거
   assert.match(await page.eval("document.querySelectorAll('[role=option]')[5].getAttribute('aria-label')"), /개념 하나에서 시작해 한 걸음씩 넓히기/);
   await page.eval("document.querySelector('[role=listbox]').focus()");
   for (let i = 0; i < 5; i++) {
