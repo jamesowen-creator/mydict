@@ -332,20 +332,20 @@ test('221 (h) 결과 화면: 큰 점수 42px/700/#b8442e(사전은 글꼴 유지
 });
 
 // ───────────────────────── (i) 하단 탭 ─────────────────────────
-test('222 (i) 하단 탭: 문학·과학·한입 첫 탭 라벨 "홈", 둘째 탭 "퀴즈", 퀴즈 풀이 중 "퀴즈" 탭이 활성', { skip: SKIP }, async () => {
-  const tabs = p => p.eval("[...document.querySelectorAll('.tab-bar .tab-btn')].map(b => ({ text: b.textContent.trim(), active: b.classList.contains('active') }))");
+test('222 (i) 하단 내비(작업226-2 갱신): 문학 홈/퀴즈/사전, 과학·한입 홈/정복/퀴즈, 퀴즈 풀이 중 "퀴즈" 탭이 활성', { skip: SKIP }, async () => {
+  const tabs = p => p.eval("[...document.querySelectorAll('.bottom-nav .bottom-nav-tab')].map(b => ({ text: b.textContent.trim(), active: b.classList.contains('active') }))");
   let page = await openReading('literature_compass');
-  assert.deepEqual((await tabs(page)).map(t => t.text), ['홈', '퀴즈']);
+  assert.deepEqual((await tabs(page)).map(t => t.text), ['홈', '퀴즈', '사전']);
   await step(page, LIT_MCQ);
-  assert.deepEqual(await tabs(page), [{ text: '홈', active: false }, { text: '퀴즈', active: true }], '문학 퀴즈 중 퀴즈 탭 활성');
+  assert.deepEqual(await tabs(page), [{ text: '홈', active: false }, { text: '퀴즈', active: true }, { text: '사전', active: false }], '문학 퀴즈 중 퀴즈 탭 활성');
   await step(page, LIT_RESULT);
   assert.equal((await tabs(page))[1].active, true, '문학 결과 화면에서도 퀴즈 탭 활성');
   await done(page);
   for (const file of ['science_reading', 'digest_reading']) {
     page = await openReading(file);
-    assert.deepEqual((await tabs(page)).map(t => t.text), ['홈', '퀴즈'], file);
+    assert.deepEqual((await tabs(page)).map(t => t.text), ['홈', '정복', '퀴즈'], file);
     await step(page, READ_QUIZ(MCQ_Q));
-    assert.deepEqual(await tabs(page), [{ text: '홈', active: false }, { text: '퀴즈', active: true }], file + ' 퀴즈 중 퀴즈 탭 활성');
+    assert.deepEqual(await tabs(page), [{ text: '홈', active: false }, { text: '정복', active: false }, { text: '퀴즈', active: true }], file + ' 퀴즈 중 퀴즈 탭 활성');
     await done(page);
   }
 });
