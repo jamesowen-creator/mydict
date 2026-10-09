@@ -25,7 +25,7 @@ const ALLOW = [
   ['.flip-card, .flip-card-front, .flip-card-back', '문학 작품 카드: 카드 모양이 뒤집기 동작 단서'],
   ['dialog', '대화상자 계열(.vm-sheet, .vm-subject, .map-sheet 등): 모달 경계'],
   ['.vm-box, .vm-card, .map-box', '지도 영역(드래그 경계)과 지도 위 카드'],
-  ['.tab-bar, .bottom-bar, .conquest-bar', '구조 막대(하단 탭·입력·정복 바)'],
+  ['.tab-bar, .bottom-bar, .conquest-bar, .bottom-nav', '구조 막대(하단 탭·입력·정복 바, 작업224-2: 음성 학습 하단 내비 — 사전 하단 내비와 같은 윗선·그림자)'],
   ['.chat-input-bar', '입력창 줄(입력 필드 영역)'],
   // 진행 표시·스피너 등 구조·장식
   ['.spinner', '로딩 스피너'],

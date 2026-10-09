@@ -27,6 +27,7 @@ function freshState() {
     quizAnswers: [],    // 돌아보기 퀴즈 답안 기록(POST .../review/answer)
     voiceMap: { nodes: [], links: [], built_at: null, nextId: 100 },   // 음성 학습 자료 연결 지도(작업214-4)
     voiceBuild: { dry: { total_notes: 0, eligible_notes: 3, targets: 3, est_calls: 3, max_per_run: 50, carry_over: 0, daily_link_remaining: 27, est_input_chars: 12000, est_cost_note: '추정입니다. 상한 값은 약 $0.012이며 실제 비용은 이보다 적을 수 있습니다.' }, dryError: null, error: null, statusSeq: [], statusIdx: 0, willProcess: 3 },
+    voiceQuizSummary: [], voiceWrong: [], voiceQuizzes: {},   // 작업224-2: 퀴즈 탭(GET quiz-summary·wrong-answers)과 자료별 저장 퀴즈(id → 문제 배열)
     voiceNotes: [],     // 음성 학습 자료 목록(GET /api/voice-notes). 상세(GET /api/voice-notes/:id)도 같은 배열에서 찾는다(작업215-2)
     adminUsers: [],     // 관리자 화면 테스트용 사용자 목록(GET/PATCH /api/admin/users)
     networkDown: false, // true면 explore 요청의 연결을 끊음
@@ -90,6 +91,8 @@ async function startMockServer() {
     }
     if (u === '/api/me') return state.authed ? J(200, state.me) : J(401, { error: 'no' });
     if (!state.authed) return J(401, { error: '로그인이 필요합니다.' });
+    if (u === '/api/voice-notes/quiz-summary' && m === 'GET') return J(200, state.voiceQuizSummary);   // 작업224-2
+    if (u === '/api/voice-notes/wrong-answers' && m === 'GET') return J(200, state.voiceWrong);
     if (u === '/api/voice-notes' && m === 'GET') return J(200, state.voiceNotes);   // 작업196: 음성 학습 목록 화면 테스트용
     // 작업214-4: 음성 학습 자료 연결 지도(routes/voice_study.js 214-2의 응답 형태를 따른다)
     if (u.startsWith('/api/voice-notes/map') || u === '/api/voice-notes/links' || u.startsWith('/api/voice-notes/links/')) {
@@ -155,7 +158,8 @@ async function startMockServer() {
         });
         return J(200, { status: rows.length ? 'ready' : 'none', links: rows, keywords: [] });
       }
-      if (vn[2]) return J(404, { error: '없음' });   // 퀴즈·그림은 아직 없는 자료
+      if (vn[2] === 'quiz') { const qz = state.voiceQuizzes[note.id]; return qz ? J(200, { questions: qz }) : J(404, { error: '없음' }); }   // 작업224-2: 저장된 퀴즈가 있는 자료
+      if (vn[2]) return J(404, { error: '없음' });   // 그림은 아직 없는 자료
       return J(200, {
         id: note.id, title: note.title || '', transcript: note.transcript || '', summary: note.summary || '', subject: note.subject || null,
         subject_detail: note.subject_detail || null, created_at: note.created_at || '2026-01-01T00:00:00Z', updated_at: note.updated_at || note.created_at || '2026-01-01T00:00:00Z',

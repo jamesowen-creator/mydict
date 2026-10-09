@@ -203,7 +203,7 @@ test('대화 입력(#chat-input)은 그대로: 안쪽 스크롤·크기 조절 �
   assert.equal(out.hasClass, false);
   assert.equal(out.offset, out.before, '내용이 길어져도 칸 높이가 그대로(안쪽 스크롤로 처리)');
   assert.equal(out.minHeight, '72px');
-  assert.deepEqual([out.position, out.bottom], ['sticky', '0px']);
+  assert.deepEqual([out.position, out.bottom], ['sticky', '78px']);   // 작업224-2: 하단 내비(78px) 위에 붙음(옛 기대: 0px)
   await page.close();
 });
 

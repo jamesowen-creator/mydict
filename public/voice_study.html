@@ -49,6 +49,37 @@
     overflow-x: hidden;
   }
 
+  /* ── 작업224-2: 하단 내비(탭 5개). 사전(english_dictionary.html)의 하단 내비와 같은 구조·크기 — 색은 이 화면의 팔레트(라벨 --text2, 활성 --primary-dark + 위쪽 3px 코랄 선) ── */
+  :root { --navbar-h: 78px; }
+  #app { padding-bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom) + 16px); }
+  .bottom-nav {
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -2px 8px rgba(226,88,59,0.07);
+    padding: 0 16px max(8px, env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 0;
+    position: fixed;
+    left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--content-max);
+    bottom: 0; z-index: 100;
+    min-height: var(--navbar-h);
+  }
+  .bottom-nav-tabs { display: flex; flex: 1; gap: 0; }
+  .bottom-nav-tab {
+    display: flex; flex-direction: row; align-items: baseline; justify-content: center; gap: 2px;
+    flex: 1 1 0; min-width: 0; min-height: var(--ctl-min-h);
+    padding: 10px 0;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 500; line-height: normal;
+    color: var(--text2); cursor: pointer;
+    border-top: 3px solid transparent; border-bottom: none; border-left: none; border-right: none;
+    background: none; white-space: nowrap;
+  }
+  .bottom-nav-tab:hover:not(.active) { color: var(--text1); }
+  .bottom-nav-tab.active { color: var(--primary-dark); border-top-color: var(--primary); }
+  .bottom-nav-tab:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
+  @media (max-width: 460px) {
+    .bottom-nav-tab { font-size: 13px; }
+  }
+
   /* ── Loading ── */
   #loading {
     position: fixed; inset: 0;
@@ -266,7 +297,7 @@
   /* 작업217-2: 근거 경고 문구는 박스 없이 작은 보조색 글자(--text2는 흰 말풍선 위 4.83:1) */
   .bubble .b-warn { margin-top: 8px; font-size: 12px; font-weight: 500; color: var(--text2); line-height: 1.5; }
   .bubble.loading { display: flex; align-items: center; gap: 10px; color: var(--text2); }
-  .chat-input-bar { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0 4px; margin-top: 16px; }
+  .chat-input-bar { position: sticky; bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom));   /* 작업224-2: 하단 내비 위에 붙음 */ background: var(--bg); padding: 12px 0 4px; margin-top: 16px; }
   .chat-input-bar textarea { min-height: 72px; }
   .chat-input-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
   .chat-input-row .counter { margin: 0; }
@@ -672,6 +703,15 @@
     </div>
   </div>
 
+  <!-- 작업224-2: 퀴즈 탭 — 퀴즈를 만들 수 있는 자료 목록(조회만 하며 AI를 부르지 않음) -->
+  <div id="view-qlist" class="view">
+    <div class="view-title">퀴즈</div>
+    <div class="view-sub">자료를 고르면 저장된 퀴즈를 바로 풀 수 있어요. 퀴즈가 없으면 자료 화면에서 직접 만들 수 있어요.</div>
+    <div id="qlist-filter" class="kw-chips" role="group" aria-label="과목 필터"></div>
+    <div id="qlist-msg" class="msg"></div>
+    <div id="qlist-list"></div>
+  </div>
+
   <!-- ⑧ 오답 노트 -->
   <div id="view-wrong" class="view">
     <div class="view-title">오답 노트</div>
@@ -679,6 +719,17 @@
     <div id="wrong-msg" class="msg"></div>
     <div id="wrong-list"></div>
   </div>
+
+  <!-- 작업224-2: 하단 내비(숨기지 않음). 지도는 화면 전환 없이 과목 선택 팝업만 연다 -->
+  <nav id="bottom-nav" class="bottom-nav" aria-label="음성 학습 메뉴">
+    <div class="bottom-nav-tabs">
+      <button type="button" class="bottom-nav-tab" id="nav-record" data-tab="record">녹음</button>
+      <button type="button" class="bottom-nav-tab" id="nav-notes" data-tab="notes">자료</button>
+      <button type="button" class="bottom-nav-tab" id="nav-quiz" data-tab="quiz">퀴즈</button>
+      <button type="button" class="bottom-nav-tab" id="nav-wrong" data-tab="wrong">오답</button>
+      <button type="button" class="bottom-nav-tab" id="nav-map" data-tab="map">지도</button>
+    </div>
+  </nav>
 </div>
 
 <!-- 작업214-3: 자료 연결 지도(과목별 팝업)와 과목 선택 -->
@@ -794,7 +845,7 @@ let editNoteId = null;
 let editDirty = false;
 let pending = null;       // { blob, seconds, mime } - 변환 전/실패 시 메모리에만 유지
 
-const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료', quiz: '퀴즈', chat: '질문하기', merge: '자료 합치기', wrong: '오답 노트' };
+const TITLES = { list: '음성 학습', record: '새로 녹음', edit: '자료', quiz: '퀴즈', chat: '질문하기', merge: '자료 합치기', wrong: '오답 노트', qlist: '퀴즈' };
 // ── 작업215-2: 원문·요약·추가하지 못한 변환 결과 칸 자동 높이 ──
 // el.style.height = 'auto' 후 scrollHeight로 맞춘다. min-height(CSS)는 그대로 유지된다.
 // 숨겨진 화면(display:none)에서는 scrollHeight가 0이라 건너뛰고, 그 화면이 보이게 될 때(showView) 다시 맞춘다.
@@ -865,11 +916,12 @@ function showView(name) {
   if (name === 'edit') resumeImagePolling();
   if (name !== 'chat') chatSession++;   // 작업186: 대화 화면을 떠나면 늦게 오는 답변은 무시
   currentView = name;
-  for (const v of ['list', 'record', 'edit', 'quiz', 'chat', 'merge', 'wrong']) $('view-' + v).classList.toggle('active', v === name);
+  for (const v of ['list', 'record', 'edit', 'quiz', 'chat', 'merge', 'wrong', 'qlist']) $('view-' + v).classList.toggle('active', v === name);
   $('page-title').textContent = TITLES[name];
   $('subbar').style.display = name === 'list' ? 'none' : '';
   // 작업222: 녹음 전송 안내는 녹음·목록·상세 화면에서만 보이고, 퀴즈·대화 등 다른 화면에서는 숨긴다
   $('notice-wrap').style.display = (name === 'list' || name === 'record' || name === 'edit') ? '' : 'none';
+  updateNav();
   autoGrowAll();   // 작업215-2: 숨겨져 있던 화면의 칸은 이제 보이므로 높이를 맞춘다
   window.scrollTo(0, 0);
 }
@@ -907,6 +959,7 @@ function resetRecording() {
   setMsg('rec-msg', '');
 }
 function toList() {
+  quizOrigin = false;
   recTarget = 'new';
   exitSelectMode();
   resetRecording();
@@ -923,7 +976,7 @@ window.addEventListener('popstate', () => {
   if (vmapHandlePop()) return;   // 작업214-3: 지도 팝업이 쌓은 기록이면 팝업만 닫고 화면은 유지
   if (currentView === 'list') return;
   if (currentView === 'quiz' || currentView === 'chat') { showView('edit'); return; }   // 작업185·186: 퀴즈·대화에서 뒤로가기 → 자료 상세로 복귀
-  if (currentView === 'merge' || currentView === 'wrong') { showView('list'); return; }   // 작업192·193: 합치기 창·오답 노트에서 뒤로가기 → 목록
+  if (currentView === 'merge' || currentView === 'wrong' || currentView === 'qlist') { showView('list'); return; }   // 작업192·193: 합치기 창·오답 노트에서 뒤로가기 → 목록
   if (currentView === 'record' && recTarget === 'append') {   // 작업191: 이어서 녹음에서 뒤로가기 → 자료 상세로 복귀(입력 내용 유지)
     if (!leaveConfirmed()) { history.pushState({ v: currentView }, ''); return; }
     resetRecording();
@@ -932,6 +985,11 @@ window.addEventListener('popstate', () => {
   }
   if (!leaveConfirmed()) {
     history.pushState({ v: currentView }, '');   // 방금 pop된 항목을 되돌려 현재 화면 유지
+    return;
+  }
+  if (currentView === 'edit' && quizOrigin) {   // 작업224-2: 퀴즈 탭에서 들어간 자료 상세에서 뒤로가기 → 퀴즈 탭
+    editDirty = false; quizOrigin = false;
+    showView('qlist'); loadQuizTab();
     return;
   }
   toList();
@@ -1096,6 +1154,127 @@ async function loadWrong() {
   }
 }
 $('wrong-btn').addEventListener('click', () => { go('wrong'); loadWrong(); });
+
+// ── 작업224-2: 하단 내비 ──
+// 활성 탭: 자료 = 목록·자료 상세·질문하기·합치기·이어서 녹음 / 퀴즈 = 퀴즈 탭·퀴즈 풀이·퀴즈 탭에서 들어간 상세 / 녹음 = 새 녹음 / 오답 = 오답 노트. 지도는 팝업이라 활성 표시가 없다.
+function activeTab() {
+  if (currentView === 'record') return recTarget === 'append' ? 'notes' : 'record';
+  if (currentView === 'qlist' || currentView === 'quiz') return 'quiz';
+  if (currentView === 'edit' || currentView === 'chat') return quizOrigin ? 'quiz' : 'notes';
+  if (currentView === 'wrong') return 'wrong';
+  return 'notes';
+}
+function updateNav() {
+  const a = activeTab();
+  for (const b of document.querySelectorAll('#bottom-nav .bottom-nav-tab')) {
+    const on = b.dataset.tab === a;
+    b.classList.toggle('active', on);
+    if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  }
+}
+// 각 탭의 첫 화면에 있는지(활성 탭을 다시 누르면 맨 위로 + 새로고침)
+function atTabRoot(tab) {
+  return (tab === 'record' && currentView === 'record' && recTarget === 'new') || (tab === 'notes' && currentView === 'list')
+    || (tab === 'quiz' && currentView === 'qlist') || (tab === 'wrong' && currentView === 'wrong');
+}
+// 한 문제라도 답했고 결과 화면 전인 퀴즈 풀이 중
+const quizInProgress = () => currentView === 'quiz' && quizState.answers.length > 0 && $('quiz-result').style.display === 'none';
+// 탭 전환은 기록을 쌓지 않고 교체한다(목록에서 처음 나갈 때만 쌓음)
+function tabShow(view) {
+  if (currentView === 'list') history.pushState({ v: view }, ''); else history.replaceState({ v: view }, '');
+  showView(view);
+}
+async function onTab(tab) {
+  if (tab === 'map') {   // 팝업만 연다(확인·화면 전환 없음)
+    if (currentView !== 'list' && !listRows.some(r => r.subject && Object.prototype.hasOwnProperty.call(SUBJECTS, r.subject))) { metisAlert('과목이 지정된 자료가 없어 지도를 볼 수 없습니다. 자료에 과목을 지정해 주세요.'); return; }
+    vmapChooseSubject();
+    return;
+  }
+  if (activeTab() === tab) {
+    if (tab === 'record' && recState === 'recording') return;   // 녹음 중에는 무동작
+    if (atTabRoot(tab)) {   // 첫 화면: 맨 위로 + 새로고침
+      window.scrollTo(0, 0);
+      if (tab === 'notes') loadList(); else if (tab === 'quiz') loadQuizTab(); else if (tab === 'wrong') loadWrong();
+      return;
+    }
+  }
+  if (!leaveConfirmed()) return;
+  if (quizInProgress() && !(await metisConfirm('퀴즈를 그만할까요? 지금까지의 답은 저장되지 않습니다.'))) return;
+  exitSelectMode(); editDirty = false; quizOrigin = false;
+  if (tab === 'record') {
+    recTarget = 'new';
+    resetRecording();
+    $('rec-hint').style.display = (navigator.wakeLock && navigator.wakeLock.request) ? 'none' : '';
+    tabShow('record');
+    return;
+  }
+  recTarget = 'new'; resetRecording();
+  if (tab === 'notes') { tabShow('list'); loadList(); }
+  else if (tab === 'quiz') { tabShow('qlist'); loadQuizTab(); }
+  else if (tab === 'wrong') { tabShow('wrong'); loadWrong(); }
+}
+for (const b of document.querySelectorAll('#bottom-nav .bottom-nav-tab')) b.addEventListener('click', () => onTab(b.dataset.tab));
+
+// ── 작업224-2: 퀴즈 탭 — GET 조회(quiz-summary, wrong-answers)만 하며 AI를 부르지 않는다 ──
+let qSummary = [], qWrongCount = new Map(), qFilter = null;
+async function loadQuizTab() {
+  setMsg('qlist-msg', '');
+  let rows;
+  try { rows = await api('GET', '/api/voice-notes/quiz-summary'); }
+  catch (e) { setMsg('qlist-msg', e.message, 'error'); return; }
+  let wrong = [];
+  try { const w = await api('GET', '/api/voice-notes/wrong-answers'); if (Array.isArray(w)) wrong = w; } catch (e) { /* 오답 수만 빠진다 */ }
+  if (currentView !== 'qlist') return;
+  qSummary = Array.isArray(rows) ? rows : [];
+  qWrongCount = new Map();
+  for (const w of wrong) qWrongCount.set(w.note_id, (qWrongCount.get(w.note_id) || 0) + 1);
+  renderQuizTab();
+}
+function quizTabLine(r) {
+  if (!r.has_quiz) return '퀴즈 없음';
+  if (!r.attempts) return '아직 풀지 않음';
+  return '최근 ' + r.last_score + '/' + r.last_total + ' · ' + r.attempts + '회 · 오답 ' + (qWrongCount.get(r.note_id) || 0);
+}
+function renderQuizTab() {
+  const subjects = Object.keys(SUBJECTS).filter(sj => qSummary.some(r => r.subject === sj));
+  if (qFilter && !subjects.includes(qFilter)) qFilter = null;
+  const bar = $('qlist-filter');
+  bar.textContent = '';
+  bar.style.display = subjects.length ? '' : 'none';
+  for (const sj of [null, ...subjects]) {
+    const c = document.createElement('button'); c.type = 'button'; c.className = 'kw-chip' + (qFilter === sj ? ' on' : '');
+    c.textContent = sj || '전체'; c.setAttribute('aria-pressed', String(qFilter === sj)); c.dataset.subject = sj || '';
+    c.addEventListener('click', () => { qFilter = sj; renderQuizTab(); });
+    bar.appendChild(c);
+  }
+  const list = $('qlist-list');
+  list.textContent = '';
+  const rows = qSummary.filter(r => !qFilter || r.subject === qFilter);
+  if (!rows.length) {
+    const d = document.createElement('div'); d.className = 'empty-state';
+    d.textContent = qSummary.length ? '이 과목에는 퀴즈를 만들 수 있는 자료가 없습니다.' : '퀴즈를 만들 수 있는 자료가 아직 없습니다. 원문이 공백을 뺀 150자 이상이어야 합니다.';
+    list.appendChild(d);
+    return;
+  }
+  for (const r of rows) {
+    const body = document.createElement('div');
+    const t = document.createElement('div'); t.className = 'note-title' + (r.title ? '' : ' empty'); t.textContent = r.title || '(제목 없음)'; body.appendChild(t);
+    if (r.subject) { const sj = document.createElement('div'); sj.className = 'note-subj'; sj.textContent = r.subject; body.appendChild(sj); }
+    const ln = document.createElement('div'); ln.className = 'note-sum'; ln.dataset.t = 'qlist-line'; ln.textContent = quizTabLine(r); body.appendChild(ln);
+    const item = document.createElement('button'); item.type = 'button'; item.className = 'note-item'; item.dataset.noteId = String(r.note_id);
+    item.appendChild(body);
+    item.addEventListener('click', () => openFromQuizTab(r.note_id));
+    list.appendChild(item);
+  }
+}
+// 자료 상세를 열고, 저장된 유효 퀴즈가 있고 원문이 안 바뀐 경우에만 기존 퀴즈 풀이로 바로 들어간다(없으면 상세에 머묾 — 만들기는 사용자가 직접)
+async function openFromQuizTab(id) {
+  await openDetail(id, 'qtab');
+  if (editNoteId !== id || currentView !== 'edit') return;
+  if (quizLoadP) await quizLoadP;
+  if (editNoteId !== id || currentView !== 'edit') return;
+  if (quizData && normNl($('edit-text').value) === quizLoadedText) $('quiz-play').click();
+}
 
 // ── 자료 합치기 창 ──
 let mergeOrder = [], mergeTitleTouched = false, mergeBusy = false;
@@ -1465,6 +1644,7 @@ function resetSummaryUi() {
   setMsg('sum-msg', '');
 }
 function openEditNew(text) {
+  quizOrigin = false;
   editMode = 'new'; editNoteId = null;
   resetSummaryUi();
   resetQuizState('');
@@ -1481,15 +1661,16 @@ function openEditNew(text) {
   pending = null;
   showView('edit');
 }
-async function openDetail(id, fromLink) {   // fromLink: true = 연결·원본으로 이동, 'merge' = 합치기 직후(오류는 합치기 창에 표시)
+async function openDetail(id, fromLink) {   // fromLink: true = 연결·원본으로 이동, 'merge' = 합치기 직후(오류는 합치기 창에 표시), 'qtab' = 퀴즈 탭에서 열기(기록은 일반 열기처럼 쌓아 뒤로가기가 퀴즈 탭으로 오게 함, 오류는 퀴즈 탭에 표시)
   setMsg('list-msg', '');
   let n;
   try { n = await api('GET', '/api/voice-notes/' + id); }
-  catch (e) { setMsg(fromLink === 'merge' ? 'merge-msg' : fromLink === 'wrong' ? 'wrong-msg' : fromLink ? 'link-msg' : 'list-msg', e.message, 'error'); return; }
+  catch (e) { setMsg(fromLink === 'merge' ? 'merge-msg' : fromLink === 'wrong' ? 'wrong-msg' : fromLink === 'qtab' ? 'qlist-msg' : fromLink ? 'link-msg' : 'list-msg', e.message, 'error'); return; }
   editMode = 'detail'; editNoteId = n.id;
+  quizOrigin = fromLink === 'qtab';
   resetSummaryUi();
   resetQuizState(n.transcript || '');
-  loadQuiz(n.id, editSession);
+  quizLoadP = loadQuiz(n.id, editSession);
   $('edit-summary').value = n.summary || '';
   setSubject(n.subject, n.subject_detail);
   setStale(!!n.summary_stale);
@@ -1502,7 +1683,7 @@ async function openDetail(id, fromLink) {   // fromLink: true = 연결·원본�
   setMsg('edit-msg', '');
   updateCounter();
   editDirty = false;
-  if (fromLink) { history.replaceState({ v: 'edit' }, ''); showView('edit'); }   // 연결로 이동할 때는 기록을 쌓지 않아 뒤로가기가 목록으로 간다
+  if (fromLink && fromLink !== 'qtab') { history.replaceState({ v: 'edit' }, ''); showView('edit'); }   // 연결로 이동할 때는 기록을 쌓지 않아 뒤로가기가 목록으로 간다
   else go('edit');
   startLinks(n.id, editSession);
   startImage(n.id, editSession, !!(n.summary || '').trim());
@@ -2043,6 +2224,8 @@ if (ttsSupported()) {
 })();
 
 // ── 퀴즈 (작업185): 서버가 원문 근거를 검증해 저장한 4지선다를 풀어 본다. 점수·답은 저장하지 않는다 ──
+let quizOrigin = false;        // 작업224-2: 지금 보는 자료 상세를 퀴즈 탭에서 열었는지(하단 내비의 활성 탭·뒤로가기 대상)
+let quizLoadP = null;          // 저장된 퀴즈 조회(GET) 진행 상태 — 퀴즈 탭에서 바로 풀기 전에 기다림
 let quizData = null;           // 저장된 퀴즈 문제 배열(없으면 null)
 let quizChecking = false;      // 저장된 퀴즈가 있는지 확인 중
 let quizBusy = false;          // 퀴즈 생성 중
