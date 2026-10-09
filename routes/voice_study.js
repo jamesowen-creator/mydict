@@ -137,6 +137,37 @@ router.get('/api/voice-notes', guard, async (req, res) => {
 // 작업193-3: '/api/voice-notes/:id'보다 먼저 등록해야 'wrong-answers'가 :id로 잡히지 않는다
 router.get('/api/voice-notes/wrong-answers', guard, wrongAnswersHandler);
 
+// 작업224-2: 퀴즈 탭용 읽기 전용 요약. 자료별로 저장된 퀴즈가 아직 유효한지(원문 해시 일치, 목록 API의 LIST_STALE_SQL과 같은 방식),
+// 시도 횟수, 최근 점수를 한 번에 돌려준다. DB 조회만 하고 AI는 호출하지 않는다. 퀴즈를 만들 수 있는 자료(공백 제외 150자 이상)만 담는다.
+// '/api/voice-notes/:id'보다 먼저 등록해야 'quiz-summary'가 :id로 잡히지 않는다.
+const QUIZ_SUMMARY_NOTES_SQL = `SELECT n.id, n.title, n.subject, n.created_at,
+  char_length(regexp_replace(COALESCE(n.transcript, ''), '\\s', '', 'g')) AS chars_nospace,
+  (q.note_id IS NOT NULL AND q.source_hash = encode(sha256(convert_to(COALESCE(n.transcript, ''), 'UTF8')), 'hex')) AS has_quiz
+  FROM voice_notes n LEFT JOIN voice_quizzes q ON q.note_id = n.id AND q.user_id = n.user_id
+  WHERE n.user_id = $1 ORDER BY n.created_at DESC, n.id DESC`;
+const QUIZ_SUMMARY_ATTEMPTS_SQL = `SELECT note_id, COUNT(*)::int AS attempts,
+  (ARRAY_AGG(score ORDER BY created_at DESC, id DESC))[1] AS last_score,
+  (ARRAY_AGG(total ORDER BY created_at DESC, id DESC))[1] AS last_total,
+  MAX(created_at) AS last_at
+  FROM voice_quiz_attempts WHERE user_id = $1 GROUP BY note_id`;
+router.get('/api/voice-notes/quiz-summary', guard, async (req, res) => {
+  try {
+    const [notes, attempts] = await Promise.all([
+      pool.query(QUIZ_SUMMARY_NOTES_SQL, [req.user.id]),
+      pool.query(QUIZ_SUMMARY_ATTEMPTS_SQL, [req.user.id]),
+    ]);
+    const byNote = new Map(attempts.rows.map(a => [a.note_id, a]));
+    res.json(notes.rows.filter(n => n.chars_nospace >= QUIZ_MIN_SOURCE_CHARS).map(n => {
+      const a = byNote.get(n.id);
+      return { note_id: n.id, title: n.title || '', subject: n.subject || null, has_quiz: !!n.has_quiz,
+        attempts: a ? a.attempts : 0, last_score: a ? a.last_score : null, last_total: a ? a.last_total : null, last_at: a ? a.last_at : null };
+    }));
+  } catch (err) {
+    console.error('voice-notes quiz-summary error:', err.message);
+    res.status(500).json(SERVER_ERROR);
+  }
+});
+
 // ─── 작업214-2: 자료 연결 지도(조회·편집·그리기) ─────────────────────────────────────────
 // 이 라우트들은 '/api/voice-notes/:id'보다 먼저 등록해야 'map'·'links'가 자료 번호로 해석되지 않는다.
 // 조회·편집 API는 Anthropic을 부르지 않는다. AI를 쓰는 것은 지도 그리기(build)뿐이며, 기존 연결 분석(analyzeLinks)을 그대로 쓴다.

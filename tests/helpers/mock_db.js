@@ -11,6 +11,9 @@ const TABLE_DEFAULTS = {
   users: () => ({ is_blocked: false, perm_concept_study: true, perm_voice_study: true }),
   // 작업214-2: 음성 학습 자료·연결(자료 연결 지도 테스트용)
   voice_notes: () => ({ title: '', transcript: '', summary: null, subject: null, subject_detail: null, link_hash: null, keywords: null, merged_from: null, created_at: new Date(), updated_at: new Date() }),
+  // 작업224-2: 퀴즈 요약 API 테스트용(저장된 퀴즈·시도 기록)
+  voice_quizzes: () => ({ created_at: new Date() }),
+  voice_quiz_attempts: () => ({ items: [], created_at: new Date() }),
   voice_links: () => ({ kind: 'grounded', relation: null, quote_from: '', quote_to: '', source: 'ai', user_edited: false, hidden: false, created_at: new Date() }),
   concept_studies: () => ({ selected_item_id: null, path: [], created_at: new Date(), updated_at: new Date() }),
   concept_items: () => ({
@@ -24,7 +27,7 @@ const TABLE_DEFAULTS = {
   concept_migrations: () => ({ done_at: new Date() }),
   api_usage: () => ({ created_at: new Date() }),
 };
-const SERIAL = new Set(['concept_studies', 'concept_items', 'concept_links', 'api_usage', 'voice_concepts', 'concept_quiz_attempts', 'voice_notes', 'voice_links']);
+const SERIAL = new Set(['concept_studies', 'concept_items', 'concept_links', 'api_usage', 'voice_concepts', 'concept_quiz_attempts', 'voice_notes', 'voice_links', 'voice_quiz_attempts']);
 const JSON_COLS = new Set(['suggestions', 'feedback', 'path', 'keywords', 'merged_from']);
 const UNIQUE = {
   concept_items: [['study_id', 'term_key'], ['legacy_voice_concept_id']],
@@ -148,6 +151,25 @@ function createMockDb() {
         if (!other) continue;
         rows.push({ ...l, other_id: other.id, other_title: other.title, other_summary: other.summary });
       }
+      return { rows, rowCount: rows.length };
+    }],
+    // 작업224-2: GET /api/voice-notes/quiz-summary — 자료별 유효 퀴즈 여부(원문 해시 일치)와 시도 집계
+    [/^SELECT n\.id, n\.title, n\.subject, n\.created_at, char_length\(regexp_replace\(COALESCE\(n\.transcript, ''\), '\\s', '', 'g'\)\) AS chars_nospace, .* FROM voice_notes n LEFT JOIN voice_quizzes q ON/, (sql, p) => {
+      const sha = t => require('crypto').createHash('sha256').update(String(t), 'utf8').digest('hex');
+      const rows = db.tables.voice_notes.filter(n => n.user_id === p[0]).sort((a, b) => (new Date(b.created_at) - new Date(a.created_at)) || (b.id - a.id)).map(n => {
+        const q = db.tables.voice_quizzes.find(x => x.note_id === n.id && x.user_id === n.user_id);
+        return { id: n.id, title: n.title, subject: n.subject, created_at: n.created_at, chars_nospace: Array.from(String(n.transcript || '').replace(/\s+/g, '')).length,
+          has_quiz: !!q && q.source_hash === sha(n.transcript || '') };
+      });
+      return { rows, rowCount: rows.length };
+    }],
+    [/^SELECT note_id, COUNT\(\*\)::int AS attempts, .* FROM voice_quiz_attempts WHERE user_id = \$1 GROUP BY note_id$/, (sql, p) => {
+      const by = new Map();
+      for (const a of db.tables.voice_quiz_attempts.filter(x => x.user_id === p[0])) { if (!by.has(a.note_id)) by.set(a.note_id, []); by.get(a.note_id).push(a); }
+      const rows = [...by].map(([note_id, list]) => {
+        list.sort((a, b) => (new Date(b.created_at) - new Date(a.created_at)) || (b.id - a.id));
+        return { note_id, attempts: list.length, last_score: list[0].score, last_total: list[0].total, last_at: list[0].created_at };
+      });
       return { rows, rowCount: rows.length };
     }],
     [/^SELECT id, name FROM users WHERE name IS NOT NULL/, () => ({ rows: [], rowCount: 0 })],
