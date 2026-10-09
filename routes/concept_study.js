@@ -3,6 +3,7 @@ const express = require('express');
 const Anthropic = require('@anthropic-ai/sdk');
 const { pool, trackUsage } = require('../lib/db');
 const { requireAuth, checkPermission } = require('../middleware/auth');
+const linksB2 = require('../lib/concept_links_b2');
 
 const router = express.Router();
 
@@ -17,7 +18,10 @@ const TEXT_LIMITS = { definition: 2000, example: 1000, simple_text: 1000, deeper
 const TEXT_FIELDS = Object.keys(TEXT_LIMITS);
 const STATUSES = ['active', 'held', 'excluded'];
 const REVIEW_STATES = ['new', 'understood', 'confused'];
-const RELATION_TYPES = ['포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련'];
+// 작업227-10: 사용자가 직접 만들고 고치는 연결(POST/PATCH)은 11값(옛 6종 + 새 5종, DB CHECK 와 같다).
+// AI 가 옛 방식(legacy)으로 내는 관계·제안은 옛 6종만 허용한다(LEGACY_RELATION_TYPES).
+const LEGACY_RELATION_TYPES = ['포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련'];
+const RELATION_TYPES = [...LEGACY_RELATION_TYPES, ...linksB2.PREDICATES];
 
 const STUDY_COLUMNS = 'id, topic, selected_item_id, path, created_at, updated_at';
 const PATH_KEEP = 12;
@@ -577,6 +581,9 @@ router.post('/api/concepts/studies/:id/review/answer', guard, async (req, res) =
 // voice_study.js의 요약·연결과 같은 모델(그 파일은 상수를 내보내지 않아 값을 그대로 둔다)
 const CONCEPT_MODEL = 'claude-haiku-4-5-20251001';
 const CONCEPT_EVENT = 'concept';
+const CONCEPT_LINK_EVENT = 'concept_link';   // 작업227-10: B2 연결 생성 호출의 사용량(설명 호출 'concept' 한도·음성 'link' 와 따로 센다)
+// CONCEPT_LINK_MODE: 'b2' 면 연결을 별도 호출(B2 방식)로 만든다. 그 밖의 값·미설정은 legacy(옛 방식, 같은 호출 안의 links)
+function conceptLinkMode() { return process.env.CONCEPT_LINK_MODE === 'b2' ? 'b2' : 'legacy'; }
 // 하루 한도(AI 호출 1회 = 1건). 환경변수 CONCEPT_AI_DAILY_CAP, 기본 60
 function conceptDailyCap() {
   const n = parseInt(process.env.CONCEPT_AI_DAILY_CAP, 10);
@@ -626,6 +633,10 @@ const CONCEPT_PROMPT_TAILS = {
   explore:
     '[작업] 사용자 입력(text)은 개념 하나이거나 짧은 질문입니다. 질문이면 핵심 개념 용어 하나를 뽑아 term에 씁니다(term은 정리된 개념 이름). 그 개념을 설명하고, [현재 개념]이 있으면 그 개념과 새 개념의 관계를 relation에 씁니다(없으면 relation의 값은 모두 빈 문자열). 제안은 새 개념 다음에 배울 개념입니다.' + LINKS_RULE + '\n' +
     'JSON만 출력한다: {"term":"","english":"","group_label":"","definition":"","example":"","simple_text":"","deeper_text":"","relation":{"relation_type":"","label":"","detail":""},' + LINKS_SCHEMA + ',' + SUGGEST_SCHEMA + '}',
+  // 작업227-10: b2 모드의 설명 호출. links 는 요청하지 않는다(연결은 별도 호출). 현재 개념과의 relation·suggestions 는 그대로
+  explore_b2:
+    '[작업] 사용자 입력(text)은 개념 하나이거나 짧은 질문입니다. 질문이면 핵심 개념 용어 하나를 뽑아 term에 씁니다(term은 정리된 개념 이름). 그 개념을 설명하고, [현재 개념]이 있으면 그 개념과 새 개념의 관계를 relation에 씁니다(없으면 relation의 값은 모두 빈 문자열). 제안은 새 개념 다음에 배울 개념입니다.\n' +
+    'JSON만 출력한다: {"term":"","english":"","group_label":"","definition":"","example":"","simple_text":"","deeper_text":"","relation":{"relation_type":"","label":"","detail":""},' + SUGGEST_SCHEMA + '}',
   easier:
     '[작업] [현재 개념]의 simple_text를 이전보다 더 쉽게 다시 씁니다(짧은 문장, 쉬운 비유). 다른 필드는 만들지 않습니다.\nJSON만 출력한다: {"simple_text":""}',
   deeper:
@@ -670,7 +681,7 @@ function fitField(v, max) {
   return charLen(t) > max ? '' : t;
 }
 
-function pickRelationType(v) { return RELATION_TYPES.includes(v) ? v : '기타 관련'; }
+function pickRelationType(v) { return LEGACY_RELATION_TYPES.includes(v) ? v : '기타 관련'; }
 
 // 제안 정리: 용어 없음·상한 초과·이미 학습 안에 있는 용어(활성·보류·제외)·중복은 버리고 최대 3개
 function sanitizeSuggestions(raw, existingKeys) {
@@ -726,7 +737,7 @@ function sanitizeAiLinks(raw, newId, candidateIds, pairKeys) {
     if (!l || typeof l !== 'object' || Array.isArray(l)) continue;
     const to = l.to_item_id;
     if (!Number.isInteger(to) || !candidateIds.has(to) || to === newId) continue;
-    if (!RELATION_TYPES.includes(l.relation_type)) continue;
+    if (!LEGACY_RELATION_TYPES.includes(l.relation_type)) continue;
     const reason = fitField(l.reason, AI_LIMITS.detail);
     if (!reason) continue;
     const pair = Math.min(to, newId) + ':' + Math.max(to, newId);
@@ -767,7 +778,8 @@ async function capReached(req, res) {
 }
 
 // Haiku 호출 1회. 성공이면 { parsed }, 실패면 { aiError }. 호출이 끝났으면 파싱 결과와 무관하게 사용량을 기록한다
-async function callConceptAI(userId, mode, input, maxTokens) {
+// opts.system/opts.event: b2 연결 생성 호출이 자기 프롬프트·사용량 이벤트를 쓸 때(작업227-10). 기본은 mode 의 프롬프트와 'concept'
+async function callConceptAI(userId, mode, input, maxTokens, opts = {}) {
   if (!process.env.ANTHROPIC_API_KEY) return { aiError: 'AI를 사용할 수 없습니다.' };
   let message;
   try {
@@ -776,14 +788,14 @@ async function callConceptAI(userId, mode, input, maxTokens) {
       model: CONCEPT_MODEL,
       max_tokens: maxTokens,
       temperature: 0.3,
-      system: buildConceptPrompt(mode),
+      system: opts.system || buildConceptPrompt(mode),
       messages: [{ role: 'user', content: input }],
     });
   } catch (err) {
     console.error('concepts ai error:', err.name, err.status || '');
     return { aiError: AI_ERROR_TEXT };
   }
-  trackUsage(userId, CONCEPT_EVENT, CONCEPT_MODEL, message.usage && message.usage.input_tokens, message.usage && message.usage.output_tokens, 0);
+  trackUsage(userId, opts.event || CONCEPT_EVENT, CONCEPT_MODEL, message.usage && message.usage.input_tokens, message.usage && message.usage.output_tokens, 0);
   try {
     const block = message.content && message.content[0];
     const text = block && block.type === 'text' && typeof block.text === 'string' ? block.text : '';
@@ -814,6 +826,40 @@ async function clientItem(item, userId) {
   const keys = new Set(items.map(i => termKey(i.term)));
   const { user_id, ...rest } = item;
   return { ...rest, suggestions: filterSuggestions(item.suggestions, keys) };
+}
+
+// 작업227-10: B2 연결 생성. 설명 저장이 끝난 새 개념과 [연결 후보](활성 개념 최근 60개, 설명 전체)로 별도 호출 1회.
+// 모든 실패(한도·호출·파싱·검증·저장)는 연결만 건너뛰고 개념 추가는 그대로 둔다. 거절 사유는 개수만 로그에 남긴다.
+async function createB2Links(req, studyId, study, items, saved, existingPairs) {
+  const out = [];
+  try {
+    if (!saved.definition || !saved.definition.trim()) return out;
+    if (await countToday(req.user.id, CONCEPT_LINK_EVENT) >= conceptDailyCap()) { console.error('concepts b2 links skipped: daily cap'); return out; }
+    const candidates = items.filter(i => i.status === 'active' && i.id !== saved.id && i.definition && i.definition.trim())
+      .slice(-PROMPT_MAX_LINK_CANDIDATES).map(i => ({ id: i.id, term: i.term, description: i.definition }));
+    if (!candidates.length) return out;
+    const newConcept = { id: saved.id, term: saved.term, description: saved.definition };
+    const ai = await callConceptAI(req.user.id, null, linksB2.buildLinkInput(newConcept, candidates, study.topic), 1200, { system: linksB2.SYSTEM_PROMPT, event: CONCEPT_LINK_EVENT });
+    if (ai.parsed === undefined) { console.error('concepts b2 links ai failed'); return out; }
+    const { links, rejected } = linksB2.validateLinks(ai.parsed, newConcept, candidates);
+    if (rejected.length) {
+      const by = {};
+      for (const r of rejected) by[r.reason] = (by[r.reason] || 0) + 1;
+      console.error('concepts b2 links rejected:', JSON.stringify(by));
+    }
+    const pairs = new Set(existingPairs);
+    for (const l of links) {
+      const c = linksB2.toStoredLink(l);
+      const key = Math.min(c.from_item_id, c.to_item_id) + ':' + Math.max(c.from_item_id, c.to_item_id);
+      if (pairs.has(key) || await linkExists(studyId, c.from_item_id, c.to_item_id)) continue;
+      pairs.add(key);
+      const detail = Array.from(c.detail).slice(0, LIMITS.detail).join('');
+      out.push(await insertLink(studyId, req.user.id, { from: c.from_item_id, to: c.to_item_id, relation_type: c.relation_type, label: c.label, detail, source: 'ai' }));
+    }
+  } catch (err) {
+    console.error('concepts b2 links error:', err.message);
+  }
+  return out;
 }
 
 function nextFeedback(feedback, kind) {
@@ -856,7 +902,8 @@ router.post('/api/concepts/studies/:id/explore', guard, async (req, res) => {
     await selectItem(study, req.user.id, item.id);   // 새로 만든(또는 다시 채우는) 개념을 선택하고 경로에 붙인다
 
     const input = buildConceptInput({ study, current: linkFrom, items, text: text.value, feedback: linkFrom ? linkFrom.feedback : null, selfId: item.id, withLinkCandidates: true });
-    const ai = await callConceptAI(req.user.id, 'explore', input, 1500);
+    const b2 = conceptLinkMode() === 'b2';   // 작업227-10: b2 면 설명 호출에서 links 를 받지 않는다
+    const ai = await callConceptAI(req.user.id, b2 ? 'explore_b2' : 'explore', input, 1500);
     let v = null;
     if (ai.parsed !== undefined) {
       v = validateExplore(ai.parsed, new Set(items.map(i => termKey(i.term))));
@@ -885,8 +932,11 @@ router.post('/api/concepts/studies/:id/explore', guard, async (req, res) => {
       });
     }
     // 작업209-2: 기존 다른 개념과의 연결 제안(같은 호출 안에서 처리). 한 건이 실패해도 개념은 이미 저장돼 있다
-    const aiLinks = [];
-    try {
+    let aiLinks = [];
+    if (b2) {
+      aiLinks = await createB2Links(req, id, study, items.map(i => (i.id === saved.id ? saved : i)), saved,
+        link ? [Math.min(link.from_item_id, link.to_item_id) + ':' + Math.max(link.from_item_id, link.to_item_id)] : []);
+    } else try {
       const pairKeys = new Set(link ? [Math.min(link.from_item_id, link.to_item_id) + ':' + Math.max(link.from_item_id, link.to_item_id)] : []);
       const candidateIds = new Set(linkCandidates(items, linkFrom ? linkFrom.id : null, item.id).map(c => c.id));
       for (const c of sanitizeAiLinks(v.rawLinks, item.id, candidateIds, pairKeys)) {

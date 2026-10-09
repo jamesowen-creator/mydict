@@ -166,22 +166,26 @@ test('SQL 의 11값과 모의 DB 가 받아들이는 값이 같다(db.js 단계�
 });
 
 // ───────────────────────── 서버는 아직 새 5종을 거부(배포해도 앱 동작 변화 없음) ─────────────────────────
-test('routes: RELATION_TYPES 는 옛 6종 그대로이고, 새 5종은 연결 추가(POST)·수정(PATCH)에서 아직 400', async () => {
+// 작업227-10 로 바뀜: 227-9 에는 새 5종이 아직 400 이었다. 이제 사용자 연결(POST/PATCH)은 11값을 받고, AI 의 옛 방식(legacy)만 6종을 쓴다.
+test('routes: 사용자 연결(POST/PATCH)은 옛 6종 + 새 5종을 받고, AI legacy 용 목록은 옛 6종 그대로', async () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'routes', 'concept_study.js'), 'utf8');
-  assert.match(src, /const RELATION_TYPES = \['포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련'\];/);
+  assert.ok(src.includes("const LEGACY_RELATION_TYPES = ['포함', '원인→결과', '순서', '대비', '비슷함', '기타 관련'];"));
+  assert.ok(src.includes('const RELATION_TYPES = [...LEGACY_RELATION_TYPES, ...linksB2.PREDICATES];'));
   const db = createMockDb(); db.addUser(7);
   const t = await startApp(['routes/concept_study.js'], { db });
   try {
     const S = '/api/concepts/studies';
     const sid = (await t.call('POST', S, { topic: 'A' })).body.id;
-    const a = (await t.call('POST', `${S}/${sid}/items`, { term: '가' })).body, b = (await t.call('POST', `${S}/${sid}/items`, { term: '나' })).body;
-    for (const type of NEW5) {
-      const r = await t.call('POST', `${S}/${sid}/links`, { from_item_id: a.id, to_item_id: b.id, relation_type: type });
-      assert.equal(r.status, 400, 'POST ' + type);
+    const items = [];
+    for (let i = 0; i < 6; i++) items.push((await t.call('POST', `${S}/${sid}/items`, { term: '개념' + i })).body);
+    for (const [i, type] of NEW5.entries()) {
+      const r = await t.call('POST', `${S}/${sid}/links`, { from_item_id: items[0].id, to_item_id: items[i + 1].id, relation_type: type });
+      assert.equal(r.status, 201, 'POST ' + type);
     }
-    const ok = await t.call('POST', `${S}/${sid}/links`, { from_item_id: a.id, to_item_id: b.id, relation_type: '포함' });
+    const ok = await t.call('POST', `${S}/${sid}/links`, { from_item_id: items[1].id, to_item_id: items[2].id, relation_type: '포함' });
     assert.equal(ok.status, 201, '옛 값은 그대로 허용');
-    for (const type of NEW5) assert.equal((await t.call('PATCH', `/api/concepts/links/${ok.body.id}`, { relation_type: type })).status, 400, 'PATCH ' + type);
+    for (const type of NEW5) assert.equal((await t.call('PATCH', `/api/concepts/links/${ok.body.id}`, { relation_type: type })).status, 200, 'PATCH ' + type);
     assert.equal((await t.call('PATCH', `/api/concepts/links/${ok.body.id}`, { relation_type: '대비' })).status, 200);
+    assert.equal((await t.call('PATCH', `/api/concepts/links/${ok.body.id}`, { relation_type: '없는관계' })).status, 400);
   } finally { await t.close(); }
 });

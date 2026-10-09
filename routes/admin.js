@@ -108,7 +108,7 @@ router.get('/api/admin/stats', requireAdmin, async (req, res) => {
       const sttModel = process.env.VOICE_STT_MODEL || 'gpt-4o-mini-transcribe';
       const sttPerMin = Number.isFinite(sttEnv) && sttEnv >= 0 ? sttEnv : (Object.prototype.hasOwnProperty.call(sttTable, sttModel) ? sttTable[sttModel] : 0.006);
       for (const r of rows) {
-        if (r.event_type === 'search' || r.event_type === 'ai' || r.event_type === 'summary' || r.event_type === 'quiz' || r.event_type === 'chat' || r.event_type === 'link' || r.event_type === 'image_aux' || r.event_type === 'concept') {
+        if (r.event_type === 'search' || r.event_type === 'ai' || r.event_type === 'summary' || r.event_type === 'quiz' || r.event_type === 'chat' || r.event_type === 'link' || r.event_type === 'image_aux' || r.event_type === 'concept' || r.event_type === 'concept_link') {
           anthropic += (Number(r.input_tokens) / 1_000_000) * 1.00;
           anthropic += (Number(r.output_tokens) / 1_000_000) * 5.00;
         }
