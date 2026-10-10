@@ -40,7 +40,7 @@ for (const w of [390, 768, 1024]) {
     assert.equal(await page.eval("Math.round(document.querySelector('.sticky-zone').getBoundingClientRect().top)"), 65, '스크롤해도 공용 헤더 바로 아래에 붙음');
     assert.equal(await css(page, "document.querySelector('.btn')", 'backgroundColor'), 'rgb(184, 68, 46)', '주 버튼은 진한 코랄(--btn-primary-bg)');
     assert.equal(await page.eval("getComputedStyle(document.documentElement).getPropertyValue('--primary').trim().toLowerCase()"), '#e2583b');
-    assert.equal(await page.eval("getComputedStyle(document.documentElement).getPropertyValue('--success').trim().toLowerCase()"), '#1d9e75', '의미색(정답)은 초록 유지');
+    assert.equal(await page.eval("getComputedStyle(document.documentElement).getPropertyValue('--success-dark').trim().toLowerCase()"), '#085041', '의미색(정답)은 초록 유지: --success-dark(ok-ink)');
     assert.equal(await page.hasHorizontalScroll(), false);
     assert.deepEqual(page.errors, []);
     await page.close();

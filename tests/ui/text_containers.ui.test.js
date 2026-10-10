@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startMockServer } = require('./helpers/mock_server');
-const { TRANSPARENT, GREEN, RED, TEXT2, CORAL_DARK, NO_MOTION, DB_READY, me, settle, step, MEASURE, assertNoBox, assertFlatPanel, done } = require('./helpers/text_ui');
+const { TRANSPARENT, GREEN, RED, TEXT2, VOICE_RED, VOICE_TEXT, VOICE_TEXT2, CORAL_DARK, NO_MOTION, DB_READY, me, settle, step, MEASURE, assertNoBox, assertFlatPanel, done } = require('./helpers/text_ui');
 const CONCEPT_RED = 'rgb(220, 38, 38)';   // 247-1: 개념 학습 --danger = 원칙 --color-danger #dc2626
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
@@ -86,7 +86,7 @@ test('217-4 voice 연상 그림 카드(.img-card)·합본 행(.merge-row, .merge
 test('217-4 voice·concept 메시지(.msg, .notice): 색 바탕·테두리·둥근 모서리 없이 앞의 기호(✕ ! i)+글자색, 대비 4.5:1', { skip: SKIP }, async () => {
   let page = await openVoice();
   await step(page, INJECT(`<div class="msg error">오류 문구</div><div class="msg warn">경고 문구</div><div class="msg info">안내 문구</div><div class="msg notice">공지 문구</div><div class="msg">중립 문구</div>`));
-  const exp = [['error', '"✕"', RED], ['warn', '"!"', 'rgb(26, 26, 26)'], ['info', '"i"', CORAL_DARK], ['notice', '"i"', CORAL_DARK]];
+  const exp = [['error', '"✕"', VOICE_RED], ['warn', '"!"', VOICE_TEXT], ['info', '"i"', CORAL_DARK], ['notice', '"i"', CORAL_DARK]];
   for (const [cls, mark, color] of exp) {
     const m = await page.eval(MEASURE(`#probe-host .msg.${cls}`, '::before'));
     assertNoBox(m, `voice .msg.${cls}`); assert.equal(m.mark, mark, cls + ' 기호'); assert.equal(m.color, color, cls + ' 글자색'); assert.ok(m.ratio >= 4.5 && m.markRatio >= 4.5, `${cls} 대비 ${m.ratio.toFixed(2)}`);
@@ -95,7 +95,7 @@ test('217-4 voice·concept 메시지(.msg, .notice): 색 바탕·테두리·둥�
   assert.equal((await page.eval(MEASURE('#probe-host .msg:not(.error):not(.warn):not(.info):not(.notice)', '::before'))).mark, 'none', '중립 메시지에는 기호 없음');
   // 실제 메시지 하나: 퀴즈 해설(.msg.quiz-feedback.error)
   await step(page, "quizData = [{ question: 'Q', choices: ['가', '나', '다', '라'], answer_index: 2, explanation: '해설', quote: '근거' }]; quizState = { i: 0, score: 0, answers: [], answered: false, saved: true }; showView('quiz'); renderQuizQuestion(); answerQuiz(0);");
-  const fb = await page.eval(MEASURE('#quiz-feedback', '::before')); assertNoBox(fb, '.quiz-feedback'); assert.equal(fb.mark, '"✕"'); assert.equal(fb.markColor, RED); assert.equal(fb.color, 'rgb(26, 26, 26)', '작업221: 해설·근거는 주 글자색(옛 기대: 전체 빨강)'); assert.ok(fb.ratio >= 4.5 && fb.markRatio >= 4.5);
+  const fb = await page.eval(MEASURE('#quiz-feedback', '::before')); assertNoBox(fb, '.quiz-feedback'); assert.equal(fb.mark, '"✕"'); assert.equal(fb.markColor, VOICE_RED); assert.equal(fb.color, VOICE_TEXT, '작업221: 해설·근거는 주 글자색(옛 기대: 전체 빨강)'); assert.ok(fb.ratio >= 4.5 && fb.markRatio >= 4.5);
   await done(page);
 
   // concept: 오류(✕), 안내(i)

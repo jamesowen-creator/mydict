@@ -19,20 +19,17 @@
      그 화면의 값을 그대로 쓰고 새 색·새 글꼴은 도입하지 않는다. 상단은 공통 헤더(appHeader). */
   :root {
     --primary: var(--color-accent, #e2583b);
-    --primary-light: #FDF0EC;
+    --primary-light: var(--color-surface-2, #eef1fb);
     --primary-dark: var(--color-accent-ink, #b8442e);
     /* 작업200: 정답 같은 의미색은 주제색(코랄)과 분리해 초록 유지 */
-    --success: #1D9E75;
-    --success-light: #E1F5EE;
     --success-dark: var(--color-ok-ink, #085041);
-    --bg: #FAFAF9;
-    --card: #FFFFFF;
-    --text1: #1a1a1a;
-    --text2: #6b7280;
-    --border: rgba(0,0,0,0.08);
-    --error: #E24B4A;
-    --error-light: #FCEBEB;
-    --error-dark: #B42318;   /* 작업217-3: 오답 글자(흰 바탕 6.57:1). 프로젝트에 이미 있는 위험색(개념 학습 --danger, 다이얼로그 위험 버튼)과 같은 값 */
+    --bg: var(--color-bg, #f5f7ff);
+    --card: var(--color-surface, #fff);
+    --text1: var(--color-text, #1a1f3c);
+    --text2: var(--color-text-sub, #4a5070);
+    --border: var(--color-line, #dde2f5);
+    --error: var(--color-danger, #dc2626);
+    --error-dark: var(--color-danger, #dc2626);   /* 작업217-3: 오답 글자(흰 바탕 6.57:1). 프로젝트에 이미 있는 위험색(개념 학습 --danger, 다이얼로그 위험 버튼)과 같은 값 */
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -55,7 +52,7 @@
   .bottom-nav {
     background: var(--card);
     border-top: 1px solid var(--border);
-    box-shadow: 0 -2px 8px rgba(226,88,59,0.07);
+    box-shadow: var(--shadow-nav, 0 -2px 8px rgba(226,88,59,0.07));
     padding: 0 16px max(8px, env(safe-area-inset-bottom));
     display: flex; align-items: center; gap: 0;
     position: fixed;
@@ -135,13 +132,11 @@
     padding: 10px 20px;
     border: none; border-radius: var(--btn-radius);
     font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 600;
-    cursor: pointer; background: var(--btn-primary-bg, #b8442e); color: #fff;
+    cursor: pointer; background: var(--btn-primary-bg, var(--color-accent-ink, #b8442e)); color: #fff;
     transition: all 0.15s;
   }
   .btn:hover:not(:disabled) { background: var(--btn-primary-bg-hover, #9c3a27); }
   .btn:disabled { opacity: 0.5; cursor: default; }
-  .btn.danger { background: var(--error-light); color: var(--error); }
-  .btn.danger:hover:not(:disabled) { background: var(--error-light); }
   .btn.block { display: flex; width: 100%; }
   .btn.small { min-height: var(--ctl-min-h); padding: 10px 20px; border-radius: var(--btn-radius); font-size: 15px; }
   /* 작업216: 보조 동작은 박스 없이 텍스트로(concept_study.html의 .btn.text와 같은 모양). 터치 영역은 높이 44px(.btn) + 가로 44px 이상.
@@ -177,7 +172,7 @@
     cursor: pointer; font-family: inherit; color: inherit;
   }
   .note-item:last-child { border-bottom: none; }
-  .note-title { font-size: 17px; font-weight: 700; word-break: break-all; }
+  .note-title { font-size: 18px; font-weight: 700; word-break: break-all; }
   .note-title.empty { color: var(--text2); font-weight: 400; }
   .note-sum { font-size: 13px; color: var(--text2); margin-top: 4px; line-height: 1.5; word-break: break-all; }
   .note-subj { font-size: 12px; color: var(--primary-dark); margin-top: 6px; }
@@ -186,7 +181,7 @@
 
   /* 녹음 */
   .rec-box { padding: 20px 16px; margin: 0 -16px; text-align: center; }   /* 작업222: 글자 시작 x 16px */
-  .rec-time { font-size: 42px; font-weight: 700; color: var(--primary); font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; }
+  .rec-time { font-size: 48px; font-weight: 700; color: var(--primary); font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; }
   .rec-sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
   .rec-dot {
     display: inline-block; width: 10px; height: 10px; border-radius: 50%;
@@ -274,7 +269,7 @@
   }
   /* 점수 글자색은 --primary(흰 바탕 3.53:1)가 아니라 --primary-dark(5.38:1) */
   .result-score { font-size: 42px; font-weight: 700; color: var(--primary-dark); font-family: 'Inter', sans-serif; }
-  .result-score span { font-size: 20px; color: var(--text2); }
+  .result-score span { font-size: 18px; color: var(--text2); }
   .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
   /* 작업221: 결과 화면 구성 = 큰 점수 + 한 줄 요약 + 틀린 문항 목록 + 버튼(읽기 화면과 같은 모양) */
   .result-section-label { font-size: 12px; font-weight: 700; color: var(--primary-dark); margin-bottom: 12px; letter-spacing: 0.03em; padding-bottom: 4px; border-bottom: 2px solid var(--primary); }
@@ -291,7 +286,7 @@
   .chat-top .quiz-question-counter { margin: 0; }
   .chat-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
   .bubble { max-width: 85%; padding: 12px 14px; border-radius: 16px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
-  .bubble.user { align-self: flex-end; background: var(--btn-primary-bg, #b8442e); color: #fff; }
+  .bubble.user { align-self: flex-end; background: var(--btn-primary-bg, var(--color-accent-ink, #b8442e)); color: #fff; }
   .bubble.bot { align-self: flex-start; background: var(--card); color: var(--text1); border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
   .bubble .b-quote { font-size: 12px; color: var(--text2); margin-top: 8px; line-height: 1.5; }
   /* 작업217-2: 근거 경고 문구는 박스 없이 작은 보조색 글자(--text2는 흰 말풍선 위 4.83:1) */
@@ -333,7 +328,7 @@
   .img-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
   .img-card-title { font-size: 15px; font-weight: 700; word-break: break-all; }
   .img-card-no { font-size: 12px; color: var(--text2); flex-shrink: 0; }
-  .img-card img { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 12px; }
+  .img-card img { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 10px; }
   .img-card img.stale { opacity: 0.4; }
   .img-card .link-badge { display: inline-block; margin-top: 10px; }
   .link-badge.err { color: var(--text1); }   /* 실패는 ⚠ 기호와 문구로 구분(--error 글자는 3.93:1이라 쓰지 않음) */
@@ -381,7 +376,7 @@
   .tts-rate select { font-family: 'Noto Sans KR', sans-serif; font-size: 14px; padding: 6px 8px; border-radius: var(--input-radius); border: 1px solid var(--border); background: var(--card); color: var(--text1); }
 
   /* ── 작업214-3: 자료 연결 지도 (개념 학습 지도 CSS를 복사해 음성 학습 토큰으로 바꾼 것. 이름은 vm-*) ── */
-  .vm-sheet { --vm-node-line: #868ca8; --vm-focus: #1a1f3c; }   /* 노드 테두리: 흰 배경 대비 3.3:1 */
+  .vm-sheet { --vm-node-line: #868ca8; --vm-focus: var(--color-text, #1a1f3c); }   /* 노드 테두리: 흰 배경 대비 3.3:1 */
   html.vm-open, html.vm-open body { overflow: hidden; }
   dialog.vm-sheet { padding: 0; border: none; border-radius: 0; margin: 0; max-width: none; max-height: none; width: 100vw; height: 100vh; height: 100dvh; overscroll-behavior: contain; overflow: hidden; background: var(--bg); color: var(--text1); }
   dialog.vm-sheet[open] { display: flex; flex-direction: column; }
@@ -389,7 +384,7 @@
     dialog.vm-sheet { margin: auto; width: min(1200px, calc(100vw - 48px)); height: calc(100vh - 48px); height: calc(100dvh - 48px); border: 1px solid var(--border); border-radius: var(--card-radius); }
   }
   .vm-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 8px 16px; border-bottom: 1px solid var(--border); background: var(--card); }
-  .vm-head h2 { margin: 0; font-size: 17px; font-weight: 800; color: var(--text1); }
+  .vm-head h2 { margin: 0; font-size: 18px; font-weight: 800; color: var(--text1); }
   .vm-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 8px 12px 12px; }
   .vm-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
   .vm-meta { font-size: 12px; color: var(--text2); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 2px 12px; }
@@ -451,7 +446,7 @@
 <!-- Access Denied (작업180: 한입 독서·과학과 같은 형식) -->
 <div id="access-denied" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center">
   <div style="font-size:48px">🔒</div>
-  <h2 style="font-size:20px;font-weight:700;color:var(--text1)">이용 권한이 없습니다</h2>
+  <h2 style="font-size:18px;font-weight:700;color:var(--text1)">이용 권한이 없습니다</h2>
   <p style="font-size:14px;color:var(--text2);line-height:1.6">음성 학습 이용 권한이 없습니다.<br>관리자에게 문의해주세요.</p>
   <a href="/" style="display:inline-flex;align-items:center;gap:8px;background:var(--btn-primary-bg, var(--primary));color:#fff;padding:14px 24px;border-radius:14px;font-size:15px;font-weight:700;text-decoration:none">METIS 홈으로</a>
 </div>

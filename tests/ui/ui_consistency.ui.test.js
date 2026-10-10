@@ -134,9 +134,9 @@ function assertTextBtn(b, label, color) {
 }
 test('220 (b) 텍스트 버튼: 15px/600, 보조색, padding 0 8px, 최소 44×44px, 밑줄, 대비 4.5:1 (음성·개념·문학·과학·한입)', { skip: SKIP }, async () => {
   let page = await openVoice();
-  assertTextBtn(await m(page, '#wrong-btn'), '음성 #wrong-btn', GRAY.sub);
+  assertTextBtn(await m(page, '#wrong-btn'), '음성 #wrong-btn', BLUE.sub);
   await step(page, 'openDetail(2)'); await page.waitFor("currentView === 'edit'"); await settle(page);
-  assertTextBtn(await m(page, '#edit-cancel'), '음성 #edit-cancel', GRAY.sub);
+  assertTextBtn(await m(page, '#edit-cancel'), '음성 #edit-cancel', BLUE.sub);
   await done(page);
   page = await openConcept();
   await page.click('#start-open'); await settle(page);
@@ -211,7 +211,7 @@ test('220 (d) 한 화면 안의 중립 글자색(채도 낮은 색, 흰색·공�
   await step(page, VOICE_QUIZ); await addTo(acc, page);
   await page.click('.mcq-option', { index: 0 }); await page.waitFor("!!document.querySelector('.mcq-option.wrong, .mcq-option.correct')"); await addTo(acc, page);
   await step(page, "chatMessages = [{ role: 'user', content: '질문' }, { role: 'bot', content: '답', grounded: false, quotes: ['근거'] }]; showView('chat'); renderChat();"); await addTo(acc, page);
-  await done(page); check('음성', acc, ['#1a1a1a', '#6b7280']);
+  await done(page); check('음성', acc, ['#1a1f3c', '#4a5070']);
   acc = new Set(); page = await openConcept(); await addTo(acc, page);
   await page.click('[data-t="open-study"]'); await page.waitFor("!!document.querySelector('[data-t=term]')"); await settle(page); await addTo(acc, page);
   await page.click('#quiz-open'); await page.waitFor("!!document.querySelector('[data-t=quiz-question]')"); await settle(page); await addTo(acc, page);
@@ -246,8 +246,8 @@ function assertQuestion(q, label, main) { assert.ok(q, label + ': 요소 없음'
 function assertFullWidth(b, label) { assert.ok(b.w >= b.parentInnerW - 1, `${label}: 다음 버튼 전체 폭 (${b.w} vs 부모 ${b.parentInnerW})`); }
 test('221 (e)(f)(g) 퀴즈 풀이: 보기 15px/400 + 번호(폭 20) + 구분선, 질문 17px/700, 다음 버튼 전체 폭 (음성·개념·문학·과학·한입·사전)', { skip: SKIP }, async () => {
   let page = await openVoice(); await step(page, VOICE_QUIZ);
-  assertOption(await m(page, '.mcq-text'), await m(page, '.mcq-num'), '음성 보기', GRAY.main); assert.equal((await m(page, '.mcq-option')).bw[2], '1px', '음성 보기 구분선');
-  assertQuestion(await m(page, '.quiz-question'), '음성 질문', GRAY.main);
+  assertOption(await m(page, '.mcq-text'), await m(page, '.mcq-num'), '음성 보기', BLUE.main); assert.equal((await m(page, '.mcq-option')).bw[2], '1px', '음성 보기 구분선');
+  assertQuestion(await m(page, '.quiz-question'), '음성 질문', BLUE.main);
   await page.click('.mcq-option', { index: 0 }); await page.waitFor("!!document.querySelector('.mcq-option.wrong, .mcq-option.correct')");
   assertFullWidth(await m(page, '#quiz-next'), '음성');
   assert.ok((await m(page, '#quiz-progress-bar')) && (await m(page, '.quiz-progress-bar-wrap')), '음성 진행 막대');
@@ -288,7 +288,7 @@ test('221 (e)(f)(g) 퀴즈 풀이: 보기 15px/400 + 번호(폭 20) + 구분선,
 test('221 (d)(h) 해설 색: 정오 한 줄만 초록/빨강+기호, 해설·근거는 주 글자색 (음성·개념·OX)', { skip: SKIP }, async () => {
   let page = await openVoice(); await step(page, VOICE_QUIZ);
   await page.click('.mcq-option', { index: 0 }); await page.waitFor("!!document.querySelector('.mcq-option.wrong')");
-  assert.equal((await m(page, '#quiz-feedback .fb-line')).color, 'rgb(180, 35, 24)', '음성 정오 줄 빨강'); assert.equal((await m(page, '#quiz-feedback .fb-sub')).color, GRAY.main, '음성 해설은 주 글자색');
+  assert.equal((await m(page, '#quiz-feedback .fb-line')).color, 'rgb(220, 38, 38)', '음성 정오 줄 빨강'); assert.equal((await m(page, '#quiz-feedback .fb-sub')).color, BLUE.main, '음성 해설은 주 글자색');
   assert.equal((await m(page, '#quiz-feedback', '::before')).mark, '"✕"');
   await done(page);
   page = await openReading('literature_compass'); await step(page, LIT_OX); await page.click('#ox-x'); await page.waitFor("document.getElementById('ox-x').classList.contains('wrong')");
@@ -385,7 +385,7 @@ test('220 (k) 글자 대비: 보조·약한 색 글자가 모두 4.5:1 이상(�
   assert.deepEqual(await page.eval(SUB_CONTRAST([GRAY.sub])), [], '한입 상세의 보조색 글자'); await done(page);
   page = await openReading('literature_compass');
   assert.deepEqual(await page.eval(SUB_CONTRAST([GRAY.sub])), [], '문학 홈의 보조색 글자'); await done(page);
-  page = await openVoice(); assert.deepEqual(await page.eval(SUB_CONTRAST([GRAY.sub])), [], '음성 목록의 보조색 글자'); await done(page);
+  page = await openVoice(); assert.deepEqual(await page.eval(SUB_CONTRAST([BLUE.sub])), [], '음성 목록의 보조색 글자'); await done(page);
   page = await openConcept(); assert.deepEqual(await page.eval(SUB_CONTRAST([BLUE.sub])), [], '개념 목록의 보조색 글자'); await done(page);
   page = await openDict();
   assert.deepEqual(await page.eval(SUB_CONTRAST([BLUE.sub])), [], '사전 홈의 보조·약한 색 글자');

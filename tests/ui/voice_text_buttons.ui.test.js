@@ -278,7 +278,7 @@ test('키보드 포커스: Tab으로 텍스트 버튼에 닿으면 2px 윤곽선
     if (hit) { await sleep(100); hit = await page.eval(`(() => { const e = document.activeElement; const cs = getComputedStyle(e); return { id: e.id, style: cs.outlineStyle, width: cs.outlineWidth, color: cs.outlineColor, offset: cs.outlineOffset }; })()`); }   // 전환은 NO_MOTION으로 꺼져 있어 포커스 직후 값이 곧 최종 값
   }
   assert.ok(hit, 'Tab으로 텍스트 버튼에 닿음');
-  assert.equal(hit.style, 'solid'); assert.equal(hit.width, '2px'); assert.equal(hit.color, 'rgb(26, 26, 26)'); assert.equal(hit.offset, '2px');
+  assert.equal(hit.style, 'solid'); assert.equal(hit.width, '2px'); assert.equal(hit.color, 'rgb(26, 31, 60)'); assert.equal(hit.offset, '2px');
   // 호버
   const pos = await page.eval("(() => { const b = document.getElementById('vm-open-btn'); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()");
   await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pos.x, y: pos.y });
@@ -286,7 +286,7 @@ test('키보드 포커스: Tab으로 텍스트 버튼에 닿으면 2px 윤곽선
   const hov = await page.eval("(() => { const cs = getComputedStyle(document.getElementById('vm-open-btn')); return { bg: cs.backgroundColor, color: cs.color, hover: document.getElementById('vm-open-btn').matches(':hover') }; })()");
   assert.equal(hov.hover, true);
   assert.equal(hov.bg, TRANSPARENT, '호버해도 배경 투명');
-  assert.equal(hov.color, 'rgb(26, 26, 26)', '호버하면 글자만 진해짐');
+  assert.equal(hov.color, 'rgb(26, 31, 60)', '호버하면 글자만 진해짐');
   await page.close();
 });
 
@@ -340,7 +340,7 @@ test('217-2 .b-warn: 박스·테두리·배경·padding 없는 12px --text2 문�
   assertNoBox(m, '.b-warn');
   assert.equal(m.pad, '0px'); assert.ok(m.ratio >= 4.5, '대비 ' + m.ratio.toFixed(2));
   assert.equal(await page.eval("getComputedStyle(document.querySelector('.b-warn')).fontSize"), '12px');
-  assert.equal(m.color, 'rgb(107, 114, 128)', '--text2');
+  assert.equal(m.color, 'rgb(74, 80, 112)', '--text2');
   const text = await page.text('.b-warn');
   assert.equal(text, '근거를 확인하지 못했습니다. 원문과 대조해 보세요.'); assert.doesNotMatch(text, /[⚠!！]/, '앞에 기호 없음');
   await page.close();
@@ -359,7 +359,7 @@ test('217-2 (a)(b)(c)(d) .kw-chip: 박스 없음, 44×44px 이상, 대비 4.5:1,
     assert.ok(m.ratio >= 4.5, `${label}: 대비 4.5:1 이상 (${m.ratio.toFixed(2)})`);
     assert.equal(m.cursor, 'pointer');
   }
-  assert.equal(off.weight, '500'); assert.equal(off.underline, false); assert.equal(off.color, 'rgb(107, 114, 128)');
+  assert.equal(off.weight, '500'); assert.equal(off.underline, false); assert.equal(off.color, 'rgb(74, 80, 112)');
   assert.equal(on.weight, '700'); assert.equal(on.underline, true); assert.equal(on.color, 'rgb(184, 68, 46)');
   assert.match(await page.text('.kw-chip[data-w="엽록체"]'), /^◇ /, '"◇" 유지');
   // 클릭하면 선택 상태가 옮겨 가는 것은 앱 코드(1608~1611행)의 동작. 같은 클래스 전환으로 굵기·밑줄이 따라 바뀌는지만 본다

@@ -15,6 +15,7 @@ const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 const GREEN = 'rgb(8, 80, 65)', RED = 'rgb(180, 35, 24)', TEXT2 = 'rgb(107, 114, 128)';   // --success-dark, --error-dark(=프로젝트 위험색 #B42318), --text2
 const CONCEPT_RED = 'rgb(220, 38, 38)';   // 247-1: 개념 학습 --danger = 원칙 --color-danger #dc2626 (다른 화면의 RED #B42318과 다름)
 const NO_MOTION = `(() => { const s = document.createElement('style'); s.id = 'test-no-motion'; s.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }'; document.head.appendChild(s); })()`;
+const VOICE_TEXT2 = 'rgb(74, 80, 112)', VOICE_RED = 'rgb(220, 38, 38)', VOICE_TEXT = 'rgb(26, 31, 60)';   // 251-1: 음성 학습 --color-text-sub, --color-danger, --color-text
 const DB_READY = "typeof DB !== 'undefined' && !!DB && getComputedStyle(document.getElementById('loading')).display === 'none'";
 const me = () => ({ id: 7, email: 'u7@example.com', name: '테스터', role: 'user', perm_voice_study: true, perm_concept_study: true,
   perm_literature_compass: true, perm_digest_reading: true, perm_science_reading: true });
@@ -93,7 +94,7 @@ test('217-3 voice 4지선다: 박스 없는 번호+본문 행(아래 구분선�
     assertNoBox(o, `보기 ${i + 1}`, { bottomLine: true });
     assert.equal(o.bw[2], i === n - 1 ? '0px' : '1px', `보기 ${i + 1}: 아래 구분선은 마지막 보기만 없음`);
     assert.ok(o.h >= 43.5, `보기 ${i + 1}: 높이 44px 이상 (${o.h})`);
-    assert.equal(num.bg, TRANSPARENT, '번호는 원형 채움 없음'); assert.equal(num.radius, '0px'); assert.equal(num.color, TEXT2, '번호 --text2'); assert.ok(num.ratio >= 4.5, '번호 대비 ' + num.ratio.toFixed(2));
+    assert.equal(num.bg, TRANSPARENT, '번호는 원형 채움 없음'); assert.equal(num.radius, '0px'); assert.equal(num.color, VOICE_TEXT2, '번호 --text2'); assert.ok(num.ratio >= 4.5, '번호 대비 ' + num.ratio.toFixed(2));
     assert.equal(num.w, 20, '번호 폭 고정 20px');
   }
   // 아주 긴 보기: 두 줄 이상으로 줄바꿈돼도 본문 왼쪽 위치가 모든 보기에서 같다
@@ -116,10 +117,10 @@ test('217-3 voice 4지선다 채점: 오답을 고르면 고른 보기 ✕+빨�
   const wrong = await page.eval(MEASURE('.mcq-option.wrong .mcq-text')), wrongMark = await page.eval(MEASURE('.mcq-option.wrong', '::before'));
   const hint = await page.eval(MEASURE('.mcq-option.correct-hint .mcq-text')), hintMark = await page.eval(MEASURE('.mcq-option.correct-hint', '::before'));
   const plain = await page.eval(MEASURE('.mcq-option', '::before', 1)), plainText = await page.eval(MEASURE('.mcq-option .mcq-text', null, 1));
-  assert.equal(wrongMark.mark, '"✕"'); assert.equal(wrong.color, RED); assert.equal(wrong.weight, '700'); assert.equal(wrong.underline, true); assert.ok(wrong.ratio >= 4.5 && wrongMark.markRatio >= 4.5, '오답 대비');
+  assert.equal(wrongMark.mark, '"✕"'); assert.equal(wrong.color, VOICE_RED); assert.equal(wrong.weight, '700'); assert.equal(wrong.underline, true); assert.ok(wrong.ratio >= 4.5 && wrongMark.markRatio >= 4.5, '오답 대비');
   assert.equal(hintMark.mark, '"○"', '오답을 골라도 정답 보기에 ○가 보임'); assert.equal(hint.color, GREEN); assert.equal(hint.weight, '700'); assert.equal(hint.underline, false, '고르지 않은 정답은 밑줄 없음'); assert.ok(hint.ratio >= 4.5 && hintMark.markRatio >= 4.5, '정답 대비');
   assert.equal(plain.mark, '""'); assert.equal(plainText.underline, false);
-  assert.equal(plainText.color, 'rgb(26, 26, 26)', '그 외 보기는 기본 글자색');
+  assert.equal(plainText.color, VOICE_TEXT, '그 외 보기는 기본 글자색');
   // 상태가 색만이 아님: 기호 + 굵기 + (고른 것은) 밑줄
   for (const el of ['.mcq-option.wrong', '.mcq-option.correct-hint']) assert.ok(await page.eval(`getComputedStyle(document.querySelector('${el}'), '::before').content !== '""'`), el + ': 기호 있음');
   // 다음 문제에서 정답 선택
