@@ -242,9 +242,9 @@ function assertOption(o, num, label, main) {
   assert.equal(o.size, 15, label + ': 보기 글자 15px'); assert.equal(o.weight, '400', label + ': 굵기 400'); assert.equal(o.color, main, label + ': 주 글자색');
   assert.equal(num.w, 20, label + ': 번호 폭 20px 고정'); assert.ok(num.ratio >= 4.5, label + ': 번호 대비');
 }
-function assertQuestion(q, label, main) { assert.ok(q, label + ': 요소 없음'); assert.equal(q.size, 17, label + ': 질문 17px'); assert.equal(q.weight, '700', label + ': 700'); assert.equal(q.color, main, label + ': 주 글자색'); }
+function assertQuestion(q, label, main) { assert.ok(q, label + ': 요소 없음'); assert.equal(q.size, 18, label + ': 질문 18px'); assert.equal(q.weight, '700', label + ': 700'); assert.equal(q.color, main, label + ': 주 글자색'); }
 function assertFullWidth(b, label) { assert.ok(b.w >= b.parentInnerW - 1, `${label}: 다음 버튼 전체 폭 (${b.w} vs 부모 ${b.parentInnerW})`); }
-test('221 (e)(f)(g) 퀴즈 풀이: 보기 15px/400 + 번호(폭 20) + 구분선, 질문 17px/700, 다음 버튼 전체 폭 (음성·개념·문학·과학·한입·사전)', { skip: SKIP }, async () => {
+test('221 (e)(f)(g) 퀴즈 풀이: 보기 15px/400 + 번호(폭 20) + 구분선, 질문 18px/700, 다음 버튼 전체 폭 (음성·개념·문학·과학·한입·사전)', { skip: SKIP }, async () => {
   let page = await openVoice(); await step(page, VOICE_QUIZ);
   assertOption(await m(page, '.mcq-text'), await m(page, '.mcq-num'), '음성 보기', BLUE.main); assert.equal((await m(page, '.mcq-option')).bw[2], '1px', '음성 보기 구분선');
   assertQuestion(await m(page, '.quiz-question'), '음성 질문', BLUE.main);
@@ -296,9 +296,9 @@ test('221 (d)(h) 해설 색: 정오 한 줄만 초록/빨강+기호, 해설·근
   await done(page);
 });
 
-test('221 (h) 결과 화면: 큰 점수 42px/700/#b8442e(사전은 글꼴 유지), 점수 아래 간격 28px, 이모지 없음 (음성·개념·문학·과학·한입·사전)', { skip: SKIP }, async () => {
+test('221 (h) 결과 화면: 큰 점수 48px/700/#b8442e(사전은 글꼴 유지), 점수 아래 간격 28px, 이모지 없음 (음성·개념·문학·과학·한입·사전)', { skip: SKIP }, async () => {
   const EMOJI = /\p{Extended_Pictographic}/u;
-  const check = (s, label) => { assert.equal(s.size, 42, label + ': 점수 42px'); assert.equal(s.weight, '700', label + ': 700'); assert.equal(s.color, CORAL_DARK, label + ': --primary-dark'); };
+  const check = (s, label) => { assert.equal(s.size, 48, label + ': 점수 48px'); assert.equal(s.weight, '700', label + ': 700'); assert.equal(s.color, CORAL_DARK, label + ': --primary-dark'); };
   let page = await openVoice(); await step(page, VOICE_QUIZ);
   await step(page, "quizState.answers = [{ q: 0, chosen: 0 }]; $('quiz-run').style.display = 'none'; $('quiz-score-num').textContent = '1'; $('quiz-score-total').textContent = '2'; $('quiz-result').style.display = ''; renderQuizWrong();");
   check(await m(page, '#quiz-score-num'), '음성'); assert.equal(await page.count('#quiz-wrong .result-wrong-item'), 1, '음성 결과에 틀린 문항 목록'); assert.ok(!EMOJI.test(await page.text('#quiz-result')), '음성 이모지 없음');
@@ -324,7 +324,7 @@ test('221 (h) 결과 화면: 큰 점수 42px/700/#b8442e(사전은 글꼴 유지
   }
   page = await openDict();
   await step(page, `wordbook = ${WORDS}; quizState = { type: 'en2ko', questions: wordbook.slice(0, 10), current: 9, correct: 7, wrongWords: [wordbook[0], wordbook[1]] }; renderQuizResult();`);
-  const sc = await m(page, '.result-score'); assert.equal(sc.size, 42, '사전 점수 42px'); assert.equal(sc.weight, '700'); assert.equal(sc.color, CORAL_DARK); assert.ok(/Sora/.test(sc.family), '사전 점수 글꼴은 기존(Sora) 유지');
+  const sc = await m(page, '.result-score'); assert.equal(sc.size, 48, '사전 점수 48px'); assert.equal(sc.weight, '700'); assert.equal(sc.color, CORAL_DARK); assert.ok(/Sora/.test(sc.family), '사전 점수 글꼴은 기존(Sora) 유지');
   assert.ok(!EMOJI.test(await page.text('.quiz-result-card')), '사전 이모지 없음');
   assert.equal(await page.eval("getComputedStyle(document.querySelector('.result-score-label')).marginBottom"), '28px', '사전 점수 아래 간격 28px');
   assert.equal((await m(page, '.quiz-result-card')).bw[0], '0px', '사전 결과 카드 박스 없음');
