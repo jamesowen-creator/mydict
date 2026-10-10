@@ -163,7 +163,7 @@ test('원래부터 .btn.text였던 버튼(시작 취소·수정류·연결 삭�
   }
   for (const dt of ['link-delete', 'delete-item']) {
     const m = await page.eval(MEASURE(`[data-t=${dt}]`));
-    assert.match(m.cls, /danger/); assert.equal(m.color, 'rgb(180, 35, 24)', dt + ': 위험 글자색 --danger'); assert.ok(m.ratio >= 5.5, dt + ' 대비 ' + m.ratio);
+    assert.match(m.cls, /danger/); assert.equal(m.color, 'rgb(220, 38, 38)', dt + ': 위험 글자색 --danger'); assert.ok(m.ratio >= 4.5, dt + ' 대비 ' + m.ratio);
   }
   await page.close();
 });
@@ -355,14 +355,14 @@ test('217-2 (a)(b)(c)(e) .btn.mic: 꺼짐·켜짐 모두 배경·테두리 없�
   assert.equal(await page.eval("document.getElementById('ask-mic').getAttribute('aria-label')"), '녹음 끝내기');
   assert.equal(on.bg, TRANSPARENT); assert.deepEqual(on.bw, ['0px', '0px', '0px', '0px']);
   assert.ok(on.h >= 43.5 && on.w >= 43.5); assert.ok(on.ratio >= 4.5, '켜짐 대비 ' + on.ratio.toFixed(2));
-  assert.equal(on.color, 'rgb(180, 35, 24)', '--danger'); assert.equal(on.weight, '800'); assert.equal(on.underline, true);
+  assert.equal(on.color, 'rgb(220, 38, 38)', '--danger'); assert.equal(on.weight, '800'); assert.equal(on.underline, true);
   const bar = await page.eval(`(() => { const c = getComputedStyle(document.getElementById('ask-mic'), '::after'); return { content: c.content, h: c.height, bg: c.backgroundColor, bw: c.borderTopWidth }; })()`);
-  assert.deepEqual(bar, { content: '""', h: '2px', bg: 'rgb(180, 35, 24)', bw: '0px' }, '아이콘 아래 2px 밑줄 선(테두리 아님)');
+  assert.deepEqual(bar, { content: '""', h: '2px', bg: 'rgb(220, 38, 38)', bw: '0px' }, '아이콘 아래 2px 밑줄 선(테두리 아님)');
   // 다른 마이크는 영향 없음, 다시 꺼지면 원래대로
   assert.equal(await page.eval("document.getElementById('start-first-mic').getAttribute('aria-pressed')"), 'false');
   await page.eval("micPaint(MIC_TARGETS[1], false)");
   const back = await page.eval(MEASURE('#ask-mic'));
-  assert.equal(back.underline, false); assert.notEqual(back.color, 'rgb(180, 35, 24)');
+  assert.equal(back.underline, false); assert.notEqual(back.color, 'rgb(220, 38, 38)');
   assert.equal(await page.eval("document.getElementById('ask-mic').getAttribute('aria-pressed')"), 'false');
   assert.deepEqual(page.errors, []);
   await page.close();

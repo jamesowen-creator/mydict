@@ -13,6 +13,7 @@ test.after(async () => { if (browser) await browser.close(); if (srv) await srv.
 
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 const GREEN = 'rgb(8, 80, 65)', RED = 'rgb(180, 35, 24)', TEXT2 = 'rgb(107, 114, 128)';   // --success-dark, --error-dark(=프로젝트 위험색 #B42318), --text2
+const CONCEPT_RED = 'rgb(220, 38, 38)';   // 247-1: 개념 학습 --danger = 원칙 --color-danger #dc2626 (다른 화면의 RED #B42318과 다름)
 const NO_MOTION = `(() => { const s = document.createElement('style'); s.id = 'test-no-motion'; s.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }'; document.head.appendChild(s); })()`;
 const DB_READY = "typeof DB !== 'undefined' && !!DB && getComputedStyle(document.getElementById('loading')).display === 'none'";
 const me = () => ({ id: 7, email: 'u7@example.com', name: '테스터', role: 'user', perm_voice_study: true, perm_concept_study: true,
@@ -186,10 +187,10 @@ test('217-3 concept 돌아보기 퀴즈 보기(.qz-opt)와 문제 영역(.qz-q):
   const wrong = await page.eval(MEASURE('.qz-opt.wrong')), wrongMark = await page.eval(MEASURE('.qz-opt.wrong .qz-mark')), wrongText = await page.eval(MEASURE('.qz-opt.wrong > span:last-child'));
   const ok = await page.eval(MEASURE('.qz-opt.right')), okMark = await page.eval(MEASURE('.qz-opt.right .qz-mark')), okText = await page.eval(MEASURE('.qz-opt.right > span:last-child'));
   assertNoBox(wrong, '오답 보기', { bottomLine: true }); assertNoBox(ok, '정답 보기', { bottomLine: true });
-  assert.equal(wrongMark.text, '✕'); assert.equal(wrong.color, RED); assert.equal(wrong.weight, '700'); assert.equal(wrongText.underline, true, '고른 보기는 밑줄'); assert.ok(wrong.ratio >= 4.5);
+  assert.equal(wrongMark.text, '✕'); assert.equal(wrong.color, CONCEPT_RED); assert.equal(wrong.weight, '700'); assert.equal(wrongText.underline, true, '고른 보기는 밑줄'); assert.ok(wrong.ratio >= 4.5);
   assert.equal(okMark.text, '○', '오답을 골라도 정답 보기에 ○'); assert.equal(ok.color, GREEN); assert.equal(ok.weight, '700'); assert.equal(okText.underline, false, '고르지 않은 정답은 밑줄 없음'); assert.ok(ok.ratio >= 4.5);
   assert.equal(await page.eval("getComputedStyle(document.querySelector('.qz-opt.wrong')).opacity"), '1', '답한 뒤(disabled)에도 흐려지지 않음');
-  const fb = await page.eval(MEASURE('[data-t=quiz-feedback]')); assert.equal(fb.color, RED); assert.ok(fb.ratio >= 4.5, '오답 안내 대비');
+  const fb = await page.eval(MEASURE('[data-t=quiz-feedback]')); assert.equal(fb.color, CONCEPT_RED); assert.ok(fb.ratio >= 4.5, '오답 안내 대비');
   await page.click('[data-t="quiz-next"]');
   await settle(page);
   const q2 = await currentQuestion(page);

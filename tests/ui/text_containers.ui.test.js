@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startMockServer } = require('./helpers/mock_server');
 const { TRANSPARENT, GREEN, RED, TEXT2, CORAL_DARK, NO_MOTION, DB_READY, me, settle, step, MEASURE, assertNoBox, assertFlatPanel, done } = require('./helpers/text_ui');
+const CONCEPT_RED = 'rgb(220, 38, 38)';   // 247-1: 개념 학습 --danger = 원칙 --color-danger #dc2626
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 let browser, srv;
@@ -110,7 +111,7 @@ test('217-4 voice·concept 메시지(.msg, .notice): 색 바탕·테두리·둥�
   await step(page, "document.getElementById('ask-msg').textContent = '오류 문구'; document.getElementById('ask-voice').textContent = '안내 문구';");
   const er = await page.eval(MEASURE('#ask-msg', '::before')), inf = await page.eval(MEASURE('#ask-voice', '::before'));
   assertNoBox(er, 'concept .msg.error'); assertNoBox(inf, 'concept .msg.info');
-  assert.equal(er.mark, '"✕"'); assert.equal(er.color, RED); assert.ok(er.ratio >= 4.5, '오류 대비 ' + er.ratio.toFixed(2));
+  assert.equal(er.mark, '"✕"'); assert.equal(er.color, CONCEPT_RED); assert.ok(er.ratio >= 4.5, '오류 대비 ' + er.ratio.toFixed(2));
   assert.equal(inf.mark, '"i"'); assert.equal(inf.color, CORAL_DARK); assert.ok(inf.ratio >= 4.5, '안내 대비 ' + inf.ratio.toFixed(2));
   await done(page);
 });

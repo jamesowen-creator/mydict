@@ -25,15 +25,12 @@
     --line: var(--color-line, #dde2f5);
     --accent: var(--color-accent, #e2583b);
     --accent-text: var(--color-accent-ink, #b8442e);
-    --on-accent: #FFFFFF;
-    --danger: #B42318;
+    --on-accent: var(--color-surface, #fff);
+    --danger: var(--color-danger, #dc2626);
     --focus: var(--color-text, #1a1f3c);
     --node-line: #868ca8;   /* 지도 노드 테두리: 흰 배경 대비 3.3:1(비텍스트 3:1 이상) */
-    --success: #1D9E75;     /* 의미색(퀴즈 정답) - 주제색 코랄과 분리 */
-    --success-bg: #E1F5EE;
     --success-dark: var(--color-ok-ink, #085041);   /* 작업217-3: 정답 글자(흰 바탕 약 10:1). 음성 학습·읽기 화면의 --success-dark와 같은 값 */
-    --danger-bg: #fcebeb;   /* 오류 박스 배경(음성 학습의 --error-light와 같은 값) */
-    --info-bg: #fdf0ec;     /* 안내 박스 배경(코랄 연한 색) */
+    --info-bg: var(--color-surface-2, #eef1fb);     /* 안내 박스 배경(코랄 연한 색) */
     --navbar-h: 78px;       /* 작업226-3: 하단 내비 높이(음성 학습·사전과 같은 값) */
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -78,7 +75,7 @@
   .small { font-size: 13px; }
   /* 작업220: 주 버튼 규격 — 높이 최소 44px, 15px / 600, 좌우 padding 20px, 테두리 없음 */
   .btn { min-height: 44px; padding: 10px 20px; border: none; font-size: 15px; background: var(--surface2); border-radius: var(--btn-radius); font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-  .btn.primary { background: var(--btn-primary-bg, #b8442e); color: var(--on-accent); }
+  .btn.primary { background: var(--btn-primary-bg, var(--color-accent-ink, #b8442e)); color: var(--on-accent); }
   .btn.primary:hover:not(:disabled) { background: var(--btn-primary-bg-hover, #9c3a27); }
   .btn.primary:active:not(:disabled) { background: var(--btn-primary-bg-active, #86311f); }
   /* 작업216-4: 보조 동작은 박스 없이 텍스트(음성 학습의 .btn.text와 같은 사양). 터치 영역: 높이 44px(.btn) + 가로 44px 이상(min-width).
@@ -326,7 +323,7 @@
   .bottom-nav {
     background: var(--surface);
     border-top: 1px solid var(--line);
-    box-shadow: 0 -2px 8px rgba(226,88,59,0.07);
+    box-shadow: var(--shadow-nav, 0 -2px 8px rgba(226,88,59,0.07));
     padding: 0 16px max(8px, env(safe-area-inset-bottom));
     display: flex; align-items: center; gap: 0;
     position: fixed;
