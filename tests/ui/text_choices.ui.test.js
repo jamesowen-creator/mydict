@@ -12,7 +12,7 @@ test.before(async () => { if (SKIP) return; srv = await startMockServer(); brows
 test.after(async () => { if (browser) await browser.close(); if (srv) await srv.close(); });
 
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
-const GREEN = 'rgb(8, 80, 65)', RED = 'rgb(180, 35, 24)', TEXT2 = 'rgb(107, 114, 128)';   // --success-dark, --error-dark(=프로젝트 위험색 #B42318), --text2
+const GREEN = 'rgb(8, 80, 65)', RED = 'rgb(220, 38, 38)', TEXT2 = 'rgb(74, 80, 112)';   // 253-1: --success-dark, --color-danger, --color-text-sub (모든 화면 공통)
 const CONCEPT_RED = 'rgb(220, 38, 38)';   // 247-1: 개념 학습 --danger = 원칙 --color-danger #dc2626 (다른 화면의 RED #B42318과 다름)
 const NO_MOTION = `(() => { const s = document.createElement('style'); s.id = 'test-no-motion'; s.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }'; document.head.appendChild(s); })()`;
 const VOICE_TEXT2 = 'rgb(74, 80, 112)', VOICE_RED = 'rgb(220, 38, 38)', VOICE_TEXT = 'rgb(26, 31, 60)';   // 251-1: 음성 학습 --color-text-sub, --color-danger, --color-text
@@ -295,7 +295,7 @@ test('217-3 읽기 3화면 O/X: 박스 없는 큰 글자 O X(32px 굵게, 좌우
     assert.equal(wx.mark, '"✕ 오답"', r.file); assert.equal(xm.color, RED); assert.equal(wx.markColor, RED); assert.equal(xm.underline, true, '고른 쪽 밑줄'); assert.ok(wx.markRatio >= 4.5);
     assert.equal(cx.mark, '"○ 정답"'); assert.equal(om.color, GREEN); assert.equal(cx.markColor, GREEN); assert.equal(om.underline, false, '고르지 않은 정답은 밑줄 없음'); assert.ok(cx.markRatio >= 4.5);
     assert.equal(await page.eval("document.getElementById('ox-x').disabled && document.getElementById('ox-o').disabled"), true);
-    const fb = await page.eval(MEASURE(r.fb, '::before')); assert.equal(fb.bg, TRANSPARENT); assert.equal(fb.radius, '0px'); assert.equal(fb.markColor, RED); assert.equal(fb.color, 'rgb(26, 26, 26)', '작업221: 해설은 주 글자색(옛 기대: 전체 빨강)'); assert.equal(fb.mark, '"✕"');   // 작업222: 해설 기호는 .msg와 같은 방식(절대 위치 기호 자리 24px)이라 뒤 공백 없음
+    const fb = await page.eval(MEASURE(r.fb, '::before')); assert.equal(fb.bg, TRANSPARENT); assert.equal(fb.radius, '0px'); assert.equal(fb.markColor, RED); assert.equal(fb.color, 'rgb(26, 31, 60)', '작업221: 해설은 주 글자색(옛 기대: 전체 빨강)'); assert.equal(fb.mark, '"✕"');   // 작업222: 해설 기호는 .msg와 같은 방식(절대 위치 기호 자리 24px)이라 뒤 공백 없음
      assert.ok(fb.ratio >= 4.5 && fb.markRatio >= 4.5);
     // 정답을 고르는 경우(두 번째 문제의 정답은 X)
     await page.click('.quiz-next-btn.visible, #quiz-next');
@@ -305,7 +305,7 @@ test('217-3 읽기 3화면 O/X: 박스 없는 큰 글자 O X(32px 굵게, 좌우
     await page.waitFor("document.getElementById('ox-x').classList.contains('correct')");
     const ok = await page.eval(MEASURE('#ox-x')), okm = await page.eval(MEASURE('#ox-x', '::after')), fb2 = await page.eval(MEASURE(r.fb, '::before'));
     assert.equal(ok.color, GREEN); assert.equal(ok.underline, true); assert.equal(okm.mark, '"○ 정답"');
-    assert.equal(fb2.markColor, GREEN); assert.equal(fb2.color, 'rgb(26, 26, 26)'); assert.equal(fb2.mark, '"○"'); assert.ok(fb2.ratio >= 4.5 && fb2.markRatio >= 4.5);
+    assert.equal(fb2.markColor, GREEN); assert.equal(fb2.color, 'rgb(26, 31, 60)'); assert.equal(fb2.mark, '"○"'); assert.ok(fb2.ratio >= 4.5 && fb2.markRatio >= 4.5);
     assert.equal(await page.count('.ox-btn.wrong'), 0);
     await done(page);
   }

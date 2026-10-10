@@ -15,20 +15,17 @@
 <style>
   :root {
     --primary: var(--color-accent, #e2583b);
-    --primary-light: #FDF0EC;
+    --primary-light: var(--color-surface-2, #eef1fb);
     --primary-dark: var(--color-accent-ink, #b8442e);
     /* 작업199: 정답 같은 의미색은 주제색(코랄)과 분리해 초록 유지 */
-    --success: #1D9E75;
-    --success-light: #E1F5EE;
     --success-dark: var(--color-ok-ink, #085041);
-    --bg: #FAFAF9;
-    --card: #FFFFFF;
-    --text1: #1a1a1a;
-    --text2: #6b7280;
-    --border: rgba(0,0,0,0.08);
-    --error: #E24B4A;
-    --error-light: #FCEBEB;
-    --error-dark: #B42318;   /* 작업217-3: 오답 글자(흰 바탕 6.57:1). 프로젝트의 위험색(개념 학습 --danger, 다이얼로그 위험 버튼)과 같은 값 */
+    --bg: var(--color-bg, #f5f7ff);
+    --card: var(--color-surface, #fff);
+    --text1: var(--color-text, #1a1f3c);
+    --text2: var(--color-text-sub, #4a5070);
+    --border: var(--color-line, #dde2f5);
+    --error: var(--color-danger, #dc2626);
+    --error-dark: var(--color-danger, #dc2626);   /* 작업217-3: 오답 글자(흰 바탕 6.57:1). 프로젝트의 위험색(개념 학습 --danger, 다이얼로그 위험 버튼)과 같은 값 */
     --navbar-h: 78px;
   }
 
@@ -170,7 +167,7 @@
     border: none; border-radius: 0; background: transparent;
     color: var(--text1); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    font-family: 'Noto Sans KR', sans-serif; font-size: 30px; line-height: 1; font-weight: 400;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 32px; line-height: 1; font-weight: 400;
   }
   .carousel-nav-btn:hover:not(:disabled) { color: var(--primary-dark); }
   .carousel-nav-btn:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; border-radius: 4px; }
@@ -181,7 +178,7 @@
   /* 작업128: 범례 클릭 필터 - 터치 영역 최소 36px, 선택/흐림 상태 */
   .carousel-legend-item {
     display: inline-flex; align-items: center; min-height: 36px;
-    padding: 0 6px; border-radius: 8px; cursor: pointer;
+    padding: 0 6px; border-radius: 10px; cursor: pointer;
     user-select: none; -webkit-user-select: none;
     transition: opacity 0.15s, color 0.15s, background 0.15s;
   }
@@ -209,8 +206,8 @@
      제목은 사전 상세(표제어)처럼 본문 큰 제목 하나만 - 상단 바에선 뺌 */
   #view-digest {
     --coral: var(--metis-coral, #e2583b);
-    --coral-ink: #b8442e;
-    --coral-tint: #FDF0EC;
+    --coral-ink: var(--color-accent-ink, #b8442e);
+    --coral-tint: var(--color-surface-2, #eef1fb);
   }
   #view-digest .content { padding: 20px 16px 100px; }
 
@@ -219,7 +216,7 @@
     border: none; border-radius: 0; box-shadow: none;
     padding: 20px 16px; margin: 0 -16px 14px;   /* 작업222: 글자 시작 x 16px */
   }
-  .digest-work-title { font-size: 24px; font-weight: 700; color: var(--text1); margin-bottom: 6px; line-height: 1.3; }
+  .digest-work-title { font-size: 22px; font-weight: 700; color: var(--text1); margin-bottom: 6px; line-height: 1.3; }
   .digest-work-meta { font-size: 14px; color: var(--text2); font-family: 'Inter', sans-serif; }
 
   .digest-section {
@@ -293,7 +290,7 @@
   .bottom-nav {
     background: var(--card);
     border-top: 1px solid var(--border);
-    box-shadow: 0 -2px 8px rgba(226,88,59,0.07);
+    box-shadow: var(--shadow-nav, 0 -2px 8px rgba(226,88,59,0.07));
     padding: 0 16px max(8px, env(safe-area-inset-bottom));
     display: flex; align-items: center; gap: 0;
     position: fixed;
@@ -426,7 +423,7 @@
 
   .quiz-next-btn {
     min-height: var(--ctl-min-h); margin-top: 20px;
-    background: var(--btn-primary-bg, #b8442e); color: #fff;
+    background: var(--btn-primary-bg, var(--color-accent-ink, #b8442e)); color: #fff;
     border: none; border-radius: var(--btn-radius);
     padding: 10px 20px; width: 100%;   /* 작업220: 주 버튼 규격 — 높이 최소 44px, 15px / 600, 좌우 padding 20px */
     font-size: 15px; font-weight: 600; cursor: pointer;
@@ -445,7 +442,7 @@
     border: none; border-radius: 0; box-shadow: none; border-bottom: 1px solid var(--border);
   }
   .result-score { font-size: 42px; font-weight: 700; color: var(--primary-dark); font-family: 'Inter', sans-serif; }
-  .result-score span { font-size: 20px; color: var(--text2); }
+  .result-score span { font-size: 18px; color: var(--text2); }
   .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
   .result-submsg { font-size: 13px; color: var(--text2); margin-top: 4px; }
   .result-section-label { font-size: 12px; font-weight: 700; color: var(--primary-dark); margin-bottom: 12px; letter-spacing: 0.03em; padding-bottom: 4px; border-bottom: 2px solid var(--primary); }
@@ -466,7 +463,7 @@
     border: none; transition: all 0.15s;
     font-family: 'Noto Sans KR', sans-serif;
   }
-  .result-btn-primary { background: var(--btn-primary-bg, #b8442e); color: #fff; }
+  .result-btn-primary { background: var(--btn-primary-bg, var(--color-accent-ink, #b8442e)); color: #fff; }
   .result-btn-primary:hover { background: var(--btn-primary-bg-hover, #9c3a27); }
   /* 작업217-2: 보조 결과 버튼은 박스 없이 밑줄 텍스트(높이 44px = .result-btn min-height, 가로 44px 이상). 글자 --text2는 페이지 바탕(#FAFAF9) 위 4.63:1 */
   /* 작업220: 텍스트 버튼 규격 — 15px / 600, 보조색, padding 0 8px, 최소 44×44px, 밑줄 */
@@ -496,7 +493,7 @@
 <!-- Access Denied -->
 <div id="access-denied" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center">
   <div style="font-size:48px">🔒</div>
-  <h2 style="font-size:20px;font-weight:700;color:var(--text1)">이용 권한이 없습니다</h2>
+  <h2 style="font-size:18px;font-weight:700;color:var(--text1)">이용 권한이 없습니다</h2>
   <p style="font-size:14px;color:var(--text2);line-height:1.6">한입 독서 이용 권한이 없습니다.<br>관리자에게 문의해주세요.</p>
   <a href="/" style="display:inline-flex;align-items:center;gap:8px;background:var(--btn-primary-bg, var(--primary));color:#fff;padding:14px 24px;border-radius:14px;font-size:15px;font-weight:700;text-decoration:none">METIS 홈으로</a>
 </div>

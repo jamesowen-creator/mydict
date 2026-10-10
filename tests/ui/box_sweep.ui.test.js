@@ -54,7 +54,7 @@ test('훑기 자체 검증: 알약·색 바탕·그림자·테두리 두 면 이
   const bad = ['display:inline-block;padding:4px 10px;border-radius:20px;background:#fee', 'background:#fdf0ec', 'box-shadow:0 1px 4px rgba(0,0,0,.1)', 'border:1px solid #888;padding:4px',
     'border-left:3px solid #888;border-top:1px solid #888', 'background:linear-gradient(#fff,#eee)', 'display:inline-block;border:1px solid #888;border-radius:50%'];
   for (const css of bad) { await page.eval(probe(css)); assert.equal((await page.eval(SWEEP(ALLOW_SEL))).length, 1, '잡아야 함: ' + css); }
-  const good = ['background:#fff;border-bottom:1px solid #ccc', 'background:#fff', 'border-left:2px solid #e2583b;padding-left:8px', 'background:rgb(250, 250, 249)'];
+  const good = ['background:#fff;border-bottom:1px solid #ccc', 'background:#fff', 'border-left:2px solid #e2583b;padding-left:8px', 'background:rgb(245, 247, 255)'];
   for (const css of good) { await page.eval(probe(css)); assert.equal((await page.eval(SWEEP(ALLOW_SEL))).length, 0, '통과해야 함: ' + css); }
   await page.eval(probe('')); await page.eval("document.getElementById('probe').innerHTML = '<span class=\"tl-bar\" style=\"border:1px solid #888;border-radius:8px;background:#fee\">x</span>'");
   assert.equal((await page.eval(SWEEP(ALLOW_SEL))).length, 0, '허용 목록(.tl-bar)은 통과');

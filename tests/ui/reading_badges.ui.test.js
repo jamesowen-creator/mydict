@@ -124,7 +124,7 @@ test('literature 키워드(.card-keyword): 박스 없는 작은 보조색 글자
   assert.ok((await page.count('.card-keyword')) >= 2);
   const k = await page.eval(MEASURE('.card-keyword'));
   assertPlainText(k, '.card-keyword');
-  assert.equal(k.color, 'rgb(107, 114, 128)', '--text2');
+  assert.equal(k.color, 'rgb(74, 80, 112)', '--text2');
   assert.equal(await pseudo(page, '.card-keyword:first-child', '::after'), '"·"');
   assert.equal(await pseudo(page, '.card-keyword:last-child', '::after'), 'none');
   // 키워드를 많이 넣어 줄바꿈을 강제해도 넘치지 않음
@@ -139,7 +139,7 @@ test('literature 대표 작가(.author-chip): 박스·배경·모서리 없이 �
   assert.ok((await page.count('.author-chip')) >= 2, '대표 작가가 2명 이상인 사조를 골랐음');
   const a = await page.eval(MEASURE('.author-chip'));
   assertPlainText(a, '.author-chip');
-  assert.equal(a.color, 'rgb(107, 114, 128)', '--text2'); assert.equal(a.weight, '600');
+  assert.equal(a.color, 'rgb(74, 80, 112)', '--text2'); assert.equal(a.weight, '600');
   assert.equal(await pseudo(page, '.author-chip', '::before'), '""', '앞의 작은 점(구분 표시) 유지');
   assert.equal(await page.eval("getComputedStyle(document.querySelector('.author-chip'), '::before').width"), '6px');
   assert.equal(await page.eval("getComputedStyle(document.querySelector('.author-chips')).columnGap"), '16px', '이름 사이 간격');
@@ -198,7 +198,7 @@ test('digest_reading: 표시 전용 뱃지가 없음(변경 없음) — 목록·
 test('유지(변환 금지): literature의 사조 칩·타임라인 칩·탭, science의 과목 카드·정복 토글, digest의 정복 토글(카드 이동 화살표는 작업217-2에서 박스 제거)', { skip: SKIP }, async () => {
   let page = await open('literature_compass');
   const bar = await must(page, '.tl-bar');
-  assert.equal(bar.radius, '8px'); assert.notEqual(bar.bg, TRANSPARENT); assert.equal(bar.cursor, 'pointer');
+  assert.equal(bar.radius, '10px'); assert.notEqual(bar.bg, TRANSPARENT); assert.equal(bar.cursor, 'pointer');
   for (const sel of ['.genre-tab', '.bottom-nav-tab']) await must(page, sel);
   // .movement-pill을 만드는 renderPills는 현재 홈 화면에서 호출되지 않는다(타임라인 renderTimeline만 씀). CSS가 그대로인지 직접 렌더해서 확인.
   // 같은 컨테이너(#pills-<시대>)를 쓰므로 타임라인 막대 측정을 마친 뒤에 렌더한다

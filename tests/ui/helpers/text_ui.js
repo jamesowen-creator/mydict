@@ -6,9 +6,10 @@ const { sleep } = require('./cdp');
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 const WHITE = 'rgb(255, 255, 255)';
 // 상태 글자색: --success-dark, --error-dark(= 프로젝트의 위험색 #B42318), --text2, --primary-dark
-const GREEN = 'rgb(8, 80, 65)', RED = 'rgb(180, 35, 24)', TEXT2 = 'rgb(107, 114, 128)', CORAL_DARK = 'rgb(184, 68, 46)';
-// 251-1: 음성 학습은 사전과 같은 푸른 계열 원칙 변수(--color-text-sub #4a5070, --color-danger #dc2626, --color-text #1a1f3c). 문학·한입·과학은 위 상수 그대로
-const VOICE_TEXT2 = 'rgb(74, 80, 112)', VOICE_RED = 'rgb(220, 38, 38)', VOICE_TEXT = 'rgb(26, 31, 60)';
+// 253-1: 모든 화면이 같은 원칙 팔레트(--color-text-sub #4a5070, --color-danger #dc2626, --color-text #1a1f3c). 상태 글자색: --success-dark, --color-danger, --text2, --primary-dark
+const GREEN = 'rgb(8, 80, 65)', RED = 'rgb(220, 38, 38)', TEXT2 = 'rgb(74, 80, 112)', TEXT = 'rgb(26, 31, 60)', CORAL_DARK = 'rgb(184, 68, 46)';
+// 251-1에서 만든 음성용 이름은 별칭으로 남김(값은 위와 같음)
+const VOICE_TEXT2 = TEXT2, VOICE_RED = RED, VOICE_TEXT = TEXT;
 const NO_MOTION = `(() => { const s = document.createElement('style'); s.id = 'test-no-motion'; s.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }'; document.head.appendChild(s); })()`;
 const DB_READY = "typeof DB !== 'undefined' && !!DB && getComputedStyle(document.getElementById('loading')).display === 'none'";
 const me = () => ({ id: 7, email: 'u7@example.com', name: '테스터', role: 'user', perm_voice_study: true, perm_concept_study: true,
@@ -63,7 +64,7 @@ function assertFlatPanel(m, label, { bottomLine = false } = {}) {
 }
 const done = async page => { assert.deepEqual(page.errors, [], '스크립트 오류 없음'); assert.equal(await page.hasHorizontalScroll(), false, '가로 스크롤 없음'); await page.close(); };
 
-module.exports = { TRANSPARENT, WHITE, GREEN, RED, TEXT2, VOICE_TEXT2, VOICE_RED, VOICE_TEXT, CORAL_DARK, NO_MOTION, DB_READY, me, settle, step, MEASURE, assertNoBox, assertFlatPanel, done };
+module.exports = { TRANSPARENT, WHITE, GREEN, RED, TEXT2, TEXT, VOICE_TEXT2, VOICE_RED, VOICE_TEXT, CORAL_DARK, NO_MOTION, DB_READY, me, settle, step, MEASURE, assertNoBox, assertFlatPanel, done };
 
 // ── 자동 훑기(computed style 기준) ───────────────────────────────────────────────
 // "박스"의 기준(클래스 이름이 아니라 계산된 스타일): 아래 중 하나라도 해당하면 박스

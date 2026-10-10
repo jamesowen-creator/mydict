@@ -15,8 +15,8 @@ test.after(async () => { if (browser) await browser.close(); if (srv) await srv.
 
 const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
 const jwt = () => `${b64({ alg: 'none' })}.${b64({ id: 7, name: '테스터', exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`;
-// 글자색(주 / 보조): 회색 계열 = #1a1a1a / #6b7280, 푸른 계열 = #1a1f3c / #4a5070
-const GRAY = { main: 'rgb(26, 26, 26)', sub: 'rgb(107, 114, 128)' }, BLUE = { main: 'rgb(26, 31, 60)', sub: 'rgb(74, 80, 112)' };
+// 글자색(주 / 보조): 원칙 팔레트 = #1a1f3c / #4a5070 (253-1 이전에는 문학·한입·과학·음성이 회색 계열 #1a1a1a / #6b7280)
+const BLUE = { main: 'rgb(26, 31, 60)', sub: 'rgb(74, 80, 112)' }, GRAY = BLUE;   // 253-1: 6화면 모두 같은 원칙 팔레트(#1a1f3c / #4a5070). GRAY는 옛 이름의 별칭
 const CORAL_DARK = 'rgb(184, 68, 46)';
 
 async function openVoice(width = 390) {
@@ -225,14 +225,14 @@ test('220 (d) 한 화면 안의 중립 글자색(채도 낮은 색, 흰색·공�
   await step(page, LIT_MCQ); await page.click('.mcq-option', { index: 0 }); await page.waitFor("!!document.querySelector('.mcq-option.wrong')"); await addTo(acc, page);
   await step(page, LIT_OX); await page.click('#ox-x'); await page.waitFor("document.getElementById('ox-x').classList.contains('wrong')"); await addTo(acc, page);
   await step(page, LIT_RESULT); await addTo(acc, page);
-  await done(page); check('문학', acc, ['#1a1a1a', '#6b7280']);
+  await done(page); check('문학', acc, ['#1a1f3c', '#4a5070']);
   for (const [name, file, go] of [['과학', 'science_reading', 'showScience(DB.concepts[0].id)'], ['한입', 'digest_reading', 'showDigest(DB.works[0].id)']]) {
     acc = new Set(); page = await openReading(file); await addTo(acc, page);
     await step(page, go); await addTo(acc, page);
     await step(page, READ_QUIZ(MCQ_Q)); await page.click('.mcq-option', { index: 0 }); await page.waitFor("!!document.querySelector('.mcq-option.wrong')"); await addTo(acc, page);
     await step(page, READ_QUIZ(OX_Q)); await page.click('#ox-x'); await page.waitFor("document.getElementById('ox-x').classList.contains('wrong')"); await addTo(acc, page);
     await step(page, RESULT_Q); await addTo(acc, page);
-    await done(page); check(name, acc, ['#1a1a1a', '#6b7280']);
+    await done(page); check(name, acc, ['#1a1f3c', '#4a5070']);
   }
 });
 
@@ -292,7 +292,7 @@ test('221 (d)(h) 해설 색: 정오 한 줄만 초록/빨강+기호, 해설·근
   assert.equal((await m(page, '#quiz-feedback', '::before')).mark, '"✕"');
   await done(page);
   page = await openReading('literature_compass'); await step(page, LIT_OX); await page.click('#ox-x'); await page.waitFor("document.getElementById('ox-x').classList.contains('wrong')");
-  assert.equal((await m(page, '#ox-feedback .fb-line')).color, 'rgb(180, 35, 24)', '문학 OX 정오 줄'); assert.equal((await m(page, '#ox-feedback')).color, GRAY.main, '문학 OX 해설은 주 글자색');
+  assert.equal((await m(page, '#ox-feedback .fb-line')).color, 'rgb(220, 38, 38)', '문학 OX 정오 줄'); assert.equal((await m(page, '#ox-feedback')).color, GRAY.main, '문학 OX 해설은 주 글자색');
   await done(page);
 });
 

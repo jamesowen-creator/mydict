@@ -269,7 +269,7 @@ for (const key of ['sci', 'dig']) {
     const page = await open(key);
     assert.equal(await page.eval("document.getElementById('nav-quiz').getAttribute('aria-disabled')"), 'true');
     assert.equal(await page.eval("getComputedStyle(document.getElementById('nav-quiz')).opacity"), '1', '흐림(opacity) 대신 aria-disabled');
-    assert.equal(await page.eval("getComputedStyle(document.getElementById('nav-quiz')).color"), 'rgb(107, 114, 128)', '보조색');
+    assert.equal(await page.eval("getComputedStyle(document.getElementById('nav-quiz')).color"), 'rgb(74, 80, 112)', '보조색');
     await page.click('#bottom-nav [data-tab="quiz"]');
     await page.waitFor("!!document.querySelector('[data-t=dialog-msg]')");
     assert.match(await page.text('[data-t="dialog-msg"]'), key === 'sci' ? /먼저 개념을 정복해 주세요/ : /먼저 작품을 읽어보세요/);

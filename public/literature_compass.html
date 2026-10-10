@@ -15,18 +15,15 @@
 <style>
   :root {
     --primary: var(--color-accent, #e2583b);
-    --primary-light: #FDF0EC;
+    --primary-light: var(--color-surface-2, #eef1fb);
     --primary-dark: var(--color-accent-ink, #b8442e);
-    --bg: #FAFAF9;
-    --card: #FFFFFF;
-    --text1: #1a1a1a;
-    --text2: #6b7280;
-    --border: rgba(0,0,0,0.08);
-    --success: #1D9E75;
-    --success-light: #E1F5EE;
-    --error: #E24B4A;
-    --error-light: #FCEBEB;
-    --error-dark: #B42318;   /* 작업217-3: 오답 글자(흰 바탕 6.57:1). 프로젝트의 위험색(개념 학습 --danger, 다이얼로그 위험 버튼)과 같은 값 */
+    --bg: var(--color-bg, #f5f7ff);
+    --card: var(--color-surface, #fff);
+    --text1: var(--color-text, #1a1f3c);
+    --text2: var(--color-text-sub, #4a5070);
+    --border: var(--color-line, #dde2f5);
+    --error: var(--color-danger, #dc2626);
+    --error-dark: var(--color-danger, #dc2626);   /* 작업217-3: 오답 글자(흰 바탕 6.57:1). 프로젝트의 위험색(개념 학습 --danger, 다이얼로그 위험 버튼)과 같은 값 */
     --success-dark: var(--color-ok-ink, #085041);   /* 작업217-3: 정답 글자(흰 바탕 약 10:1). 다른 읽기 화면의 --success-dark와 같은 값 */
     --navbar-h: 78px;
   }
@@ -74,7 +71,7 @@
   .bottom-nav {
     background: var(--card);
     border-top: 1px solid var(--border);
-    box-shadow: 0 -2px 8px rgba(226,88,59,0.07);
+    box-shadow: var(--shadow-nav, 0 -2px 8px rgba(226,88,59,0.07));
     padding: 0 16px max(8px, env(safe-area-inset-bottom));
     display: flex; align-items: center; gap: 0;
     position: fixed;
@@ -146,7 +143,7 @@
     margin: 0 -16px;   /* 작업222: 글자 시작 x 16px */
   }
   .era-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-  .era-name { font-size: 17px; font-weight: 700; color: var(--text1); }
+  .era-name { font-size: 18px; font-weight: 700; color: var(--text1); }
   .era-range { font-size: 12px; color: var(--text2); font-family: 'Inter', sans-serif; }
   .era-divider { height: 1px; background: var(--border); margin: 14px 0; }
   .movement-label { font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 10px; letter-spacing: 0.03em; }
@@ -162,21 +159,21 @@
     display: flex; flex-direction: column; align-items: center; gap: 2px;
     text-align: center;
   }
-  .movement-pill:hover { background: var(--btn-primary-bg, #b8442e); color: #fff; }
+  .movement-pill:hover { background: var(--btn-primary-bg, var(--color-accent-ink, #b8442e)); color: #fff; }
   .movement-pill .pill-name { font-size: 13px; font-weight: 600; line-height: 1.3; }
   .movement-pill .pill-period { font-size: 11px; font-weight: 400; opacity: 0.65; font-family: 'Inter', sans-serif; line-height: 1.2; }
 
   /* ── Timeline ── */
   .timeline-wrap { display: flex; }
   .tl-axis { width: 36px; flex-shrink: 0; position: relative; border-right: 1.5px solid var(--border); }
-  .tl-axis-label { position: absolute; right: 5px; transform: translateY(-50%); font-size: 9px; color: var(--text2); font-family: 'Inter', sans-serif; line-height: 1; pointer-events: none; white-space: nowrap; }
+  .tl-axis-label { position: absolute; right: 5px; transform: translateY(-50%); font-size: 11px; color: var(--text2); font-family: 'Inter', sans-serif; line-height: 1; pointer-events: none; white-space: nowrap; }
   .tl-lane { flex: 1; min-width: 80px; position: relative; }
   .tl-lane + .tl-lane { border-left: 1px solid rgba(226,88,59,0.1); }
   .tl-grid-line { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed rgba(226,88,59,0.15); pointer-events: none; z-index: 0; }
-  .tl-bar { position: absolute; left: 3px; right: 3px; border-radius: 8px; background: var(--primary-light); border: 1px solid rgba(226,88,59,0.25); color: var(--primary-dark); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 3px 5px; overflow: hidden; transition: background 0.15s, color 0.15s; box-sizing: border-box; z-index: 1; }
-  .tl-bar:hover { background: var(--btn-primary-bg, #b8442e); color: #fff; }
+  .tl-bar { position: absolute; left: 3px; right: 3px; border-radius: 10px; background: var(--primary-light); border: 1px solid rgba(226,88,59,0.25); color: var(--primary-dark); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 3px 5px; overflow: hidden; transition: background 0.15s, color 0.15s; box-sizing: border-box; z-index: 1; }
+  .tl-bar:hover { background: var(--btn-primary-bg, var(--color-accent-ink, #b8442e)); color: #fff; }
   .tl-bar-dim { opacity: 0.22; pointer-events: none; cursor: default; }
-  .tl-bar-name { font-size: 10px; font-weight: 600; text-align: center; word-break: keep-all; white-space: normal; line-height: 1.3; }
+  .tl-bar-name { font-size: 11px; font-weight: 600; text-align: center; word-break: keep-all; white-space: normal; line-height: 1.3; }
 
   /* ── Genre Filter Tabs ── */
   .genre-filter-tabs {
@@ -251,7 +248,7 @@
   }
   .briefing-cta {
     min-height: var(--ctl-min-h); margin-top: 28px;
-    background: var(--btn-primary-bg, #b8442e);
+    background: var(--btn-primary-bg, var(--color-accent-ink, #b8442e));
     color: #fff;
     border: none;
     border-radius: var(--btn-radius);
@@ -317,7 +314,7 @@
   .badge-level { color: #92400E; }
   .badge-level.고등 { color: #831843; }
 
-  .card-title { font-size: 26px; font-weight: 700; color: var(--text1); margin-bottom: 6px; line-height: 1.3; }
+  .card-title { font-size: 22px; font-weight: 700; color: var(--text1); margin-bottom: 6px; line-height: 1.3; }
   .card-meta { font-size: 14px; color: var(--text2); margin-bottom: 4px; font-family: 'Inter', sans-serif; }
   .card-genre { font-size: 13px; color: var(--text2); margin-bottom: 16px; }
   .card-keywords { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
@@ -373,7 +370,7 @@
     border: none; border-radius: 0; background: transparent;
     color: var(--text1); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    font-family: 'Noto Sans KR', sans-serif; font-size: 30px; line-height: 1; font-weight: 400;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 32px; line-height: 1; font-weight: 400;
   }
   .nav-btn:hover:not(:disabled) { color: var(--primary-dark); }
   .nav-btn:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; border-radius: 4px; }
@@ -387,7 +384,7 @@
 
   .quiz-start-btn {
     min-height: var(--ctl-min-h); margin: 0 16px 16px;
-    background: var(--btn-primary-bg, #b8442e);
+    background: var(--btn-primary-bg, var(--color-accent-ink, #b8442e));
     color: #fff;
     border: none;
     border-radius: var(--btn-radius);
@@ -514,7 +511,7 @@
 
   .quiz-next-btn {
     min-height: var(--ctl-min-h); margin-top: 20px;
-    background: var(--btn-primary-bg, #b8442e); color: #fff;
+    background: var(--btn-primary-bg, var(--color-accent-ink, #b8442e)); color: #fff;
     border: none; border-radius: var(--btn-radius);
     padding: 10px 20px; width: 100%;
     font-size: 15px; font-weight: 600; cursor: pointer;
@@ -533,7 +530,7 @@
     border: none; border-radius: 0; box-shadow: none; border-bottom: 1px solid var(--border);
   }
   .result-score { font-size: 42px; font-weight: 700; color: var(--primary-dark); font-family: 'Inter', sans-serif; }
-  .result-score span { font-size: 20px; color: var(--text2); }
+  .result-score span { font-size: 18px; color: var(--text2); }
   .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
   .result-submsg { font-size: 13px; color: var(--text2); margin-top: 4px; }
 
@@ -556,7 +553,7 @@
     border: none; transition: all 0.15s;
     font-family: 'Noto Sans KR', sans-serif;
   }
-  .result-btn-primary { background: var(--btn-primary-bg, #b8442e); color: #fff; }
+  .result-btn-primary { background: var(--btn-primary-bg, var(--color-accent-ink, #b8442e)); color: #fff; }
   .result-btn-primary:hover { background: var(--btn-primary-bg-hover, #9c3a27); }
   /* 작업217-2: 보조 결과 버튼은 박스 없이 밑줄 텍스트(높이 44px = .result-btn min-height, 가로 44px 이상). 글자 --text2는 페이지 바탕(#FAFAF9) 위 4.63:1 */
   /* 작업220: 텍스트 버튼 규격 — 15px / 600, 보조색, padding 0 8px, 최소 44×44px, 밑줄 */
@@ -591,7 +588,7 @@
 <!-- Access Denied -->
 <div id="access-denied" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center">
   <div style="font-size:48px">🔒</div>
-  <h2 style="font-size:20px;font-weight:700;color:var(--text1)">이용 권한이 없습니다</h2>
+  <h2 style="font-size:18px;font-weight:700;color:var(--text1)">이용 권한이 없습니다</h2>
   <p style="font-size:14px;color:var(--text2);line-height:1.6">문학 나침반 이용 권한이 없습니다.<br>관리자에게 문의해주세요.</p>
   <a href="/" style="display:inline-flex;align-items:center;gap:8px;background:var(--btn-primary-bg, var(--primary));color:#fff;padding:14px 24px;border-radius:14px;font-size:15px;font-weight:700;text-decoration:none">METIS 홈으로</a>
 </div>
