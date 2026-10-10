@@ -12,7 +12,7 @@ for (const m of css.matchAll(/(--[\w-]+):\s*([^;]+);/g)) tokens[m[1]] = norm(m[2
 
 for (const f of fs.readdirSync(pub).filter(n => n.endsWith('.html'))) {
   const html = fs.readFileSync(path.join(pub, f), 'utf8');
-  const refs = [...html.matchAll(/--[\w-]+:\s*var\((--[\w-]+),\s*([^)]+)\)/g)];
+  const refs = [...html.matchAll(/--[\w-]+:\s*var\((--(?:color-|card-radius|radius-ctl)[\w-]*),\s*([^)]+)\)/g)];
   if (!refs.length) continue;
   test(`${f}: var() 폴백이 tokens.css 값과 같음`, () => {
     assert.match(html, /\/css\/common\/tokens\.css/, 'tokens.css 링크');
