@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
 <!-- 작업13: 공용 인증 위젯 스타일(.metis-app-header-btn 등) 재사용 -->
 <link rel="stylesheet" href="/css/common/appHeader.css">
+<!-- 작업243-2: 다른 화면과 같은 본문 폭 변수(--content-max) -->
+<link rel="stylesheet" href="/css/common/tokens.css">
 <style>
   :root {
     --bg: #f5f7ff; --surface: #fff; --border: #dde2f5;
@@ -17,12 +19,14 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   /* 작업76: 카드 박스를 걷어내면서 배경도 흰색으로 - 구분은 여백과 1px 구분선으로만 */
-  body { background: var(--surface); color: var(--text); font-family: 'Noto Sans KR', sans-serif; min-height: 100vh; }
+  body { background: var(--surface); color: var(--text); font-family: 'Noto Sans KR', sans-serif; min-height: 100vh;
+    /* 작업243-2: 다른 화면과 같이 헤더·본문 모두 var(--content-max)(680px) 가운데 */
+    max-width: var(--content-max); margin: 0 auto; }
 
   /* ── Header ── */
   header {
     background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 10px 16px; min-height: 52px;
+    padding: 8px 16px; min-height: 65px;
     /* 작업13: 인증 위젯(이름+로그아웃)이 추가되면서 좁은 모바일 폭에서
        기존 height:52px 고정 + justify-content:space-between만으로는
        내용이 넘쳐 "돌아가기" 링크가 세로로 찌그러졌음 - 감싸지도록
@@ -50,24 +54,13 @@
   #metis-header-auth .metis-app-header-btn { border-radius: 0; }
 
   /* ── Layout ── */
-  main { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+  main { padding: 24px 16px; }   /* 작업243-2: 폭은 body(680px)를 따른다 */
   /* 작업76: 카드 박스 제거 - 섹션 사이는 여백 + 하단 구분선 */
   .section { margin-bottom: 32px; padding-bottom: 32px; border-bottom: 1px solid var(--border); }
   .section:last-child { border-bottom: none; margin-bottom: 0; }
   .section-header { padding: 0 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .section-title { font-size: 12px; font-weight: 700; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; }
   .section-body { padding: 0; }
-
-  /* ── Stats cards ── */
-  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); column-gap: 24px; }
-  .stat-card { padding: 12px 0; border-top: 1px solid var(--border); }
-  .stat-label { font-size: 11px; color: var(--text3); font-weight: 500; margin-bottom: 6px; }
-  .stat-value { font-size: 22px; font-weight: 700; color: var(--text); font-family: 'Sora', sans-serif; }
-  .stat-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
-  .stat-card.accent .stat-value { color: var(--accent); }
-  .stat-card.success .stat-value { color: var(--success); }
-  .stat-card.warn .stat-value { color: var(--warn); }
-  .stat-card.danger .stat-value { color: var(--danger); }
 
   /* ── Cost ── */
   .cost-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 32px; }
@@ -118,6 +111,9 @@
   input:checked + .toggle-slider { background: var(--accent); }
   input:checked + .toggle-slider:before { transform: translateX(16px); }
   .toggle-danger input:checked + .toggle-slider { background: var(--danger); }
+  /* 작업243-2: 일부만 켜진 상태(언어 사전 권한 5개가 섞임) - 경고색 바탕에 손잡이는 가운데 */
+  input[data-mixed="1"] + .toggle-slider { background: var(--warn); }
+  input[data-mixed="1"] + .toggle-slider:before { transform: translateX(8px); }
   .toggle-warn input:checked + .toggle-slider { background: var(--warn); }
 
   /* Row waiting for approval - stand out in the list */
@@ -212,17 +208,6 @@
   </div>
 
   <div id="content">
-    <!-- Stats -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-title">사용자 현황</span>
-        <span id="stats-updated" style="font-size:11px;color:var(--text3)"></span>
-      </div>
-      <div class="section-body">
-        <div class="stats-grid" id="stats-grid"></div>
-      </div>
-    </div>
-
     <!-- API Cost -->
     <div class="section">
       <div class="section-header">
@@ -248,16 +233,12 @@
               <th>역할</th>
               <th>승인</th>
               <th>차단</th>
-              <th>검색</th>
-              <th>단어장</th>
-              <th>퀴즈</th>
-              <th>TTS</th>
-              <th>팟캐스트</th>
-              <th>문학나침반</th>
-              <th>한입독서</th>
+              <th>언어 사전</th>
+              <th>문학 나침반</th>
+              <th>한입 독서</th>
               <th>과학</th>
-              <th>음성</th>
-              <th>개념</th>
+              <th>음성 학습</th>
+              <th>개념학습</th>
               <th style="text-align:right">검색 횟수</th>
               <th style="text-align:right">TTS 횟수</th>
               <th style="text-align:right">단어장</th>
@@ -318,45 +299,6 @@ async function checkAuth() {
   } catch { return false; }
 }
 
-// ── Render stats ──────────────────────────────────────────────────────────────
-function renderStats(data) {
-  const u = data.users;
-  const grid = document.getElementById('stats-grid');
-  grid.innerHTML = `
-    <div class="stat-card accent">
-      <div class="stat-label">전체 사용자</div>
-      <div class="stat-value">${fmt(u.total)}</div>
-    </div>
-    <div class="stat-card success">
-      <div class="stat-label">활성 사용자</div>
-      <div class="stat-value">${fmt(u.active)}</div>
-    </div>
-    <div class="stat-card danger">
-      <div class="stat-label">차단된 사용자</div>
-      <div class="stat-value">${fmt(u.blocked)}</div>
-    </div>
-    <div class="stat-card warn">
-      <div class="stat-label">승인 대기</div>
-      <div class="stat-value">${fmt(u.pending)}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">관리자</div>
-      <div class="stat-value">${fmt(u.admins)}</div>
-    </div>
-    ${renderUsageStat(data.usage, 'search', '총 검색', 'accent')}
-    ${renderUsageStat(data.usage, 'tts', '총 TTS', 'warn')}
-    ${renderUsageStat(data.monthly, 'search', '이번달 검색', '')}
-    ${renderUsageStat(data.monthly, 'tts', '이번달 TTS', '')}
-  `;
-  document.getElementById('stats-updated').textContent = '방금 업데이트';
-}
-
-function renderUsageStat(rows, type, label, cls) {
-  const row = rows.find(r => r.event_type === type);
-  const count = row ? fmt(row.count) : '0';
-  return `<div class="stat-card ${cls}"><div class="stat-label">${label}</div><div class="stat-value">${count}</div></div>`;
-}
-
 // ── Render cost ───────────────────────────────────────────────────────────────
 function renderCost(data) {
   const grid = document.getElementById('cost-grid');
@@ -390,6 +332,7 @@ function renderUsers(users) {
   usersData = users;
   const tbody = document.getElementById('user-tbody');
   tbody.innerHTML = users.map(u => renderUserRow(u)).join('');
+  for (const i of tbody.querySelectorAll('input[data-mixed="1"]')) i.indeterminate = true;
 }
 
 function renderUserRow(u) {
@@ -424,16 +367,12 @@ function renderUserRow(u) {
         <span class="toggle-slider"></span>
       </label>
     </td>
-    ${permToggle(u, 'can_search')}
-    ${permToggle(u, 'can_wordbook')}
-    ${permToggle(u, 'can_quiz')}
-    ${permToggle(u, 'can_tts')}
-    ${permToggle(u, 'can_podcast')}
-    ${permToggle(u, 'perm_literature_compass')}
-    ${permToggle(u, 'perm_digest_reading')}
-    ${permToggle(u, 'perm_science_reading')}
-    ${permToggle(u, 'perm_voice_study')}
-    ${permToggle(u, 'perm_concept_study')}
+    ${dictionaryToggle(u)}
+    ${permToggle(u, 'perm_literature_compass', '문학 나침반')}
+    ${permToggle(u, 'perm_digest_reading', '한입 독서')}
+    ${permToggle(u, 'perm_science_reading', '과학')}
+    ${permToggle(u, 'perm_voice_study', '음성 학습')}
+    ${permToggle(u, 'perm_concept_study', '개념학습')}
     <td style="text-align:right;font-weight:600">${fmt(u.search_count)}</td>
     <td style="text-align:right;font-weight:600">${fmt(u.tts_count)}</td>
     <td style="text-align:right">${fmt(u.wordbook_count)}</td>
@@ -443,13 +382,36 @@ function renderUserRow(u) {
   </tr>`;
 }
 
-function permToggle(u, field) {
+function permToggle(u, field, label) {
   return `<td>
     <label class="toggle">
-      <input type="checkbox" ${u[field] !== false ? 'checked' : ''} onchange="setPending(${u.id}, '${field}', this.checked)">
+      <input type="checkbox" aria-label="${label}" ${u[field] !== false ? 'checked' : ''} onchange="setPending(${u.id}, '${field}', this.checked)">
       <span class="toggle-slider"></span>
     </label>
   </td>`;
+}
+
+// 작업243-2: 랜딩페이지의 "언어 사전" 과목 하나가 기능 권한 5개(검색·단어장·퀴즈·TTS·팟캐스트)를 함께 켜고 끈다.
+// 5개가 모두 켜짐이면 켜짐, 모두 꺼짐이면 꺼짐, 섞여 있으면 혼합(중간 상태, aria-checked="mixed"). 혼합에서 누르면 5개 모두 켜짐.
+const DICTIONARY_PERMS = ['can_search', 'can_wordbook', 'can_quiz', 'can_tts', 'can_podcast'];
+function dictionaryState(u) {
+  const on = DICTIONARY_PERMS.filter(f => u[f] !== false).length;   // 값이 없으면 켜짐(다른 권한 열과 같은 규칙)
+  return on === DICTIONARY_PERMS.length ? 'on' : on === 0 ? 'off' : 'mixed';
+}
+function dictionaryToggle(u) {
+  const st = dictionaryState(u);
+  return `<td>
+    <label class="toggle">
+      <input type="checkbox" aria-label="언어 사전" data-dict="1" aria-checked="${st === 'mixed' ? 'mixed' : st === 'on' ? 'true' : 'false'}" ${st === 'on' ? 'checked' : ''} ${st === 'mixed' ? 'data-mixed="1"' : ''} onchange="setDictionary(${u.id}, this)">
+      <span class="toggle-slider"></span>
+    </label>
+  </td>`;
+}
+function setDictionary(userId, input) {
+  input.removeAttribute('data-mixed');
+  input.indeterminate = false;
+  input.setAttribute('aria-checked', input.checked ? 'true' : 'false');
+  for (const f of DICTIONARY_PERMS) setPending(userId, f, input.checked);   // 저장 때 5개 키를 함께 보낸다
 }
 
 function setPending(userId, field, value) {
@@ -503,7 +465,6 @@ async function loadData() {
     if (!usersRes.ok || !statsRes.ok) throw new Error('API error');
     const [users, stats] = await Promise.all([usersRes.json(), statsRes.json()]);
     pendingChanges = {};
-    renderStats(stats);
     renderCost(stats);
     renderUsers(users);
   } catch (e) {

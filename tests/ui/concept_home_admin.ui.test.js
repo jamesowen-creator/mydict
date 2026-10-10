@@ -52,7 +52,7 @@ test('홈 메뉴 빌드 결과물: public/home 번들이 index.html과 맞고 �
   assert.ok(!html.includes('\r'), 'index.html은 LF');
 });
 
-test('관리자: "개념" 열이 "음성" 다음에 있고 토글하면 perm_concept_study가 저장됨', { skip: SKIP }, async () => {
+test('관리자: "개념학습" 열이 "음성 학습" 다음에 있고 토글하면 perm_concept_study가 저장됨', { skip: SKIP }, async () => {
   srv.reset();
   srv.state.me = { id: 7, email: 'u7@example.com', name: '관리자', role: 'admin' };
   srv.state.adminUsers = [userRow(7, '관리자', { role: 'admin' }), userRow(8, '학생')];
@@ -60,8 +60,8 @@ test('관리자: "개념" 열이 "음성" 다음에 있고 토글하면 perm_con
   await page.goto(srv.url + '/admin');
   await page.waitFor("document.querySelectorAll('#user-tbody tr').length === 2", 8000);
   const heads = await page.eval("[...document.querySelectorAll('thead th')].map(t => t.innerText.trim())");
-  const i = heads.indexOf('음성');
-  assert.equal(heads[i + 1], '개념');
+  const i = heads.indexOf('음성 학습');   // 작업243-2: 열 이름이 랜딩페이지 과목 이름으로 바뀜(음성 → 음성 학습, 개념 → 개념학습)
+  assert.equal(heads[i + 1], '개념학습');
   assert.equal(await page.eval("document.querySelectorAll('thead th').length"), await page.eval("document.querySelectorAll('#row-8 > td').length"), '열 수가 머리글과 같음');
   const cell = `#row-8 > td:nth-child(${i + 2}) input`;
   assert.equal(await page.eval(`document.querySelector(${JSON.stringify(cell)}).checked`), true);
