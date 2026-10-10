@@ -3,3 +3,6 @@ node_modules/
 *.env
 client_secret*.json
 .claude/
+prompt.txt
+reference/Design.zip
+reference/screenshots/
