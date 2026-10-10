@@ -411,14 +411,16 @@
   .vm-pick-empty { padding: 12px; font-size: 13px; color: var(--text2); }
   .vm-edge path.line { fill: none; stroke: var(--text2); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
   .vm-edge path.hit { fill: none; stroke: transparent; stroke-width: 28; cursor: pointer; vector-effect: non-scaling-stroke; pointer-events: stroke; }   /* 눈에 안 보이는 두꺼운 클릭 영역(화면 28px 고정) */
+  .vm-edge.hl path.line { stroke: var(--text1); stroke-width: 2.5; }
   .vm-edge.sel path.line { stroke: var(--primary); stroke-width: 3; }
-  .vm-edge text { font-size: 11px; fill: var(--text2); text-anchor: middle; paint-order: stroke; stroke: var(--card); stroke-width: 4px; pointer-events: none; }
-  .vm-edge.sel text { fill: var(--primary-dark); font-weight: 700; }
-  .vm-small .vm-edge text { display: none; }
   .vm-node { cursor: pointer; }
   .vm-node rect { fill: var(--card); stroke: var(--vm-node-line); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
   .vm-node text { font-size: 13px; fill: var(--text1); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
   .vm-node.iso { opacity: 0.6; }
+  .vm-node.dim { opacity: 0.35; }
+  .vm-node.hl rect { stroke: var(--text1); stroke-width: 2; }
+  .vm-node.hl text { font-weight: 700; }
+  .vm-tools .btn[aria-pressed=true] { color: var(--text1); font-weight: 800; border-bottom: 2px solid var(--primary); }
   .vm-node.sel rect { stroke: var(--primary); stroke-width: 3; }
   .vm-node.sel text { font-weight: 800; }
   .vm-node:focus-visible rect { outline: none; stroke: var(--vm-focus); stroke-width: 3; }
@@ -744,8 +746,9 @@
       <button id="vm-zoom-in" class="btn small text" type="button" data-t="vm-zoom-in">확대</button>
       <button id="vm-zoom-out" class="btn small text" type="button" data-t="vm-zoom-out">축소</button>
       <button id="vm-zoom-fit" class="btn small text" type="button" data-t="vm-zoom-fit">화면 맞춤</button>
+      <button id="vm-full" class="btn small text" type="button" data-t="vm-full" aria-pressed="false">전체 보기</button>
     </div>
-    <div class="vm-meta"><span id="vm-build-hint" data-t="vm-build-hint"></span><span id="vm-built" data-t="vm-built"></span></div>
+    <div class="vm-meta"><span id="vm-iso-hint" data-t="vm-iso-hint"></span><span id="vm-build-hint" data-t="vm-build-hint"></span><span id="vm-built" data-t="vm-built"></span></div>
     <div id="vm-progress" class="vm-progress" style="display:none" role="status"><div class="spinner small"></div><span id="vm-progress-text" data-t="vm-progress-text"></span></div>
     <div id="vm-msg" class="msg" data-t="vm-msg"></div>
     <div id="vm-empty" class="msg warn" data-t="vm-empty" hidden></div>
@@ -2791,9 +2794,13 @@ const VMAP_SVGNS = 'http://www.w3.org/2000/svg';
 const VMAPD = { W: 132, H: 44, COLW: 192, ROWH: 64, GAP: 48, COLS: 3 };
 const VMAP_MIN_SCALE = 0.05, VMAP_MAX_SCALE = 3;   // 자료 200개 지도도 낮은 화면에 전부 맞출 수 있는 하한
 const VMAP_REL_MAX = 80, VMAP_POLL_MS = 2500, VMAP_MIN_ELIGIBLE = 3;
+// 작업229-2: 개념 학습 지도(227-16·17)의 가독성 이식. 열 때 노드 글자의 화면 크기 하한(px)과 노드 글자의 SVG 단위 크기(CSS .vm-node text 와 같게), 허브 기준, 열 안 정렬 횟수
+const VMAP_READ_PX = 12, VMAP_FONT_UNITS = 13, VMAP_HUB_MIN_DEG = 5;
+const VMAP_LAYOUT_SWEEPS = 6;
+const VMAP_DASH = { background: '6 4' };   // ◇ 배경지식 연결은 점선, ✔ 근거 확인·직접 만든 연결은 실선
 const vmap = {
   open: false, subject: '', data: null, selNode: null, selEdge: null, adding: null, editingReason: null,
-  focusId: null, centerOnFocus: false, fit: true, scale: 1, tx: 0, ty: 0, cw: 0, ch: 0, scrollY: 0, origin: 'list', apply: null,
+  focusId: null, centerOnFocus: false, full: false, fit: true, scale: 1, tx: 0, ty: 0, cw: 0, ch: 0, scrollY: 0, origin: 'list', apply: null,
   ignorePop: false, popWaiters: [], loadSeq: 0, buildSession: 0, buildTimer: null, building: false,
 };
 let vmapDrag = null;
@@ -2821,6 +2828,26 @@ const vmapTitle = n => (n && n.title) || '(제목 없음)';
 const vmapNodeById = id => (vmap.data ? vmap.data.nodes.find(n => n.id === id) : null);
 const vmapMsg = (text, kind) => setMsg('vm-msg', text, kind);
 
+// 열(BFS 단계) 안의 순서를 바꿔 선 교차를 줄인다(작업227-17 복사). 이웃(바로 옆 열)의 평균 행 위치 순으로 정렬하고 왼쪽→오른쪽, 오른쪽→왼쪽을 번갈아 되풀이한다. 같은 입력이면 항상 같은 결과(동점은 입력 순서)
+function vmapSortLevels(levels, adj, order) {
+  if (!VMAP_LAYOUT_SWEEPS || levels.length < 2) return;
+  const lvOf = new Map(), idx = new Map();
+  levels.forEach((lv, li) => lv.forEach((n, i) => { lvOf.set(n, li); idx.set(n, i); }));
+  const bary = (n, towards) => {
+    const v = adj.get(n).filter(m => lvOf.get(m) === towards).map(m => idx.get(m));
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : idx.get(n);   // 옆 열에 이웃이 없으면 지금 자리 유지
+  };
+  const li = levels.map((_, i) => i);
+  for (let pass = 0; pass < VMAP_LAYOUT_SWEEPS; pass++) {
+    const down = pass % 2 === 0;
+    for (const l of down ? li.slice(1) : li.slice(0, -1).reverse()) {
+      const t = down ? l - 1 : l + 1;
+      const key = new Map(levels[l].map(n => [n, bary(n, t)]));
+      levels[l].sort((a, b) => key.get(a) - key.get(b) || order.get(a) - order.get(b));
+      levels[l].forEach((n, i) => idx.set(n, i));
+    }
+  }
+}
 // 배치: 연결된 덩어리는 너비 우선 단계(열)로, 연결 없는 자료는 아래에 3열 격자로
 function vmapLayout(nodes, edges) {
   const adj = new Map(nodes.map(n => [n, []]));
@@ -2842,6 +2869,7 @@ function vmapLayout(nodes, edges) {
       }
       frontier = next;
     }
+    vmapSortLevels(levels, adj, order);
     let rows = 0;
     levels.forEach((lv, li) => { lv.forEach((n, ri) => pos.set(n, { x: li * VMAPD.COLW, y: y0 + ri * VMAPD.ROWH })); rows = Math.max(rows, lv.length); });
     y0 += rows * VMAPD.ROWH + VMAPD.GAP;
@@ -2895,7 +2923,7 @@ $('link-map-open').addEventListener('click', () => {
 async function vmapOpen(subject, focusId) {
   if (vmap.open) return;
   Object.assign(vmap, { open: true, subject, data: null, selNode: focusId == null ? null : focusId, selEdge: null, adding: null, editingReason: null,
-    focusId: focusId == null ? null : focusId, centerOnFocus: focusId != null, fit: true, scrollY: window.scrollY, origin: currentView, building: false });
+    focusId: focusId == null ? null : focusId, centerOnFocus: focusId != null, full: false, fit: true, scrollY: window.scrollY, origin: currentView, building: false });
   vmap.buildSession++;
   document.documentElement.classList.add('vm-open');   // 배경 스크롤 잠금
   $('vm-title').textContent = '자료 연결 지도 · ' + subject;
@@ -2971,6 +2999,7 @@ function vmapRender() {
   $('vm-build').disabled = vmap.building || eligible < VMAP_MIN_ELIGIBLE;
   $('vm-build-hint').textContent = eligible < VMAP_MIN_ELIGIBLE ? '요약이 있는 자료가 3개 이상 필요합니다' : '';
   $('vm-built').textContent = data.built_at ? '마지막 지도 그리기 ' + fmtDate(data.built_at) : '';
+  $('vm-iso-hint').textContent = '';
   const empty = $('vm-empty');
   if (!nodesData.length) {
     empty.textContent = '이 과목에는 자료가 없습니다.'; empty.hidden = false;
@@ -2985,6 +3014,22 @@ function vmapRender() {
   const ids = nodesData.map(n => n.id).sort((a, b) => a - b);
   const { pos, labelY } = vmapLayout(ids, links.map(l => [l.from_note_id, l.to_note_id]));
 
+  // 작업229-2(이웃 보기): 초점 = 선택한 자료, 없으면 [이 자료 중심으로 보기]로 들어온 자료, 그것도 없으면 연결이 가장 많은 자료(동률이면 id가 작은 쪽).
+  // 이웃 보기에서는 초점 + 1단계 이웃만 진하게 그리고 나머지는 흐리게, 연결 없는 자료는 숨긴다(초점이면 보임). 연결이 하나도 없으면 전체 보기와 같다
+  const full = vmap.full || !links.length;
+  const focusId = degree.has(vmap.selNode) ? vmap.selNode : degree.has(vmap.focusId) ? vmap.focusId : ids.reduce((best, id) => (degree.get(id) > degree.get(best) ? id : best), ids[0]);
+  const nbrs = new Set([focusId]);
+  for (const l of links) { if (l.from_note_id === focusId) nbrs.add(l.to_note_id); if (l.to_note_id === focusId) nbrs.add(l.from_note_id); }
+  const shown = full ? ids : ids.filter(id => degree.get(id) > 0 || id === focusId);
+  const hiddenIso = ids.length - shown.length;
+  const showLabel = labelY !== null && shown.some(id => degree.get(id) === 0);
+  $('vm-iso-hint').textContent = hiddenIso ? `연결 없는 자료 ${hiddenIso}개는 전체 보기에서 볼 수 있어요` : '';
+  $('vm-full').setAttribute('aria-pressed', String(vmap.full));
+  // 허브: 연결 수 상위 15% 이면서 VMAP_HUB_MIN_DEG 이상인 자료. 허브에 닿은 선은 초점이 아니면 더 연하게 그린다
+  const degSorted = ids.map(id => degree.get(id)).sort((a, b) => a - b);
+  const hubDeg = Math.max(VMAP_HUB_MIN_DEG, degSorted[Math.floor(degSorted.length * 0.85)] || 0);
+  const isHub = id => degree.get(id) >= hubDeg;
+
   const svg = vmapSv('svg', { role: 'group', 'aria-label': '자료 연결 지도', 'data-t': 'vm-svg' });
   const gEdges = vmapSv('g'), gNodes = vmapSv('g');
   svg.append(gEdges, gNodes);
@@ -2992,42 +3037,60 @@ function vmapRender() {
     const a = vmapNodeById(l.from_note_id), b = vmapNodeById(l.to_note_id);
     const g = vmapEdgeGeom(pos.get(l.from_note_id), pos.get(l.to_note_id));
     const pick = () => { if (vmapDrag && vmapDrag.moved) return; vmapSelect('edge', l.id); };
-    // 지도에는 이유 문장만 쓴다(✔/◇ 배지나 AI·확인 필요 문구는 카드에서만)
-    const e = vmapSv('g', { class: 'vm-edge' + (l.id === vmap.selEdge ? ' sel' : ''), 'data-t': 'vm-edge', 'data-id': l.id, role: 'button', tabindex: 0, 'aria-label': `${vmapTitle(a)}와 ${vmapTitle(b)}의 연결${l.relation ? ': ' + l.relation : ''}` },
-      vmapSv('path', { class: 'line', d: g.d }), vmapSv('path', { class: 'hit', d: g.d }),
-      l.relation ? vmapSv('text', { x: g.mx, y: g.my - 4 }, vmapClip(l.relation, 12)) : null);
+    // 선 단계: 진함(초점에 닿은 선·선택한 선) / 중간(초점 이웃끼리) / 연함(그 밖, 허브에 닿으면 더 연함). 전체 보기에서는 전체가 더 진하다
+    const hl = l.from_note_id === focusId || l.to_note_id === focusId || l.id === vmap.selEdge;
+    const mid = !hl && nbrs.has(l.from_note_id) && nbrs.has(l.to_note_id);
+    const hub = !hl && (isHub(l.from_note_id) || isHub(l.to_note_id));
+    const op = hl ? 1 : full ? (mid ? 0.9 : hub ? 0.35 : 0.5) : (mid ? 0.35 : hub ? 0.12 : 0.2);
+    // 지도에는 연결 문구를 쓰지 않는다(노드와 겹침). 이유 문장·✔/◇ 배지는 선을 눌러 뜨는 카드에서만 본다. ◇ 배경지식 연결만 점선으로 구분한다
+    const e = vmapSv('g', { class: 'vm-edge' + (hl ? ' hl' : '') + (l.id === vmap.selEdge ? ' sel' : ''), 'data-t': 'vm-edge', 'data-id': l.id, 'data-hl': hl ? '1' : '0', 'data-hub': hub ? '1' : '0', opacity: op < 1 ? op : null, role: 'button', tabindex: 0, 'aria-label': `${vmapTitle(a)}와 ${vmapTitle(b)}의 연결${l.relation ? ': ' + l.relation : ''}` },
+      vmapSv('path', { class: 'line', d: g.d, 'stroke-dasharray': VMAP_DASH[l.kind] || null }), vmapSv('path', { class: 'hit', d: g.d }));
     e.addEventListener('click', pick);
     e.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(); } });
     gEdges.append(e);
   }
-  for (const id of ids) {
+  for (const id of shown) {
     const p = pos.get(id), n = vmapNodeById(id);
     const pick = () => { if (vmapDrag && vmapDrag.moved) return; vmapSelect('node', id); };
-    const g = vmapSv('g', { class: 'vm-node' + (degree.get(id) ? '' : ' iso') + (id === vmap.selNode ? ' sel' : ''), 'data-t': 'vm-node', 'data-id': id, role: 'button', tabindex: 0, 'aria-label': vmapTitle(n) + (degree.get(id) ? '' : ' (연결 없음)'), transform: `translate(${p.x},${p.y})` },
+    const inNb = nbrs.has(id);
+    const g = vmapSv('g', { class: 'vm-node' + (degree.get(id) ? '' : ' iso') + (id === vmap.selNode ? ' sel' : '') + (!full && inNb ? ' hl' : '') + (!full && !inNb ? ' dim' : ''), 'data-t': 'vm-node', 'data-id': id, role: 'button', tabindex: 0, 'aria-label': vmapTitle(n) + (degree.get(id) ? '' : ' (연결 없음)'), transform: `translate(${p.x},${p.y})` },
       vmapSv('title', {}, vmapTitle(n)), vmapSv('rect', { width: VMAPD.W, height: VMAPD.H }), vmapSv('text', { x: VMAPD.W / 2, y: VMAPD.H / 2 }, vmapClip(vmapTitle(n), 9)));
     g.addEventListener('click', pick);
     g.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(); } });
     gNodes.append(g);
   }
-  if (labelY !== null) gNodes.append(vmapSv('text', { class: 'vm-label', x: 0, y: labelY }, '연결 없는 자료'));
+  if (showLabel) gNodes.append(vmapSv('text', { class: 'vm-label', x: 0, y: labelY }, '연결 없는 자료'));
   box.append(svg);
 
-  // 보기 영역(viewBox): 열릴 때 전체를 화면에 맞추고(글자 크기 하한 없음), 이후 확대·이동 상태는 다시 그려도 유지한다
+  // 보기 영역(viewBox): 열릴 때 기본 배율은 노드 글자가 화면에서 12px 이상이 되는 값(12/13)을 하한으로 한다. 전체가 안 들어오면 줄이지 않고 끌어서 본다(직접 축소는 기존 범위).
+  // 이후 확대·이동 상태는 다시 그려도 유지한다. 이웃 보기는 초점 + 이웃이 들어오는 크기로 맞춘다
   const cw = box.clientWidth || 358, ch = box.clientHeight || 300;
   vmap.cw = cw; vmap.ch = ch;
   function fitView() {
-    const r = ids.map(id => pos.get(id));
+    const r = shown.map(id => pos.get(id));
     const b = { x0: Math.min(...r.map(q => q.x)) - 24, x1: Math.max(...r.map(q => q.x + VMAPD.W)) + 24, y0: Math.min(...r.map(q => q.y)) - 24, y1: Math.max(...r.map(q => q.y + VMAPD.H)) + 24 };
-    if (labelY !== null) b.y0 -= 16;
-    vmap.scale = Math.max(VMAP_MIN_SCALE, Math.min(cw / (b.x1 - b.x0), ch / (b.y1 - b.y0), 1.5));
-    vmap.tx = (b.x0 + b.x1) / 2 - cw / vmap.scale / 2;
-    vmap.ty = (b.y0 + b.y1) / 2 - ch / vmap.scale / 2;
+    if (showLabel) b.y0 -= 16;
+    const fit = Math.min(cw / (b.x1 - b.x0), ch / (b.y1 - b.y0), 1.5);
+    const floor = VMAP_READ_PX / VMAP_FONT_UNITS;
+    const vw = () => cw / vmap.scale, vh = () => ch / vmap.scale;
+    if (full) {
+      vmap.scale = Math.max(floor, fit);
+      vmap.tx = (b.x1 - b.x0) <= vw() ? (b.x0 + b.x1) / 2 - vw() / 2 : b.x0 - 8 / vmap.scale;   // 안 들어오면 왼쪽 위부터
+      vmap.ty = (b.y1 - b.y0) <= vh() ? (b.y0 + b.y1) / 2 - vh() / 2 : b.y0;
+    } else {
+      const fp = [...nbrs].map(id => pos.get(id));
+      const fb = { x0: Math.min(...fp.map(q => q.x)) - 16, x1: Math.max(...fp.map(q => q.x + VMAPD.W)) + 16, y0: Math.min(...fp.map(q => q.y)) - 16, y1: Math.max(...fp.map(q => q.y + VMAPD.H)) + 16 };
+      const want = Math.min(cw / (fb.x1 - fb.x0), ch / (fb.y1 - fb.y0), 1.2);
+      vmap.scale = Math.max(floor, want);
+      const c = want >= floor ? { x: (fb.x0 + fb.x1) / 2, y: (fb.y0 + fb.y1) / 2 } : (q => ({ x: q.x + VMAPD.W / 2, y: q.y + VMAPD.H / 2 }))(pos.get(focusId));
+      vmap.tx = c.x - vw() / 2; vmap.ty = c.y - vh() / 2;
+      // 지도 바깥의 빈 곳이 보이지 않게 보이는 영역을 지도 범위 안으로 맞춘다(지도가 더 작으면 가운데)
+      vmap.tx = (b.x1 - b.x0) <= vw() ? (b.x0 + b.x1) / 2 - vw() / 2 : Math.min(Math.max(vmap.tx, b.x0), b.x1 - vw());
+      vmap.ty = (b.y1 - b.y0) <= vh() ? (b.y0 + b.y1) / 2 - vh() / 2 : Math.min(Math.max(vmap.ty, b.y0), b.y1 - vh());
+    }
     vmap.fit = false;
   }
-  const apply = () => {
-    svg.setAttribute('viewBox', `${vmap.tx} ${vmap.ty} ${cw / vmap.scale} ${ch / vmap.scale}`);
-    svg.classList.toggle('vm-small', vmap.scale < 0.45);   // 많이 줄이면 연결선 글자는 숨겨 겹침을 막는다
-  };
+  const apply = () => svg.setAttribute('viewBox', `${vmap.tx} ${vmap.ty} ${cw / vmap.scale} ${ch / vmap.scale}`);
   if (vmap.fit) fitView();
   if (vmap.centerOnFocus && vmap.focusId != null && pos.has(vmap.focusId)) {   // [이 자료 중심으로 보기]: 그 자료를 읽을 수 있는 크기로 가운데에
     vmap.scale = Math.min(VMAP_MAX_SCALE, Math.max(vmap.scale, 1));
@@ -3104,6 +3167,7 @@ function vmapZoom(f) {
 $('vm-zoom-in').addEventListener('click', () => vmapZoom(1.25));
 $('vm-zoom-out').addEventListener('click', () => vmapZoom(0.8));
 $('vm-zoom-fit').addEventListener('click', () => { vmap.fit = true; vmapRender(); });
+$('vm-full').addEventListener('click', () => { vmap.full = !vmap.full; vmap.fit = true; vmapRender(); });
 // 화면 폭이 바뀌면(회전 등) 다시 맞춘다. 주소창 때문에 높이만 조금 바뀌는 경우는 보던 위치를 유지한다
 let vmapResizeTimer = null;
 window.addEventListener('resize', () => {
@@ -3120,6 +3184,7 @@ function vmapSelect(kind, id) {
   vmap.selNode = kind === 'node' ? id : null;
   vmap.selEdge = kind === 'edge' ? id : null;
   vmap.adding = null; vmap.editingReason = null;
+  if (vmap.data && !vmap.full && vmap.data.links.length) { vmapRender(); return; }   // 이웃 보기는 선택에 따라 진하게·흐리게가 바뀌므로 다시 그린다(보던 위치는 유지)
   for (const n of document.querySelectorAll('#vm-box .vm-node')) n.classList.toggle('sel', kind === 'node' && Number(n.dataset.id) === id);
   for (const e of document.querySelectorAll('#vm-box .vm-edge')) e.classList.toggle('sel', kind === 'edge' && Number(e.dataset.id) === id);
   vmapRenderCard();

@@ -150,6 +150,7 @@ test('지도 팝업·과목 선택의 보조 버튼과 JS 생성 버튼(이유 �
   assertTextButton(await page.eval(MEASURE('[data-t=vm-reason-cancel]')), 'vm-reason-cancel');
   { const bg = (await page.eval(MEASURE('[data-t=vm-reason-save]'))).bg; assert.ok(isPrimaryFill(bg), '[저장]은 주요 동작 채움 유지(기본 또는 호버 색): ' + bg); }
   await page.click('[data-t=vm-reason-cancel]');
+  await page.click('#vm-full');   // 229-4: 연결 없는 자료는 전체 보기에서만 보인다
   await clickNode(page, 4);
   assertTextButton(await page.eval(MEASURE('[data-t=vm-add-link]')), 'vm-add-link');
   { const bg = (await page.eval(MEASURE('[data-t=vm-open-note]'))).bg; assert.ok(isPrimaryFill(bg), '[이 자료 열기]는 채움 유지: ' + bg); }

@@ -36,6 +36,7 @@ async function openMap(page, subject = '과학') {
   await page.click(`.vm-subject-btn[data-subject="${subject}"]`);
   await page.waitFor("document.getElementById('vm-sheet').open && (!!document.querySelector('[data-t=vm-svg]') || document.getElementById('vm-empty').textContent.length > 0)", 6000);
 }
+const showAll = page => page.click('#vm-full');   // 229-2: 이웃 보기가 기본이라 연결 없는 자료는 전체 보기에서만 보인다
 const sheetOpen = page => page.eval("document.getElementById('vm-sheet').open");
 const log = (url, method) => srv.state.log.filter(l => l.url === url && (!method || l.method === method));
 const MAP = '/api/voice-notes/map', BUILD = '/api/voice-notes/map/build', STATUS = '/api/voice-notes/map/build-status';
@@ -97,12 +98,15 @@ test('지도를 여는 것만으로는 AI 경로를 부르지 않는다: GET map
   assert.equal(srv.state.log.find(l => l.url === MAP).search, '?subject=%EA%B3%BC%ED%95%99');
   assert.equal(buildCalls().length, 0, 'build 호출 없음(dry_run 포함)');
   assert.equal(log(STATUS).length, 0);
-  assert.equal(await page.count('[data-t=vm-node]'), 4);
+  assert.equal(await page.count('[data-t=vm-node]'), 3, '이웃 보기(기본): 연결 없는 자료는 숨김');
   assert.equal(await page.count('[data-t=vm-edge]'), 3);
+  await showAll(page);
+  assert.equal(await page.count('[data-t=vm-node]'), 4, '전체 보기: 연결 없는 자료 포함');
   assert.equal(await page.count('.vm-node.iso'), 1, '연결 없는 자료는 옅게');
+  assert.equal(log(MAP, 'GET').length, 1, '보기 전환은 API를 부르지 않음');
   assert.match(await page.text('#vm-built'), /마지막 지도 그리기/);
   assert.equal(await page.text('#vm-title'), '자료 연결 지도 · 과학');
-  assert.equal(await allInside(page), true, '열릴 때 전체가 화면에 맞춰짐');
+  assert.equal(await allInside(page), true, '전체 보기에서도 이 크기(4개)는 화면에 맞춰짐');
   await done(page);
 });
 
@@ -217,21 +221,23 @@ test('핀치(두 손가락): 벌리면 확대·오므리면 축소, 가운데 �
   await done(page);
 });
 
-test('노드 200개: 전부 화면에 맞춰지고(연결선 글자는 숨김), 줌 하한 0.05·상한 3에서 멈춤', { skip: SKIP }, async () => {
+test('노드 200개: 전체 보기에서 모두 그려지고(글자 12px 하한이 맞춤보다 우선), 줌 하한 0.05·상한 3에서 멈춤', { skip: SKIP }, async () => {
   const d = big(200);
   const page = await open({ nodes: d.nodes, links: d.links });
   await openMap(page);
+  assert.equal(await page.count('[data-t=vm-node]'), 151, '이웃 보기(기본): 연결 없는 49개는 숨김');
+  assert.match(await page.text('[data-t=vm-iso-hint]'), /연결 없는 자료 49개는 전체 보기에서 볼 수 있어요/);
+  await showAll(page);
   assert.equal(await page.count('[data-t=vm-node]'), 200);
-  assert.equal(await allInside(page), true);
   const sc = await scaleOf(page);
-  assert.ok(sc >= 0.05 && sc < 0.75, '하한 없이 줄어듦: ' + sc);
-  assert.equal(await page.eval("document.querySelector('[data-t=vm-svg]').classList.contains('vm-small')"), true, '많이 줄이면 연결선 글자 숨김');
+  assert.ok(Math.abs(sc - 12 / 13) < 0.01, '맞춤보다 읽기 우선: 노드 글자 12px 하한(배율 12/13)에서 멈춤: ' + sc);
+  assert.equal(await allInside(page), false, '200개는 한 화면에 다 들어오지 않아 끌어서 봄');
   for (let i = 0; i < 45; i++) await page.click('#vm-zoom-out');
   assert.ok(Math.abs((await scaleOf(page)) - 0.05) < 0.002, '축소 한계 0.05');
   for (let i = 0; i < 45; i++) await page.click('#vm-zoom-in');
   assert.ok(Math.abs((await scaleOf(page)) - 3) < 0.01, '확대 한계 3');
   await page.click('#vm-zoom-fit');
-  assert.equal(await allInside(page), true, '화면 맞춤으로 복귀');
+  assert.ok(Math.abs((await scaleOf(page)) - 12 / 13) < 0.01, '화면 맞춤으로 복귀(12px 하한 배율)');
   await done(page);
 });
 
@@ -241,7 +247,9 @@ test('연결선 클릭 영역: 눈에 안 보이는 28px 고정이고 선에서 
   await openMap(page);
   for (let i = 0; i < 3; i++) await page.click('#vm-zoom-out');
   const info = await page.eval(`(() => { const p = document.querySelector('[data-t=vm-edge] path.hit'); const cs = getComputedStyle(p); return { w: cs.strokeWidth, stroke: cs.stroke, ve: cs.vectorEffect, line: getComputedStyle(document.querySelector('[data-t=vm-edge] path.line')).strokeWidth }; })()`);
-  assert.equal(info.w, '28px'); assert.equal(info.ve, 'non-scaling-stroke'); assert.match(info.stroke, /rgba\(0, 0, 0, 0\)|transparent/); assert.equal(info.line, '1.5px');
+  assert.equal(info.w, '28px'); assert.equal(info.ve, 'non-scaling-stroke'); assert.match(info.stroke, /rgba\(0, 0, 0, 0\)|transparent/);
+  assert.equal(info.line, '2.5px', '초점에 닿은 선(첫 선)은 2.5px');
+  assert.equal(await page.eval("getComputedStyle(document.querySelector('[data-t=vm-edge][data-hl=\"0\"] path.line')).strokeWidth"), '1.5px', '초점에 닿지 않은 선은 1.5px');
   const pt = await page.eval(`(() => {
     const all = document.querySelectorAll('[data-t=vm-edge]'); const e = all[all.length - 1];
     const p = e.querySelector('path.hit'); const m = p.getPointAtLength(p.getTotalLength() / 2); const ctm = p.getScreenCTM();
@@ -261,7 +269,8 @@ test('연결선 카드: 이유·구절·kind 배지, manual은 배지 없음, �
   await openMap(page);
   const svgText = await page.eval("document.querySelector('[data-t=vm-svg]').textContent");
   assert.doesNotMatch(svgText, /✔|◇|AI|확인 필요|근거 확인|배경지식/, '지도 위 문구');
-  assert.match(svgText, /엽록체에서 광합성/, '이유 문장은 선 위에 표시');
+  assert.doesNotMatch(svgText, /엽록체에서 광합성|에너지 대사|내가 이은 이유/, '229-2: 이유 문장은 지도 위(노드와 겹침)에 쓰지 않음');
+  assert.equal(await page.count('[data-t=vm-svg] .vm-edge text'), 0, '선 위 글자 요소 없음');
   await clickEdge(page, 11);
   assert.equal(await page.text('[data-t=vm-kind]'), '✔ 근거 확인');
   assert.match(await page.text('[data-t=vm-reason]'), /엽록체에서 광합성이 일어난다/);
@@ -347,6 +356,7 @@ test('삭제: metisConfirm(AI 연결은 "지도에서 숨깁니다", 직접 만�
 test('노드 카드·연결 추가: 검색으로 고르고 이유(80자)를 적어 POST, 지도에 반영, 중복이면 "이미 연결되어 있습니다."', { skip: SKIP }, async () => {
   const page = await open();
   await openMap(page);
+  await showAll(page);
   await clickNode(page, 4);
   assert.equal(await page.text('[data-t=vm-node-title]'), '혼자 있는 자료');
   assert.deepEqual(await page.eval("[...document.querySelectorAll('#vm-card .vm-actions button')].map(b => b.textContent)"), ['이 자료 열기', '다른 자료와 연결 추가', '닫기']);
@@ -607,6 +617,134 @@ test('회귀 방지: 팝업 마크업은 앱 본문 뒤에 있고, 문서의 첫
   await done(page);
 });
 
+// ───────────────────────── 작업229-2~3: 가독성 이식(이웃 보기·글자 12px·정렬·문구 제거) ─────────────────────────
+const lk = (id, a, b, kind = 'background') => ({ id, from_note_id: a, to_note_id: b, kind, relation: '이유 ' + id, source: 'ai' });
+const nodes6 = Array.from({ length: 6 }, (_, i) => ({ id: i + 1, title: '자료 ' + (i + 1) }));
+const idsOf = (page, sel) => page.eval(`[...document.querySelectorAll('${sel}')].map(n => Number(n.dataset.id)).sort((a, b) => a - b)`);
+
+test('이웃 보기: 첫 진입 시 연결 최다 자료(동률이면 id가 작은 쪽)가 초점이고 초점 + 이웃만 진하게, 나머지는 흐리게', { skip: SKIP }, async () => {
+  // 동률: 1(연결 2개)과 4(연결 2개) → id가 작은 1이 초점
+  let page = await open({ nodes: nodes6, links: [lk(21, 1, 2), lk(22, 1, 3), lk(23, 4, 5), lk(24, 4, 6)] });
+  await openMap(page);
+  assert.deepEqual(await idsOf(page, '.vm-node.hl'), [1, 2, 3], '초점 1 + 이웃');
+  assert.deepEqual(await idsOf(page, '.vm-node.dim'), [4, 5, 6], '그 밖은 흐리게');
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('[data-t=vm-edge]')].filter(e => e.dataset.hl === '1').map(e => Number(e.dataset.id)).sort()"), [21, 22], '초점에 닿은 선만 진하게');
+  assert.equal(await page.eval("document.getElementById('vm-full').getAttribute('aria-pressed')"), 'false');
+  await done(page);
+  // 단독 최다: 4(연결 3개)
+  page = await open({ nodes: nodes6, links: [lk(21, 1, 2), lk(23, 4, 5), lk(24, 4, 6), lk(25, 4, 3)] });
+  await openMap(page);
+  assert.deepEqual(await idsOf(page, '.vm-node.hl'), [3, 4, 5, 6], '연결이 가장 많은 4가 초점');
+  await done(page);
+});
+
+test('전체 보기 토글: 모든 노드 표시, 이웃 보기에서는 "연결 없는 자료 N개는 전체 보기에서 볼 수 있어요" 한 줄', { skip: SKIP }, async () => {
+  const page = await open({ nodes: nodes6, links: [lk(21, 1, 2), lk(22, 1, 3)] });   // 4·5·6은 연결 없음
+  await openMap(page);
+  assert.equal(await page.count('[data-t=vm-node]'), 3);
+  assert.equal(await page.text('[data-t=vm-iso-hint]'), '연결 없는 자료 3개는 전체 보기에서 볼 수 있어요');
+  assert.equal(await page.eval("getComputedStyle(document.getElementById('vm-iso-hint')).borderTopWidth"), '0px', '박스 없는 텍스트');
+  await showAll(page);
+  assert.equal(await page.count('[data-t=vm-node]'), 6, '전체 보기: 연결 없는 자료 포함');
+  assert.equal(await page.count('.vm-node.dim'), 0, '전체 보기에서는 흐리게 하지 않음');
+  assert.equal(await page.eval("document.getElementById('vm-full').getAttribute('aria-pressed')"), 'true');
+  assert.equal(await page.text('[data-t=vm-iso-hint]'), '', '전체 보기에서는 안내 줄 없음');
+  await showAll(page);
+  assert.equal(await page.count('[data-t=vm-node]'), 3, '다시 누르면 이웃 보기');
+  assert.equal(await page.text('[data-t=vm-iso-hint]'), '연결 없는 자료 3개는 전체 보기에서 볼 수 있어요');
+  await done(page);
+});
+
+test('지도 위에는 relation 문구 요소가 없고, 선을 눌러 뜬 카드에는 이유 문장이 있다(◇ 선만 점선)', { skip: SKIP }, async () => {
+  const page = await open();
+  await openMap(page);
+  await showAll(page);
+  assert.equal(await page.count('[data-t=vm-svg] .vm-edge text'), 0, '선 위 글자 요소 없음');
+  const svgText = await page.eval("document.querySelector('[data-t=vm-svg]').textContent");
+  for (const r of ['엽록체에서 광합성이 일어난다', '에너지 대사로 이어진다', '내가 이은 이유']) assert.ok(!svgText.includes(r), '지도 위에 이유 문장 없음: ' + r);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('[data-t=vm-edge] path.line')].map(p => p.getAttribute('stroke-dasharray'))"), [null, '6 4', null], '◇ 배경지식(12번)만 점선');
+  await clickEdge(page, 12);
+  assert.equal(await page.text('[data-t=vm-reason]'), '에너지 대사로 이어진다');
+  await done(page);
+});
+
+test('노드 글자는 화면에서 12px 이상: 열릴 때와 200개 전체 보기에서도', { skip: SKIP }, async () => {
+  const px = p => p.eval("(() => { const t = document.querySelector('[data-t=vm-node] text'); return t.getScreenCTM().a * parseFloat(getComputedStyle(t).fontSize); })()");
+  let page = await open({ width: 1024, height: 800 });
+  await openMap(page);
+  assert.ok((await px(page)) >= 11.99, '이웃 보기: ' + (await px(page)));
+  await showAll(page);
+  assert.ok((await px(page)) >= 11.99, '전체 보기: ' + (await px(page)));
+  await done(page);
+  const d = big(200);
+  page = await open({ nodes: d.nodes, links: d.links });
+  await openMap(page);
+  assert.ok((await px(page)) >= 11.99, '200개 이웃 보기: ' + (await px(page)));
+  await showAll(page);
+  assert.equal(await page.count('[data-t=vm-node]'), 200);
+  assert.ok((await px(page)) >= 11.99, '200개 전체 보기(맞춤보다 읽기 우선): ' + (await px(page)));
+  await done(page);
+});
+
+test('열 안 정렬: 교차 수가 정렬 전보다 늘지 않고(엇갈린 예는 0으로 줄고), 같은 입력이면 같은 결과', { skip: SKIP }, async () => {
+  const page = await open();
+  const r = await page.eval(`(() => {
+    const cross = (levels, edges) => {
+      const idx = new Map(), lvOf = new Map();
+      levels.forEach((lv, li) => lv.forEach((n, i) => { idx.set(n, i); lvOf.set(n, li); }));
+      const es = edges.filter(([a, b]) => Math.abs(lvOf.get(a) - lvOf.get(b)) === 1).map(([a, b]) => (lvOf.get(a) < lvOf.get(b) ? [a, b] : [b, a]));
+      let c = 0;
+      for (let i = 0; i < es.length; i++) for (let j = i + 1; j < es.length; j++) {
+        const [u1, v1] = es[i], [u2, v2] = es[j];
+        if (lvOf.get(u1) !== lvOf.get(u2)) continue;
+        if ((idx.get(u1) - idx.get(u2)) * (idx.get(v1) - idx.get(v2)) < 0) c++;
+      }
+      return c;
+    };
+    const run = (levels, edges) => {
+      const adj = new Map(levels.flat().map(n => [n, []]));
+      for (const [a, b] of edges) { adj.get(a).push(b); adj.get(b).push(a); }
+      const order = new Map(levels.flat().map((n, i) => [n, i]));
+      const before = cross(levels, edges);
+      vmapSortLevels(levels, adj, order);
+      return { before, after: cross(levels, edges), order: JSON.stringify(levels) };
+    };
+    const out = { cases: [] };
+    out.simple = run([[1, 2], [3, 4]], [[1, 4], [2, 3]]);   // 엇갈린 예: 1-4, 2-3
+    let seed = 12345; const rnd = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return Math.floor(seed / 65536) % n; };
+    for (let t = 0; t < 8; t++) {   // 결정적 난수로 만든 3열 x 8개, 인접 열 사이 연결 14개씩
+      const mk = () => [0, 1, 2].map(li => Array.from({ length: 8 }, (_, i) => li * 10 + i));
+      const edges = [];
+      for (let li = 0; li < 2; li++) for (let k = 0; k < 14; k++) edges.push([li * 10 + rnd(8), (li + 1) * 10 + rnd(8)]);
+      const a = run(mk(), edges), b = run(mk(), edges);
+      out.cases.push({ before: a.before, after: a.after, same: a.order === b.order });
+    }
+    return out;
+  })()`);
+  assert.equal(r.simple.before, 1); assert.equal(r.simple.after, 0, '엇갈린 예는 교차 0');
+  assert.equal(r.cases.length, 8);
+  for (const c of r.cases) { assert.ok(c.after <= c.before, `교차 ${c.before} → ${c.after}`); assert.equal(c.same, true, '결정적'); }
+  assert.ok(r.cases.some(c => c.after < c.before), '난수 예 중 실제로 줄어든 것이 있음');
+  await done(page);
+});
+
+test('이웃 보기에서 노드를 눌러 다시 그려도 보던 위치(이동·확대율)는 유지되고 초점만 바뀐다', { skip: SKIP }, async () => {
+  const page = await open({ nodes: nodes6, links: [lk(21, 1, 2), lk(22, 1, 3), lk(23, 4, 5), lk(24, 4, 6)] });
+  await openMap(page);
+  await page.click('#vm-zoom-in');
+  await page.drag('#vm-box', 60, 40);
+  await sleep(50);
+  const v0 = await vb(page);
+  assert.deepEqual(await idsOf(page, '.vm-node.hl'), [1, 2, 3]);
+  await clickNode(page, 5);
+  assert.deepEqual(await idsOf(page, '.vm-node.hl'), [4, 5], '5를 누르면 5와 이웃(4)이 진하게');
+  assert.ok(await page.eval("document.querySelector('[data-t=vm-node][data-id=\"5\"]').classList.contains('sel')"), '선택 표시');
+  const v1 = await vb(page);
+  assert.ok(v1.every((n, i) => Math.abs(n - v0[i]) < 0.01), '보기 영역 유지: ' + v0 + ' → ' + v1);
+  assert.equal(await page.text('[data-t=vm-node-title]'), '자료 5', '카드도 열림');
+  await done(page);
+});
+
 for (const w of [390, 768, 1024]) {
   test(`레이아웃 ${w}px: 지도·카드·과목 선택의 버튼 44px 이상, 가로 스크롤 없음, 스크립트 오류 없음`, { skip: SKIP }, async () => {
     const page = await open({ width: w, height: 844 });
@@ -619,6 +757,7 @@ for (const w of [390, 768, 1024]) {
     await clickEdge(page, 11);
     const small = await page.eval(`[...document.querySelectorAll('#vm-sheet button')].filter(b => { const r = b.getBoundingClientRect(); return r.width > 0 && (r.height < 43.5 || r.width < 43.5); }).map(b => b.getAttribute('data-t') || b.id)`);
     assert.deepEqual(small, [], '44px 미만 요소');
+    await showAll(page);
     await clickNode(page, 4);
     await page.click('[data-t=vm-add-link]');
     const small2 = await page.eval(`[...document.querySelectorAll('#vm-sheet button, #vm-sheet input')].filter(b => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height < 43.5; }).map(b => b.getAttribute('data-t') || b.id)`);
