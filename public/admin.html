@@ -14,7 +14,7 @@
   :root {
     --bg: var(--color-bg, #f5f7ff); --surface: var(--color-surface, #fff); --border: var(--color-line, #dde2f5);
     --accent: var(--color-accent, #e2583b); --danger: var(--color-danger, #dc2626); --success: var(--color-ok, #16a34a);
-    --warn: #d97706; --text: var(--color-text, #1a1f3c); --text2: var(--color-text-sub, #4a5070); --text3: #9398b5;
+    --warn: #d97706; --text: var(--color-text, #1a1f3c); --text2: var(--color-text-sub, #4a5070); --text3: var(--color-text-sub, #4a5070);
     --radius: 12px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -157,14 +157,14 @@
   /* ── Toast ── */
   #toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
-    background: #1a1f3c; color: #fff; padding: 10px 20px;
+    background: var(--color-text, #1a1f3c); color: #fff; padding: 10px 20px;
     font-size: 13px; opacity: 0; pointer-events: none; transition: all 0.25s; z-index: 999;
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   /* ── Access denied ── */
   #denied { display: none; flex-direction: column; align-items: center; justify-content: center; height: 80vh; gap: 12px; }
-  #denied h1 { font-size: 20px; color: var(--danger); }
+  #denied h1 { font-size: 18px; color: var(--danger); }
   #denied p { color: var(--text2); font-size: 14px; }
 
   /* ── Loading ── */
@@ -344,7 +344,7 @@ function renderUserRow(u) {
       <div class="user-cell">
         <div class="user-avatar">${(u.name || '?')[0].toUpperCase()}</div>
         <div>
-          <div class="user-name">${escHtml(u.name || '')} ${isMe ? '<span style="font-size:10px;color:var(--text3)">(나)</span>' : ''}${isPending ? '<span class="pending-badge">승인대기</span>' : ''}</div>
+          <div class="user-name">${escHtml(u.name || '')} ${isMe ? '<span style="font-size:11px;color:var(--text3)">(나)</span>' : ''}${isPending ? '<span class="pending-badge">승인대기</span>' : ''}</div>
           <div class="user-email">${escHtml(u.email || '')}</div>
         </div>
       </div>
