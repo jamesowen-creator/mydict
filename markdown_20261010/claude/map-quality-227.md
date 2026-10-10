@@ -77,3 +77,10 @@ Haiku 4.5(claude-haiku-4-5-20251001)만 사용. Opus 미사용.
 - C:\dev\metis3-hub-study\: B3.system.txt, plan_D.md, A_hub_table.md, prompts\(B2x·B3+해시), snapshot\, fixtures\(network·phone·hub25), run_all.ps1(-DryRun/-Stage/-CapUsd), sheets\(+orig\), results\(runs, score.md, judgments_227_21.json), tools\, keys\.
 - C:\dev\metis3-map-proto\, C:\dev\metis3-audit-218\after\227-16~18\, C:\dev\metis3-db-check\(미실행 조회문).
 - API 키: 실험도 앱과 같은 jamesowen 키 사용. 삭제하면 앱 AI 기능이 멈추므로 삭제 금지. 교체는 새 키 생성 → Railway ANTHROPIC_API_KEY 교체 → 구 키 삭제 순서.
+
+## 237 지도 순수 함수 공용 모듈 분리 (2026-10-10, 커밋 57ac3a7)
+- public/js/map/mapCore.js(85줄): sortLevels, layoutMap, edgeGeom, clipText, sv, MAPD, MAP_LAYOUT_SWEEPS(전역 let), SVG 이름공간. 개념 쪽 코드를 그대로 옮김(diff 동일). 클래식 스크립트이고 concept_study.html·voice_study.html이 `/js/map/mapCore.js?v=1`을 로드. 음성 쪽은 vmapSortLevels·vmapLayout·vmapEdgeGeom·vmapClip·vmapSv를 한 줄 별칭으로 남기고 VMAPD = MAPD.
+- 줄 수: concept_study.html 2184→2104, voice_study.html 3421→3353, 공용 파일 변경 0. 어긋남 방지 테스트 tests/map_core_shared.test.js 4건(두 html이 mapCore.js를 로드하고 함수 본문을 다시 정의하지 않음). 기준선 UI 테스트 건수 동일, 전체 608건 통과.
+- 수정할 때 주의: mapCore.js를 고치면 주소의 ?v=N을 올려야 옛 서비스 워커 캐시를 피함(.js는 캐시 우선). 개념 UI 테스트는 MAP_LAYOUT_SWEEPS를 직접 대입.
+- 보류: B안(끌기·핀치·휠·맞춤·확대까지 약 170줄, 상태 객체를 인자로 넘김)은 위험 중간이라 폰 확인 후. C안(지도 전체)은 그리기 골격 일치율 37%라 비권장.
+- 실제 폰·iOS 확인은 없음(헤드리스 Chrome만).

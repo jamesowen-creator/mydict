@@ -23,9 +23,10 @@
 - Railway 변수 값은 열람·기록하지 않는다. **jamesowen API 키는 앱이 쓰므로 삭제 금지.**
 
 ## 현재 위치 (2026-10-10)
-- origin/master = 31c7523 (235-2 불필요 파일 삭제, 문서·설정만 변경). 그 앞 92430bb(232-3 문서 사본 동기화), a900655(230-1). 마지막 앱 코드 커밋 7dda05d (229-2~4 음성 지도 가독성 이식, voice_study.html만 변경). 227 마지막 코드 커밋 24c13a4 (227-25). 227 지도 품질 작업은 B2 연결 생성, 가독성, 인사이트 패널, 허브 규칙(B3), 나누기 제안(4a)까지 배포 완료. 상세는 **claude/map-quality-227.md**.
+- origin/master = e77ed8d (243-2 관리자 화면 수정). 최근 커밋: a826a6d(242-1 공용 디자인 변수), 3c18368(240-3), 1a6daad(240-2 디자인 원칙 문서), 7447c15(238-2 디자인 현황 집계), 57ac3a7(237-2 지도 공용 모듈), 4a0c49f(236-1), 31c7523(235-2 불필요 파일 삭제). 마지막 앱 코드 커밋은 e77ed8d(public/admin.html), 그 앞 지도 코드는 57ac3a7(mapCore.js). 전체 테스트 619건 통과(첫 실행 기준). 227 마지막 코드 커밋 24c13a4 (227-25). 227 지도 품질 작업은 B2 연결 생성, 가독성, 인사이트 패널, 허브 규칙(B3), 나누기 제안(4a)까지 배포 완료. 상세는 **claude/map-quality-227.md**.
 - 사용자 확인 대기: 폰에서 지도(이웃 보기, 글자 크기, 연결 카드, "지도에서 읽기" 패널), 개념 추가 시 연결 품질, 연결 6개 이상 개념에서 나누기 제안, Console 비용(추정 개념당 약 1센트), Console 입력 토큰으로 227-25 효과 확인.
 - 사용자 결정(2026-10-10): 실사용 확인(폰 지도, Console 비용)은 건너뛰고 음성 지도 이식을 먼저 마친 뒤 정리 작업으로 진행. 위 확인 항목은 미확인으로 남음. 음성 지도 이식 기록은 claude/voice-map-214.md의 229 절.
 - 저장소 markdown_20261010\claude\ 사본은 236-1에서 cleanup-plan, orchestrator-handover를 Project 문서와 맞춤(map-quality-227, voice-map-214는 232-3 이후 변경 없음). 이후 문서 변경은 지시문에 내용을 담아 Claude Code가 직접 수정.
 - 정리 작업(2026-10-10): **완료.** Railway에는 lucky-truth의 metis3-app + Postgres-dyGe(운영 DB)만 남음. Console의 Voca. 키 삭제(jamesowen 키는 앱 사용). C:\dev 실험 폴더 3개 삭제, 3개 보관. 저장소 안 불필요 파일 삭제(235-2). voice_concepts·concept_migrations 코드·테이블, tests/legacy는 유지 결정. 남은 선택 사항: C:\dev\null 삭제 여부. 상세는 **claude/cleanup-plan.md**.
-- UI 통일·하단 내비 이력은 claude/ui-unify-plan.md, claude/bottom-nav-plan.md. 그 밖: concept-study-design/phase2, voice-study-design, voice-map-214, digest-reading-plan.
+- UI 통일·하단 내비 이력은 claude/ui-unify-plan.md, claude/bottom-nav-plan.md. 디자인 원칙 확정과 공용 변수(238~242)는 claude/design-principles-238.md, 이식용 원칙은 claude/design-principles-portable.md, 저장소의 확정 원칙은 docs/design/design-principles.md. 관리자 화면·권한 구조는 claude/admin-permissions-243.md. 그 밖: concept-study-design/phase2, voice-study-design, voice-map-214, digest-reading-plan.
+- 다음 후보(2026-10-10): 디자인 적용 B′(화면 별칭, 화면 변화 0, sw.js 버전 올림)와 C(값 변경, 화면 단위), 서버 권한 검사 추가(문학·한입·과학·퀴즈·팟캐스트, admin-permissions-243.md), 지도 공용 모듈 B안(폰 확인 후), 폰 폭 admin 헤더 높이 조정. 사용자 확인 대기(폰 지도, Console 비용)는 미확인.
