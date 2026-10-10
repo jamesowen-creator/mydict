@@ -937,7 +937,7 @@ router.post('/api/concepts/studies/:id/explore', guard, async (req, res) => {
       try { currentLinks = (await linkDegrees(id, req.user.id, items)).get(linkFrom.id) || 0; }
       catch (err) { console.error('concepts explore degree error:', err.message); }
     }
-    const input = buildConceptInput({ study, current: linkFrom, items, text: text.value, feedback: linkFrom ? linkFrom.feedback : null, selfId: item.id, withLinkCandidates: true, currentLinks });
+    const input = buildConceptInput({ study, current: linkFrom, items, text: text.value, feedback: linkFrom ? linkFrom.feedback : null, selfId: item.id, withLinkCandidates: !b2, currentLinks });
     const ai = await callConceptAI(req.user.id, b2 ? (currentLinks >= SPLIT_HINT_MIN_LINKS ? 'explore_b2_split' : 'explore_b2') : 'explore', input, 1500);
     let v = null;
     if (ai.parsed !== undefined) {

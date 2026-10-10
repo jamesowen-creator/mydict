@@ -53,6 +53,7 @@ test('기본(환경변수 없음) = legacy: 호출 1회, 설명 호출 안의 li
   assert.equal(anthropic.calls.length, 1);
   assert.match(anthropic.calls[0].system, /"links":\[\{"to_item_id"/, 'legacy 프롬프트는 links 를 요청');
   assert.deepEqual(events(db), ['concept']);
+  assert.deepEqual(dataIn(anthropic.calls[0])['연결 후보'].map(c => c.id), [chl.id], '227-25: legacy 설명 호출 입력에는 연결 후보가 그대로 있음');
   assert.equal(r.body.links.length, 1);
   assert.equal(r.body.links[0].relation_type, '포함');
   await close();
@@ -82,6 +83,7 @@ test('b2: 설명 호출(links 요청 없음) + 연결 호출(B2 프롬프트) 2�
   assert.doesNotMatch(explain.system, /"links"/, 'b2 설명 호출은 links 를 요청하지 않음');
   assert.doesNotMatch(explain.system, /연결 규칙/);
   assert.match(explain.system, /"suggestions"/);
+  assert.deepEqual(Object.keys(dataIn(explain)), ['분야', '현재 개념', '현재 개념의 연결 수', '학습 중인 개념', '제외·보류 용어', '기존 그룹', '사용자 입력', '반응 이력'], '227-25: b2 설명 호출 입력에는 연결 후보가 없고 나머지 키는 그대로');
   assert.equal(link.system, b2.SYSTEM_PROMPT);
   assert.equal(link.model, 'claude-haiku-4-5-20251001');
   const data = JSON.parse(link.messages[0].content.split('\n').slice(1).join('\n'));
