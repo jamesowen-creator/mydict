@@ -18,13 +18,13 @@
      작업155: 범례 필터 방식을 버리고 과목 선택 화면(view-subjects)을 추가 -
      3단계(과목 선택 → 과목별 캐러셀 → 개념 상세) 구조로 바뀜 */
   :root {
-    --primary: #e2583b;
+    --primary: var(--color-accent, #e2583b);
     --primary-light: #FDF0EC;
-    --primary-dark: #b8442e;
+    --primary-dark: var(--color-accent-ink, #b8442e);
     /* 작업199: 정답 같은 의미색은 주제색(코랄)과 분리해 초록 유지 */
     --success: #1D9E75;
     --success-light: #E1F5EE;
-    --success-dark: #085041;
+    --success-dark: var(--color-ok-ink, #085041);
     --bg: #FAFAF9;
     --card: #FFFFFF;
     --text1: #1a1a1a;

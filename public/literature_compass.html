@@ -14,9 +14,9 @@
 <link rel="stylesheet" href="/css/common/screenBar.css">
 <style>
   :root {
-    --primary: #e2583b;
+    --primary: var(--color-accent, #e2583b);
     --primary-light: #FDF0EC;
-    --primary-dark: #b8442e;
+    --primary-dark: var(--color-accent-ink, #b8442e);
     --bg: #FAFAF9;
     --card: #FFFFFF;
     --text1: #1a1a1a;
@@ -27,7 +27,7 @@
     --error: #E24B4A;
     --error-light: #FCEBEB;
     --error-dark: #B42318;   /* 작업217-3: 오답 글자(흰 바탕 6.57:1). 프로젝트의 위험색(개념 학습 --danger, 다이얼로그 위험 버튼)과 같은 값 */
-    --success-dark: #085041;   /* 작업217-3: 정답 글자(흰 바탕 약 10:1). 다른 읽기 화면의 --success-dark와 같은 값 */
+    --success-dark: var(--color-ok-ink, #085041);   /* 작업217-3: 정답 글자(흰 바탕 약 10:1). 다른 읽기 화면의 --success-dark와 같은 값 */
     --navbar-h: 78px;
   }
 

@@ -25,27 +25,27 @@
 <link rel="stylesheet" href="/css/common/tokens.css">
 <style>
   :root {
-    --bg: #f5f7ff;
-    --surface: #ffffff;
-    --surface2: #eef1fb;
-    --border: #dde2f5;
-    --accent: #e2583b;
+    --bg: var(--color-bg, #f5f7ff);
+    --surface: var(--color-surface, #ffffff);
+    --surface2: var(--color-surface-2, #eef1fb);
+    --border: var(--color-line, #dde2f5);
+    --accent: var(--color-accent, #e2583b);
     --accent2: #f54a7a;
-    --accent3: #16a34a;
+    --accent3: var(--color-ok, #16a34a);
     --accent-ko: #e67e22;
     --accent-ja: #b3261e;
     --accent-zh: #c0392b;
-    --text: #1a1f3c;
-    --text2: #4a5070;
+    --text: var(--color-text, #1a1f3c);
+    --text2: var(--color-text-sub, #4a5070);
     /* 작업220: 약한 글자색 #9398b5는 페이지 바탕 2.8:1·보조 바탕 2.5:1로 4.5:1에 못 미쳐서, 세 바탕(#f5f7ff, #eef1fb, 흰색) 모두에서 4.5:1 이상인 기존 색 --text2(#4a5070, 6.7:1 이상)와 같은 값으로 올림. 이 팔레트에는 더 연하면서 4.5:1을 넘는 색이 없음 */
-    --text3: #4a5070;
-    --correct-text: #085041;   /* 작업221: 퀴즈 정답 글자(흰 바탕 약 10:1). 다른 화면의 --success-dark와 같은 값 */
+    --text3: var(--color-text-sub, #4a5070);
+    --correct-text: var(--color-ok-ink, #085041);   /* 작업221: 퀴즈 정답 글자(흰 바탕 약 10:1). 다른 화면의 --success-dark와 같은 값 */
     --wrong-text: #B42318;     /* 작업221: 퀴즈 오답 글자(흰 바탕 6.57:1). 다른 화면의 --error-dark와 같은 값 */
-    --accent-text: #b8442e;   /* 작업220: 섹션 제목 글자색(흰·페이지 바탕 위 5:1 이상). 값은 다른 화면의 --primary-dark 와 같음 */
-    --correct: #16a34a;
-    --wrong: #dc2626;
-    --radius: 16px;
-    --radius-sm: 10px;
+    --accent-text: var(--color-accent-ink, #b8442e);   /* 작업220: 섹션 제목 글자색(흰·페이지 바탕 위 5:1 이상). 값은 다른 화면의 --primary-dark 와 같음 */
+    --correct: var(--color-ok, #16a34a);
+    --wrong: var(--color-danger, #dc2626);
+    --radius: var(--card-radius, 16px);
+    --radius-sm: var(--radius-ctl, 10px);
     /* 작업12: 기존 52px 상단 nav 대비 50% 키운 값. OCR 버튼/토스트/main
        하단 여백이 전부 이 값 + 안전영역을 기준으로 계산되므로 바 높이를
        바꿀 일이 있으면 여기 하나만 고치면 됨. */

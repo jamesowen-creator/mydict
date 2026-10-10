@@ -18,13 +18,13 @@
      작업184: 겉모양을 science_reading.html과 통일 - 색·글꼴·버튼·카드·안내 스타일은
      그 화면의 값을 그대로 쓰고 새 색·새 글꼴은 도입하지 않는다. 상단은 공통 헤더(appHeader). */
   :root {
-    --primary: #e2583b;
+    --primary: var(--color-accent, #e2583b);
     --primary-light: #FDF0EC;
-    --primary-dark: #b8442e;
+    --primary-dark: var(--color-accent-ink, #b8442e);
     /* 작업200: 정답 같은 의미색은 주제색(코랄)과 분리해 초록 유지 */
     --success: #1D9E75;
     --success-light: #E1F5EE;
-    --success-dark: #085041;
+    --success-dark: var(--color-ok-ink, #085041);
     --bg: #FAFAF9;
     --card: #FFFFFF;
     --text1: #1a1a1a;
