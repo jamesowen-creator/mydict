@@ -31,16 +31,15 @@
     --border: var(--color-line, #dde2f5);
     --accent: var(--color-accent, #e2583b);
     --accent2: #f54a7a;
-    --accent3: var(--color-ok, #16a34a);
-    --accent-ko: #e67e22;
-    --accent-ja: #b3261e;
-    --accent-zh: #c0392b;
+    --accent-ko: var(--lang-ko, #e67e22);
+    --accent-ja: var(--lang-ja, #b3261e);
+    --accent-zh: var(--lang-zh, #c0392b);
     --text: var(--color-text, #1a1f3c);
     --text2: var(--color-text-sub, #4a5070);
     /* 작업220: 약한 글자색 #9398b5는 페이지 바탕 2.8:1·보조 바탕 2.5:1로 4.5:1에 못 미쳐서, 세 바탕(#f5f7ff, #eef1fb, 흰색) 모두에서 4.5:1 이상인 기존 색 --text2(#4a5070, 6.7:1 이상)와 같은 값으로 올림. 이 팔레트에는 더 연하면서 4.5:1을 넘는 색이 없음 */
     --text3: var(--color-text-sub, #4a5070);
     --correct-text: var(--color-ok-ink, #085041);   /* 작업221: 퀴즈 정답 글자(흰 바탕 약 10:1). 다른 화면의 --success-dark와 같은 값 */
-    --wrong-text: #B42318;     /* 작업221: 퀴즈 오답 글자(흰 바탕 6.57:1). 다른 화면의 --error-dark와 같은 값 */
+    --wrong-text: var(--color-danger, #dc2626);     /* 작업221: 퀴즈 오답 글자(흰 바탕 6.57:1). 다른 화면의 --error-dark와 같은 값 */
     --accent-text: var(--color-accent-ink, #b8442e);   /* 작업220: 섹션 제목 글자색(흰·페이지 바탕 위 5:1 이상). 값은 다른 화면의 --primary-dark 와 같음 */
     --correct: var(--color-ok, #16a34a);
     --wrong: var(--color-danger, #dc2626);
@@ -179,7 +178,7 @@
   /* 작업107: OCR 인식 후보 순차 탐색 - "이전 / N / 다음" */
   .ocr-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 12px;padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;width:fit-content}
   .ocr-nav[hidden]{display:none}
-  .ocr-nav-btn{width:32px;height:32px;border-radius:50%;border:none;background:var(--surface);color:var(--accent);font-size:18px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .ocr-nav-btn{width:32px;height:32px;border-radius:50%;border:none;background:var(--surface);color: var(--color-accent-ink, #b8442e);font-size:18px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
   .ocr-nav-btn:disabled{opacity:.35}
   .ocr-nav-counter{font-size:13px;font-weight:700;color:var(--text2);min-width:44px;text-align:center}
 
@@ -229,7 +228,7 @@
   .search-clear-btn:hover { color: var(--text); }
 
   .btn {
-    min-height: var(--ctl-min-h); background: var(--btn-primary-bg, #b8442e);
+    min-height: var(--ctl-min-h); background: var(--btn-primary-bg, var(--color-accent-ink, #b8442e));
     color: white;
     border: none;
     border-radius: var(--radius-sm);
@@ -329,7 +328,7 @@
 
   .result-word {
     font-family: 'Sora', sans-serif;
-    font-size: 26px;
+    font-size: 22px;
     font-weight: 700;
     color: var(--text);
     margin-bottom: 4px;
@@ -395,7 +394,7 @@
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.04em;
-    color: var(--accent);
+    color: var(--color-accent-ink, #b8442e);
   }
 
   .result-section {
@@ -478,7 +477,7 @@
     min-width: 100px;
     cursor: pointer;
   }
-  .similar-word:hover { color: var(--accent); }
+  .similar-word:hover { color: var(--color-accent-ink, #b8442e); }
 
   .similar-diff {
     font-size: 13px;
@@ -587,7 +586,7 @@
   .wb-side-group:last-child { border-bottom: none; margin-bottom: 0; }
   .wb-side-group.wb-side-gap-before { margin-top: 10px; }
   .wb-side-label {
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--text3);
     text-transform: uppercase;
@@ -604,7 +603,7 @@
     border-radius: var(--radius-sm);
     border: 1.5px solid var(--border);
     background: var(--surface);
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--text2);
     cursor: pointer;
@@ -613,11 +612,11 @@
     font-family: 'Noto Sans KR', sans-serif;
   }
   .wb-side-icon { font-size: 17px; line-height: 1; }
-  .wb-side-btn.active-en, .wb-side-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(226,88,59,0.06); }
+  .wb-side-btn.active-en, .wb-side-btn.active { border-color: var(--accent); color: var(--color-accent-ink, #b8442e); background: rgba(226,88,59,0.06); }
   .wb-side-btn.active-ko { border-color: var(--accent-ko); color: var(--accent-ko); background: rgba(230,126,34,0.06); }
   .wb-side-btn.active-ja { border-color: var(--accent-ja); color: var(--accent-ja); background: rgba(179,38,30,0.06); }
   .wb-side-btn.active-zh { border-color: var(--accent-zh); color: var(--accent-zh); background: rgba(192,57,43,0.06); }
-  .wb-side-btn.danger.active { border-color: var(--wrong); color: var(--wrong); background: rgba(239,68,68,0.08); }
+  .wb-side-btn.danger.active { border-color: var(--color-danger-ink, #B42318); color: var(--wrong); background: rgba(239,68,68,0.08); }
   .wb-main { flex: 1; min-width: 0; }
 
   /* Selection action bar (전체선택/재생 or 전체선택/선택 삭제/취소) - sticks
@@ -708,7 +707,7 @@
     width: 16px; height: 16px; flex-shrink: 0;
     border: 1.5px solid var(--border); border-radius: 4px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 10px; color: transparent; transition: all 0.15s;
+    font-size: 11px; color: transparent; transition: all 0.15s;
   }
   .word-chip.selected .word-chip-check { background: var(--accent); border-color: var(--accent); color: #fff; }
   .wb-sort-btn {
@@ -718,7 +717,7 @@
     color: var(--text2); cursor: pointer;
     transition: all 0.15s; font-family: 'Sora', sans-serif;
   }
-  .wb-sort-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(226,88,59,0.08); }
+  .wb-sort-btn.active { border-color: var(--accent); color: var(--color-accent-ink, #b8442e); background: rgba(226,88,59,0.08); }
 
   .empty-state {
     text-align: center;
@@ -726,7 +725,7 @@
     color: var(--text3);
   }
 
-  .empty-state-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state-icon { font-size: 48px; margin-bottom: 12px; }
   .empty-state-text { font-size: 14px; line-height: 1.6; }
 
   /* QUIZ */
@@ -939,7 +938,7 @@
     border: 1px solid var(--border);
     color: var(--text);
     padding: 10px 20px;
-    border-radius: 40px;
+    border-radius: 16px;
     font-size: 13px;
     font-weight: 500;
     z-index: 999;
@@ -957,7 +956,7 @@
     display: inline-block;
   }
   .ko-entry-word-link:hover {
-    color: var(--accent);
+    color: var(--color-accent-ink, #b8442e);
   }
 
   /* 추가 번역 버튼 */
@@ -981,7 +980,7 @@
   .extra-trans-btn {
     flex: 1;
     padding: 10px;
-    border-radius: 14px;
+    border-radius: 10px;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -1017,7 +1016,7 @@
     display: flex; align-items: center; justify-content: center;
   }
   .login-card {
-    background: #fff; border-radius: 24px;
+    background: var(--color-surface, #fff); border-radius: 16px;
     box-shadow: 0 8px 40px rgba(226,88,59,0.13);
     padding: 44px 36px; max-width: 360px; width: 90%;
     text-align: center;
@@ -1027,8 +1026,8 @@
   .login-subtitle { font-size: 14px; color: var(--text2); margin-bottom: 32px; line-height: 1.6; }
   .google-login-btn {
     display: flex; align-items: center; justify-content: center; gap: 10px;
-    background: #fff; border: 1.5px solid var(--border);
-    border-radius: 12px; padding: 13px 20px; width: 100%;
+    background: var(--color-surface, #fff); border: 1.5px solid var(--border);
+    border-radius: 10px; padding: 13px 20px; width: 100%;
     font-size: 15px; font-weight: 600; color: var(--text);
     cursor: pointer; transition: all 0.2s; text-decoration: none;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -1080,7 +1079,7 @@
     padding: 8px 14px;
     font-size: 14px;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--color-accent-ink, #b8442e);
     cursor: pointer;
     transition: all 0.15s;
     line-height: 1.2;
@@ -1125,7 +1124,7 @@
     color: var(--text);
   }
   .meaning-domain {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--text3);
     letter-spacing: 0.03em;
@@ -1226,7 +1225,7 @@
     transition: all 0.15s; font-family: 'Sora', sans-serif;
   }
   .podcast-speed-btn.active {
-    border-color: var(--accent); color: var(--accent);
+    border-color: var(--accent); color: var(--color-accent-ink, #b8442e);
     background: rgba(226,88,59,0.08);
   }
   .podcast-mode-row, .podcast-repeat-row, .podcast-gap-row { display: flex; justify-content: center; gap: 8px; margin-top: 6px; }
@@ -1238,7 +1237,7 @@
     transition: all 0.15s; font-family: 'Sora', sans-serif;
   }
   .podcast-mode-btn.active, .podcast-repeat-btn.active, .podcast-gap-btn.active {
-    border-color: var(--accent); color: var(--accent);
+    border-color: var(--accent); color: var(--color-accent-ink, #b8442e);
     background: rgba(226,88,59,0.08);
   }
 
@@ -1272,7 +1271,7 @@
     margin-bottom: 8px;
   }
   .metacog-question {
-    font-size: 19px;
+    font-size: 18px;
     font-weight: 700;
     margin: 16px 0 20px;
     line-height: 1.4;
@@ -1285,7 +1284,7 @@
     margin: 16px 0;
   }
   .metacog-ox-btn {
-    font-size: 34px;
+    font-size: 32px;
     padding: 20px;
     border: 2px solid var(--border);
     border-radius: var(--radius-sm);
@@ -1351,8 +1350,8 @@
     font-weight: 600;
     display: none;
   }
-  .metacog-feedback.correct { background: rgba(22,163,74,0.12); color: var(--correct); display: block; }
-  .metacog-feedback.wrong   { background: rgba(220,38,38,0.12); color: var(--wrong);   display: block; }
+  .metacog-feedback.correct { background: rgba(22,163,74,0.12); color: var(--color-ok-ink, #085041); display: block; }
+  .metacog-feedback.wrong   { background: rgba(220,38,38,0.12); color: var(--color-danger-ink, #B42318);   display: block; }
   .metacog-feedback.partial { background: rgba(251,191,36,0.12); color: #b45309;        display: block; }
   .metacog-self-eval {
     display: grid;
@@ -1480,7 +1479,7 @@
     padding-left: 40px;
   }
   #search-btn {
-    background: var(--btn-primary-bg, #b8442e);
+    background: var(--btn-primary-bg, var(--color-accent-ink, #b8442e));
     border-radius: var(--btn-radius);
   }
 
@@ -1505,7 +1504,7 @@
   #page-search .lang-tag.active-zh {
     color: #1A1A1E;
     font-weight: 700;
-    border-bottom-color: #e2583b;
+    border-bottom-color: var(--color-accent, #e2583b);
   }
 </style>
 </head>
@@ -2413,7 +2412,7 @@ function renderResultKO(result, alreadySaved) {
   document.getElementById('search-result').innerHTML = `
     <div class="result-card">
       <div style="display:flex;align-items:center;gap:10px">
-        <div class="result-word" style="color:var(--accent-ko)">${result.word}</div>
+        <div class="result-word" style="color:var(--color-text, #1a1f3c)">${result.word}</div>
         <button class="tts-btn" data-tts="${encodeURIComponent(result.word)}" data-lang="ko" onclick="playTTSFromBtn(this)" title="발음 듣기"><span class="tts-icon">🔊</span><span class="tts-label">발음</span></button>
       </div>
       ${result.headline ? `<div class="word-headline">${result.headline}</div>` : ''}
@@ -3605,7 +3604,7 @@ async function checkMcWithAI() {
 
 function finalizeAI(isCorrect) {
   document.getElementById('mc-ai-result').innerHTML =
-    isCorrect ? '<div style="color:var(--correct);margin-top:6px;font-size:13px">✓ 정답으로 처리</div>'
+    isCorrect ? '<div style="color:var(--color-ok-ink, #085041);margin-top:6px;font-size:13px">✓ 정답으로 처리</div>'
               : '<div style="color:var(--wrong);margin-top:6px;font-size:13px">✗ 오답으로 처리</div>';
   showMcSelfEval();
 }
@@ -3653,9 +3652,9 @@ function renderMcSummary() {
       <div style="font-size:18px;font-weight:700;margin-bottom:4px">복습 완료!</div>
       <div style="font-size:13px;color:var(--text2);margin-bottom:4px">총 ${total}개 단어</div>
       <div class="metacog-summary-stats">
-        <span class="metacog-stat" style="background:rgba(22,163,74,0.12);color:var(--correct)">💪 ${summary.s3}개</span>
+        <span class="metacog-stat" style="background:rgba(22,163,74,0.12);color:var(--color-ok-ink, #085041)">💪 ${summary.s3}개</span>
         <span class="metacog-stat" style="background:rgba(251,191,36,0.12);color:#b45309">🤔 ${summary.s1}개</span>
-        <span class="metacog-stat" style="background:rgba(220,38,38,0.12);color:var(--wrong)">🎲 ${summary.s0}개</span>
+        <span class="metacog-stat" style="background:rgba(220,38,38,0.12);color:var(--color-danger-ink, #B42318)">🎲 ${summary.s0}개</span>
       </div>
       ${minNextDays < Infinity ? `<div style="font-size:13px;color:var(--text2);margin:8px 0">다음 복습 예정: <strong>${minNextDays}일 후</strong></div>` : ''}
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:18px">

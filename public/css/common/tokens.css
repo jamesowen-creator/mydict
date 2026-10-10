@@ -39,6 +39,7 @@
   --color-danger: #dc2626;
   --color-ok: #16a34a;
   --color-ok-ink: #085041;
+  --color-danger-ink: #B42318; /* 옅은 면 위 오류 글자용 진한 빨강(흰·페이지 바탕 위 오류 글자는 --color-danger) */
   --lang-ko: #e67e22;
   --lang-en: #e2583b;
   --lang-zh: #c0392b;
