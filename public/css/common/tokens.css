@@ -24,3 +24,55 @@
   --btn-primary-bg-hover: #9c3a27;
   --btn-primary-bg-active: #86311f;
 }
+
+/* 디자인 원칙 변수 (docs/design/design-principles.md 기준, 242-1). 화면에서 쓰기 전까지 영향 없음 */
+:root {
+  /* 색 */
+  --color-text: #1a1f3c;
+  --color-text-sub: #4a5070;
+  --color-line: #dde2f5;
+  --color-bg: #f5f7ff;
+  --color-surface: #ffffff;
+  --color-surface-2: #eef1fb;
+  --color-accent: #e2583b;
+  --color-accent-ink: #b8442e;
+  --color-danger: #dc2626;
+  --color-ok: #16a34a;
+  --color-ok-ink: #085041;
+  --lang-ko: #e67e22;
+  --lang-en: #e2583b;
+  --lang-zh: #c0392b;
+  --lang-ja: #b3261e;
+  /* 글꼴·글자 크기 */
+  --font-sans: "Noto Sans KR", sans-serif;
+  --font-num: "Sora", sans-serif;
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-15: 15px;
+  --fs-16: 16px;
+  --fs-18: 18px;
+  --fs-22: 22px;
+  --fs-32: 32px;
+  --fs-48: 48px;
+  /* 간격 */
+  --sp-0: 0;
+  --sp-4: 4px;
+  --sp-8: 8px;
+  --sp-10: 10px;
+  --sp-12: 12px;
+  --sp-16: 16px;
+  --sp-20: 20px;
+  --sp-24: 24px;
+  /* 모서리(카드는 기존 --card-radius 16px 사용) */
+  --radius-ctl: 10px;
+  --radius-round: 50%;
+  /* 그림자(초안: 사전 실제 선언과 다르면 실제 선언 우선) */
+  --shadow-nav: 0 -2px 8px rgba(226, 88, 59, 0.07);
+  --shadow-card: 0 4px 20px rgba(226, 88, 59, 0.08);
+  --ring-focus: 0 0 0 3px rgba(226, 88, 59, 0.25);
+  /* 레이아웃 */
+  --header-h: 65px;
+  --bar-h: 56px;
+}
