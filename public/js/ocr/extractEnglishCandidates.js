@@ -42,13 +42,22 @@ function normalizeToken(raw) {
 // project has no bundled word list or dictionary API). It's an optional trailing arg so
 // metis2-app's own test fixtures (which call these functions without it) still pass
 // unchanged when it's omitted.
+// 작업265: 사전 목록(public/data/ocr-word-list.txt)에는 하이픈 항목이 하나도 없어서
+// "well-known" 같은 복합어는 엔진이 정확히 읽어도 항상 탈락했다. 하이픈 양쪽 부분이
+// 각각 3글자 이상이고 둘 다 목록에 있으면 복합어로 인정한다(2글자 이하 조각은 오탐이
+// 많아 제외). 하이픈이 2개 이상이거나 맨 앞·맨 뒤인 경우는 isCandidateWord의 패턴이 이미 막는다.
+function isKnownHyphenCompound(word, wordSet) {
+  const parts = word.split('-');
+  return parts.length === 2 && parts.every((part) => part.length >= 3 && wordSet.has(part));
+}
+
 function isCandidateWord(word, wordSet) {
   if (word.length < 2 || word.length > 30) return false;
   if (!/^[a-z]+(?:-[a-z]+)?$/.test(word)) return false;
   if (word.includes('-') && word.split('-').some((part) => part.length < 2)) return false;
   if (/(.)\1{2,}/.test(word)) return false;
   if (!isSupportedWordInput(word) || stopwords.has(word)) return false;
-  if (wordSet && !wordSet.has(word)) return false;
+  if (wordSet && !wordSet.has(word) && !(word.includes('-') && isKnownHyphenCompound(word, wordSet))) return false;
   return /[aeiou]/.test(word) || (word.length >= 3 && word.slice(1).includes('y'));
 }
 
