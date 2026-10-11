@@ -24,7 +24,7 @@ const EXISTING = {
   '--gutter': '16px', '--body-font-size': '15px', '--content-max': '680px', '--btn-primary-bg': '#b8442e', '--btn-primary-bg-hover': '#9c3a27', '--btn-primary-bg-active': '#86311f',
 };
 const NEW = {
-  '--color-text': '#1a1f3c', '--color-text-sub': '#4a5070', '--color-line': '#dde2f5', '--color-bg': '#f5f7ff', '--color-surface': '#ffffff', '--color-surface-2': '#eef1fb',
+  '--color-text': '#1a1f3c', '--color-text-sub': '#4a5070', '--color-line': '#dde2f5', '--color-line-strong': '#868ca8', '--color-bg': '#f5f7ff', '--color-surface': '#ffffff', '--color-surface-2': '#eef1fb',
   '--color-accent': '#e2583b', '--color-accent-ink': '#b8442e', '--color-danger': '#dc2626', '--color-ok': '#16a34a', '--color-ok-ink': '#085041', '--color-danger-ink': '#B42318',
   '--lang-ko': '#e67e22', '--lang-en': '#e2583b', '--lang-zh': '#c0392b', '--lang-ja': '#b3261e',
   '--font-sans': '"Noto Sans KR", sans-serif', '--font-num': '"Sora", sans-serif',
@@ -36,8 +36,8 @@ const NEW = {
   '--header-h': '65px', '--bar-h': '56px',
 };
 
-test('tokens.css: 새 공용 변수 43개가 원칙 값대로 있다', () => {
-  assert.equal(Object.keys(NEW).length, 43);
+test('tokens.css: 새 공용 변수 44개가 원칙 값대로 있다', () => {
+  assert.equal(Object.keys(NEW).length, 44);
   for (const [name, value] of Object.entries(NEW)) assert.equal(defined.get(name), value, `${name} 값`);
 });
 
@@ -46,7 +46,7 @@ test('tokens.css: 기존 변수 12개의 이름·값이 그대로다', () => {
   for (const [name, value] of Object.entries(EXISTING)) assert.equal(defined.get(name), value, `${name} 값`);
 });
 
-test('tokens.css: 위 55개 말고 다른 변수는 정의하지 않는다(의도하지 않은 추가 방지)', () => {
+test('tokens.css: 위 56개 말고 다른 변수는 정의하지 않는다(의도하지 않은 추가 방지)', () => {
   const extra = [...defined.keys()].filter(n => !(n in NEW) && !(n in EXISTING));
   assert.deepEqual(extra, []);
 });

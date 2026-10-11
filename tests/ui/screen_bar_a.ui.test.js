@@ -46,7 +46,7 @@ for (const [file, views] of Object.entries(VIEWS)) {
         assert.equal(await page.count('.top-bar, .subject-bar, .back-btn'), 0, label + ': 옛 복사본 클래스 없음');
         if (v.bar) {
           const title = await page.eval("(() => { const t = document.querySelector('.view.active .screen-bar-title'); return t ? getComputedStyle(t).fontSize : null; })()");
-          if (title) assert.equal(title, '17px', label + ': 제목 17px');
+          if (title) assert.equal(title, '18px', label + ': 제목 18px');
         }
         if (v.back) {
           const r = await page.eval("(() => { const b = document.querySelector('.view.active .screen-bar-back'); const r = b.getBoundingClientRect(); return [r.width, r.height]; })()");

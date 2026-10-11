@@ -30,7 +30,6 @@
     --surface2: var(--color-surface-2, #eef1fb);
     --border: var(--color-line, #dde2f5);
     --accent: var(--color-accent, #e2583b);
-    --accent2: #f54a7a;
     --accent-ko: var(--lang-ko, #e67e22);
     --accent-ja: var(--lang-ja, #b3261e);
     --accent-zh: var(--lang-zh, #c0392b);
@@ -1176,7 +1175,7 @@
   }
   .podcast-word-info { flex: 1; min-width: 0; }
   .podcast-word-display {
-    font-family: 'Sora', sans-serif; font-size: 20px;
+    font-family: 'Sora', sans-serif; font-size: 18px;
     font-weight: 700; color: var(--text);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
@@ -3648,7 +3647,6 @@ function renderMcSummary() {
 
   document.getElementById('metacog-container').innerHTML = `
     <div class="metacog-summary-card">
-      <div style="font-size:42px;margin-bottom:12px">🧠</div>
       <div style="font-size:18px;font-weight:700;margin-bottom:4px">복습 완료!</div>
       <div style="font-size:13px;color:var(--text2);margin-bottom:4px">총 ${total}개 단어</div>
       <div class="metacog-summary-stats">
@@ -3703,7 +3701,7 @@ function renderWrongNote() {
       </div>
       <div class="word-grid">${wrongNote.map((w, i) => `
         <div class="word-chip" onclick="searchFromWordbook('${w.word.replace(/'/g, "\\'")}', 'en')">
-          <span class="word-chip-text" style="color:var(--accent2)">${w.word}</span>
+          <span class="word-chip-text" style="color:var(--color-text, #1a1f3c)">${w.word}</span>
           <span class="word-chip-del" onclick="event.stopPropagation();deleteWrong(${i})">×</span>
         </div>
       `).join('')}</div>

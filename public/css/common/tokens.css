@@ -31,6 +31,7 @@
   --color-text: #1a1f3c;
   --color-text-sub: #4a5070;
   --color-line: #dde2f5;
+  --color-line-strong: #868ca8;   /* 비텍스트 3:1 선(흰 바탕 대비 3.3:1). 지도 노드 테두리·입력창 테두리 후보 */
   --color-bg: #f5f7ff;
   --color-surface: #ffffff;
   --color-surface-2: #eef1fb;
