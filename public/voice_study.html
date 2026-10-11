@@ -208,7 +208,7 @@
   textarea.summary { min-height: 150px; }
   /* 작업215-2: 원문·요약 칸은 내용 길이만큼 늘어난다(안쪽 스크롤·크기 조절 손잡이 없음). 높이는 autoGrow()가 맞춘다 */
   textarea.auto-grow { overflow-y: hidden; resize: none; }
-  input[type=text]:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+  input[type=text]:focus, textarea:focus, select:focus { border-color: var(--color-accent, #e2583b); box-shadow: var(--ring-focus); outline: none; }   /* 작업260: 포커스 표시 통일(코랄 테두리+링) */
   .counter { font-size: 12px; color: var(--text2); text-align: right; margin-top: 4px; }
   .meta { font-size: 12px; color: var(--text2); margin-top: 10px; line-height: 1.6; }
   .sum-head { display: flex; align-items: center; justify-content: space-between; margin: 20px 0 8px; }
@@ -272,7 +272,7 @@
   .result-score span { font-size: 18px; color: var(--text2); }
   .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
   /* 작업221: 결과 화면 구성 = 큰 점수 + 한 줄 요약 + 틀린 문항 목록 + 버튼(읽기 화면과 같은 모양) */
-  .result-section-label { font-size: 12px; font-weight: 700; color: var(--primary-dark); margin-bottom: 12px; letter-spacing: 0.03em; padding-bottom: 4px; border-bottom: 2px solid var(--primary); }
+  .result-section-label { font-size: 12px; font-weight: 700; color: var(--primary-dark); margin-bottom: 12px; letter-spacing: 0.04em; padding-bottom: 4px; border-bottom: 2px solid var(--primary); }
   .result-wrong-list { display: flex; flex-direction: column; gap: 0; margin-bottom: 24px; }
   .result-wrong-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
   .result-wrong-list .result-wrong-item:last-child { border-bottom: none; }
@@ -374,6 +374,7 @@
   .tts-row .btn.small { flex: none; }
   .tts-rate { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text2); margin-left: auto; }
   .tts-rate select { font-family: 'Noto Sans KR', sans-serif; font-size: 14px; padding: 6px 8px; border-radius: var(--input-radius); border: 1px solid var(--border); background: var(--card); color: var(--text1); }
+  .tts-rate select:focus { border-color: var(--color-accent, #e2583b); box-shadow: var(--ring-focus); outline: none; }
 
   /* ── 작업214-3: 자료 연결 지도 (개념 학습 지도 CSS를 복사해 음성 학습 토큰으로 바꾼 것. 이름은 vm-*) ── */
   .vm-sheet { --vm-node-line: var(--color-line-strong, #868ca8); --vm-focus: var(--color-text, #1a1f3c); }   /* 노드 테두리: 흰 배경 대비 3.3:1 */

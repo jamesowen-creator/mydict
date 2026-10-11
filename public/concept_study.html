@@ -70,7 +70,7 @@
 
   /* 공통 요소 */
   /* 작업220: 섹션 제목 규격 — 12px / 700 / --accent-text(#b8442e, 페이지 바탕 위 5.25:1) / 블록으로 쓰이는 제목은 아래 2px 코랄 선(장식) */
-  .label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--accent-text); text-transform: uppercase; }
+  .label { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--color-accent-ink, #b8442e); text-transform: none; }
   .muted { color: var(--text2); }
   .small { font-size: 13px; }
   /* 작업220: 주 버튼 규격 — 높이 최소 44px, 15px / 600, 좌우 padding 20px, 테두리 없음 */
@@ -93,6 +93,8 @@
     width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--input-radius); padding: 11px 12px; min-height: 44px; line-height: 1.5;
   }
   textarea { resize: vertical; min-height: 88px; }
+  /* 작업260: 입력창 포커스는 코랄 테두리+링(전역 :focus-visible 윤곽선은 버튼·링크용으로 두고 입력창에서만 끔) */
+  input[type=text]:focus, textarea:focus, select:focus { border-color: var(--color-accent, #e2583b); box-shadow: var(--ring-focus); outline: none; }
   .field { margin-top: 14px; }
   .field > .label { display: block; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 2px solid var(--accent); }
   .counter { font-size: 12px; color: var(--text2); text-align: right; margin-top: 2px; }

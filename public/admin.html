@@ -58,7 +58,7 @@
   .section { margin-bottom: 32px; padding-bottom: 32px; border-bottom: 1px solid var(--border); }
   .section:last-child { border-bottom: none; margin-bottom: 0; }
   .section-header { padding: 0 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .section-title { font-size: 12px; font-weight: 700; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; }
+  .section-title { font-size: 12px; font-weight: 700; color: var(--color-accent-ink, #b8442e); letter-spacing: 0.04em; text-transform: none; }
   .section-body { padding: 0; }
 
   /* ── Cost ── */
@@ -134,6 +134,7 @@
     font-size: 13px; padding: 0 8px; min-height: 44px; min-width: 72px; border: 1px solid var(--border);
     border-radius: 0; background: var(--surface); color: var(--text); cursor: pointer;
   }
+  select.role-select:focus { border-color: var(--color-accent, #e2583b); box-shadow: var(--ring-focus); outline: none; }   /* 작업260: 포커스 표시 통일 */
 
   /* ── Action buttons ── */
   /* 작업76: 주요 액션이라 radius는 여기만 남김(10px), 터치 영역 44px */
