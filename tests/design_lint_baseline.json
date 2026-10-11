@@ -1,0 +1,104 @@
+{
+ "note": "작업262-1: 원칙 밖 값의 현재 개수. 늘면 테스트 실패, 줄면 UPDATE_DESIGN_BASELINE=1 로 갱신.",
+ "total": {
+  "hex_direct": 97,
+  "hex_direct_nonprinciple": 52,
+  "hex_fallback_nonprinciple": 15,
+  "var_def_nonprinciple": 3,
+  "font_size_out": 12,
+  "radius_out": 50,
+  "emoji": 103
+ },
+ "files": {
+  "admin.html": {
+   "hex_direct": 8,
+   "hex_direct_nonprinciple": 4,
+   "hex_fallback_nonprinciple": 0,
+   "var_def_nonprinciple": 1,
+   "font_size_out": 1,
+   "radius_out": 0,
+   "emoji": 0
+  },
+  "concept_study.html": {
+   "hex_direct": 0,
+   "hex_direct_nonprinciple": 0,
+   "hex_fallback_nonprinciple": 2,
+   "var_def_nonprinciple": 0,
+   "font_size_out": 5,
+   "radius_out": 3,
+   "emoji": 4
+  },
+  "css/common/appHeader.css": {
+   "hex_direct": 13,
+   "hex_direct_nonprinciple": 4,
+   "hex_fallback_nonprinciple": 0,
+   "var_def_nonprinciple": 0,
+   "font_size_out": 2,
+   "radius_out": 2,
+   "emoji": 0
+  },
+  "css/common/screenBar.css": {
+   "hex_direct": 7,
+   "hex_direct_nonprinciple": 0,
+   "hex_fallback_nonprinciple": 0,
+   "var_def_nonprinciple": 0,
+   "font_size_out": 0,
+   "radius_out": 1,
+   "emoji": 0
+  },
+  "css/common/tokens.css": {
+   "hex_direct": 0,
+   "hex_direct_nonprinciple": 0,
+   "hex_fallback_nonprinciple": 0,
+   "var_def_nonprinciple": 2,
+   "font_size_out": 0,
+   "radius_out": 0,
+   "emoji": 0
+  },
+  "digest_reading.html": {
+   "hex_direct": 17,
+   "hex_direct_nonprinciple": 14,
+   "hex_fallback_nonprinciple": 2,
+   "var_def_nonprinciple": 0,
+   "font_size_out": 0,
+   "radius_out": 6,
+   "emoji": 5
+  },
+  "english_dictionary.html": {
+   "hex_direct": 23,
+   "hex_direct_nonprinciple": 16,
+   "hex_fallback_nonprinciple": 2,
+   "var_def_nonprinciple": 0,
+   "font_size_out": 3,
+   "radius_out": 18,
+   "emoji": 70
+  },
+  "literature_compass.html": {
+   "hex_direct": 11,
+   "hex_direct_nonprinciple": 3,
+   "hex_fallback_nonprinciple": 4,
+   "var_def_nonprinciple": 0,
+   "font_size_out": 0,
+   "radius_out": 9,
+   "emoji": 4
+  },
+  "science_reading.html": {
+   "hex_direct": 14,
+   "hex_direct_nonprinciple": 11,
+   "hex_fallback_nonprinciple": 3,
+   "var_def_nonprinciple": 0,
+   "font_size_out": 0,
+   "radius_out": 6,
+   "emoji": 6
+  },
+  "voice_study.html": {
+   "hex_direct": 4,
+   "hex_direct_nonprinciple": 0,
+   "hex_fallback_nonprinciple": 2,
+   "var_def_nonprinciple": 0,
+   "font_size_out": 1,
+   "radius_out": 5,
+   "emoji": 14
+  }
+ }
+}

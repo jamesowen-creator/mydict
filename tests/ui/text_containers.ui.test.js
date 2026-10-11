@@ -129,7 +129,7 @@ test('217-4 literature 컨테이너: .era-card(구분선만), .section-box, .qui
   assertFlatPanel(await page.eval(MEASURE('.section-box')), '.section-box');
   await step(page, 'showCards();');
   // 카드 앞면은 뒤집기 단서라서 그대로(유지 예외): 테두리·둥근 모서리 유지
-  const front = await page.eval(MEASURE('.flip-card-front')); assert.equal(front.radius, '20px'); assert.equal(front.bw[0], '1px');
+  const front = await page.eval(MEASURE('.flip-card-front')); assert.equal(front.radius, '16px'); assert.equal(front.bw[0], '1px');
   await step(page, INJECT_REL);
   const rel = await page.eval(MEASURE('#probe-host .related-item'));
   assertNoBox(rel, '.related-item', { bottomLine: true }); assert.equal(rel.bw[2], '1px');

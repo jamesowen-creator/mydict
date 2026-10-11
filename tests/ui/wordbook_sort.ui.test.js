@@ -42,6 +42,7 @@ for (const w of [390, 1280]) {
   test(`단어장 ${w}px: 정렬 항목은 최신순이 위·ABC순이 아래, 처음엔 최신순이 선택됨(화면 위치도 위→아래)`, { skip: SKIP }, async () => {
     const page = await openWordbook(w);
     assert.deepEqual(await sortBar(page), ['recent*', 'abc']);
+    assert.deepEqual(await page.eval("[...document.querySelectorAll('.wb-sort-btn')].map(b => b.textContent.replace(/[^가-힣A-Za-z]/g, ''))"), ['최신순', 'ABC순'], '버튼 글자(작업262: 최근순→최신순)');
     const ys = await page.eval("[...document.querySelectorAll('.wb-sort-btn')].map(b => b.getBoundingClientRect().top)");
     assert.ok(ys[0] < ys[1], '최신순 버튼이 ABC순 버튼보다 위 ' + ys);
     assert.deepEqual(page.errors, []);

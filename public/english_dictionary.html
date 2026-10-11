@@ -265,36 +265,6 @@
     gap: 6px;
     margin-top: 8px;
   }
-  .lang-tag {
-    font-size: 11px;
-    font-weight: 700;
-    padding: 2px 10px;
-    border-radius: 20px;
-    background: var(--surface2);
-    color: var(--text3);
-    border: 1px solid var(--border);
-    transition: all 0.2s;
-  }
-  .lang-tag.active-en {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
-  }
-  .lang-tag.active-ko {
-    background: var(--accent-ko);
-    color: white;
-    border-color: var(--accent-ko);
-  }
-  .lang-tag.active-ja {
-    background: var(--accent-ja);
-    color: white;
-    border-color: var(--accent-ja);
-  }
-  .lang-tag.active-zh {
-    background: var(--accent-zh);
-    color: white;
-    border-color: var(--accent-zh);
-  }
 
   /* MAIN */
   main {
@@ -1039,14 +1009,6 @@
     display: flex; align-items: center;
     padding-left: 8px; flex-shrink: 0;
   }
-  .nav-admin-btn {
-    margin-left: 8px; font-size: 11px; font-weight: 700;
-    padding: 3px 9px; border-radius: 20px;
-    background: #ede9fe; color: #6d28d9;
-    text-decoration: none; white-space: nowrap;
-    letter-spacing: 0.3px;
-  }
-  .nav-admin-btn:hover { background: #ddd6fe; }
 
   /* ─── SEARCH WELCOME ─────────────────────────────────────────── */
   .user-welcome-bar {
@@ -1398,10 +1360,9 @@
     margin: 16px 0;
     flex-wrap: wrap;
   }
-  .metacog-stat {
+  .metacog-stat {   /* 작업262: 박스(배경·모서리) 없는 글자. 바깥 간격은 padding으로 그대로 */
     font-size: 14px;
     padding: 6px 14px;
-    border-radius: 20px;
     font-weight: 700;
   }
 
@@ -1491,6 +1452,7 @@
     border-radius: 0;
     padding: 8px 2px;
     min-height: 44px;
+    transition: all 0.2s;
     font-size: 14px;
     font-weight: 500;
     font-family: 'Noto Sans KR', sans-serif;
@@ -1611,7 +1573,7 @@
 
         <div class="wb-side-group">
           <div class="wb-side-label">정렬</div>
-          <button class="wb-side-btn wb-sort-btn active" data-sort="recent" onclick="setWordbookSort('recent')"><span class="wb-side-icon">🕐</span><span>최근순</span></button>
+          <button class="wb-side-btn wb-sort-btn active" data-sort="recent" onclick="setWordbookSort('recent')"><span class="wb-side-icon">🕐</span><span>최신순</span></button>
           <button class="wb-side-btn wb-sort-btn" data-sort="abc" onclick="setWordbookSort('abc')"><span class="wb-side-icon">🔤</span><span>ABC순</span></button>
         </div>
 
@@ -3658,9 +3620,9 @@ function renderMcSummary() {
       <div style="font-size:18px;font-weight:700;margin-bottom:4px">복습 완료!</div>
       <div style="font-size:13px;color:var(--text2);margin-bottom:4px">총 ${total}개 단어</div>
       <div class="metacog-summary-stats">
-        <span class="metacog-stat" style="background:rgba(22,163,74,0.12);color:var(--color-ok-ink, #085041)">💪 ${summary.s3}개</span>
-        <span class="metacog-stat" style="background:rgba(251,191,36,0.12);color:#b45309">🤔 ${summary.s1}개</span>
-        <span class="metacog-stat" style="background:rgba(220,38,38,0.12);color:var(--color-danger-ink, #B42318)">🎲 ${summary.s0}개</span>
+        <span class="metacog-stat" style="color:var(--color-ok-ink, #085041)">💪 ${summary.s3}개</span>
+        <span class="metacog-stat" style="color:#b45309">🤔 ${summary.s1}개</span>
+        <span class="metacog-stat" style="color:var(--color-danger-ink, #B42318)">🎲 ${summary.s0}개</span>
       </div>
       ${minNextDays < Infinity ? `<div style="font-size:13px;color:var(--text2);margin:8px 0">다음 복습 예정: <strong>${minNextDays}일 후</strong></div>` : ''}
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:18px">
