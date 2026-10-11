@@ -1,4 +1,4 @@
-// 작업261-2: OCR 패널은 밝은 배경(토큰 색)이고, 영상 위 요소(후보 칩·원형 버튼·오류 문구)는 흰 면 α≥.92 + 진한 글자로 어느 영상 위에서도 읽힌다.
+// 작업261-2: OCR 패널은 밝은 배경(토큰 색)이고, 영상 위 요소 중 원형 버튼·오류 문구는 흰 면 α≥.92(후보 칩은 263에서 이전 반투명 검정으로 복원) + 진한 글자로 어느 영상 위에서도 읽힌다.
 // 카메라 없이 측정한다: 패널의 hidden 을 풀고 후보 칩·인식 박스·오류 문구를 직접 넣는다(JS 동작은 건드리지 않음). 영상 위 실제 가독성은 이 테스트로 알 수 없다.
 // 실행: node --test "tests/ui/*.test.js"   (Chrome이 없으면 건너뜀)
 const test = require('node:test');
@@ -46,10 +46,12 @@ for (const w of [390, 1280]) {
     assert.equal(m.close.color, 'rgb(26, 31, 60)');
     assert.equal(m.torch.color, 'rgb(74, 80, 112)', '조명 기본은 보조색');
     assert.equal(m.torchActive.color, 'rgb(184, 68, 46)', '조명 켜짐은 accent-ink'); assert.equal(m.torchActive.fontWeight, '700', '켜짐은 굵게(색 단독 금지)'); assert.notEqual(m.torch.fontWeight, '700');
-    for (const k of ['cand', 'sel', 'circle', 'error']) assert.ok(alpha(m[k].backgroundColor) >= 0.92, `${k} 배경 알파 ${m[k].backgroundColor}`);
-    assert.equal(m.cand.fontSize, '13px', '후보 칩 글자'); assert.equal(m.cand.color, 'rgb(26, 31, 60)');
+    for (const k of ['circle', 'error']) assert.ok(alpha(m[k].backgroundColor) >= 0.92, `${k} 배경 알파 ${m[k].backgroundColor}`);
+    // 작업263: 후보 칩은 너무 밝다는 의견으로 261-2 이전 색(반투명 검정 면+흰 글자)으로 되돌림. 크기·모서리·폭·높이는 그대로
+    assert.equal(m.cand.backgroundColor, 'rgba(0, 0, 0, 0.15)', '후보 칩 배경'); assert.equal(m.cand.color, 'rgba(255, 255, 255, 0.8)', '후보 칩 글자');
+    assert.equal(m.cand.borderTopColor, 'rgba(255, 255, 255, 0.2)', '후보 칩 테두리'); assert.equal(m.cand.fontSize, '13px', '후보 칩 글자 크기');
     assert.equal(m.cand.borderRadius, '10px');
-    assert.equal(m.sel.borderTopColor, 'rgb(226, 88, 59)', '선택된 칩 테두리 accent'); assert.equal(m.sel.fontWeight, '700', '선택된 칩 굵게');
+    assert.equal(m.sel.boxShadow, 'rgba(255, 255, 255, 0.65) 0px 0px 0px 1px inset', '선택된 칩 안쪽 흰 선'); assert.equal(m.sel.fontWeight, '700', '선택된 칩 굵게(색 단독 금지)'); assert.equal(m.cand.fontWeight, '500');
     assert.ok(m.spans.every(Boolean), '후보 칩 글자가 잘리지 않음'); assert.ok(m.candH.every(h => h === 44), '후보 칩은 한 줄(높이 44) ' + m.candH);
     assert.equal(m.circle.w, 56); assert.equal(m.circle.borderRadius, '50%'); assert.equal(m.circle.color, 'rgb(184, 68, 46)'); assert.equal(m.circle.boxShadow, 'none', '글로우 없음');
     assert.equal(m.error.color, 'rgb(180, 35, 24)', '오류 글자 danger-ink');
