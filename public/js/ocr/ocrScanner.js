@@ -1,7 +1,7 @@
 import { captureLiveFrame } from './liveFrameCapture.js';
 import { createLiveEnglishOcrSession } from './liveEnglishOcrSession.js';
 import { deriveLiveOcrCandidates, preloadEnglishWordSet } from './extractEnglishCandidates.js';
-import { projectOverlayRect } from './liveOverlayGeometry.js';
+import { projectOverlayRect, projectCropBox, computeGuideCrop } from './liveOverlayGeometry.js';
 import { createCandidateStabilityTracker } from './ocrCandidateStability.js';
 
 // 작업7: 원 크기(56px)는 그대로 두고 아이콘만 22px -> 28px로 키워서
@@ -61,7 +61,8 @@ export function createOcrScanner(root, { onSelect } = {}) {
       b.onclick = () => onSelect?.(words[i].text, i, words.map(w => w.text));
     });
     overlay.innerHTML = words.map(w => {
-      const r = projectOverlayRect(w.bbox, video, overlay, guide);
+      // 작업266: 인식한 프레임의 크롭 변환(w.crop)으로 투영(크롭과 같은 규칙). 크롭 정보가 없으면 기존 비율 방식
+      const r = w.crop ? projectCropBox(w.bbox, w.crop) : projectOverlayRect(w.bbox, video, overlay, guide);
       return r ? `<span class="ocr-box" style="left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px"></span>` : '';
     }).join('');
   }
@@ -83,12 +84,14 @@ export function createOcrScanner(root, { onSelect } = {}) {
     if (state.busy || state.paused || !state.session) return;
     state.busy = true;
     try {
-      const blob = await captureLiveFrame(video, canvas, guide);
+      // 작업266: 스캔마다 눈에 보이는 가이드(.ocr-guide)의 화면 사각형을 읽어 영상 좌표로 바꾼 크롭을 쓴다(회전·창 크기 변경 반영)
+      const crop = computeGuideCrop(video, guideEl);
+      const blob = await captureLiveFrame(video, canvas, guide, crop);
       const imageSize = { width: canvas.width, height: canvas.height };
       const data = await state.session.recognize(blob);
       const rawWords = await deriveLiveOcrCandidates(data, imageSize);
       // 작업112: 매 프레임(빈 프레임 포함) 넣어야 스트릭이 정확히 유지/리셋됨
-      const words = stability.filter(rawWords);
+      const words = stability.filter(rawWords).map(w => ({ ...w, crop }));
       if (words.length) {
         recordHistory(words);
         render(words);

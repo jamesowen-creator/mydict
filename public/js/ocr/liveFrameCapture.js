@@ -64,17 +64,24 @@ export function preprocessImageData(imageData, { contrast = 40, binarize = false
 // 이걸 기본값으로 선택함. 테스트 스크립트/결과는 진행 보고에 남김.
 const PREPROCESS_OPTIONS = { contrast: 40, binarize: false };
 
-export function captureLiveFrame(video, canvas, guide) {
+// 작업266: crop({ x, y, w, h, outW, outH }, liveOverlayGeometry.computeGuideCrop 결과)이 있으면 눈에 보이는 가이드 영역을
+// 그대로 잘라 outW×outH 로 인식에 넘긴다. 없으면(영상 미로드·가이드 크기를 못 읽음) 기존 영상 비율(guide) 계산으로 폴백.
+export function captureLiveFrame(video, canvas, guide, crop) {
   const vw = video.videoWidth, vh = video.videoHeight;
   if (!vw || !vh) throw new Error('카메라 프레임을 준비하지 못했습니다.');
-  const x = Math.max(0, Math.round(guide.left * vw));
-  const y = Math.max(0, Math.round(guide.top * vh));
-  const w = Math.min(vw - x, Math.round(guide.width * vw));
-  const h = Math.min(vh - y, Math.round(guide.height * vh));
-  canvas.width = w; canvas.height = h;
+  let x, y, w, h, outW, outH;
+  if (crop) { ({ x, y, w, h, outW, outH } = crop); }
+  else {
+    x = Math.max(0, Math.round(guide.left * vw));
+    y = Math.max(0, Math.round(guide.top * vh));
+    w = Math.min(vw - x, Math.round(guide.width * vw));
+    h = Math.min(vh - y, Math.round(guide.height * vh));
+    outW = w; outH = h;
+  }
+  canvas.width = outW; canvas.height = outH;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(video, x, y, w, h, 0, 0, w, h);
-  const imageData = ctx.getImageData(0, 0, w, h);
+  ctx.drawImage(video, x, y, w, h, 0, 0, outW, outH);
+  const imageData = ctx.getImageData(0, 0, outW, outH);
   preprocessImageData(imageData, PREPROCESS_OPTIONS);
   ctx.putImageData(imageData, 0, 0);
   return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('프레임 변환에 실패했습니다.')), 'image/jpeg', 0.88));
