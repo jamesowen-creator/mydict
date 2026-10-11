@@ -1611,8 +1611,8 @@
 
         <div class="wb-side-group">
           <div class="wb-side-label">정렬</div>
-          <button class="wb-side-btn wb-sort-btn active" data-sort="abc" onclick="setWordbookSort('abc')"><span class="wb-side-icon">🔤</span><span>ABC순</span></button>
-          <button class="wb-side-btn wb-sort-btn" data-sort="recent" onclick="setWordbookSort('recent')"><span class="wb-side-icon">🕐</span><span>최근순</span></button>
+          <button class="wb-side-btn wb-sort-btn active" data-sort="recent" onclick="setWordbookSort('recent')"><span class="wb-side-icon">🕐</span><span>최근순</span></button>
+          <button class="wb-side-btn wb-sort-btn" data-sort="abc" onclick="setWordbookSort('abc')"><span class="wb-side-icon">🔤</span><span>ABC순</span></button>
         </div>
 
         <div class="wb-side-group">
@@ -1895,7 +1895,7 @@ function showPage(name, push = true) {
   if (tabIdx >= 0) document.querySelectorAll('.nav-tab')[tabIdx].classList.add('active');
 
   if (name === 'home')     initDashboard();
-  if (name === 'wordbook') renderWordbook();
+  if (name === 'wordbook') { resetWordbookSort(); renderWordbook(); }
   if (name === 'quiz')     renderQuizStart(false);
   if (name === 'wrong')    renderWrongNote();
   if (name === 'metacog')  initMetacogPage();
@@ -2773,7 +2773,7 @@ async function loadExtraTransKO(word, lang, btn) {
 
 // ─── WORDBOOK ─────────────────────────────────────────────────────────────────
 let currentWordbookTab = 'en';
-let wordbookSortOrder = 'abc';
+let wordbookSortOrder = 'recent';   // 작업259: 기본은 최신순. 단어장을 열 때·언어를 바꿀 때 resetWordbookSort()로 되돌린다
 let selectedWords = new Set();
 let currentUserName = '';
 // 'none' | 'listen' | 'delete' - mutually exclusive by construction (a single
@@ -2783,6 +2783,7 @@ let _currentPage = 'search';
 
 function switchWordbookTab(tab) {
   currentWordbookTab = tab;
+  resetWordbookSort();
   selectedWords.clear();
   wordbookMode = 'none';
   ['en','ko','ja','zh'].forEach(function(l) {
@@ -2873,11 +2874,18 @@ function renderWordbook() {
   el.innerHTML = '<div class="word-grid">' + html + '</div>';
   updateSelectedBtn();
 }
+function syncWordbookSortButtons() {
+  document.querySelectorAll('.wb-sort-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.sort === wordbookSortOrder);
+  });
+}
+function resetWordbookSort() {
+  wordbookSortOrder = 'recent';
+  syncWordbookSortButtons();
+}
 function setWordbookSort(sort) {
   wordbookSortOrder = sort;
-  document.querySelectorAll('.wb-sort-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.sort === sort);
-  });
+  syncWordbookSortButtons();
   renderWordbook();
 }
 

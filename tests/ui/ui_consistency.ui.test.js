@@ -196,7 +196,7 @@ test('220 (c) 섹션 제목: 12px/700/#b8442e + 아래 2px 코랄 선 (음성·�
   assertSection(await m(page, '.result-section-label'), '한입 .result-section-label');
   await done(page);
   page = await openDict();
-  await step(page, `wordbook = ${WORDS}; showPage('wordbook')`);
+  await step(page, `wordbook = ${WORDS}; showPage('wordbook'); setWordbookSort('abc')`);   // 작업259: 기본이 최신순이라 알파벳 제목은 ABC순을 골라야 보임
   assertSection(await m(page, '.alpha-header'), '사전 .alpha-header', { line: false });
   assert.equal((await m(page, '.alpha-header')).bw[2], '2px', '사전 섹션 제목의 아래 2px 선은 그대로');
   await done(page);
