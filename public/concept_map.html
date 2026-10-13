@@ -12,8 +12,8 @@
 <link rel="stylesheet" href="/css/common/tokens.css">
 <link rel="stylesheet" href="/css/common/screenBar.css">
 <style>
-  /* 작업270-1: 개념 지도(개발 중). 옛 개념학습(concept_study.html)과 별도 화면이며 이번 단계는 권한 확인과 빈 화면뿐이다.
-     색·크기는 /css/common/tokens.css 의 변수만 쓴다(직접 hex 없음). */
+  /* 작업270-1·271-1: 개념 지도(개발 중). 옛 개념학습(concept_study.html)과 별도 화면.
+     색·크기·모서리는 /css/common/tokens.css 의 변수만 쓴다(직접 hex 없음, 글자 크기 11·12·13·14·15·16·18·22, 모서리 10·16·50%). */
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html { -webkit-text-size-adjust: 100%; }
   body {
@@ -27,7 +27,9 @@
     max-width: var(--content-max);
     margin: 0 auto;
   }
-  button { font-family: inherit; font-size: inherit; color: inherit; cursor: pointer; }
+  button, input, textarea, select { font-family: inherit; font-size: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { opacity: 0.45; cursor: default; }
   :focus-visible { outline: 2px solid var(--color-text); outline-offset: 2px; }
   [hidden] { display: none !important; }
   svg.ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
@@ -35,11 +37,50 @@
   #loading, #access-denied { position: fixed; inset: 0; z-index: 999; background: var(--color-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; }
   #loading p, #access-denied p { color: var(--color-text-sub); font-size: 14px; }
   #access-denied h2 { font-size: 18px; font-weight: 800; }
-  .btn { min-height: 44px; padding: 0 18px; border: none; border-radius: var(--radius-ctl); background: var(--color-accent-ink); color: var(--color-surface); font-weight: 600; display: inline-flex; align-items: center; text-decoration: none; }
-  .wrap { max-width: var(--content-max); margin: 0 auto; padding: 0 var(--gutter); }
-  .view-head { padding: 28px 0 8px; }
-  .view-title { font-size: 22px; font-weight: 800; line-height: 1.3; }
-  .view-sub { margin-top: 10px; font-size: 14px; color: var(--color-text-sub); }
+
+  .btn { min-height: var(--ctl-min-h); padding: 0 16px; border: none; border-radius: var(--radius-ctl); background: var(--color-accent-ink); color: var(--color-surface); font-weight: 600; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+  .btn.text { background: transparent; color: var(--color-accent-ink); padding: 0 10px; }
+  .btn.danger { background: var(--color-danger-ink); }
+  .wrap { max-width: var(--content-max); margin: 0 auto; padding: 0 var(--gutter) 40px; }
+  .sec { padding: 20px 0 8px; border-bottom: 1px solid var(--color-line); }
+  .sec:last-child { border-bottom: none; }
+  .sec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--ctl-min-h); }
+  .sec-title { font-size: 18px; font-weight: 800; line-height: 1.3; min-width: 0; overflow-wrap: anywhere; }
+  .hint { margin-top: 6px; font-size: 14px; color: var(--color-text-sub); }
+  .msg { min-height: 0; margin-top: 8px; font-size: 14px; color: var(--color-danger-ink); }
+  .msg:empty { display: none; }
+
+  /* 주제 트리 */
+  #tree, #tree ul { list-style: none; }
+  .t-row { display: flex; align-items: center; min-height: var(--ctl-min-h); border-bottom: 1px solid var(--color-line); }
+  .t-toggle, .t-spacer { flex: none; width: 36px; height: var(--ctl-min-h); display: inline-flex; align-items: center; justify-content: center; background: none; border: none; color: var(--color-text-sub); }
+  .t-toggle svg { transition: transform 0.15s; }
+  .t-toggle[aria-expanded=true] svg { transform: rotate(90deg); }
+  .t-node { flex: 1; min-width: 0; min-height: var(--ctl-min-h); display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px; background: none; border: none; text-align: left; font-weight: 500; }
+  .t-node .t-title { min-width: 0; overflow-wrap: anywhere; }
+  .t-node .t-count { flex: none; font-size: 13px; color: var(--color-text-sub); font-weight: 400; }
+  .t-node[aria-current=true] { font-weight: 800; color: var(--color-accent-ink); background: var(--color-surface-2); border-radius: var(--radius-ctl); }
+  #topic-actions { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 0 14px; }
+
+  /* 개념 목록 */
+  #concept-list { list-style: none; }
+  .c-item { padding: 12px 0; border-bottom: 1px solid var(--color-line); }
+  .c-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .c-term { font-size: 16px; font-weight: 800; overflow-wrap: anywhere; }
+  .c-en { font-size: 14px; color: var(--color-text-sub); overflow-wrap: anywhere; }
+  .c-memo { margin-top: 4px; font-size: 14px; color: var(--color-text-sub); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .c-tools { display: flex; gap: 4px; margin-top: 4px; margin-left: -10px; }
+
+  /* 대화상자 */
+  dialog { margin: auto; width: min(calc(100vw - 32px), 420px); max-height: calc(100dvh - 32px); overflow-y: auto; border: 1px solid var(--color-line); border-radius: var(--card-radius); padding: 20px; background: var(--color-surface); color: var(--color-text); }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+  dialog h3 { font-size: 18px; font-weight: 800; line-height: 1.3; }
+  dialog .field { margin-top: 14px; }
+  dialog label { display: block; font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  dialog input, dialog textarea, dialog select { width: 100%; min-height: var(--ctl-min-h); padding: 8px 12px; border: 1px solid var(--color-line-strong); border-radius: var(--input-radius); background: var(--color-surface); }
+  dialog textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
+  dialog .body-text { margin-top: 12px; white-space: pre-line; overflow-wrap: anywhere; }
+  dialog .btn-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 </style>
 </head>
 <body>
@@ -62,13 +103,74 @@
     <h1 class="screen-bar-title">개념 지도</h1>
   </div>
   <div class="wrap">
-    <div class="view-head">
-      <p id="dev-note" class="view-sub">개발 중입니다. 다음 단계에서 주제와 개념 기능이 추가됩니다.</p>
-    </div>
+    <section class="sec" id="topics-sec" aria-label="주제">
+      <div class="sec-head">
+        <h2 class="sec-title">주제</h2>
+        <button id="add-root-btn" class="btn text" type="button">주제 추가</button>
+      </div>
+      <p id="topics-msg" class="msg" role="alert"></p>
+      <ul id="tree" role="tree" aria-label="주제 목록"></ul>
+      <p id="tree-empty" class="hint" hidden>아직 주제가 없습니다. 첫 주제를 만들어 보세요.</p>
+      <div id="topic-actions" hidden>
+        <button id="act-add-child" class="btn text" type="button">하위 주제 추가</button>
+        <button id="act-rename" class="btn text" type="button">이름 변경</button>
+        <button id="act-move" class="btn text" type="button">이동</button>
+        <button id="act-delete" class="btn text" type="button">삭제</button>
+      </div>
+    </section>
+    <section class="sec" id="concepts-sec" aria-label="개념" hidden>
+      <div class="sec-head">
+        <h2 class="sec-title" id="concepts-title">개념</h2>
+        <button id="add-concept-btn" class="btn text" type="button">개념 추가</button>
+      </div>
+      <p id="concepts-msg" class="msg" role="alert"></p>
+      <ul id="concept-list"></ul>
+      <p id="concepts-empty" class="hint" hidden>이 주제에는 아직 개념이 없습니다.</p>
+    </section>
   </div>
 </div>
 
+<dialog id="name-dlg" aria-labelledby="name-heading">
+  <form id="name-form" novalidate>
+    <h3 id="name-heading"></h3>
+    <div class="field"><label id="name-label" for="name-input"></label><input id="name-input" type="text" maxlength="80" autocomplete="off"></div>
+    <p id="name-msg" class="msg" role="alert"></p>
+    <div class="btn-row"><button id="name-cancel" class="btn text" type="button">취소</button><button id="name-ok" class="btn" type="submit">저장</button></div>
+  </form>
+</dialog>
+
+<dialog id="move-dlg" aria-labelledby="move-heading">
+  <form id="move-form" novalidate>
+    <h3 id="move-heading">주제 이동</h3>
+    <p id="move-sub" class="body-text"></p>
+    <div class="field"><label for="move-select">옮길 위치</label><select id="move-select"></select></div>
+    <p id="move-msg" class="msg" role="alert"></p>
+    <div class="btn-row"><button id="move-cancel" class="btn text" type="button">취소</button><button id="move-ok" class="btn" type="submit">이동</button></div>
+  </form>
+</dialog>
+
+<dialog id="confirm-dlg" aria-labelledby="confirm-heading">
+  <form id="confirm-form" novalidate>
+    <h3 id="confirm-heading"></h3>
+    <p id="confirm-text" class="body-text"></p>
+    <p id="confirm-msg" class="msg" role="alert"></p>
+    <div class="btn-row"><button id="confirm-cancel" class="btn text" type="button">취소</button><button id="confirm-ok" class="btn danger" type="submit">삭제</button></div>
+  </form>
+</dialog>
+
+<dialog id="concept-dlg" aria-labelledby="concept-heading">
+  <form id="concept-form" novalidate>
+    <h3 id="concept-heading"></h3>
+    <div class="field"><label for="concept-term">개념 이름</label><input id="concept-term" type="text" maxlength="80" autocomplete="off"></div>
+    <div class="field"><label for="concept-english">영문 표기 (선택)</label><input id="concept-english" type="text" maxlength="120" autocomplete="off"></div>
+    <div class="field"><label for="concept-memo">메모 (선택)</label><textarea id="concept-memo" maxlength="2000"></textarea></div>
+    <p id="concept-msg" class="msg" role="alert"></p>
+    <div class="btn-row"><button id="concept-cancel" class="btn text" type="button">취소</button><button id="concept-ok" class="btn" type="submit">저장</button></div>
+  </form>
+</dialog>
+
 <script>
+const $ = id => document.getElementById(id);
 function getToken() { try { return localStorage.getItem('mydict_token'); } catch (e) { return null; } }
 
 // 개발 중인 화면이므로 fail-closed: /api/me 가 성공하고 perm_concept_map 이 명시적으로 true 일 때만 보여 준다
@@ -84,19 +186,341 @@ async function hasPermission() {
   } catch (e) { return false; }
 }
 
+// 응답을 { status, body }로 돌려준다. 네트워크 오류는 status 0
+async function api(method, url, body) {
+  try {
+    const r = await fetch(url, {
+      method,
+      headers: Object.assign({ Authorization: 'Bearer ' + (getToken() || '') }, body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    let b = null;
+    try { b = await r.json(); } catch (e) { /* 본문 없음 */ }
+    return { status: r.status, body: b || {} };
+  } catch (e) {
+    return { status: 0, body: { error: '네트워크에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.' } };
+  }
+}
+const okStatus = r => r.status >= 200 && r.status < 300 && r.body && r.body.ok !== false;
+const errText = (r, fallback) => (r.body && r.body.error) || fallback || '요청을 처리하지 못했습니다.';
+
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === 'text') e.textContent = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? '' : String(v));
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined) e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  return e;
+}
+const CHEVRON = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('class', 'ic'); s.setAttribute('viewBox', '0 0 24 24'); const p = document.createElementNS('http://www.w3.org/2000/svg', 'polyline'); p.setAttribute('points', '9 18 15 12 9 6'); s.append(p); return s; };
+
+// ── 상태 ──
+const S = { topics: [], maxDepth: 5, selectedId: null, collapsed: new Set(), concepts: [] };
+const byId = id => S.topics.find(t => t.id === id) || null;
+const childrenOf = pid => S.topics.filter(t => (t.parent_id === undefined ? null : t.parent_id) === pid).sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+function descendantIds(id) { const out = []; const walk = p => { for (const c of childrenOf(p)) { out.push(c.id); walk(c.id); } }; walk(id); return out; }
+function heightOf(id) { let hgt = 1; const walk = (p, lv) => { hgt = Math.max(hgt, lv); for (const c of childrenOf(p)) walk(c.id, lv + 1); }; walk(id, 1); return hgt; }
+function pathOf(t) { const names = []; let cur = t; while (cur) { names.unshift(cur.title); cur = cur.parent_id === null || cur.parent_id === undefined ? null : byId(cur.parent_id); } return names.join(' › '); }
+
+// ── 대화상자 도우미 ──
+function openDlg(dlg) { try { dlg.showModal(); } catch (e) { dlg.setAttribute('open', ''); } }
+function closeDlg(dlg) { try { dlg.close(); } catch (e) { dlg.removeAttribute('open'); } }
+function setBusy(btn, on) { btn.disabled = on; }
+
+// ── 불러오기 ──
+async function loadTopics() {
+  const r = await api('GET', '/api/cmap/topics');
+  if (!okStatus(r)) { $('topics-msg').textContent = errText(r, '주제를 불러오지 못했습니다.'); return false; }
+  $('topics-msg').textContent = '';
+  S.topics = r.body.topics || [];
+  S.maxDepth = r.body.max_depth || 5;
+  return true;
+}
+async function loadConcepts() {
+  S.concepts = [];
+  if (S.selectedId === null) { renderConcepts(); return; }
+  const id = S.selectedId;
+  const r = await api('GET', '/api/cmap/topics/' + id + '/concepts');
+  if (S.selectedId !== id) return;   // 그 사이 다른 주제를 골랐으면 버린다
+  if (!okStatus(r)) { $('concepts-msg').textContent = errText(r, '개념을 불러오지 못했습니다.'); renderConcepts(); return; }
+  $('concepts-msg').textContent = '';
+  S.concepts = r.body.concepts || [];
+  renderConcepts();
+}
+function expandAncestors(id) {
+  let cur = byId(id);
+  while (cur && cur.parent_id !== null && cur.parent_id !== undefined) { S.collapsed.delete(cur.parent_id); cur = byId(cur.parent_id); }
+}
+async function refresh(selectId) {
+  await loadTopics();
+  if (selectId !== undefined) S.selectedId = selectId;
+  if (S.selectedId !== null && !byId(S.selectedId)) S.selectedId = null;
+  if (S.selectedId !== null) expandAncestors(S.selectedId);
+  renderTree();
+  renderActions();
+  await loadConcepts();
+}
+
+// ── 주제 트리 ──
+function renderTree() {
+  const root = $('tree');
+  root.textContent = '';
+  const build = (pid, depth) => {
+    const items = childrenOf(pid);
+    const ul = h('ul', pid === null ? {} : { role: 'group' });
+    for (const t of items) {
+      const kids = childrenOf(t.id);
+      const open = !S.collapsed.has(t.id);
+      const li = h('li', { role: 'treeitem', 'aria-expanded': kids.length ? String(open) : null, 'aria-selected': String(t.id === S.selectedId), 'data-id': t.id });
+      const row = h('div', { class: 't-row', style: 'padding-left:' + ((depth - 1) * 16) + 'px' },
+        kids.length
+          ? h('button', { class: 't-toggle', type: 'button', 'aria-expanded': String(open), 'aria-label': t.title + (open ? ' 접기' : ' 펼치기'), 'data-t': 'toggle', 'data-id': t.id,
+              onclick: () => { if (S.collapsed.has(t.id)) S.collapsed.delete(t.id); else S.collapsed.add(t.id); renderTree(); } }, CHEVRON())
+          : h('span', { class: 't-spacer' }),
+        h('button', { class: 't-node', type: 'button', 'aria-current': t.id === S.selectedId ? 'true' : null, 'data-t': 'node', 'data-id': t.id, onclick: () => selectTopic(t.id) },
+          h('span', { class: 't-title', text: t.title }),
+          h('span', { class: 't-count', text: '개념 ' + t.concept_count })));
+      li.append(row);
+      if (kids.length && open) li.append(build(t.id, depth + 1));
+      ul.append(li);
+    }
+    return ul;
+  };
+  const top = build(null, 1);
+  while (top.firstChild) root.append(top.firstChild);
+  $('tree-empty').hidden = S.topics.length > 0;
+}
+function selectTopic(id) {
+  S.selectedId = id;
+  renderTree();
+  renderActions();
+  loadConcepts();
+}
+function renderActions() {
+  const t = S.selectedId === null ? null : byId(S.selectedId);
+  $('topic-actions').hidden = !t;
+  $('concepts-sec').hidden = !t;
+  if (!t) return;
+  $('act-add-child').disabled = t.depth >= S.maxDepth;
+  $('act-add-child').title = t.depth >= S.maxDepth ? '주제는 최대 ' + S.maxDepth + '단계까지 만들 수 있습니다.' : '';
+  $('concepts-title').textContent = t.title + ' · 개념';
+}
+
+// ── 이름 입력 대화상자 (주제 추가 / 하위 추가 / 이름 변경) ──
+let nameSubmit = null;
+function openNameDialog({ heading, label, value, okText, submit }) {
+  $('name-heading').textContent = heading;
+  $('name-label').textContent = label;
+  $('name-input').value = value || '';
+  $('name-ok').textContent = okText;
+  $('name-msg').textContent = '';
+  nameSubmit = submit;
+  openDlg($('name-dlg'));
+  $('name-input').focus();
+  $('name-input').select();
+}
+$('name-cancel').addEventListener('click', () => closeDlg($('name-dlg')));
+$('name-form').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  if (!nameSubmit) return;
+  const value = $('name-input').value.trim();
+  if (!value) { $('name-msg').textContent = '주제 이름을 입력해 주세요.'; return; }
+  setBusy($('name-ok'), true);
+  const r = await nameSubmit(value);
+  setBusy($('name-ok'), false);
+  if (!okStatus(r)) { $('name-msg').textContent = errText(r); return; }   // 중복(409) 등은 대화상자 안에 보여 주고 열어 둔다
+  closeDlg($('name-dlg'));
+  await refresh(r.body.topic ? r.body.topic.id : undefined);
+});
+$('add-root-btn').addEventListener('click', () => openNameDialog({
+  heading: '주제 추가', label: '주제 이름', value: '', okText: '추가',
+  submit: v => api('POST', '/api/cmap/topics', { title: v }),
+}));
+$('act-add-child').addEventListener('click', () => {
+  const t = byId(S.selectedId);
+  if (!t) return;
+  openNameDialog({ heading: '하위 주제 추가', label: '‘' + t.title + '’ 아래에 만들 주제 이름', value: '', okText: '추가',
+    submit: v => api('POST', '/api/cmap/topics', { title: v, parent_id: t.id }) });
+});
+$('act-rename').addEventListener('click', () => {
+  const t = byId(S.selectedId);
+  if (!t) return;
+  openNameDialog({ heading: '이름 변경', label: '주제 이름', value: t.title, okText: '저장', submit: v => api('PATCH', '/api/cmap/topics/' + t.id, { title: v }) });
+});
+
+// ── 이동 ──
+$('act-move').addEventListener('click', () => {
+  const t = byId(S.selectedId);
+  if (!t) return;
+  const sub = new Set(descendantIds(t.id)); sub.add(t.id);
+  const height = heightOf(t.id);
+  const sel = $('move-select');
+  sel.textContent = '';
+  sel.append(h('option', { value: '', text: '최상위' }));
+  for (const x of S.topics.slice().sort((a, b) => pathOf(a).localeCompare(pathOf(b), 'ko'))) {
+    if (sub.has(x.id) || x.depth + height > S.maxDepth) continue;   // 자기 자신·하위, 5단계를 넘는 곳은 고르지 못하게
+    sel.append(h('option', { value: String(x.id), text: pathOf(x) }));
+  }
+  sel.value = t.parent_id === null || t.parent_id === undefined ? '' : String(t.parent_id);
+  $('move-sub').textContent = '‘' + t.title + '’ 주제를 아래 위치로 옮깁니다. 하위 주제와 개념도 함께 옮겨집니다.';
+  $('move-msg').textContent = '';
+  openDlg($('move-dlg'));
+  sel.focus();
+});
+$('move-cancel').addEventListener('click', () => closeDlg($('move-dlg')));
+$('move-form').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const t = byId(S.selectedId);
+  if (!t) return;
+  setBusy($('move-ok'), true);
+  const v = $('move-select').value;
+  const r = await api('POST', '/api/cmap/topics/' + t.id + '/move', { parent_id: v === '' ? null : Number(v) });
+  setBusy($('move-ok'), false);
+  if (!okStatus(r)) { $('move-msg').textContent = errText(r); return; }
+  closeDlg($('move-dlg'));
+  await refresh(t.id);
+});
+
+// ── 확인 대화상자 (삭제) ──
+let confirmAction = null;
+function openConfirm({ heading, text, okText, action }) {
+  $('confirm-heading').textContent = heading;
+  $('confirm-text').textContent = text;
+  $('confirm-ok').textContent = okText || '삭제';
+  $('confirm-msg').textContent = '';
+  confirmAction = action;
+  openDlg($('confirm-dlg'));
+  $('confirm-cancel').focus();
+}
+$('confirm-cancel').addEventListener('click', () => closeDlg($('confirm-dlg')));
+$('confirm-form').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  if (!confirmAction) return;
+  setBusy($('confirm-ok'), true);
+  const r = await confirmAction();
+  setBusy($('confirm-ok'), false);
+  if (r && r.failed) { $('confirm-msg').textContent = r.failed; return; }   // 이름 겹침 등: 서버 문구를 그대로 보여 주고 열어 둔다
+  closeDlg($('confirm-dlg'));
+});
+
+$('act-delete').addEventListener('click', async () => {
+  const t = byId(S.selectedId);
+  if (!t) return;
+  const isTop = t.parent_id === null || t.parent_id === undefined;
+  if (!isTop) {
+    const parent = byId(t.parent_id);
+    const kids = childrenOf(t.id).length;
+    openConfirm({
+      heading: '하위 주제 삭제',
+      text: '‘' + t.title + '’ 주제를 삭제합니다.\n' + (kids || t.concept_count
+        ? '아래 하위 주제 ' + kids + '개와 이 주제의 개념 ' + t.concept_count + '개는 상위 주제 ‘' + (parent ? parent.title : '') + '’(으)로 옮겨집니다.'
+        : '옮길 하위 주제와 개념은 없습니다.'),
+      action: async () => {
+        const r = await api('DELETE', '/api/cmap/topics/' + t.id);
+        if (!okStatus(r)) return { failed: errText(r) };
+        S.selectedId = r.body.parent_id !== undefined ? r.body.parent_id : null;
+        await refresh();
+        return {};
+      },
+    });
+    return;
+  }
+  // 최상위: 서버가 알려 주는 삭제 범위(하위 주제·개념 수)를 확인창에 보여 준다
+  const probe = await api('DELETE', '/api/cmap/topics/' + t.id);
+  if (probe.status === 409 && probe.body && probe.body.needs_confirm) {
+    const c = probe.body.counts || { topics: 0, concepts: 0 };
+    openConfirm({
+      heading: '최상위 주제 삭제',
+      text: '‘' + t.title + '’ 주제를 삭제하면 아래 항목이 모두 함께 삭제됩니다.\n하위 주제 ' + c.topics + '개, 개념 ' + c.concepts + '개\n삭제한 뒤에는 되돌릴 수 없습니다.',
+      okText: '모두 삭제',
+      action: async () => {
+        const r = await api('DELETE', '/api/cmap/topics/' + t.id + '?confirm=1');
+        if (!okStatus(r)) return { failed: errText(r) };
+        S.selectedId = null;
+        await refresh();
+        return {};
+      },
+    });
+  } else if (probe.status === 404) {
+    await refresh();
+  } else {
+    $('topics-msg').textContent = errText(probe, '삭제 범위를 확인하지 못했습니다.');
+  }
+});
+
+// ── 개념 ──
+function renderConcepts() {
+  const ul = $('concept-list');
+  ul.textContent = '';
+  $('concepts-empty').hidden = S.concepts.length > 0 || S.selectedId === null;
+  for (const c of S.concepts) {
+    ul.append(h('li', { class: 'c-item', 'data-id': c.id, 'data-t': 'concept' },
+      h('div', { class: 'c-head' }, h('span', { class: 'c-term', text: c.term }), c.english ? h('span', { class: 'c-en', text: c.english }) : null),
+      c.memo ? h('div', { class: 'c-memo', text: c.memo }) : null,
+      h('div', { class: 'c-tools' },
+        h('button', { class: 'btn text', type: 'button', 'data-t': 'concept-edit', 'aria-label': c.term + ' 수정', text: '수정', onclick: () => openConceptDialog(c) }),
+        h('button', { class: 'btn text', type: 'button', 'data-t': 'concept-delete', 'aria-label': c.term + ' 삭제', text: '삭제', onclick: () => deleteConcept(c) }))));
+  }
+}
+let editingConcept = null;
+function openConceptDialog(c) {
+  editingConcept = c || null;
+  $('concept-heading').textContent = c ? '개념 수정' : '개념 추가';
+  $('concept-term').value = c ? c.term : '';
+  $('concept-english').value = c && c.english ? c.english : '';
+  $('concept-memo').value = c && c.memo ? c.memo : '';
+  $('concept-msg').textContent = '';
+  openDlg($('concept-dlg'));
+  $('concept-term').focus();
+}
+$('add-concept-btn').addEventListener('click', () => openConceptDialog(null));
+$('concept-cancel').addEventListener('click', () => closeDlg($('concept-dlg')));
+$('concept-form').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const term = $('concept-term').value.trim();
+  if (!term) { $('concept-msg').textContent = '개념 이름을 입력해 주세요.'; return; }
+  const body = { term, english: $('concept-english').value, memo: $('concept-memo').value };
+  setBusy($('concept-ok'), true);
+  const r = editingConcept
+    ? await api('PATCH', '/api/cmap/concepts/' + editingConcept.id, body)
+    : await api('POST', '/api/cmap/topics/' + S.selectedId + '/concepts', body);
+  setBusy($('concept-ok'), false);
+  if (!okStatus(r)) { $('concept-msg').textContent = errText(r); return; }
+  closeDlg($('concept-dlg'));
+  await refresh();
+});
+function deleteConcept(c) {
+  openConfirm({
+    heading: '개념 삭제',
+    text: '‘' + c.term + '’ 개념을 삭제합니다.',
+    action: async () => {
+      const r = await api('DELETE', '/api/cmap/concepts/' + c.id);
+      if (!okStatus(r) && r.status !== 404) return { failed: errText(r) };
+      await refresh();
+      return {};
+    },
+  });
+}
+
+// ── 시작 ──
 function applyHeaderHeight() {
   const hdr = document.querySelector('.metis-app-header');
   if (hdr) document.documentElement.style.setProperty('--hdr-h', hdr.offsetHeight + 'px');
 }
 window.addEventListener('resize', applyHeaderHeight);
-document.getElementById('back-btn').addEventListener('click', () => { location.href = '/'; });
+$('back-btn').addEventListener('click', () => { location.href = '/'; });
 
 (async function init() {
   const allowed = await hasPermission();
-  document.getElementById('loading').hidden = true;
-  if (!allowed) { document.getElementById('access-denied').hidden = false; return; }
-  document.getElementById('app').hidden = false;
+  $('loading').hidden = true;
+  if (!allowed) { $('access-denied').hidden = false; return; }
+  $('app').hidden = false;
   applyHeaderHeight();
+  await refresh();
+  if (S.topics.length && S.selectedId === null) selectTopic(childrenOf(null)[0].id);
 })();
 </script>
 </body>

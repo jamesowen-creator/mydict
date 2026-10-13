@@ -35,18 +35,18 @@ test('개념 지도 화면: 권한 없음·값 없음·조회 실패·토큰 없
   }
 });
 
-test('개념 지도 화면: 권한 있으면 제목과 안내 문구만, 390px에서 가로 스크롤 없고 상단 잘림 없음', { skip: SKIP }, async () => {
+test('개념 지도 화면: 권한 있으면 제목과 본문 표시, 390px에서 가로 스크롤 없고 상단 잘림 없음', { skip: SKIP }, async () => {
   const page = await openMap({ perm_concept_map: true });
   assert.equal(await visible(page, 'app'), true);
   assert.equal(await visible(page, 'access-denied'), false);
   assert.equal(await page.text('.screen-bar-title'), '개념 지도');
-  assert.equal(await page.text('#dev-note'), '개발 중입니다. 다음 단계에서 주제와 개념 기능이 추가됩니다.');
   assert.equal(await page.hasHorizontalScroll(), false);
-  const r = await page.eval(`(() => { const hdr = document.querySelector('.metis-app-header').getBoundingClientRect(), bar = document.querySelector('.screen-bar').getBoundingClientRect(), note = document.getElementById('dev-note').getBoundingClientRect();
-    return { hdrBottom: hdr.bottom, barTop: bar.top, barBottom: bar.bottom, noteTop: note.top, noteRight: note.right, vw: innerWidth }; })()`);
+  // 작업271-2: 2a 단계에서 "개발 중" 안내 문구는 주제·개념 화면으로 바뀜(이 파일의 모의 서버에는 /api/cmap 이 없어 목록 조회는 실패하고, 화면은 오류 문구만 보여 줌)
+  const r = await page.eval(`(() => { const hdr = document.querySelector('.metis-app-header').getBoundingClientRect(), bar = document.querySelector('.screen-bar').getBoundingClientRect(), sec = document.getElementById('topics-sec').getBoundingClientRect();
+    return { hdrBottom: hdr.bottom, barTop: bar.top, barBottom: bar.bottom, secTop: sec.top, secRight: sec.right, vw: innerWidth }; })()`);
   assert.ok(r.barTop >= r.hdrBottom - 1, '제목 줄이 공용 헤더 아래');
-  assert.ok(r.noteTop >= r.barBottom, '안내 문구가 제목 줄에 가려지지 않음');
-  assert.ok(r.noteRight <= r.vw, '안내 문구가 화면 안');
+  assert.ok(r.secTop >= r.barBottom, '본문이 제목 줄에 가려지지 않음');
+  assert.ok(r.secRight <= r.vw, '본문이 화면 안');
   // 뒤로 가기 → 홈
   await page.click('#back-btn');
   await page.waitFor("location.pathname === '/'", 6000);
