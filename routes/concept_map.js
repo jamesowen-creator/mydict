@@ -5,6 +5,7 @@ const T = require('../lib/cmap_topics');
 const AI = require('../lib/cmap_ai');
 const M = require('../lib/cmap_map');
 const H = require('../lib/cmap_hash');
+const N = require('../lib/cmap_narrate');
 
 const router = express.Router();
 
@@ -633,6 +634,75 @@ router.put('/api/cmap/maps/:id/positions', guard, handle(async req => {
     if (after.hash !== before.hash) throw conflict('위치를 바꾸는 중 지도의 의미(노드·연결)가 달라져 취소했습니다.', { semantic_changed: true });
     const status = await statusOf(c, id, req.user.id);
     return { body: { positions: after.nodes.map(n => ({ concept_id: n.concept_id, x: n.x, y: n.y })), status } };
+  });
+}));
+
+// ─── 작업273-4: AI 해설 ─────────────────────────────────────────────────────────────────────
+// 클라이언트는 지도 id 만 보낸다. 서버가 DB 에서 지도(개념·설명·연결)와 같은 주제 트리의 저장된 개념 목록을 읽어 입력을 만든다.
+// 저장된 지도(saved_at 있음, 현재 해시 = semantic_hash)에서만 만들 수 있다. 지도당 최신 해설 1개를 cmap_narrations 에 둔다.
+async function narrationContext(db, userId, map) {
+  const g = await graphOf(db, map.id);
+  const idx = T.buildIndex(await loadTopics(db, userId));
+  const root = idx.byId.get(map.root_topic_id);
+  const topicSet = new Set(root ? [root.id, ...T.descendants(idx, root.id).map(t => t.id)] : []);
+  const { rows: all } = await db.query('SELECT id, topic_id, term, english, explanation FROM cmap_concepts WHERE user_id = $1 ORDER BY sort_order, id', [userId]);
+  const inTree = all.filter(c => topicSet.has(c.topic_id));
+  const nodeSet = new Set(g.nodeIds);
+  const concepts = inTree.filter(c => nodeSet.has(c.id));
+  const saved = inTree.filter(c => !nodeSet.has(c.id)).map(c => ({ id: c.id, topic_id: c.topic_id, term: c.term }));
+  return { hash: g.hash, concepts, saved, edges: g.edges, rootTitle: root ? root.title : map.title, otherTerms: saved.map(c => c.term) };
+}
+const NARRATION_COLS = 'id, map_id, source_hash, content, model, created_at';
+const jsonOf = v => (typeof v === 'string' ? JSON.parse(v) : v);
+const narrating = new Set();   // 같은 지도의 해설을 동시에 두 번 만들지 않도록(사용자·지도 단위)
+const conceptList = ctx => ctx.concepts.map(c => ({ id: c.id, term: c.term, english: c.english || null }));
+
+router.get('/api/cmap/maps/:id/narration', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('지도를 찾을 수 없습니다.');
+  const map = await ownMap(pool, id, req.user.id);
+  const ctx = await narrationContext(pool, req.user.id, map);
+  const { rows } = await pool.query(`SELECT ${NARRATION_COLS} FROM cmap_narrations WHERE map_id = $1 AND user_id = $2`, [id, req.user.id]);
+  const row = rows[0] || null;
+  const used = await AI.countToday(req.user.id, N.NARRATE_EVENT);
+  return { body: {
+    narration: row ? { id: row.id, content: N.annotateSuggestions(jsonOf(row.content), ctx.concepts, ctx.saved), model: row.model, created_at: row.created_at, source_hash: row.source_hash } : null,
+    stale: row ? row.source_hash !== ctx.hash : false,
+    current_hash: ctx.hash, save_status: H.saveStatus(map, ctx.hash),
+    concepts: conceptList(ctx),
+    daily: { used, cap: N.narrateDailyCap() },
+  } };
+}));
+
+router.post('/api/cmap/maps/:id/narrate', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('지도를 찾을 수 없습니다.');
+  const map = await ownMap(pool, id, req.user.id);
+  const ctx = await narrationContext(pool, req.user.id, map);
+  if (H.saveStatus(map, ctx.hash) !== 'saved') throw conflict('저장된 지도에서만 해설을 만들 수 있습니다. 지도를 먼저 [저장]해 주세요.', { needs_save: true });
+  if (!ctx.concepts.length) throw bad('지도에 개념이 없습니다.');
+  const cap = N.narrateDailyCap();
+  if (await AI.countToday(req.user.id, N.NARRATE_EVENT) >= cap) throw new HttpError(429, `하루 ${cap}건까지 AI 해설을 만들 수 있습니다.`);
+  const key = req.user.id + ':' + id;
+  if (narrating.has(key)) throw conflict('이 지도의 해설을 이미 만드는 중입니다.', { in_progress: true });
+  narrating.add(key);
+  let out;
+  try { out = await N.generateNarration(req.user.id, ctx); } finally { narrating.delete(key); }
+  if (out.error) throw new HttpError(502, out.error, { ai_error: true });
+  return withTx(async c => {
+    const cur = await ownMap(c, id, req.user.id, { lock: true });
+    const now = await graphOf(c, id);
+    if (now.hash !== ctx.hash || H.saveStatus(cur, now.hash) !== 'saved') throw conflict('해설을 만드는 동안 지도가 바뀌어 저장하지 않았습니다. 지도를 확인한 뒤 다시 만들어 주세요.', { changed: true });
+    await c.query('DELETE FROM cmap_narrations WHERE map_id = $1', [id]);
+    const { rows } = await c.query(
+      `INSERT INTO cmap_narrations (map_id, user_id, source_hash, content, model) VALUES ($1, $2, $3, $4, $5) RETURNING ${NARRATION_COLS}`,
+      [id, req.user.id, ctx.hash, JSON.stringify(out.content), AI.CMAP_MODEL]);
+    const row = rows[0];
+    return { status: 201, body: {
+      narration: { id: row.id, content: jsonOf(row.content), model: row.model, created_at: row.created_at, source_hash: row.source_hash },
+      stale: false, current_hash: ctx.hash, save_status: 'saved', concepts: conceptList(ctx),
+      daily: { used: await AI.countToday(req.user.id, N.NARRATE_EVENT), cap },
+    } };
   });
 }));
 

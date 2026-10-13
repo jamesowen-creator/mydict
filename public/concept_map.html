@@ -118,8 +118,38 @@
   .map-opt-bar { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px 10px; background: var(--color-surface); border: 1px solid var(--color-accent-ink); border-radius: var(--radius-ctl); font-size: 13px; }
   .map-opt-bar span { flex: 1 1 140px; }
   .m-node.preview rect { stroke: var(--color-accent-ink); stroke-dasharray: 4 3; }
+  .map-tabs { display: flex; gap: 8px; padding-top: 12px; }
+  .map-tab { flex: 1; min-height: var(--ctl-min-h); border: 1px solid var(--color-line-strong); border-radius: var(--radius-ctl); background: var(--color-surface); color: var(--color-text); font-weight: 700; }
+  .map-tab.sel { background: var(--color-accent-ink); border-color: var(--color-accent-ink); color: var(--color-surface); }
+  .m-node.hl rect { stroke: var(--color-accent-ink); stroke-width: 3.5; }
+  .m-node.dim { opacity: 0.35; }
+  #narr-panel { display: none; padding-top: 12px; padding-bottom: 32px; }
+  #map-view.narr-mode #narr-panel { display: block; }
+  #map-view.narr-mode .map-only { display: none; }
+  #map-view.narr-mode .map-canvas { height: 220px; min-height: 0; }
+  .narr-summary { margin: 4px 0 8px; font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+  .narr-para { display: block; width: 100%; margin-top: 8px; padding: 12px; text-align: left; border: 1px solid var(--color-line); border-radius: var(--card-radius); background: var(--color-surface); color: var(--color-text); font-size: 15px; line-height: 1.7; min-height: var(--ctl-min-h); }
+  .narr-para.sel { border-color: var(--color-accent-ink); border-width: 2px; }
+  .narr-text { display: block; overflow-wrap: anywhere; }
+  .narr-cap { display: block; margin-top: 6px; font-size: 13px; color: var(--color-text-sub); overflow-wrap: anywhere; }
+  .narr-sec { margin: 20px 0 4px; }
+  .narr-mnemonic { margin: 4px 0 0; padding-left: 20px; font-size: 14px; }
+  .narr-mnemonic li { margin-top: 4px; overflow-wrap: anywhere; }
+  .narr-sugs { margin: 4px 0 0; padding: 0; list-style: none; }
+  .narr-sug { margin-top: 8px; padding: 12px; border: 1px solid var(--color-line); border-radius: var(--card-radius); background: var(--color-surface); }
+  .narr-sug p { margin: 0; }
+  .narr-sug-term { font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+  .narr-sug-reason { font-size: 14px; margin-top: 4px; overflow-wrap: anywhere; }
+  .narr-sug-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; margin-top: 4px; }
+  .narr-stale, .narr-error { margin-bottom: 8px; padding: 12px; border: 1px solid var(--color-accent-ink); border-radius: var(--card-radius); background: var(--color-surface); font-size: 14px; }
+  .narr-stale p, .narr-error p { margin: 0 0 4px; }
+  .narr-error { color: var(--color-danger-ink); }
+  .narr-error .btn { margin-top: 8px; }
+  .narr-loading { margin: 0 0 8px; font-size: 14px; color: var(--color-text-sub); }
+  .narr-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .narr-daily { text-align: right; }
   #map-hint { min-height: 3.2em; }   /* 안내가 한 줄↔두 줄로 바뀌어도 캔버스가 밀리지 않게 높이를 고정 */
-  .map-canvas { position: relative; margin-top: 8px; height: calc(100dvh - var(--hdr-h, 65px) - 320px); min-height: 320px; border: 1px solid var(--color-line); border-radius: var(--card-radius); background: var(--color-surface); overflow: hidden; }
+  .map-canvas { position: relative; margin-top: 8px; height: calc(100dvh - var(--hdr-h, 65px) - 376px); min-height: 320px; border: 1px solid var(--color-line); border-radius: var(--card-radius); background: var(--color-surface); overflow: hidden; }
   .map-canvas .msg { position: absolute; left: 8px; right: 8px; bottom: 8px; margin: 0; padding: 6px 10px; background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-ctl); }   /* 오류 문구는 캔버스 위에 겹쳐 보여 캔버스를 밀지 않는다 */
   #map-svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
   .m-node rect { fill: var(--color-surface); stroke: var(--color-line-strong); stroke-width: 1.5; cursor: grab; }
@@ -144,6 +174,7 @@
 <script src="/js/cmap/layoutOptimize.js?v=1"></script>
 <script src="/js/cmap/pairPicker.js?v=1"></script>
 <script src="/js/cmap/mapView.js?v=1"></script>
+<script src="/js/cmap/narrateView.js?v=1"></script>
 
 <div id="loading" role="status"><p>불러오는 중…</p></div>
 
@@ -204,20 +235,22 @@
     <h1 id="map-title" class="screen-bar-title"></h1>
   </div>
   <div class="wrap">
-    <div class="map-tools">
+    <div class="map-tabs" role="tablist" aria-label="지도 보기"><button id="tab-map" class="map-tab sel" type="button" role="tab" aria-selected="true">지도</button><button id="tab-narr" class="map-tab" type="button" role="tab" aria-selected="false">해설</button></div>
+    <div class="map-tools map-only">
       <button id="map-pick-toggle" class="btn text" type="button" aria-expanded="false" aria-controls="map-pick-panel">개념 선택</button>
       <button id="map-fit" class="btn text" type="button">전체 보기</button>
       <span id="map-count" class="hint"></span>
     </div>
-    <div class="map-tools">
+    <div class="map-tools map-only">
       <span id="map-save-state" class="map-save-state" role="status"></span>
       <button id="map-save" class="btn text" type="button">저장</button>
       <button id="map-opt" class="btn text" type="button">배치 최적화</button>
       <button id="map-undo" class="btn text" type="button" hidden>되돌리기</button>
     </div>
-    <div id="map-pick-panel" class="map-pick" hidden><div id="map-pick-list"></div></div>
-    <p id="map-hint" class="hint"></p>
+    <div id="map-pick-panel" class="map-pick map-only" hidden><div id="map-pick-list"></div></div>
+    <p id="map-hint" class="hint map-only"></p>
     <div class="map-canvas"><div id="map-opt-bar" class="map-opt-bar" hidden><span id="map-opt-info"></span><button id="map-opt-apply" class="btn" type="button">적용</button><button id="map-opt-cancel" class="btn text" type="button">취소</button></div><svg id="map-svg" role="group" aria-label="개념 지도"></svg><p id="map-msg" class="msg" role="alert"></p></div>
+    <div id="narr-panel" aria-live="polite"></div>
   </div>
  </div>
 </div>

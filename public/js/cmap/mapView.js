@@ -18,8 +18,11 @@
   const M = {
     rootId: null, map: null, nodes: new Map(), edges: [], concepts: new Map(), topics: [], types: [],
     temp: new Map(), view: { tx: 0, ty: 0, scale: 1 }, ptrs: new Map(), gest: null, pinch: null, selected: null, picker: null, svg: null, busy: false,
-    status: null, preview: null, undo: null,   // 작업273-3: 저장 상태 { current_hash, save_status }, 최적화 미리보기 { pos, metrics }, 되돌리기 { pos }
+    mode: 'map', hl: new Set(), status: null, preview: null, undo: null,   // 작업273-3: 저장 상태 { current_hash, save_status }, 최적화 미리보기 { pos, metrics }, 되돌리기 { pos }
   };
+  const listeners = { open: [], close: [], status: [], mode: [] };   // 작업273-4: 해설 탭(narrateView.js)이 구독
+  const emit = (ev, arg) => { for (const fn of listeners[ev]) { try { fn(arg); } catch (e) { console.error(e); } } };
+  const locked = () => !!M.preview || M.mode === 'narr';              // 미리보기·해설 탭에서는 노드·연결을 건드릴 수 없고 화면 이동·확대만 된다
   let ED = null;   // 연결 대화상자 상태 { mode, edge, from, to, flips }
 
   const termOf = id => (M.concepts.get(id) ? M.concepts.get(id).term : '?');
@@ -58,7 +61,7 @@
     }
     for (const id of M.nodes.keys()) {
       const p = posOf(id), n = M.nodes.get(id);
-      nodeLayer.append(sv('g', { class: 'm-node' + (M.selected === id ? ' sel' : '') + (isPlaced(n) ? '' : ' temp') + (M.preview ? ' preview' : ''), 'data-node': id, 'data-t': 'node', transform: `translate(${p.x},${p.y})`, role: 'button', tabindex: 0, 'aria-label': termOf(id) + (M.selected === id ? ' (선택됨)' : '') },
+      nodeLayer.append(sv('g', { class: 'm-node' + (M.selected === id ? ' sel' : '') + (isPlaced(n) ? '' : ' temp') + (M.preview ? ' preview' : '') + (M.hl.size ? (M.hl.has(id) ? ' hl' : ' dim') : ''), 'data-node': id, 'data-t': 'node', transform: `translate(${p.x},${p.y})`, role: 'button', tabindex: 0, 'aria-label': termOf(id) + (M.selected === id ? ' (선택됨)' : '') },
         sv('rect', { width: G.NODE_W, height: G.NODE_H, rx: 10 }),
         sv('text', { x: G.NODE_W / 2, y: G.NODE_H / 2 + 5, 'text-anchor': 'middle', class: 'm-node-text' }, clipText(termOf(id), 9))));
     }
@@ -104,7 +107,7 @@
     M.nodes = new Map(b.nodes.map(n => [n.concept_id, { x: n.x, y: n.y }]));
     M.edges = b.edges;
     M.selected = null; M.gest = null; M.pinch = null; M.ptrs.clear();
-    M.status = { current_hash: b.current_hash, save_status: b.save_status }; M.preview = null; M.undo = null;
+    M.status = { current_hash: b.current_hash, save_status: b.save_status }; M.preview = null; M.undo = null; M.hl = new Set();
     if (!M.picker) {
       M.picker = PP.create({
         onFirst: id => { M.selected = id; render(); },
@@ -125,9 +128,12 @@
     render();
     renderPickPanel();
     renderSave(); renderOptUi();
+    setMode('map', true);
+    emit('open');
   }
   function close() {
-    M.preview = null; M.undo = null;       // 화면을 떠나면 되돌리기는 사라진다
+    M.preview = null; M.undo = null; M.hl = new Set(); setMode('map', true);
+    emit('close');       // 화면을 떠나면 되돌리기는 사라진다
     if (M.picker) M.picker.reset();
     M.gest = null; M.pinch = null; M.ptrs.clear();
     $('map-view').hidden = true;
@@ -268,6 +274,7 @@
     if (st) M.status = { current_hash: st.current_hash, save_status: st.save_status };
     if (semantic) { M.undo = null; renderOptUi(); }     // 노드·연결이 바뀌면 이전 배치로 되돌릴 수 없다
     renderSave();
+    emit('status');
   }
   const fmtTime = iso => { const d = new Date(iso); return isNaN(d) ? '' : (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
   function renderSave() {
@@ -335,6 +342,25 @@
     recomputeTemp(); fit(); render(); renderSave(); renderOptUi();
   }
 
+  // ── 탭(지도 | 해설)과 강조(작업273-4) ──
+  function setMode(mode, silent) {
+    if (M.mode === mode && !silent) return;
+    if (mode === 'narr' && M.preview) cancelPreview();
+    M.mode = mode;
+    if (M.picker) M.picker.reset();
+    M.selected = null; M.gest = null; M.pinch = null; M.ptrs.clear();
+    $('map-view').classList.toggle('narr-mode', mode === 'narr');
+    for (const [id, m] of [['tab-map', 'map'], ['tab-narr', 'narr']]) { $(id).setAttribute('aria-selected', String(mode === m)); $(id).classList.toggle('sel', mode === m); }
+    if (!silent) { if (M.svg) { requestAnimationFrame(() => { fit(); render(); }); } emit('mode', mode); }
+  }
+  function highlight(ids) {
+    M.hl = new Set((ids || []).filter(id => M.nodes.has(id)));
+    if (M.svg && M.nodes.size) {
+      if (M.hl.size) { const r = M.svg.getBoundingClientRect(); M.view = G.fitView([...M.hl].map(posOf), r.width, r.height); applyView(); } else fit();
+    }
+    render();
+  }
+
   // ── 제스처 ──
   let bound = false;
   function bindSvgOnce() {
@@ -348,7 +374,7 @@
     svg.addEventListener('wheel', onWheel, { passive: false });
     svg.addEventListener('keydown', ev => {
       if (ev.key !== 'Enter' && ev.key !== ' ') return;
-      if (M.preview) return;
+      if (locked()) return;
       const nd = ev.target.closest && ev.target.closest('[data-node]'), ed = ev.target.closest && ev.target.closest('[data-edge]');
       if (nd) { ev.preventDefault(); M.picker.tap(Number(nd.dataset.node)); }
       else if (ed) { ev.preventDefault(); const e = M.edges.find(x => x.id === Number(ed.dataset.edge)); if (e) openEdgeDialog('edit', { edge: e, from: e.from_concept_id, to: e.to_concept_id }); }
@@ -369,7 +395,7 @@
     if (M.ptrs.size === 2) { startPinch(); return; }
     if (M.ptrs.size > 2) return;
     const t = ev.target.closest ? ev.target : null;
-    const nd = !M.preview && t && t.closest('[data-node]'), ed = !M.preview && t && t.closest('[data-edge]');   // 미리보기 중에는 노드·연결을 건드릴 수 없고 화면 이동·확대만 된다
+    const nd = !locked() && t && t.closest('[data-node]'), ed = !locked() && t && t.closest('[data-edge]');   // 미리보기 중에는 노드·연결을 건드릴 수 없고 화면 이동·확대만 된다
     if (nd) {
       const id = Number(nd.dataset.node), n = M.nodes.get(id);
       M.gest = { kind: 'node', id, x: ev.clientX, y: ev.clientY, orig: { x: n.x, y: n.y }, start: posOf(id), moved: false, pid: ev.pointerId };
@@ -459,11 +485,18 @@
   }
 
   window.CmapMap = {
-    open, close,
+    open, close, setMode, highlight,
+    on(ev, fn) { if (listeners[ev]) listeners[ev].push(fn); },
+    status() { return M.status ? { ...M.status } : null; },
+    mapId() { return M.map ? M.map.id : null; },
+    rootId() { return M.rootId; },
+    topicOfConcept(id) { const c = M.concepts.get(id); return c ? c.topic_id : null; },
+    openPick() { $('map-pick-panel').hidden = false; $('map-pick-toggle').setAttribute('aria-expanded', 'true'); },
     // 테스트용 확인: 배치 최적화 미리보기 상태
     _preview() { return M.preview ? { pos: [...M.preview.pos].map(([id, p]) => ({ id, ...p })), metrics: M.preview.metrics } : null; },
     togglePanel() { const p = $('map-pick-panel'); p.hidden = !p.hidden; $('map-pick-toggle').setAttribute('aria-expanded', String(!p.hidden)); },
     // 테스트 확인용(읽기 전용 사본)
-    _state() { return { nodes: [...M.nodes].map(([id, n]) => ({ id, x: n.x, y: n.y })), edges: M.edges.map(e => ({ ...e })), view: { ...M.view }, selected: M.selected, mapId: M.map && M.map.id }; },
+    _highlight() { return [...M.hl].sort((a, b) => a - b); },
+    _state() { return { mode: M.mode, nodes: [...M.nodes].map(([id, n]) => ({ id, x: n.x, y: n.y })), edges: M.edges.map(e => ({ ...e })), view: { ...M.view }, selected: M.selected, mapId: M.map && M.map.id }; },
   };
 })();
