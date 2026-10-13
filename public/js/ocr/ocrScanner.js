@@ -1,7 +1,8 @@
 import { captureLiveFrame } from './liveFrameCapture.js';
 import { createLiveEnglishOcrSession } from './liveEnglishOcrSession.js';
-import { deriveLiveOcrCandidates, preloadEnglishWordSet } from './extractEnglishCandidates.js';
-import { projectOverlayRect, projectCropBox, computeGuideCrop } from './liveOverlayGeometry.js';
+import { deriveLiveOcrCandidates, preloadEnglishWordSet, normalizeToken } from './extractEnglishCandidates.js';
+import { projectOverlayRect, projectCropBox, computeGuideCrop, guideToVideoCrop } from './liveOverlayGeometry.js';
+import { filterTouchWords, pickTouchWord } from './touchWordPick.js';
 import { createCandidateStabilityTracker } from './ocrCandidateStability.js';
 
 // 작업7: 원 크기(56px)는 그대로 두고 아이콘만 22px -> 28px로 키워서
@@ -32,13 +33,20 @@ export function createOcrScanner(root, { onSelect } = {}) {
   const guideEl = root.querySelector('[data-ocr-guide]');
   const laserEl = root.querySelector('[data-ocr-laser]');
   const guide = { left: .11, top: .38, width: .78, height: .28 };
+  // 작업272-2: 터치 모드(상단 [자동 | 터치])
+  const modeBtns = [...root.querySelectorAll('[data-ocr-mode]')];
+  const touchBar = root.querySelector('[data-ocr-touch-bar]');
+  const touchMsg = root.querySelector('[data-ocr-touch-msg]');
+  const retakeBtn = root.querySelector('[data-ocr-touch-retake]');
+  const touch = { words: null, busy: false, seq: 0 };   // words: 스냅샷에서 인식한 단어(화면 좌표 rect 포함). seq: 낡은 인식 결과를 버리는 번호
   const state = {
     stream: null, session: null, timer: null, busy: false,
     cameraOpen: false, paused: false,
     history: [], cursor: -1,
     // 작업272-1: 세대 번호(취소 토큰). start()/stopCamera() 마다 바뀌어, 그 사이에 끝난 비동기 작업(카메라 열기·엔진 준비·인식)이
     // 이미 종료된 세션의 상태를 건드리지 못하게 한다. starting: 시작 중 중복 시작 방지
-    gen: 0, starting: false
+    gen: 0, starting: false,
+    mode: 'auto'
   };
   // 작업112: 같은 단어가 연속 프레임 동안 재인식돼야만 후보로 승인
   const stability = createCandidateStabilityTracker();
@@ -86,17 +94,18 @@ export function createOcrScanner(root, { onSelect } = {}) {
   async function scan() {
     if (state.busy || state.paused || !state.session) return;
     const gen = state.gen, session = state.session;   // 작업272-1: 이 스캔이 속한 세션. 도중에 종료·재시작되면 gen 이 달라져 결과를 버린다
+    const stale = () => gen !== state.gen || state.mode !== 'auto';   // 작업272-2: 터치 모드로 바뀐 뒤 끝난 자동 스캔 결과도 버린다
     state.busy = true;
     try {
       // 작업266: 스캔마다 눈에 보이는 가이드(.ocr-guide)의 화면 사각형을 읽어 영상 좌표로 바꾼 크롭을 쓴다(회전·창 크기 변경 반영)
       const crop = computeGuideCrop(video, guideEl);
       const blob = await captureLiveFrame(video, canvas, guide, crop);
-      if (gen !== state.gen) return;
+      if (stale()) return;
       const imageSize = { width: canvas.width, height: canvas.height };
       const data = await session.recognize(blob);
-      if (gen !== state.gen) return;
+      if (stale()) return;
       const rawWords = await deriveLiveOcrCandidates(data, imageSize);
-      if (gen !== state.gen) return;
+      if (stale()) return;
       // 작업112: 매 프레임(빈 프레임 포함) 넣어야 스트릭이 정확히 유지/리셋됨
       const words = stability.filter(rawWords).map(w => ({ ...w, crop }));
       if (words.length) {
@@ -106,7 +115,7 @@ export function createOcrScanner(root, { onSelect } = {}) {
         updateChrome();
       }
     } catch (e) {
-      if (gen === state.gen) showError('텍스트 인식 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+      if (!stale()) showError('텍스트 인식 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       if (gen === state.gen) state.busy = false;
     }
@@ -170,9 +179,10 @@ export function createOcrScanner(root, { onSelect } = {}) {
       if (cancelled()) { abandon(); return; }   // 엔진 준비 중에 종료됨: 만든 세션을 바로 정리하고 스캔을 시작하지 않는다
       state.session = mine.session;
       state.cameraOpen = true;
-      state.paused = false;
+      state.paused = state.mode === 'touch';   // 터치 모드로 시작하면 자동 스캔은 멈춘 채 둔다
       state.timer = setInterval(scan, 2000);
       updateChrome();
+      showTouchHint();
       scan();
     } finally {
       if (!cancelled()) state.starting = false;
@@ -197,10 +207,114 @@ export function createOcrScanner(root, { onSelect } = {}) {
     state.history = [];
     state.cursor = -1;
     stability.reset();
+    resetTouch();
     list.innerHTML = '';
     overlay.innerHTML = '';
+    showTouchHint();
     updateChrome();
   }
+
+  // ── 작업272-2: 터치 모드 ──
+  function setTouchMsg(msg, { retake = false } = {}) {
+    if (!touchBar) return;
+    touchMsg.textContent = msg || '';
+    retakeBtn.hidden = !retake;
+    touchBar.hidden = !msg;
+  }
+  function showTouchHint() {
+    if (state.mode !== 'touch') { setTouchMsg(''); return; }
+    setTouchMsg(state.cameraOpen ? '화면의 단어를 눌러 선택하세요.' : '카메라를 준비하는 중이에요.');
+  }
+  function resetTouch() { touch.seq++; touch.busy = false; touch.words = null; }
+  function resumeVideo() { try { const p = video.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* 무시 */ } }
+
+  function setMode(mode) {
+    if (mode === state.mode || (mode !== 'auto' && mode !== 'touch')) return;
+    state.mode = mode;
+    root.dataset.mode = mode;
+    modeBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ocrMode === mode)));
+    resetTouch();
+    list.innerHTML = '';
+    overlay.innerHTML = '';
+    stability.reset();
+    if (mode === 'touch') {
+      state.paused = state.cameraOpen;                       // 자동 스캔 정지(진행 중인 스캔 결과는 stale()로 버려짐)
+      if (!state.cameraOpen && !state.starting) void start();   // 카메라가 아직 안 켜졌으면 모드를 고르는 동작으로 시작
+    } else if (state.cameraOpen) {
+      resumeVideo();                                         // 스냅샷으로 멈춘 영상을 다시 재생하고 자동 스캔 재개
+      state.paused = false;
+      scan();
+    }
+    showTouchHint();
+    updateChrome();
+  }
+
+  // 스냅샷 한 장을 인식해 단어 박스를 모두 그리고, 터치한 곳의 단어를 고른다.
+  // 영상은 pause 해서 화면과 인식 대상이 같은 장면이 되게 한다. 인식 영역 = 화면에 보이는 영역 전체(.ocr-preview 안의 video 사각형)
+  async function onOverlayTap(ev) {
+    if (state.mode !== 'touch') return;
+    if (!state.cameraOpen || !state.session) {              // 카메라·엔진 준비 전: 인식하지 않고 안내만
+      if (!state.starting) void start();
+      setTouchMsg('카메라를 준비하는 중이에요.');
+      return;
+    }
+    if (touch.busy) return;
+    const oRect = overlay.getBoundingClientRect();
+    const point = { x: ev.clientX - oRect.left, y: ev.clientY - oRect.top };
+    if (touch.words) { finishPick(point); return; }           // 이미 인식한 장면: 다시 인식하지 않고 박스에서 고른다
+    if (state.busy) { setTouchMsg('잠시만 기다린 뒤 다시 눌러 주세요.'); return; }   // 막 멈춘 자동 스캔이 끝나기 전(공용 canvas 보호)
+    const gen = state.gen, session = state.session, seq = ++touch.seq;
+    const stale = () => gen !== state.gen || seq !== touch.seq || state.mode !== 'touch';
+    touch.busy = true;
+    try { video.pause(); } catch (e) { /* 무시 */ }
+    setTouchMsg('인식 중…');
+    let timer = null;
+    try {
+      const view = video.getBoundingClientRect();
+      const crop = guideToVideoCrop(video.videoWidth, video.videoHeight, view, view);   // 보이는 영역 전체를 영상 좌표로
+      if (!crop) throw new Error('no-frame');
+      const blob = await captureLiveFrame(video, canvas, guide, crop);
+      if (stale()) return;
+      const limit = Number(window.__OCR_TOUCH_TIMEOUT_MS) > 0 ? Number(window.__OCR_TOUCH_TIMEOUT_MS) : 20000;   // 테스트만 덮어쓴다
+      const timedOut = new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('timeout')), limit); });
+      const data = await Promise.race([session.recognize(blob), timedOut]);
+      if (stale()) return;
+      const words = filterTouchWords(data && data.words, normalizeToken).map(w => ({ ...w, rect: projectCropBox(w.bbox, crop) }));
+      touch.words = words;
+      overlay.innerHTML = words.map(w => `<span class="ocr-box" style="left:${w.rect.left}px;top:${w.rect.top}px;width:${w.rect.width}px;height:${w.rect.height}px"></span>`).join('');
+      if (!words.length) { setTouchMsg('인식된 단어가 없어요.', { retake: true }); return; }
+      finishPick(point);
+    } catch (e) {
+      if (stale()) return;
+      touch.seq++;                                           // 늦게 끝나는 옛 인식 결과는 버린다
+      overlay.innerHTML = '';
+      touch.words = null;
+      setTouchMsg(e && e.message === 'timeout' ? '인식이 오래 걸려 중단했어요. 다시 찍거나 종료해 주세요.' : '인식 중 오류가 났어요. 다시 찍어 주세요.', { retake: true });
+    } finally {
+      if (timer) clearTimeout(timer);
+      if (gen === state.gen && seq === touch.seq) touch.busy = false;
+    }
+  }
+
+  function finishPick(point) {
+    const picked = pickTouchWord(touch.words, point);
+    if (!picked) { setTouchMsg('단어를 찾지 못했어요.', { retake: true }); return; }
+    const text = picked.word.text;
+    onSelect?.(text, 0, [text]);                             // 기존 흐름: 플래그 → 패널 닫기 → 검색 탭 → searchWord → 큐
+  }
+
+  modeBtns.forEach(b => { b.onclick = () => setMode(b.dataset.ocrMode); });
+  overlay.onclick = onOverlayTap;
+  if (retakeBtn) {
+    retakeBtn.onclick = () => {                              // 멈춘 장면을 버리고 영상을 다시 재생한다
+      resetTouch();
+      overlay.innerHTML = '';
+      resumeVideo();
+      showTouchHint();
+    };
+  }
+  root.dataset.mode = 'auto';
+  modeBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ocrMode === 'auto')));
 
   captureBtn.onclick = () => {
     if (!state.cameraOpen) { void start(); return; }

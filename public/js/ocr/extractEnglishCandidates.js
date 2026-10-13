@@ -32,7 +32,8 @@ function isSupportedWordInput(word) {
   return word.length >= 1 && word.length <= 50 && wordInputPattern.test(word) && word.split(' ').length <= 2;
 }
 
-function normalizeToken(raw) {
+// 작업272-2: 터치 모드(touchWordPick.js 호출부)가 같은 정리 규칙을 쓰도록 export 만 추가(동작은 그대로)
+export function normalizeToken(raw) {
   return normalizeWord(raw.replace(/[‐‑‒–—―]/g, '-').replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, ''));
 }
 

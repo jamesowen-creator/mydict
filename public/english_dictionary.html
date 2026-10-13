@@ -1416,6 +1416,16 @@
   .ocr-circle-btn[hidden]{display:none}
   .ocr-error{position:absolute;left:50%;top:calc(50% + 4.5rem);transform:translateX(-50%);width:16rem;box-sizing:border-box;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.92);text-align:center;font-size:12px;line-height:1.4;color:var(--color-danger-ink, #B42318);z-index:25}
   .ocr-error:empty{display:none}
+  /* 작업272-2: 터치 모드. 상단 [자동 | 터치] 분절 버튼(터치 44px), 터치 모드에서는 후보 칩 열·가이드·하단 버튼을 숨기고 안내 줄만 보인다 */
+  .ocr-mode{display:inline-flex;align-items:center}
+  .ocr-mode button{min-height:44px;padding:0 12px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--color-text-sub);font-size:14px;font-weight:500}
+  .ocr-mode button[aria-pressed=true]{color:var(--color-accent-ink);font-weight:800;border-bottom-color:var(--color-accent)}
+  .ocr-scanner[data-mode=touch] .ocr-candidates,.ocr-scanner[data-mode=touch] .ocr-guide,.ocr-scanner[data-mode=touch] .ocr-controls{display:none}
+  .ocr-scanner[data-mode=touch] .ocr-overlay{cursor:pointer}
+  .ocr-touch-bar{position:absolute;left:16px;right:16px;bottom:16px;margin:0 auto;width:fit-content;z-index:25;display:flex;align-items:center;gap:8px;max-width:calc(100% - 32px);padding:6px 12px;border-radius:var(--radius-ctl);background:rgba(255,255,255,.92);color:var(--color-text);font-size:14px;line-height:1.4}
+  .ocr-touch-bar[hidden]{display:none}
+  .ocr-touch-retake{flex:none;min-height:44px;padding:0 10px;border:none;background:transparent;color:var(--color-accent-ink);font-size:14px;font-weight:700}
+  .ocr-touch-retake[hidden]{display:none}
   /* 작업12: 하단 고정 nav 위로 띄워서 겹치지 않게 */
   /* 작업31: 텍스트 필 버튼 대신 원형 그레이스케일 아이콘 버튼으로 */
   /* 작업34: 아이콘 원형 버튼 대신 텍스트 전용 버튼으로 */
@@ -4190,6 +4200,10 @@ if ('serviceWorker' in navigator) {
       <button data-ocr-close type="button" class="ocr-close-btn">종료</button>
       <button data-ocr-torch type="button" class="ocr-torch-btn" hidden>조명</button>
     </div>
+    <div class="ocr-mode" role="group" aria-label="선택 방식">
+      <button type="button" data-ocr-mode="auto" aria-pressed="true">자동</button>
+      <button type="button" data-ocr-mode="touch" aria-pressed="false">터치</button>
+    </div>
     <span class="ocr-live-badge"><span class="ocr-live-dot"></span>LIVE OCR</span>
   </div>
   <div class="ocr-preview">
@@ -4197,6 +4211,7 @@ if ('serviceWorker' in navigator) {
     <div data-ocr-overlay class="ocr-overlay"></div>
     <canvas data-ocr-canvas hidden></canvas>
     <div data-ocr-candidates class="ocr-candidates"></div>
+    <div data-ocr-touch-bar class="ocr-touch-bar" hidden><span data-ocr-touch-msg role="status"></span><button data-ocr-touch-retake type="button" class="ocr-touch-retake" hidden>다시 찍기</button></div>
   </div>
   <div data-ocr-guide class="ocr-guide">
     <span class="ocr-corner ocr-corner-tl"></span>
