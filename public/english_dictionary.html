@@ -1808,16 +1808,36 @@ function safeParseJSON(text) {
   }
 }
 
+// 작업267-2: AI 호출 1건당 최대 대기 시간(ms). 초과하면 요청을 abort하고 isTimeout 오류를 던진다
+// (영어 검색은 1차+2차를 각각 이 시간으로 따로 센다). 영구 무응답으로 스피너·비활성 검색 버튼이 남는 것을 막는 상한이며,
+// 정상 응답이 오래 걸리는 경우(수십 초)는 포함하도록 넉넉히 잡았다. 테스트만 window.__AI_TIMEOUT_MS 로 짧게 덮어쓴다.
+const AI_TIMEOUT_MS = 40000;
+function aiTimeoutMs() {
+  const o = window.__AI_TIMEOUT_MS;
+  return Number.isFinite(o) && o > 0 ? o : AI_TIMEOUT_MS;
+}
+
 async function callAI(prompt) {
-  const response = await fetch('/api/ai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt })
-  });
-  const data = await response.json();
-  if (data.error) throw new Error(data.error);
-  if (!response.ok) throw new Error('서버 오류가 발생했습니다.');
-  return (data.result ?? '').replace(/```json|```/g, '').trim();
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, aiTimeoutMs());
+  try {
+    const response = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+      signal: ctrl.signal
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    if (!response.ok) throw new Error('서버 오류가 발생했습니다.');
+    return (data.result ?? '').replace(/```json|```/g, '').trim();
+  } catch (e) {
+    if (timedOut) { const te = new Error('응답이 늦어지고 있습니다.'); te.isTimeout = true; throw te; }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
@@ -1991,6 +2011,8 @@ async function doSearch() {
   // 잘못 남아있을 수 있음).
   const source = _sourceOverride || 'manual';
   _sourceOverride = null;
+  _lastSearch = { query, lang, source };   // 작업267-2: 시간 초과 후 '다시 시도' 버튼이 같은 검색을 다시 하기 위해
+  _pendingDetail = null;                   // 이전 검색의 2차 재시도 대기는 새 검색이 시작되면 버린다
 
   const resultDiv = document.getElementById('search-result');
   const btn = document.getElementById('search-btn');
@@ -2022,10 +2044,45 @@ async function doSearch() {
       await searchChinese(query, resultDiv, source);
     }
   } catch (err) {
-    resultDiv.innerHTML = `<div class="result-card" style="color:var(--wrong)">오류가 발생했습니다. 다시 시도해주세요.<br><small>${err.message}</small></div>`;
+    if (err && err.isTimeout) {
+      // 작업267-2: 재시도는 사용자가 누를 때만(자동 재시도 없음 - AI 비용 보호)
+      resultDiv.innerHTML = `<div class="result-card search-timeout">응답이 늦어지고 있습니다. 잠시 후 다시 시도해주세요.<div class="extra-trans-btns"><button type="button" class="extra-trans-btn" id="search-retry-btn" onclick="retryLastSearch()">다시 시도</button></div></div>`;
+    } else {
+      resultDiv.innerHTML = `<div class="result-card" style="color:var(--wrong)">오류가 발생했습니다. 다시 시도해주세요.<br><small>${err.message}</small></div>`;
+    }
   }
 
   btn.disabled = false;
+}
+
+// 작업267-2: 마지막 검색(언어·출처 포함)을 같은 조건으로 다시 실행. OCR 순차 탐색 큐는 건드리지 않는다.
+let _lastSearch = null;
+function retryLastSearch() {
+  if (!_lastSearch) return;
+  document.getElementById('search-input').value = _lastSearch.query;
+  _langOverride = _lastSearch.lang;
+  _sourceOverride = _lastSearch.source;
+  doSearch();
+}
+
+// 작업267-2: 영어 2차(상세) 호출이 시간 초과로 끝났을 때 재시도에 필요한 1차 결과. 새 검색이 시작되면 null.
+let _pendingDetail = null;
+async function retryDetail() {
+  const p = _pendingDetail;
+  if (!p) return;
+  renderResultEN(p.result, false, { loadingDetail: true });
+  let timedOut = false;
+  try {
+    applyEnglishDetail(p.result, safeParseJSON(await callAI(buildDictDetailPrompt(p.result))));
+  } catch (e) {
+    if (_pendingDetail !== p) return;   // 그 사이 다른 검색이 시작됨
+    if (e && e.isTimeout) timedOut = true;
+    else console.error('[dict-2stage] 2차 재시도 실패 - 1차 결과만 유지:', e);
+  }
+  if (_pendingDetail !== p) return;
+  if (timedOut) { renderResultEN(p.result, false, { detailFailed: true }); return; }
+  _pendingDetail = null;
+  await finishEnglishSearch(p.result, p.source);
 }
 
 // ─── ENGLISH SEARCH ───────────────────────────────────────────────────────────
@@ -2131,18 +2188,31 @@ async function searchEnglish(query, resultDiv, source = 'manual') {
 
   try {
     const detailText = await callAI(buildDictDetailPrompt(result));
-    const detail = safeParseJSON(detailText);
-    (result.meanings || []).forEach((m, i) => {
-      Object.assign(m, detail.meanings?.[i] || {});
-    });
-    result.similar = detail.similar || [];
-    result.collocations = detail.collocations || [];
-    result.nuance = result.meanings?.map(m => m.usage_note).filter(Boolean).join(' ') || '';
+    applyEnglishDetail(result, safeParseJSON(detailText));
     console.log(`[dict-2stage] 2차(나머지 상세) 응답: ${Math.round(performance.now() - t0)}ms (전체 경과)`);
   } catch (e) {
+    if (e && e.isTimeout) {
+      // 작업267-2: 1차 결과는 유지하고 2차 영역에만 안내+재시도. 반쪽 데이터가 단어장에 저장되지 않도록
+      // 저장은 재시도가 성공한 뒤로 미룬다(중복 저장 방지).
+      _pendingDetail = { result, source };
+      renderResultEN(result, false, { detailFailed: true });
+      return;
+    }
     console.error('[dict-2stage] 2차 호출 실패 - 1차 결과만 유지:', e);
   }
+  await finishEnglishSearch(result, source);
+}
 
+function applyEnglishDetail(result, detail) {
+  (result.meanings || []).forEach((m, i) => {
+    Object.assign(m, detail.meanings?.[i] || {});
+  });
+  result.similar = detail.similar || [];
+  result.collocations = detail.collocations || [];
+  result.nuance = result.meanings?.map(m => m.usage_note).filter(Boolean).join(' ') || '';
+}
+
+async function finishEnglishSearch(result, source) {
   // 사용자가 1차만 보고 페이지를 떠날 수도 있으니, 2차까지 끝난 완전한
   // 형태가 됐을 때 저장한다(완성 전 저장 시 단어장/퀴즈에 반쪽짜리
   // usage_note/example 없는 데이터가 남는 것을 방지).
@@ -2157,6 +2227,7 @@ async function searchEnglish(query, resultDiv, source = 'manual') {
 
 function renderResultEN(result, alreadySaved, opts = {}) {
   const loadingDetail = !!opts.loadingDetail;
+  const detailFailed = !!opts.detailFailed;   // 작업267-2: 2차 시간 초과 - 유의어 자리에 안내+재시도
   // 작업14: 2차 호출이 아직 안 끝난 섹션 자리에 표시할 스켈레톤 -
   // 홈 대시보드에서 쓰던 것과 같은 .skel-block 셰이머 재사용
   const detailSkeleton = (lines = 2) =>
@@ -2237,7 +2308,8 @@ function renderResultEN(result, alreadySaved, opts = {}) {
   // 안 그러면 2차 로딩 중에 뜻 블록별 스켈레톤과 별개로 빈 "예문" 섹션에도
   // 스켈레톤이 중복으로 떴었음)
   const examplesSection = examplesHtml;
-  const similarSection = similarHtml || (loadingDetail ? detailSkeleton(3) : '');
+  const detailFailedNotice = `<div class="detail-failed">추가 정보를 불러오지 못했습니다.<div class="extra-trans-btns"><button type="button" class="extra-trans-btn" id="detail-retry-btn" onclick="retryDetail()">다시 시도</button></div></div>`;
+  const similarSection = similarHtml || (loadingDetail ? detailSkeleton(3) : (detailFailed ? detailFailedNotice : ''));
   const collocationsSection = collocationsHtml || (loadingDetail ? detailSkeleton(2) : '');
 
   const searchQuery = result.search_query || '';
@@ -4064,6 +4136,14 @@ function setupBackButtonBlock() {
       if (typeof window.__closeOcrPanel === 'function') window.__closeOcrPanel({ viaBack: true });
       return;
     }
+    // 작업267-2: OCR 칩 선택 직후 closePanel()의 history.back()이 뒤늦게 일으키는 popstate.
+    // 이전 탭(단어장·퀴즈 등)으로 되돌리지 않고 검색 탭을 유지한다. 검색 탭에서 열었던 경우는 기존과 같이 추가 기록 없음,
+    // 다른 탭에서 열었던 경우는 탭 전환과 같이 검색 탭 기록을 쌓아 뒤로가기가 원래 탭으로 돌아가게 한다.
+    if (window.__ocrSelectPending) {
+      window.__ocrSelectPending = false;
+      showPage('search', !(e.state && e.state.page === 'search'));
+      return;
+    }
     if (e.state && e.state.page && e.state.page !== 'ocr') {
       showPage(e.state.page, false);
     } else if (!e.state || !e.state.page) {
@@ -4144,7 +4224,11 @@ if ('serviceWorker' in navigator) {
     panel.hidden = false;
     scanner = createOcrScanner(panel, {
       onSelect: (word, index, candidateWords) => {
+        // 작업267-2: 어느 탭에서 OCR을 열었든 검색 탭을 보여준다. 뒤따르는 popstate는 위 플래그로 구분(2초 뒤 자동 해제).
+        window.__ocrSelectPending = true;
+        setTimeout(() => { window.__ocrSelectPending = false; }, 2000);
         closePanel();
+        if (typeof showPage === 'function') showPage('search', false);
         // searchWord()가 내부에서 clearOcrQueue()를 먼저 호출하므로,
         // 새 큐는 반드시 그 다음에 세팅해야 지워지지 않는다.
         if (typeof searchWord === 'function') searchWord(word, 'en', 'ocr');
