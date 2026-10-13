@@ -241,3 +241,18 @@ test('시간 초과 뒤 늦게 오는 응답은 화면·저장에 반영되지 �
   assert.equal(s.retry, false); assert.equal(s.btnDisabled, false); assert.equal(s.spinner, false);
   await page.close();
 });
+
+// 작업270-1(전체 테스트 중 로드가 클 때 드물게 실패한 것을 계기로 추가): history.back()의 popstate가 늦게 도착해도(여기서는 2.5초) 검색 탭을 유지한다
+test('popstate가 2.5초 늦게 도착해도 이전 탭(단어장)으로 되돌리지 않음 / 연속 선택의 옛 타이머가 새 플래그를 지우지 않음', { skip: SKIP, timeout: 60000 }, async () => {
+  const page = await openDict();
+  await page.eval(`(() => { const hb = history.back.bind(history); history.back = () => { setTimeout(hb, 2500); }; })()`);
+  await page.eval(`showPage('wordbook')`); await sleep(100);
+  const word = await selectChip(page);
+  await page.waitFor(`!!document.querySelector('#search-result .result-word')`, 4000);
+  await sleep(3500);   // 지연된 history.back() 과 그 popstate 가 지나간 뒤
+  let s = await state(page);
+  assert.equal(s.page, 'page-search', '늦은 popstate 뒤에도 검색 탭');
+  assert.equal(s.input, word);
+  assert.equal(await page.eval('!!window.__ocrSelectPending'), false, '플래그는 popstate 에서 해제됨');
+  await page.close();
+});

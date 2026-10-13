@@ -239,6 +239,7 @@
               <th>과학</th>
               <th>음성 학습</th>
               <th>개념학습</th>
+              <th>개념 지도</th>
               <th style="text-align:right">검색 횟수</th>
               <th style="text-align:right">TTS 횟수</th>
               <th style="text-align:right">단어장</th>
@@ -373,6 +374,7 @@ function renderUserRow(u) {
     ${permToggle(u, 'perm_science_reading', '과학')}
     ${permToggle(u, 'perm_voice_study', '음성 학습')}
     ${permToggle(u, 'perm_concept_study', '개념학습')}
+    ${permToggleStrict(u, 'perm_concept_map', '개념 지도')}
     <td style="text-align:right;font-weight:600">${fmt(u.search_count)}</td>
     <td style="text-align:right;font-weight:600">${fmt(u.tts_count)}</td>
     <td style="text-align:right">${fmt(u.wordbook_count)}</td>
@@ -380,6 +382,16 @@ function renderUserRow(u) {
       <button class="btn-save" id="save-${u.id}" onclick="saveUser(${u.id})" disabled>저장</button>
     </td>
   </tr>`;
+}
+
+// 작업270-1: 기본값이 false 인 권한(개념 지도)용. 값이 없거나 false 면 꺼진 상태로 보인다(permToggle 은 값이 없으면 켜진 상태)
+function permToggleStrict(u, field, label) {
+  return `<td>
+    <label class="toggle">
+      <input type="checkbox" aria-label="${label}" ${u[field] === true ? 'checked' : ''} onchange="setPending(${u.id}, '${field}', this.checked)">
+      <span class="toggle-slider"></span>
+    </label>
+  </td>`;
 }
 
 function permToggle(u, field, label) {

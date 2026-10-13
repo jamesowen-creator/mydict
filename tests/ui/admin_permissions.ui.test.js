@@ -66,10 +66,10 @@ for (const width of [1280, 390]) {
   });
 }
 
-test('표 머리글 순서: 사용자·역할·승인·차단·과목 6열·사용 횟수 3열·저장', { skip: SKIP }, async () => {
+test('표 머리글 순서: 사용자·역할·승인·차단·과목 6열+개념 지도(작업270-1)·사용 횟수 3열·저장', { skip: SKIP }, async () => {
   const page = await openAdmin([userRow(7, '관리자', { role: 'admin' }), userRow(8, '학생')]);
   const heads = await page.eval("[...document.querySelectorAll('thead th')].map(t => t.innerText.trim())");
-  assert.deepEqual(heads, ['사용자', '역할', '승인', '차단', '언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '개념학습', '검색 횟수', 'TTS 횟수', '단어장', '저장']);
+  assert.deepEqual(heads, ['사용자', '역할', '승인', '차단', '언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '개념학습', '개념 지도', '검색 횟수', 'TTS 횟수', '단어장', '저장']);
   assert.equal(await page.eval("document.querySelectorAll('#row-8 > td').length"), heads.length, '열 수가 머리글과 같음');
   await page.close();
 });

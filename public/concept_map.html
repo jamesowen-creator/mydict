@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>개념 지도 - METIS</title>
+<link rel="icon" type="image/png" href="/icons/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/common/appHeader.css">
+<link rel="stylesheet" href="/css/common/tokens.css">
+<link rel="stylesheet" href="/css/common/screenBar.css">
+<style>
+  /* 작업270-1: 개념 지도(개발 중). 옛 개념학습(concept_study.html)과 별도 화면이며 이번 단계는 권한 확인과 빈 화면뿐이다.
+     색·크기는 /css/common/tokens.css 의 변수만 쓴다(직접 hex 없음). */
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text);
+    min-height: 100dvh;
+    overflow-x: hidden;
+    line-height: 1.6;
+    font-size: var(--body-font-size);
+    max-width: var(--content-max);
+    margin: 0 auto;
+  }
+  button { font-family: inherit; font-size: inherit; color: inherit; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--color-text); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  svg.ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+  #loading, #access-denied { position: fixed; inset: 0; z-index: 999; background: var(--color-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; }
+  #loading p, #access-denied p { color: var(--color-text-sub); font-size: 14px; }
+  #access-denied h2 { font-size: 18px; font-weight: 800; }
+  .btn { min-height: 44px; padding: 0 18px; border: none; border-radius: var(--radius-ctl); background: var(--color-accent-ink); color: var(--color-surface); font-weight: 600; display: inline-flex; align-items: center; text-decoration: none; }
+  .wrap { max-width: var(--content-max); margin: 0 auto; padding: 0 var(--gutter); }
+  .view-head { padding: 28px 0 8px; }
+  .view-title { font-size: 22px; font-weight: 800; line-height: 1.3; }
+  .view-sub { margin-top: 10px; font-size: 14px; color: var(--color-text-sub); }
+</style>
+</head>
+<body>
+
+<script src="/js/common/appHeader.js"></script>
+<script>MetisAppHeader.inject();</script>
+
+<div id="loading" role="status"><p>불러오는 중…</p></div>
+
+<div id="access-denied" hidden>
+  <svg class="ic" viewBox="0 0 24 24" width="40" height="40"><rect x="5" y="11" width="14" height="9"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+  <h2>이용 권한이 없습니다</h2>
+  <p>개념 지도는 아직 개발 중이며<br>권한이 있는 계정만 사용할 수 있습니다.</p>
+  <a class="btn" href="/">METIS 홈으로</a>
+</div>
+
+<div id="app" hidden>
+  <div class="screen-bar">
+    <button id="back-btn" class="screen-bar-back" type="button" aria-label="홈으로"><svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <h1 class="screen-bar-title">개념 지도</h1>
+  </div>
+  <div class="wrap">
+    <div class="view-head">
+      <p id="dev-note" class="view-sub">개발 중입니다. 다음 단계에서 주제와 개념 기능이 추가됩니다.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+function getToken() { try { return localStorage.getItem('mydict_token'); } catch (e) { return null; } }
+
+// 개발 중인 화면이므로 fail-closed: /api/me 가 성공하고 perm_concept_map 이 명시적으로 true 일 때만 보여 준다
+// (옛 개념학습은 명시적 false 일 때만 거부하는 fail-open 이다)
+async function hasPermission() {
+  const token = getToken();
+  if (!token) return false;
+  try {
+    const r = await fetch('/api/me', { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) return false;
+    const me = await r.json();
+    return me.perm_concept_map === true;
+  } catch (e) { return false; }
+}
+
+function applyHeaderHeight() {
+  const hdr = document.querySelector('.metis-app-header');
+  if (hdr) document.documentElement.style.setProperty('--hdr-h', hdr.offsetHeight + 'px');
+}
+window.addEventListener('resize', applyHeaderHeight);
+document.getElementById('back-btn').addEventListener('click', () => { location.href = '/'; });
+
+(async function init() {
+  const allowed = await hasPermission();
+  document.getElementById('loading').hidden = true;
+  if (!allowed) { document.getElementById('access-denied').hidden = false; return; }
+  document.getElementById('app').hidden = false;
+  applyHeaderHeight();
+})();
+</script>
+</body>
+</html>

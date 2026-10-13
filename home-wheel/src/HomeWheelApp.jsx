@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ThreeDWheelPicker } from './ThreeDWheelPicker.jsx';
 import { getToken, clearToken, fetchMe } from './auth.js';
 
@@ -14,11 +14,16 @@ const OPTIONS = [
   { id: 'concept', name: '개념학습', description: '개념 하나에서 시작해 한 걸음씩 넓히기', url: '/concept_study.html' },
 ];
 
+// 작업270-1: 개발 중인 새 메뉴. 로그인한 사용자의 perm_concept_map 이 true 일 때만 휠에 더한다(fetchMe 가 받는 /api/me 응답에 이미 들어 있음).
+// 권한이 없거나 로그인 전이면 OPTIONS 배열 그대로라서 기존 휠(항목 수·순서·위치)은 달라지지 않는다.
+const CMAP_OPTION = { id: 'cmap', name: '개념 지도', description: '주제별 개념을 직접 연결해 지도로 만들기 (개발 중)', url: '/concept_map.html' };
+
 export default function HomeWheelApp() {
   const [selected, setSelected] = useState(OPTIONS[0].id);
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [pendingApproval, setPendingApproval] = useState(false);
+  const options = useMemo(() => (user && user.perm_concept_map === true ? [...OPTIONS, CMAP_OPTION] : OPTIONS), [user]);
 
   useEffect(() => {
     // 9-a: unapproved signups never get a JWT (see routes/auth.js's OAuth
@@ -39,7 +44,7 @@ export default function HomeWheelApp() {
   }, []);
 
   const goTo = (id) => {
-    const target = OPTIONS.find((o) => o.id === id);
+    const target = options.find((o) => o.id === id);
     if (target) window.location.href = target.url;
   };
 
@@ -93,7 +98,8 @@ export default function HomeWheelApp() {
       ) : (
         <div className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-xl">
-            <ThreeDWheelPicker options={OPTIONS} value={selected} onChange={setSelected} onCenterTap={goTo} />
+            {/* key: 항목 수가 바뀌는 경우(권한자)에만 휠을 다시 만들어 회전 위치가 어긋나지 않게 함. 일반 사용자는 key 가 그대로(6) */}
+            <ThreeDWheelPicker key={options.length} options={options} value={selected} onChange={setSelected} onCenterTap={goTo} />
           </div>
         </div>
       )}

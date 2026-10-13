@@ -4243,9 +4243,12 @@ if ('serviceWorker' in navigator) {
     panel.hidden = false;
     scanner = createOcrScanner(panel, {
       onSelect: (word, index, candidateWords) => {
-        // 작업267-2: 어느 탭에서 OCR을 열었든 검색 탭을 보여준다. 뒤따르는 popstate는 위 플래그로 구분(2초 뒤 자동 해제).
+        // 작업267-2: 어느 탭에서 OCR을 열었든 검색 탭을 보여준다. 뒤따르는 popstate는 위 플래그로 구분한다.
+        // 작업270-1: popstate 가 늦게 도착하는 느린 기기·부하 상황을 견디도록 자동 해제를 2초 → 10초로 늘리고, 연속 선택 때
+        // 앞 선택의 타이머가 새 플래그를 지우지 않게 타이머를 하나만 둔다(popstate 가 오면 그 자리에서 해제됨).
         window.__ocrSelectPending = true;
-        setTimeout(() => { window.__ocrSelectPending = false; }, 2000);
+        clearTimeout(window.__ocrSelectTimer);
+        window.__ocrSelectTimer = setTimeout(() => { window.__ocrSelectPending = false; }, 10000);
         closePanel();
         if (typeof showPage === 'function') showPage('search', false);
         // searchWord()가 내부에서 clearOcrQueue()를 먼저 호출하므로,

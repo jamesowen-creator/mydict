@@ -106,13 +106,14 @@ router.get('/api/me', requireAuth, async (req, res) => {
       role: emailIsAdmin ? 'admin' : (req.user.role || 'user'), is_blocked: false,
       can_search: true, can_wordbook: true, can_quiz: true, can_tts: true, can_podcast: true,
       perm_literature_compass: true, perm_digest_reading: true, perm_science_reading: true, perm_voice_study: true, perm_concept_study: true,
+      perm_concept_map: false,   // 작업270-1: DB 없이는 확인할 수 없으므로 닫아 둔다(옛 perm_* 와 달리 fail-closed)
     });
   }
   try {
     const { rows } = await pool.query(
       `SELECT id, email, name, role, is_blocked,
               can_search, can_wordbook, can_quiz, can_tts, can_podcast,
-              perm_literature_compass, perm_digest_reading, perm_science_reading, perm_voice_study, perm_concept_study
+              perm_literature_compass, perm_digest_reading, perm_science_reading, perm_voice_study, perm_concept_study, perm_concept_map
        FROM users WHERE id = $1`,
       [req.user.id]
     );
