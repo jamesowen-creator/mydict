@@ -237,11 +237,11 @@ test('최상위 주제 삭제: confirm 없으면 409 + 항목 개수, confirm=1 
   const before = s.db.snapshot();
   let r = await s.call('DELETE', `/api/cmap/topics/${a.id}`);
   assert.equal(r.status, 409); assert.equal(r.body.ok, false); assert.equal(r.body.needs_confirm, true);
-  assert.deepEqual(r.body.counts, { topics: 2, concepts: 3 });
+  assert.deepEqual(r.body.counts, { topics: 2, concepts: 3, maps: 0 });   // 작업273-2: 지도 수 필드 추가
   assert.equal(s.db.snapshot(), before, '확인 없이는 아무것도 지워지지 않음');
   for (const q of ['?confirm=0', '?confirm=true', '?confirm=']) assert.equal((await s.call('DELETE', `/api/cmap/topics/${a.id}${q}`)).status, 409, q);
   r = await s.call('DELETE', `/api/cmap/topics/${a.id}?confirm=1`);
-  assert.equal(r.status, 200); assert.deepEqual(r.body.deleted_counts, { topics: 2, concepts: 3 });
+  assert.equal(r.status, 200); assert.deepEqual(r.body.deleted_counts, { topics: 2, concepts: 3, maps: 0 });
   assert.deepEqual((await s.list()).map(t => t.title), ['다른 트리']);
   assert.deepEqual(s.db.concepts.filter(c => c.user_id === 1).map(c => c.term), ['keep']);
   assert.equal(s.db.topics.filter(t => t.user_id === 2).length, 1, '다른 사용자 데이터 유지'); assert.equal(s.db.concepts.filter(c => c.user_id === 2).length, 1);

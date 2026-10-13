@@ -3,6 +3,7 @@ const { pool } = require('../lib/db');
 const { requireAuth } = require('../middleware/auth');
 const T = require('../lib/cmap_topics');
 const AI = require('../lib/cmap_ai');
+const M = require('../lib/cmap_map');
 
 const router = express.Router();
 
@@ -164,6 +165,14 @@ router.post('/api/cmap/topics/:id/move', guard, handle(async req => {
     const dup = T.findSibling(idx, newParentId, topic.title, id);
     if (dup) throw conflict(`옮길 위치에 '${dup.title}' 주제가 이미 있습니다.`);
     const newRoot = T.rootIdForParent(idx, newParentId);
+    // 작업273-2: 지도에 쓰이는 개념이 들어 있는 가지는 다른 최상위 주제로 옮길 수 없다(지도의 뿌리 밖으로 나가는 개념이 생기므로)
+    const oldRoot = topic.root_id === null || topic.root_id === undefined ? topic.id : topic.root_id;
+    if (oldRoot !== (newParentId === null ? id : newRoot)) {
+      const used = await usedInMaps(c, req.user.id, [id, ...T.descendants(idx, id).map(d => d.id)]);
+      if (used > 0) throw conflict(`이 가지의 개념 ${used}개가 지도에서 쓰이고 있어 다른 최상위 주제로 옮길 수 없습니다. 지도에서 먼저 빼 주세요.`, { in_maps: used });
+      // 뿌리가 더 이상 최상위가 아니게 되는 주제의 (비어 있는) 지도는 지운다
+      if (topic.parent_id === null || topic.parent_id === undefined) await c.query('DELETE FROM cmap_maps WHERE root_topic_id = $1 AND user_id = $2', [id, req.user.id]);
+    }
     const { rows } = await c.query(
       `UPDATE cmap_topics SET parent_id = $1, root_id = $2, sort_order = $3, updated_at = now() WHERE id = $4 AND user_id = $5 RETURNING ${TOPIC_COLS}`,
       [newParentId, newRoot, T.nextSortOrder(idx, newParentId), id, req.user.id]);
@@ -214,14 +223,16 @@ router.delete('/api/cmap/topics/:id', guard, handle(async req => {
     const sub = T.descendants(idx, id);
     const counts = await conceptCounts(c, req.user.id);
     const conceptTotal = [id, ...sub.map(t => t.id)].reduce((n, tid) => n + (counts.get(tid) || 0), 0);
+    const mapCount = (await c.query('SELECT id, root_topic_id FROM cmap_maps WHERE user_id = $1', [req.user.id])).rows.filter(m => m.root_topic_id === id).length;   // 작업273-2
     if (!confirm) {
       throw conflict('최상위 주제를 삭제하면 아래 항목이 모두 삭제됩니다. 삭제하려면 확인이 필요합니다.',
-        { needs_confirm: true, counts: { topics: sub.length, concepts: conceptTotal } });
+        { needs_confirm: true, counts: { topics: sub.length, concepts: conceptTotal, maps: mapCount } });
     }
+    await c.query('DELETE FROM cmap_maps WHERE root_topic_id = $1 AND user_id = $2', [id, req.user.id]);   // 지도(노드·간선 포함)를 먼저 지운다
     for (const tid of [id, ...sub.map(t => t.id)]) await c.query('DELETE FROM cmap_concepts WHERE topic_id = $1 AND user_id = $2', [tid, req.user.id]);
     await c.query('DELETE FROM cmap_topics WHERE root_id = $1 AND user_id = $2', [id, req.user.id]);
     await c.query('DELETE FROM cmap_topics WHERE id = $1 AND user_id = $2', [id, req.user.id]);
-    return { body: { deleted: id, deleted_counts: { topics: sub.length, concepts: conceptTotal } } };
+    return { body: { deleted: id, deleted_counts: { topics: sub.length, concepts: conceptTotal, maps: mapCount } } };
   });
 }));
 
@@ -362,9 +373,206 @@ router.patch('/api/cmap/concepts/:id', guard, handle(async req => {
 router.delete('/api/cmap/concepts/:id', guard, handle(async req => {
   const id = parseId(req.params.id);
   if (id === null) throw notFound('개념을 찾을 수 없습니다.');
-  const { rowCount } = await pool.query('DELETE FROM cmap_concepts WHERE id = $1 AND user_id = $2', [id, req.user.id]);
-  if (!rowCount) throw notFound('개념을 찾을 수 없습니다.');
-  return { body: { deleted: id } };
+  return withTx(async c => {
+    const { rows: own } = await c.query('SELECT id FROM cmap_concepts WHERE id = $1 AND user_id = $2 FOR UPDATE', [id, req.user.id]);
+    if (!own.length) throw notFound('개념을 찾을 수 없습니다.');
+    // 작업273-2: 지도에서 쓰이는 개념이면 그 노드와 연결된 간선을 함께 지우고, 그 지도의 저장 표시(semantic_hash)를 NULL 로 되돌린다
+    const { rows: maps } = await c.query('SELECT id FROM cmap_maps WHERE user_id = $1', [req.user.id]);
+    let removedNodes = 0, removedEdges = 0;
+    for (const m of maps) {
+      const { rows: nodes } = await c.query('SELECT concept_id FROM cmap_map_nodes WHERE map_id = $1', [m.id]);
+      if (!nodes.some(n => n.concept_id === id)) continue;
+      const { rows: edges } = await c.query('SELECT id, from_concept_id, to_concept_id FROM cmap_edges WHERE map_id = $1', [m.id]);
+      for (const e of edges) if (e.from_concept_id === id || e.to_concept_id === id) { await c.query('DELETE FROM cmap_edges WHERE id = $1', [e.id]); removedEdges++; }
+      await c.query('DELETE FROM cmap_map_nodes WHERE map_id = $1 AND concept_id = $2', [m.id, id]);
+      await c.query('UPDATE cmap_maps SET semantic_hash = NULL, updated_at = now() WHERE id = $1 AND user_id = $2', [m.id, req.user.id]);
+      removedNodes++;
+    }
+    await c.query('DELETE FROM cmap_concepts WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    return { body: { deleted: id, removed_from_maps: removedNodes, removed_edges: removedEdges } };
+  });
+}));
+
+// ─── 작업273-2: 지도(노드 선택·배치·간선) ───────────────────────────────────────────────
+// 규칙은 서버가 강제한다: 노드는 그 지도의 최상위 주제 트리에 속한 개념만, 간선의 양 끝은 그 지도의 노드여야 하며 같은 쌍은 방향과 상관없이 한 번만,
+// 문구 필수(≤40자)·종류 선택(5종)·'구별'은 방향 없음(id 작은 쪽이 from), 좌표는 유한한 숫자 범위. 모든 간선·노드는 사용자가 직접 만든다(AI 제안 없음).
+const MAP_COLS = 'id, root_topic_id, title, semantic_hash, saved_at, created_at, updated_at';
+const EDGE_COLS = 'id, map_id, from_concept_id, to_concept_id, relation_type, label, created_at';
+
+// 지도에 쓰이는 노드 중 topicIds 에 속한 개념의 수(사용자의 모든 지도 합계)
+async function usedInMaps(db, userId, topicIds) {
+  const set = new Set(topicIds);
+  const { rows: cs } = await db.query('SELECT id, topic_id FROM cmap_concepts WHERE user_id = $1', [userId]);
+  const ids = new Set(cs.filter(x => set.has(x.topic_id)).map(x => x.id));
+  if (!ids.size) return 0;
+  const { rows: maps } = await db.query('SELECT id FROM cmap_maps WHERE user_id = $1', [userId]);
+  let n = 0;
+  for (const m of maps) {
+    const { rows } = await db.query('SELECT concept_id FROM cmap_map_nodes WHERE map_id = $1', [m.id]);
+    n += rows.filter(r => ids.has(r.concept_id)).length;
+  }
+  return n;
+}
+
+async function ownMap(db, mapId, userId, { lock = false } = {}) {
+  const { rows } = await db.query(`SELECT ${MAP_COLS} FROM cmap_maps WHERE id = $1 AND user_id = $2${lock ? ' FOR UPDATE' : ''}`, [mapId, userId]);
+  if (!rows.length) throw notFound('지도를 찾을 수 없습니다.');
+  return rows[0];
+}
+
+// 지도의 뿌리 주제 트리에 속한 개념(id, topic_id, term, english)과 트리의 주제들
+async function treeOfMap(db, userId, rootTopicId) {
+  const idx = T.buildIndex(await loadTopics(db, userId));
+  const root = idx.byId.get(rootTopicId);
+  const topics = root ? [root, ...T.descendants(idx, rootTopicId)] : [];
+  const set = new Set(topics.map(t => t.id));
+  const { rows } = await db.query('SELECT id, topic_id, term, english FROM cmap_concepts WHERE user_id = $1 ORDER BY sort_order, id', [userId]);
+  return { topics, concepts: rows.filter(x => set.has(x.topic_id)) };
+}
+
+// 지도 조회(없으면 만든다): :rootId 는 최상위 주제. 노드·간선·트리 안의 개념과 주제를 함께 돌려준다
+router.get('/api/cmap/topics/:rootId/map', guard, handle(async req => {
+  const rootId = parseId(req.params.rootId);
+  if (rootId === null) throw notFound('주제를 찾을 수 없습니다.');
+  return withTx(async c => {
+    const idx = T.buildIndex(await loadTopics(c, req.user.id, { lock: true }));
+    const root = idx.byId.get(rootId);
+    if (!root) throw notFound('주제를 찾을 수 없습니다.');
+    if (root.parent_id !== null && root.parent_id !== undefined) throw bad('지도는 최상위 주제 단위로 만듭니다.');
+    let { rows: maps } = await c.query(`SELECT ${MAP_COLS} FROM cmap_maps WHERE root_topic_id = $1 AND user_id = $2 ORDER BY id`, [rootId, req.user.id]);
+    if (!maps.length) {
+      maps = (await c.query(`INSERT INTO cmap_maps (user_id, root_topic_id, title) VALUES ($1, $2, $3) RETURNING ${MAP_COLS}`, [req.user.id, rootId, root.title])).rows;
+    }
+    const map = maps[0];
+    const { rows: nodes } = await c.query('SELECT map_id, concept_id, x, y FROM cmap_map_nodes WHERE map_id = $1 ORDER BY concept_id', [map.id]);
+    const { rows: edges } = await c.query(`SELECT ${EDGE_COLS} FROM cmap_edges WHERE map_id = $1 ORDER BY id`, [map.id]);
+    const tree = await treeOfMap(c, req.user.id, rootId);
+    return { body: {
+      map, nodes: nodes.map(n => ({ concept_id: n.concept_id, x: n.x, y: n.y })), edges,
+      concepts: tree.concepts, topics: tree.topics.map(t => ({ id: t.id, parent_id: t.parent_id, title: t.title, sort_order: t.sort_order })),
+      relation_types: M.RELATION_TYPES,
+    } };
+  });
+}));
+
+// 노드 추가(지도에 쓸 개념 선택). 이미 있으면 그대로 돌려줌
+router.post('/api/cmap/maps/:id/nodes', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('지도를 찾을 수 없습니다.');
+  const cid = typeof bodyOf(req).concept_id === 'number' ? parseId(String(bodyOf(req).concept_id)) : null;
+  if (cid === null) throw bad('concept_id가 올바르지 않습니다.');
+  return withTx(async c => {
+    const map = await ownMap(c, id, req.user.id, { lock: true });
+    const tree = await treeOfMap(c, req.user.id, map.root_topic_id);
+    if (!tree.concepts.some(x => x.id === cid)) throw bad('이 지도의 주제 안에 있는 개념만 지도에 쓸 수 있습니다.');
+    const { rows: ex } = await c.query('SELECT map_id, concept_id, x, y FROM cmap_map_nodes WHERE map_id = $1', [id]);
+    const have = ex.find(n => n.concept_id === cid);
+    if (have) return { body: { node: { concept_id: have.concept_id, x: have.x, y: have.y }, existing: true } };
+    const { rows } = await c.query('INSERT INTO cmap_map_nodes (map_id, concept_id) VALUES ($1, $2) RETURNING map_id, concept_id, x, y', [id, cid]);
+    return { status: 201, body: { node: { concept_id: rows[0].concept_id, x: rows[0].x, y: rows[0].y }, existing: false } };
+  });
+}));
+
+// 노드 빼기. 연결된 간선이 있으면 confirm=1 이 있어야 하고(없으면 409 + 간선 수) 간선도 함께 지운다
+router.delete('/api/cmap/maps/:id/nodes/:conceptId', guard, handle(async req => {
+  const id = parseId(req.params.id), cid = parseId(req.params.conceptId);
+  if (id === null || cid === null) throw notFound('노드를 찾을 수 없습니다.');
+  const confirm = req.query.confirm === '1';
+  return withTx(async c => {
+    await ownMap(c, id, req.user.id, { lock: true });
+    const { rows: nodes } = await c.query('SELECT map_id, concept_id FROM cmap_map_nodes WHERE map_id = $1', [id]);
+    if (!nodes.some(n => n.concept_id === cid)) throw notFound('지도에 없는 개념입니다.');
+    const { rows: edges } = await c.query('SELECT id, from_concept_id, to_concept_id FROM cmap_edges WHERE map_id = $1', [id]);
+    const touching = edges.filter(e => e.from_concept_id === cid || e.to_concept_id === cid);
+    if (touching.length && !confirm) {
+      throw conflict(`이 개념을 지도에서 빼면 연결 ${touching.length}개도 함께 지워집니다. 확인이 필요합니다.`, { needs_confirm: true, counts: { edges: touching.length } });
+    }
+    for (const e of touching) await c.query('DELETE FROM cmap_edges WHERE id = $1', [e.id]);
+    await c.query('DELETE FROM cmap_map_nodes WHERE map_id = $1 AND concept_id = $2', [id, cid]);
+    return { body: { removed: cid, removed_edges: touching.length } };
+  });
+}));
+
+// 노드 위치 저장(드래그가 끝났을 때)
+router.patch('/api/cmap/maps/:id/nodes/:conceptId', guard, handle(async req => {
+  const id = parseId(req.params.id), cid = parseId(req.params.conceptId);
+  if (id === null || cid === null) throw notFound('노드를 찾을 수 없습니다.');
+  const pos = M.readPosition(bodyOf(req).x, bodyOf(req).y);
+  if (pos.error) throw bad(pos.error);
+  return withTx(async c => {
+    await ownMap(c, id, req.user.id, { lock: true });
+    const { rows } = await c.query('UPDATE cmap_map_nodes SET x = $1, y = $2 WHERE map_id = $3 AND concept_id = $4 RETURNING map_id, concept_id, x, y', [pos.value.x, pos.value.y, id, cid]);
+    if (!rows.length) throw notFound('지도에 없는 개념입니다.');
+    return { body: { node: { concept_id: rows[0].concept_id, x: rows[0].x, y: rows[0].y } } };
+  });
+}));
+
+// 간선 만들기(사용자가 두 노드를 이어 줌)
+router.post('/api/cmap/maps/:id/edges', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('지도를 찾을 수 없습니다.');
+  const body = bodyOf(req);
+  const a = typeof body.from_concept_id === 'number' ? parseId(String(body.from_concept_id)) : null;
+  const b = typeof body.to_concept_id === 'number' ? parseId(String(body.to_concept_id)) : null;
+  if (a === null || b === null) throw bad('연결할 두 개념의 id가 올바르지 않습니다.');
+  if (a === b) throw bad('같은 개념끼리는 연결할 수 없습니다.');
+  const label = M.readLabel(body.label);
+  if (label.error) throw bad(label.error);
+  const type = M.readRelationType(body.relation_type);
+  if (type.error) throw bad(type.error);
+  return withTx(async c => {
+    await ownMap(c, id, req.user.id, { lock: true });
+    const { rows: nodes } = await c.query('SELECT map_id, concept_id FROM cmap_map_nodes WHERE map_id = $1', [id]);
+    if (!nodes.some(n => n.concept_id === a) || !nodes.some(n => n.concept_id === b)) throw bad('연결하는 두 개념이 모두 지도에 있어야 합니다.');
+    const { rows: edges } = await c.query('SELECT id, from_concept_id, to_concept_id FROM cmap_edges WHERE map_id = $1', [id]);
+    if (M.pairExists(edges, a, b, null)) throw conflict('이미 연결돼 있는 두 개념입니다. 기존 연결을 고쳐 주세요.');
+    const dir = M.normalizeDirection(a, b, type.value === undefined ? null : type.value);
+    const { rows } = await c.query(`INSERT INTO cmap_edges (map_id, from_concept_id, to_concept_id, relation_type, label) VALUES ($1, $2, $3, $4, $5) RETURNING ${EDGE_COLS}`,
+      [id, dir.from, dir.to, type.value === undefined ? null : type.value, label.value]);
+    return { status: 201, body: { edge: rows[0] } };
+  });
+}));
+
+// 간선 수정: 문구·종류·방향 바꾸기(reverse: true). '구별'(대칭)은 방향이 없다
+router.patch('/api/cmap/edges/:id', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('연결을 찾을 수 없습니다.');
+  const body = bodyOf(req);
+  let label;
+  if (has(body, 'label')) { const l = M.readLabel(body.label); if (l.error) throw bad(l.error); label = l.value; }
+  const type = has(body, 'relation_type') ? M.readRelationType(body.relation_type) : { value: undefined };
+  if (type.error) throw bad(type.error);
+  const reverse = body.reverse === true;
+  if (has(body, 'reverse') && typeof body.reverse !== 'boolean') throw bad('reverse는 true/false여야 합니다.');
+  if (label === undefined && type.value === undefined && !reverse) throw bad('변경할 항목이 없습니다.');
+  return withTx(async c => {
+    const { rows: found } = await c.query(`SELECT ${EDGE_COLS} FROM cmap_edges WHERE id = $1`, [id]);
+    if (!found.length) throw notFound('연결을 찾을 수 없습니다.');
+    const cur = found[0];
+    await ownMap(c, cur.map_id, req.user.id, { lock: true });
+    const nextType = type.value === undefined ? cur.relation_type : type.value;
+    let from = cur.from_concept_id, to = cur.to_concept_id;
+    if (reverse) {
+      if (nextType === M.SYMMETRIC_TYPE) throw bad(`'${M.SYMMETRIC_TYPE}'은 방향이 없어 바꿀 수 없습니다.`);
+      [from, to] = [to, from];
+    }
+    const dir = M.normalizeDirection(from, to, nextType);
+    const { rows } = await c.query(`UPDATE cmap_edges SET from_concept_id = $1, to_concept_id = $2, relation_type = $3, label = $4 WHERE id = $5 RETURNING ${EDGE_COLS}`,
+      [dir.from, dir.to, nextType === undefined ? null : nextType, label === undefined ? cur.label : label, id]);
+    return { body: { edge: rows[0] } };
+  });
+}));
+
+router.delete('/api/cmap/edges/:id', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('연결을 찾을 수 없습니다.');
+  return withTx(async c => {
+    const { rows: found } = await c.query('SELECT id, map_id FROM cmap_edges WHERE id = $1', [id]);
+    if (!found.length) throw notFound('연결을 찾을 수 없습니다.');
+    await ownMap(c, found[0].map_id, req.user.id, { lock: true });
+    await c.query('DELETE FROM cmap_edges WHERE id = $1', [id]);
+    return { body: { deleted: id } };
+  });
 }));
 
 module.exports = router;

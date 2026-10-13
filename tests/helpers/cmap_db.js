@@ -1,16 +1,20 @@
-// 작업271-1: 개념 지도(cmap_topics, cmap_concepts) 전용 가짜 DB. 공용 tests/helpers/mock_db.js 는 수정하지 않고, 그 위에 얹는다
+// 작업271-1·273-1·273-2: 개념 지도(cmap_topics, cmap_concepts, cmap_maps, cmap_map_nodes, cmap_edges) 전용 가짜 DB. 공용 tests/helpers/mock_db.js 는 수정하지 않고, 그 위에 얹는다
 // (users 등 나머지 SQL 은 mock_db 에 맡기고, cmap_* SQL 만 여기서 처리한다).
-// 실제 PG 제약을 흉내 낸 것일 뿐이다(한계): UNIQUE(lower), CHECK(제목 길이·parent/root 짝), FK(NO ACTION: 문장 끝 / DEFERRED: 트랜잭션 끝),
+// 실제 PG 제약을 흉내 낸 것일 뿐이다(한계): UNIQUE(lower)·UNIQUE(쌍, 방향 무관), CHECK, FK(NO ACTION: 문장 끝 / DEFERRED: 트랜잭션 끝 / CASCADE: 연쇄 삭제),
 // 트랜잭션(BEGIN 시점 복사본으로 ROLLBACK). SQL 은 routes/concept_map.js 가 쓰는 형태만 처리하고 그 밖의 cmap SQL 은 오류로 알린다.
 const { createMockDb } = require('./mock_db');
 
 function dbError(code, message) { const e = new Error(message); e.code = code; return e; }
 const lower = s => String(s).toLowerCase();
 const len = s => Array.from(String(s)).length;
+const REL = ['사용', '일부', '종류', '일으킴', '구별'];
+const TABLES = ['cmap_topics', 'cmap_concepts', 'cmap_maps', 'cmap_map_nodes', 'cmap_edges'];
 
 function createCmapDb() {
   const base = createMockDb();
-  const db = { base, topics: [], concepts: [], seq: { t: 1, c: 1 }, snap: null, queries: [], failOn: null, tables: base.tables, trackUsage: base.trackUsage, addUser: base.addUser };
+  const db = { base, topics: [], concepts: [], maps: [], nodes: [], edges: [], seq: { t: 1, c: 1, m: 1, e: 1 }, snap: null, queries: [], failOn: null, tables: base.tables, trackUsage: base.trackUsage, addUser: base.addUser };
+  const list = name => ({ cmap_topics: db.topics, cmap_concepts: db.concepts, cmap_maps: db.maps, cmap_map_nodes: db.nodes, cmap_edges: db.edges })[name];
+  const setList = (name, arr) => { const k = { cmap_topics: 'topics', cmap_concepts: 'concepts', cmap_maps: 'maps', cmap_map_nodes: 'nodes', cmap_edges: 'edges' }[name]; db[k] = arr; };
 
   // ── 제약 ──
   function checkTopic(row, self) {
@@ -27,6 +31,24 @@ function createCmapDb() {
     if (row.explanation_source !== null && row.explanation_source !== undefined && !['ai', 'manual'].includes(row.explanation_source)) throw dbError('23514', 'cmap_concepts explanation_source check');
     if (db.concepts.some(o => o !== self && o.id !== row.id && o.topic_id === row.topic_id && lower(o.term) === lower(row.term))) throw dbError('23505', 'duplicate key (cmap_concepts term)');
   }
+  function checkMap(row) {
+    if (typeof row.title !== 'string' || len(row.title) < 1 || len(row.title) > 80 || row.title.trim() === '') throw dbError('23514', 'cmap_maps title check');
+  }
+  function checkNode(row, self) {
+    if (db.nodes.some(o => o !== self && o.map_id === row.map_id && o.concept_id === row.concept_id)) throw dbError('23505', 'duplicate key (cmap_map_nodes pk)');
+    if (!db.maps.some(m => m.id === row.map_id)) throw dbError('23503', 'cmap_map_nodes map FK');
+    if (!db.concepts.some(c => c.id === row.concept_id)) throw dbError('23503', 'cmap_map_nodes concept FK');
+    for (const v of [row.x, row.y]) if (v !== null && v !== undefined && !Number.isFinite(v)) throw dbError('22003', 'cmap_map_nodes real');
+  }
+  function checkEdge(row, self) {
+    if (typeof row.label !== 'string' || len(row.label) < 1 || len(row.label) > 40 || row.label.trim() === '') throw dbError('23514', 'cmap_edges label check');
+    if (row.relation_type !== null && row.relation_type !== undefined && !REL.includes(row.relation_type)) throw dbError('23514', 'cmap_edges relation_type check');
+    if (row.from_concept_id === row.to_concept_id) throw dbError('23514', 'cmap_edges from<>to check');
+    const others = db.edges.filter(o => o !== self && o.id !== row.id && o.map_id === row.map_id);
+    if (others.some(o => o.from_concept_id === row.from_concept_id && o.to_concept_id === row.to_concept_id)) throw dbError('23505', 'duplicate key (cmap_edges map,from,to)');
+    if (others.some(o => Math.min(o.from_concept_id, o.to_concept_id) === Math.min(row.from_concept_id, row.to_concept_id) && Math.max(o.from_concept_id, o.to_concept_id) === Math.max(row.from_concept_id, row.to_concept_id))) throw dbError('23505', 'duplicate key (cmap_edges pair)');
+    for (const cid of [row.from_concept_id, row.to_concept_id]) if (!db.nodes.some(n => n.map_id === row.map_id && n.concept_id === cid)) throw dbError('23503', 'cmap_edges node FK');
+  }
   const ids = new Set();
   function checkTopicRefs() {   // NO ACTION: 문장 끝에 남은 주제가 사라진 주제를 가리키면 오류
     ids.clear(); db.topics.forEach(t => ids.add(t.id));
@@ -35,13 +57,30 @@ function createCmapDb() {
       if (t.root_id !== null && !ids.has(t.root_id)) throw dbError('23503', 'cmap_topics root FK');
     }
   }
-  function checkConceptRefs() {   // DEFERRABLE INITIALLY DEFERRED: 트랜잭션 끝(COMMIT)에 검사
+  function checkDeferredRefs() {   // DEFERRABLE INITIALLY DEFERRED: 트랜잭션 끝(COMMIT)에 검사
     ids.clear(); db.topics.forEach(t => ids.add(t.id));
     for (const c of db.concepts) if (!ids.has(c.topic_id)) throw dbError('23503', 'cmap_concepts topic FK');
+    for (const m of db.maps) if (!ids.has(m.root_topic_id)) throw dbError('23503', 'cmap_maps root topic FK');
+  }
+  // CASCADE: 지도 → 노드·간선, 개념 → 노드, 노드 → 그 노드를 끝으로 하는 간선
+  function cascadeAfterDelete(table, removed) {
+    if (!removed.length) return;
+    if (table === 'cmap_maps') {
+      const mids = new Set(removed.map(m => m.id));
+      cascadeAfterDelete('cmap_map_nodes', db.nodes.filter(n => mids.has(n.map_id)));
+      db.nodes = db.nodes.filter(n => !mids.has(n.map_id));
+      db.edges = db.edges.filter(e => !mids.has(e.map_id));
+    } else if (table === 'cmap_concepts') {
+      const cids = new Set(removed.map(c => c.id));
+      const gone = db.nodes.filter(n => cids.has(n.concept_id));
+      db.nodes = db.nodes.filter(n => !cids.has(n.concept_id));
+      cascadeAfterDelete('cmap_map_nodes', gone);
+    } else if (table === 'cmap_map_nodes') {
+      db.edges = db.edges.filter(e => !removed.some(n => n.map_id === e.map_id && (n.concept_id === e.from_concept_id || n.concept_id === e.to_concept_id)));
+    }
   }
 
   // ── 문장 해석 ──
-  const tableOf = name => (name === 'cmap_topics' ? db.topics : db.concepts);
   function conds(where, params) {
     const tests = where.split(' AND ').map(c => {
       const m = c.trim().match(/^(\w+) = \$(\d+)$/);
@@ -53,17 +92,30 @@ function createCmapDb() {
   }
   const pick = (row, cols) => { const o = {}; for (const c of cols.split(',').map(s => s.trim())) o[c] = row[c] === undefined ? null : row[c]; return o; };
   const clone = r => ({ ...r });
-const jsonCol = (col, v) => (col === 'explanation' && typeof v === 'string' ? JSON.parse(v) : v);   // JSONB: 문자열 파라미터는 객체로 저장
+  const jsonCol = (col, v) => (col === 'explanation' && typeof v === 'string' ? JSON.parse(v) : v);   // JSONB: 문자열 파라미터는 객체로 저장
+  const checkers = { cmap_topics: checkTopic, cmap_concepts: checkConcept, cmap_maps: checkMap, cmap_map_nodes: checkNode, cmap_edges: checkEdge };
+  const newRow = {
+    cmap_topics: () => ({ id: db.seq.t++, created_at: new Date(), updated_at: new Date(), sort_order: 0 }),
+    cmap_concepts: () => ({ id: db.seq.c++, created_at: new Date(), updated_at: new Date(), sort_order: 0, content_source: 'manual', english: null, memo: null, explanation: null, explanation_source: null, explained_at: null }),
+    cmap_maps: () => ({ id: db.seq.m++, created_at: new Date(), updated_at: new Date(), semantic_hash: null, saved_at: null }),
+    cmap_map_nodes: () => ({ x: null, y: null }),
+    cmap_edges: () => ({ id: db.seq.e++, created_at: new Date(), relation_type: null }),
+  };
+  const sortBy = (rows, order) => {
+    const cols = order.split(',').map(s => s.trim());
+    return rows.slice().sort((a, b) => { for (const c of cols) { if (a[c] === b[c]) continue; return a[c] < b[c] ? -1 : 1; } return 0; });
+  };
+  const tableRe = TABLES.join('|');
 
   async function query(sqlRaw, params = []) {
     const sql = String(sqlRaw).replace(/\s+/g, ' ').trim();
     if (!/cmap_|^(BEGIN|COMMIT|ROLLBACK)$/i.test(sql)) return base.pool.query(sqlRaw, params);
     db.queries.push(sql);
     if (db.failOn && db.failOn.test(sql)) throw new Error('cmap_db: 주입된 오류');
-    if (/^BEGIN$/i.test(sql)) { db.snap = JSON.stringify({ t: db.topics, c: db.concepts, seq: db.seq }); return { rows: [], rowCount: 0 }; }
-    if (/^COMMIT$/i.test(sql)) { checkConceptRefs(); checkTopicRefs(); db.snap = null; return { rows: [], rowCount: 0 }; }
+    if (/^BEGIN$/i.test(sql)) { db.snap = JSON.stringify({ t: db.topics, c: db.concepts, m: db.maps, n: db.nodes, e: db.edges, seq: db.seq }); return { rows: [], rowCount: 0 }; }
+    if (/^COMMIT$/i.test(sql)) { checkDeferredRefs(); checkTopicRefs(); db.snap = null; return { rows: [], rowCount: 0 }; }
     if (/^ROLLBACK$/i.test(sql)) {
-      if (db.snap) { const s = JSON.parse(db.snap); db.topics = s.t; db.concepts = s.c; db.seq = s.seq; db.snap = null; }
+      if (db.snap) { const s = JSON.parse(db.snap); db.topics = s.t; db.concepts = s.c; db.maps = s.m; db.nodes = s.n; db.edges = s.e; db.seq = s.seq; db.snap = null; }
       return { rows: [], rowCount: 0 };
     }
     let m;
@@ -72,43 +124,43 @@ const jsonCol = (col, v) => (col === 'explanation' && typeof v === 'string' ? JS
       for (const c of db.concepts) if (c.user_id === params[0]) by.set(c.topic_id, (by.get(c.topic_id) || 0) + 1);
       return { rows: [...by].map(([topic_id, n]) => ({ topic_id, n })), rowCount: by.size };
     }
-    if ((m = sql.match(/^SELECT (.+?) FROM (cmap_topics|cmap_concepts) WHERE (.+?)(?: ORDER BY (.+?))?(?: FOR UPDATE)?$/))) {
-      let rows = tableOf(m[2]).filter(conds(m[3], params));
-      if (m[4]) { if (m[4] !== 'sort_order, id') throw new Error('cmap_db: 지원하지 않는 ORDER BY ' + m[4]); rows = rows.slice().sort((a, b) => a.sort_order - b.sort_order || a.id - b.id); }
+    if ((m = sql.match(new RegExp(`^SELECT (.+?) FROM (${tableRe}) WHERE (.+?)(?: ORDER BY (.+?))?(?: FOR UPDATE)?$`)))) {
+      let rows = list(m[2]).filter(conds(m[3], params));
+      if (m[4]) rows = sortBy(rows, m[4]);
       return { rows: rows.map(r => pick(r, m[1])), rowCount: rows.length };
     }
-    if ((m = sql.match(/^INSERT INTO (cmap_topics|cmap_concepts) \(([^)]*)\) VALUES \(([^)]*)\) RETURNING (.+)$/))) {
-      const cols = m[1] === undefined ? [] : m[2].split(',').map(s => s.trim());
+    if ((m = sql.match(new RegExp(`^INSERT INTO (${tableRe}) \\(([^)]*)\\) VALUES \\(([^)]*)\\) RETURNING (.+)$`)))) {
+      const cols = m[2].split(',').map(s => s.trim());
       const vals = m[3].split(',').map(s => s.trim());
-      const row = m[1] === 'cmap_topics'
-        ? { id: db.seq.t++, created_at: new Date(), updated_at: new Date(), sort_order: 0 }
-        : { id: db.seq.c++, created_at: new Date(), updated_at: new Date(), sort_order: 0, content_source: 'manual', english: null, memo: null, explanation: null, explanation_source: null, explained_at: null };
+      const row = newRow[m[1]]();
       cols.forEach((c, i) => { const mm = vals[i].match(/^\$(\d+)$/); if (!mm) throw new Error('cmap_db: 지원하지 않는 VALUES'); row[c] = jsonCol(c, params[Number(mm[1]) - 1]); });
-      if (m[1] === 'cmap_topics') { checkTopic(row, null); db.topics.push(row); } else { checkConcept(row, null); db.concepts.push(row); }
+      checkers[m[1]](row, null);
+      list(m[1]).push(row);
       return { rows: [pick(row, m[4])], rowCount: 1 };
     }
-    if ((m = sql.match(/^UPDATE (cmap_topics|cmap_concepts) SET (.+?) WHERE (.+?)(?: RETURNING (.+))?$/))) {
+    if ((m = sql.match(new RegExp(`^UPDATE (${tableRe}) SET (.+?) WHERE (.+?)(?: RETURNING (.+))?$`)))) {
       const sets = m[2].split(/,\s*/).map(s => {
-        const mm = s.match(/^(\w+) = (\$(\d+)|now\(\))$/);
+        const mm = s.match(/^(\w+) = (\$(\d+)|now\(\)|NULL)$/);
         if (!mm) throw new Error('cmap_db: 지원하지 않는 SET ' + s);
-        return [mm[1], mm[3] ? jsonCol(mm[1], params[Number(mm[3]) - 1]) : new Date()];
+        return [mm[1], mm[3] ? jsonCol(mm[1], params[Number(mm[3]) - 1]) : mm[2] === 'NULL' ? null : new Date()];
       });
-      const hit = tableOf(m[1]).filter(conds(m[3], params));
+      const hit = list(m[1]).filter(conds(m[3], params));
       for (const row of hit) {
         const next = clone(row);
         for (const [c, v] of sets) next[c] = v;
-        if (m[1] === 'cmap_topics') checkTopic(next, row); else checkConcept(next, row);
+        checkers[m[1]](next, row);
         Object.assign(row, next);
       }
       if (m[1] === 'cmap_topics') checkTopicRefs();
       return { rows: m[4] ? hit.map(r => pick(r, m[4])) : [], rowCount: hit.length };
     }
-    if ((m = sql.match(/^DELETE FROM (cmap_topics|cmap_concepts) WHERE (.+?)$/))) {
+    if ((m = sql.match(new RegExp(`^DELETE FROM (${tableRe}) WHERE (.+?)$`)))) {
       const test = conds(m[2], params);
-      const list = tableOf(m[1]);
-      const removed = list.filter(test);
-      const keep = list.filter(r => !test(r));
-      if (m[1] === 'cmap_topics') { db.topics = keep; checkTopicRefs(); } else db.concepts = keep;   // 주제는 문장 끝 검사(NO ACTION)
+      const rowsOf = list(m[1]);
+      const removed = rowsOf.filter(test);
+      setList(m[1], rowsOf.filter(r => !test(r)));
+      cascadeAfterDelete(m[1], removed);
+      if (m[1] === 'cmap_topics') checkTopicRefs();   // 주제는 문장 끝 검사(NO ACTION)
       return { rows: [], rowCount: removed.length };
     }
     throw new Error('cmap_db: 지원하지 않는 SQL ' + sql.slice(0, 140));
@@ -119,7 +171,7 @@ const jsonCol = (col, v) => (col === 'explanation' && typeof v === 'string' ? JS
   db.pool = { query, connect: async () => db.client };
   // 테스트 편의
   db.topicBy = (userId, title) => db.topics.find(t => t.user_id === userId && t.title === title);
-  db.snapshot = () => JSON.stringify({ t: db.topics, c: db.concepts });
+  db.snapshot = () => JSON.stringify({ t: db.topics, c: db.concepts, m: db.maps, n: db.nodes, e: db.edges });
   return db;
 }
 

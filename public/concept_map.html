@@ -104,12 +104,40 @@
   .c-expl dl { margin: 0 0 8px; }
   .c-expl dt { margin-top: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--color-text-sub); }
   .c-expl dd { margin: 2px 0 0; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  /* 작업273-2: 지도 화면 */
+  .map-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 12px; }
+  .map-pick { margin-top: 4px; padding: 8px 12px; max-height: 40dvh; overflow-y: auto; border: 1px solid var(--color-line); border-radius: var(--card-radius); background: var(--color-surface); }
+  .pick-topic { margin: 8px 0 0; }
+  .pick-row { display: flex; align-items: center; gap: 10px; min-height: var(--ctl-min-h); cursor: pointer; }
+  .pick-row input { width: 22px; height: 22px; flex: none; accent-color: var(--color-accent-ink); }
+  .pick-term { font-weight: 700; overflow-wrap: anywhere; }
+  .pick-en { font-size: 13px; color: var(--color-text-sub); overflow-wrap: anywhere; }
+  #map-hint { min-height: 3.2em; }   /* 안내가 한 줄↔두 줄로 바뀌어도 캔버스가 밀리지 않게 높이를 고정 */
+  .map-canvas { position: relative; margin-top: 8px; height: calc(100dvh - var(--hdr-h, 65px) - 270px); min-height: 320px; border: 1px solid var(--color-line); border-radius: var(--card-radius); background: var(--color-surface); overflow: hidden; }
+  .map-canvas .msg { position: absolute; left: 8px; right: 8px; bottom: 8px; margin: 0; padding: 6px 10px; background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-ctl); }   /* 오류 문구는 캔버스 위에 겹쳐 보여 캔버스를 밀지 않는다 */
+  #map-svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .m-node rect { fill: var(--color-surface); stroke: var(--color-line-strong); stroke-width: 1.5; cursor: grab; }
+  .m-node.sel rect { fill: var(--color-surface-2); stroke: var(--color-accent); stroke-width: 2.5; }
+  .m-node.temp rect { stroke-dasharray: 5 3; }
+  .m-node:focus-visible rect { stroke: var(--color-text); stroke-width: 2.5; }
+  .m-node-text { font-size: 13px; font-weight: 700; fill: var(--color-text); pointer-events: none; }
+  .m-edge-line { fill: none; stroke: var(--color-text-sub); stroke-width: 1.6; pointer-events: none; }
+  .m-edge-hit { fill: none; stroke: transparent; stroke-width: 22; cursor: pointer; }
+  .m-edge-label { font-size: 12px; fill: var(--color-text-sub); paint-order: stroke; stroke: var(--color-surface); stroke-width: 4px; pointer-events: none; }
+  .m-arrow-path { fill: var(--color-text-sub); }
+  .edge-pair { margin-top: 12px; font-size: 16px; font-weight: 800; overflow-wrap: anywhere; }
+  .edge-flip-row { margin-top: 4px; margin-left: -10px; }
 </style>
 </head>
 <body>
 
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
+<script src="/js/map/mapCore.js?v=1"></script>
+<script src="/js/cmap/mapGeometry.js?v=1"></script>
+<script src="/js/cmap/pairPicker.js?v=1"></script>
+<script src="/js/cmap/mapView.js?v=1"></script>
 
 <div id="loading" role="status"><p>불러오는 중…</p></div>
 
@@ -121,6 +149,7 @@
 </div>
 
 <div id="app" hidden>
+ <div id="main-view">
   <div class="screen-bar">
     <button id="back-btn" class="screen-bar-back" type="button" aria-label="홈으로"><svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
     <h1 class="screen-bar-title">개념 지도</h1>
@@ -138,6 +167,7 @@
         <button id="act-add-child" class="btn text" type="button">하위 주제 추가</button>
         <button id="act-rename" class="btn text" type="button">이름 변경</button>
         <button id="act-move" class="btn text" type="button">이동</button>
+        <button id="act-map" class="btn text" type="button">지도 보기</button>
         <button id="act-delete" class="btn text" type="button">삭제</button>
       </div>
     </section>
@@ -159,6 +189,25 @@
       <p id="concepts-empty" class="hint" hidden>이 주제에는 아직 개념이 없습니다.</p>
     </section>
   </div>
+ </div>
+
+ <!-- 작업273-2: 지도 화면(최상위 주제 하나의 지도) -->
+ <div id="map-view" hidden>
+  <div class="screen-bar">
+    <button id="map-back" class="screen-bar-back" type="button" aria-label="주제 화면으로"><svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <h1 id="map-title" class="screen-bar-title"></h1>
+  </div>
+  <div class="wrap">
+    <div class="map-tools">
+      <button id="map-pick-toggle" class="btn text" type="button" aria-expanded="false" aria-controls="map-pick-panel">개념 선택</button>
+      <button id="map-fit" class="btn text" type="button">전체 보기</button>
+      <span id="map-count" class="hint"></span>
+    </div>
+    <div id="map-pick-panel" class="map-pick" hidden><div id="map-pick-list"></div></div>
+    <p id="map-hint" class="hint"></p>
+    <div class="map-canvas"><svg id="map-svg" role="group" aria-label="개념 지도"></svg><p id="map-msg" class="msg" role="alert"></p></div>
+  </div>
+ </div>
 </div>
 
 <dialog id="name-dlg" aria-labelledby="name-heading">
@@ -186,6 +235,20 @@
     <p id="confirm-text" class="body-text"></p>
     <p id="confirm-msg" class="msg" role="alert"></p>
     <div class="btn-row"><button id="confirm-cancel" class="btn text" type="button">취소</button><button id="confirm-ok" class="btn danger" type="submit">삭제</button></div>
+  </form>
+</dialog>
+
+<dialog id="edge-dlg" aria-labelledby="edge-heading">
+  <form id="edge-form" novalidate>
+    <h3 id="edge-heading"></h3>
+    <p id="edge-pair" class="edge-pair" data-t="edge-pair"></p>
+    <div class="edge-flip-row"><button id="edge-flip" class="btn text" type="button">방향 바꾸기</button></div>
+    <div class="field"><label for="edge-label">관계 문구 (필수, 40자 이내)</label><input id="edge-label" type="text" maxlength="40" autocomplete="off" placeholder="예: 때문에"></div>
+    <div class="field"><label for="edge-type">관계 종류 (선택)</label>
+      <select id="edge-type"><option value="">선택 안 함</option><option value="사용">사용(의존)</option><option value="일부">일부</option><option value="종류">종류</option><option value="일으킴">일으킴</option><option value="구별">구별(방향 없음)</option></select></div>
+    <p id="edge-type-hint" class="hint"></p>
+    <p id="edge-msg" class="msg" role="alert"></p>
+    <div class="btn-row"><button id="edge-delete" class="btn text" type="button" hidden>연결 삭제</button><button id="edge-cancel" class="btn text" type="button">취소</button><button id="edge-ok" class="btn" type="submit">저장</button></div>
   </form>
 </dialog>
 
@@ -472,7 +535,7 @@ $('act-delete').addEventListener('click', async () => {
     const c = probe.body.counts || { topics: 0, concepts: 0 };
     openConfirm({
       heading: '최상위 주제 삭제',
-      text: '‘' + t.title + '’ 주제를 삭제하면 아래 항목이 모두 함께 삭제됩니다.\n하위 주제 ' + c.topics + '개, 개념 ' + c.concepts + '개\n삭제한 뒤에는 되돌릴 수 없습니다.',
+      text: '‘' + t.title + '’ 주제를 삭제하면 아래 항목이 모두 함께 삭제됩니다.\n하위 주제 ' + c.topics + '개, 개념 ' + c.concepts + '개, 지도 ' + (c.maps || 0) + '개\n삭제한 뒤에는 되돌릴 수 없습니다.',
       okText: '모두 삭제',
       action: async () => {
         const r = await api('DELETE', '/api/cmap/topics/' + t.id + '?confirm=1');
@@ -669,7 +732,7 @@ $('explain-form').addEventListener('submit', ev => {
 function deleteConcept(c) {
   openConfirm({
     heading: '개념 삭제',
-    text: '‘' + c.term + '’ 개념을 삭제합니다.',
+    text: '‘' + c.term + '’ 개념을 삭제합니다.\n지도에서 쓰고 있는 개념이면 지도의 노드와 연결도 함께 사라져요.',
     action: async () => {
       const r = await api('DELETE', '/api/cmap/concepts/' + c.id);
       if (!okStatus(r) && r.status !== 404) return { failed: errText(r) };
@@ -678,6 +741,16 @@ function deleteConcept(c) {
     },
   });
 }
+
+// ── 작업273-2: 지도 보기 ──
+$('act-map').addEventListener('click', () => {
+  let root = byId(S.selectedId);
+  if (!root) return;
+  while (root.parent_id !== null && root.parent_id !== undefined) root = byId(root.parent_id);
+  window.CmapMap.open(root.id);
+});
+$('map-back').addEventListener('click', () => { window.CmapMap.close(); refresh(); });
+$('map-pick-toggle').addEventListener('click', () => window.CmapMap.togglePanel());
 
 // ── 시작 ──
 function applyHeaderHeight() {
