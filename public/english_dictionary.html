@@ -2020,9 +2020,16 @@ function clearSearchInput() {
   input.focus();
 }
 
+// 작업272-4: 검색 요청 번호. doSearch 가 시작될 때마다 올라가고, 비동기 검색 함수(영·한·일·중)와 2차 재시도는 시작할 때의 번호를 기억했다가
+// 화면에 쓰기 직전에 지금 번호와 같은지(= 가장 최근 요청인지) 확인한다. 낡은 요청은 화면·버튼·재시도 상태를 건드리지 않는다.
+// 낡은 요청의 단어장 자동 저장은 기존대로 한다(화면에만 반영하지 않음). 같은 단어가 동시에 두 번 저장되지 않게 저장 중인 영어 단어를 기억한다.
+let _searchSeq = 0;
+const _savingEnglish = new Set();
+
 async function doSearch() {
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
+  const seq = ++_searchSeq;   // 작업272-4
 
   // 작업13: 검색 실행 시 입력 블록을 헤더 바로 아래로 애니메이션 이동
   document.querySelector('.search-page-wrap').classList.add('searched');
@@ -2052,6 +2059,7 @@ async function doSearch() {
     return w.word === query && w.lang === lang;
   });
   if (cached) {
+    btn.disabled = false;   // 작업272-4: 앞선 요청이 아직 돌고 있어도(낡은 요청은 버튼을 건드리지 않으므로) 버튼이 잠긴 채 남지 않게 한다
     if (lang === 'en') renderResultEN(cached, true);
     else if (lang === 'ko') renderResultKO(cached, true);
     else if (lang === 'ja') renderResultJA(cached, true);
@@ -2073,6 +2081,7 @@ async function doSearch() {
       await searchChinese(query, resultDiv, source);
     }
   } catch (err) {
+    if (seq !== _searchSeq) return;   // 작업272-4: 낡은 요청의 시간 초과·오류 카드는 최근 결과를 덮어쓰지 않는다
     if (err && err.isTimeout) {
       // 작업267-2: 재시도는 사용자가 누를 때만(자동 재시도 없음 - AI 비용 보호)
       resultDiv.innerHTML = `<div class="result-card search-timeout">응답이 늦어지고 있습니다. 잠시 후 다시 시도해주세요.<div class="extra-trans-btns"><button type="button" class="extra-trans-btn" id="search-retry-btn" onclick="retryLastSearch()">다시 시도</button></div></div>`;
@@ -2081,7 +2090,7 @@ async function doSearch() {
     }
   }
 
-  btn.disabled = false;
+  if (seq === _searchSeq) btn.disabled = false;   // 작업272-4: 최근 요청만 버튼을 되돌린다
 }
 
 // 작업267-2: 마지막 검색(언어·출처 포함)을 같은 조건으로 다시 실행. OCR 순차 탐색 큐는 건드리지 않는다.
@@ -2099,6 +2108,7 @@ let _pendingDetail = null;
 async function retryDetail() {
   const p = _pendingDetail;
   if (!p) return;
+  const mySeq = _searchSeq;   // 작업272-4: 재시도 도중 새 검색이 시작되면 이 재시도의 결과는 화면에 쓰지 않는다
   renderResultEN(p.result, false, { loadingDetail: true });
   let timedOut = false;
   try {
@@ -2108,7 +2118,7 @@ async function retryDetail() {
     if (e && e.isTimeout) timedOut = true;
     else console.error('[dict-2stage] 2차 재시도 실패 - 1차 결과만 유지:', e);
   }
-  if (_pendingDetail !== p) return;
+  if (_pendingDetail !== p || mySeq !== _searchSeq) return;
   if (timedOut) { renderResultEN(p.result, false, { detailFailed: true }); return; }
   _pendingDetail = null;
   // 작업267-3: 1차 결과가 이미 저장돼 있으면(entryId) POST 없이 같은 단어장 항목만 2차 포함 데이터로 갱신(서버·DB에는 1차만 남음).
@@ -2119,7 +2129,7 @@ async function retryDetail() {
     renderResultEN(p.result, true);
     return;
   }
-  await finishEnglishSearch(p.result, p.source);
+  await finishEnglishSearch(p.result, p.source, mySeq);
 }
 
 // ─── ENGLISH SEARCH ───────────────────────────────────────────────────────────
@@ -2208,11 +2218,13 @@ YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
 }
 
 async function searchEnglish(query, resultDiv, source = 'manual') {
+  const mySeq = _searchSeq;                  // 작업272-4: doSearch 가 방금 올린 번호(이 함수는 첫 await 전까지 동기로 실행됨)
+  const stale = () => mySeq !== _searchSeq;
   const t0 = performance.now();
   const quickText = await callAI(buildDictQuickPrompt(query));
   const result = safeParseJSON(quickText);
   result.lang = 'en';
-  currentResult = result;
+  if (!stale()) currentResult = result;
   console.log(`[dict-2stage] 1차(사전적 의미) 응답: ${Math.round(performance.now() - t0)}ms`);
 
   // 1차만으로도 화면에 바로 보여줄 수 있는 최소 필드(short_meaning)는 지금
@@ -2221,7 +2233,7 @@ async function searchEnglish(query, resultDiv, source = 'manual') {
   result.nuance = '';
 
   // 활용/예문/유의어/Collocation은 아직 없음 - 스켈레톤과 함께 1차 결과부터 즉시 렌더링
-  renderResultEN(result, false, { loadingDetail: true });
+  if (!stale()) renderResultEN(result, false, { loadingDetail: true });
 
   try {
     const detailText = await callAI(buildDictDetailPrompt(result));
@@ -2232,15 +2244,15 @@ async function searchEnglish(query, resultDiv, source = 'manual') {
       // 작업267-2/3: 1차 결과는 유지하고 2차 영역에만 안내+재시도. 저장은 2차 일반 오류와 똑같이 1차 결과를 지금 저장하고,
       // 저장된 항목 id를 보관해 재시도 성공 시에는 서버에 다시 저장하지 않고 같은 항목(메모리)만 갱신한다.
       const p = { result, source, entryId: null };
-      _pendingDetail = p;
+      if (!stale()) _pendingDetail = p;       // 작업272-4: 낡은 요청은 재시도 대기 상태를 만들지 않는다(1차 저장은 그대로 한다)
       const { alreadySaved, id } = await saveEnglishResult(result, source);
       p.entryId = id;
-      if (_pendingDetail === p) renderResultEN(result, alreadySaved, { detailFailed: true });   // 그 사이 새 검색이 시작됐으면 그리지 않음
+      if (!stale() && _pendingDetail === p) renderResultEN(result, alreadySaved, { detailFailed: true });   // 그 사이 새 검색이 시작됐으면 그리지 않음
       return;
     }
     console.error('[dict-2stage] 2차 호출 실패 - 1차 결과만 유지:', e);
   }
-  await finishEnglishSearch(result, source);
+  await finishEnglishSearch(result, source, mySeq);
 }
 
 function applyEnglishDetail(result, detail) {
@@ -2255,21 +2267,29 @@ function applyEnglishDetail(result, detail) {
 // 작업267-3: 저장 단계(일반 오류 경로·시간 초과 경로·정상 경로 공통). 이미 단어장에 있으면 저장 생략.
 // 반환: { alreadySaved, id } — id는 이번에 저장된 항목의 id(저장 실패·생략이면 null)
 async function saveEnglishResult(result, source) {
-  const alreadySaved = wordbook.some(w => w.word.toLowerCase() === result.word.toLowerCase() && w.lang === 'en');
+  const key = String(result.word).toLowerCase();
+  // 작업272-4: 같은 단어를 서로 다른 요청이 동시에 끝내도(예: 다음→이전을 빠르게 눌러 같은 단어를 두 번 검색) 저장은 한 번만 한다
+  const alreadySaved = wordbook.some(w => w.word.toLowerCase() === key && w.lang === 'en') || _savingEnglish.has(key);
   let id = null;
   if (!alreadySaved) {
-    const saved = await saveWordToDB(result, source);
-    if (saved) { wordbook.push({ ...result, id: saved.id, savedAt: Date.now(), source }); id = saved.id; }
+    _savingEnglish.add(key);
+    try {
+      const saved = await saveWordToDB(result, source);
+      if (saved) { wordbook.push({ ...result, id: saved.id, savedAt: Date.now(), source }); id = saved.id; }
+    } finally {
+      _savingEnglish.delete(key);
+    }
     updateBadges();
   }
   return { alreadySaved, id };
 }
 
-async function finishEnglishSearch(result, source) {
+async function finishEnglishSearch(result, source, seq) {
   // 사용자가 1차만 보고 페이지를 떠날 수도 있으니, 2차까지 끝난 완전한
   // 형태가 됐을 때 저장한다(완성 전 저장 시 단어장/퀴즈에 반쪽짜리
   // usage_note/example 없는 데이터가 남는 것을 방지).
   const { alreadySaved } = await saveEnglishResult(result, source);
+  if (seq !== undefined && seq !== _searchSeq) return;   // 작업272-4: 낡은 요청은 저장만 하고 화면에는 쓰지 않는다
   renderResultEN(result, alreadySaved);
 }
 
@@ -2425,6 +2445,7 @@ function renderResultEN(result, alreadySaved, opts = {}) {
 
 // ─── KOREAN SEARCH ────────────────────────────────────────────────────────────
 async function searchKorean(query, resultDiv, source = 'manual') {
+  const mySeq = _searchSeq;   // 작업272-4: 낡은 요청은 저장만 하고 화면에는 쓰지 않는다
   const prompt = `You are a Korean-English dictionary assistant.
 For the Korean word or phrase: "${query}"
 
@@ -2455,7 +2476,7 @@ Return up to 5 derivatives and 2-4 English entries representing different nuance
   const text = await callAI(prompt);
   const result = safeParseJSON(text);
   result.lang = 'ko';
-  currentResult = result;
+  if (mySeq === _searchSeq) currentResult = result;
 
   const alreadySaved = wordbook.some(w => w.word === result.word && w.lang === 'ko');
   if (!alreadySaved) {
@@ -2464,7 +2485,7 @@ Return up to 5 derivatives and 2-4 English entries representing different nuance
     if (saved) wordbook.push({ ...entry, id: saved.id, savedAt: Date.now(), source });
     updateBadges();
   }
-  renderResultKO(result, alreadySaved);
+  if (mySeq === _searchSeq) renderResultKO(result, alreadySaved);
 }
 
 function renderResultKO(result, alreadySaved) {
@@ -2557,6 +2578,7 @@ function searchWord(word, lang, source = 'manual') {
 
 // ─── JAPANESE SEARCH ──────────────────────────────────────────────────────────
 async function searchJapanese(query, resultDiv, source = 'manual') {
+  const mySeq = _searchSeq;   // 작업272-4: 낡은 요청은 저장만 하고 화면에는 쓰지 않는다
   const prompt = `You are a Japanese-Korean dictionary assistant.
 For the Japanese word or phrase: "${query}"
 
@@ -2597,7 +2619,7 @@ Return up to 5 derivatives and 2-3 entries. YOUR ENTIRE RESPONSE MUST BE A SINGL
     if (saved) wordbook.push({ ...entry, id: saved.id, savedAt: Date.now(), source });
     updateBadges();
   }
-  renderResultJA(result, alreadySaved);
+  if (mySeq === _searchSeq) renderResultJA(result, alreadySaved);
 }
 
 function renderResultJA(result, alreadySaved) {
@@ -2660,6 +2682,7 @@ function renderResultJA(result, alreadySaved) {
 
 // ─── CHINESE SEARCH ───────────────────────────────────────────────────────────
 async function searchChinese(query, resultDiv, source = 'manual') {
+  const mySeq = _searchSeq;   // 작업272-4: 낡은 요청은 저장만 하고 화면에는 쓰지 않는다
   const prompt = `You are a Chinese-Korean dictionary assistant.
 For the Chinese word or phrase (Simplified): "${query}"
 
@@ -2700,7 +2723,7 @@ Return up to 5 derivatives and 2-3 entries. YOUR ENTIRE RESPONSE MUST BE A SINGL
     if (saved) wordbook.push({ ...entry, id: saved.id, savedAt: Date.now(), source });
     updateBadges();
   }
-  renderResultZH(result, alreadySaved);
+  if (mySeq === _searchSeq) renderResultZH(result, alreadySaved);
 }
 
 function renderResultZH(result, alreadySaved) {
