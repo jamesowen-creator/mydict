@@ -2082,6 +2082,14 @@ async function retryDetail() {
   if (_pendingDetail !== p) return;
   if (timedOut) { renderResultEN(p.result, false, { detailFailed: true }); return; }
   _pendingDetail = null;
+  // 작업267-3: 1차 결과가 이미 저장돼 있으면(entryId) POST 없이 같은 단어장 항목만 2차 포함 데이터로 갱신(서버·DB에는 1차만 남음).
+  // 항목이 사라졌거나(삭제) 1차 저장이 실패했으면(entryId 없음) 지금처럼 새로 저장한다.
+  const entry = p.entryId != null ? wordbook.find(w => w.id === p.entryId) : null;
+  if (entry) {
+    Object.assign(entry, p.result, { id: entry.id, savedAt: entry.savedAt, source: entry.source });
+    renderResultEN(p.result, true);
+    return;
+  }
   await finishEnglishSearch(p.result, p.source);
 }
 
@@ -2192,10 +2200,13 @@ async function searchEnglish(query, resultDiv, source = 'manual') {
     console.log(`[dict-2stage] 2차(나머지 상세) 응답: ${Math.round(performance.now() - t0)}ms (전체 경과)`);
   } catch (e) {
     if (e && e.isTimeout) {
-      // 작업267-2: 1차 결과는 유지하고 2차 영역에만 안내+재시도. 반쪽 데이터가 단어장에 저장되지 않도록
-      // 저장은 재시도가 성공한 뒤로 미룬다(중복 저장 방지).
-      _pendingDetail = { result, source };
-      renderResultEN(result, false, { detailFailed: true });
+      // 작업267-2/3: 1차 결과는 유지하고 2차 영역에만 안내+재시도. 저장은 2차 일반 오류와 똑같이 1차 결과를 지금 저장하고,
+      // 저장된 항목 id를 보관해 재시도 성공 시에는 서버에 다시 저장하지 않고 같은 항목(메모리)만 갱신한다.
+      const p = { result, source, entryId: null };
+      _pendingDetail = p;
+      const { alreadySaved, id } = await saveEnglishResult(result, source);
+      p.entryId = id;
+      if (_pendingDetail === p) renderResultEN(result, alreadySaved, { detailFailed: true });   // 그 사이 새 검색이 시작됐으면 그리지 않음
       return;
     }
     console.error('[dict-2stage] 2차 호출 실패 - 1차 결과만 유지:', e);
@@ -2212,16 +2223,24 @@ function applyEnglishDetail(result, detail) {
   result.nuance = result.meanings?.map(m => m.usage_note).filter(Boolean).join(' ') || '';
 }
 
+// 작업267-3: 저장 단계(일반 오류 경로·시간 초과 경로·정상 경로 공통). 이미 단어장에 있으면 저장 생략.
+// 반환: { alreadySaved, id } — id는 이번에 저장된 항목의 id(저장 실패·생략이면 null)
+async function saveEnglishResult(result, source) {
+  const alreadySaved = wordbook.some(w => w.word.toLowerCase() === result.word.toLowerCase() && w.lang === 'en');
+  let id = null;
+  if (!alreadySaved) {
+    const saved = await saveWordToDB(result, source);
+    if (saved) { wordbook.push({ ...result, id: saved.id, savedAt: Date.now(), source }); id = saved.id; }
+    updateBadges();
+  }
+  return { alreadySaved, id };
+}
+
 async function finishEnglishSearch(result, source) {
   // 사용자가 1차만 보고 페이지를 떠날 수도 있으니, 2차까지 끝난 완전한
   // 형태가 됐을 때 저장한다(완성 전 저장 시 단어장/퀴즈에 반쪽짜리
   // usage_note/example 없는 데이터가 남는 것을 방지).
-  const alreadySaved = wordbook.some(w => w.word.toLowerCase() === result.word.toLowerCase() && w.lang === 'en');
-  if (!alreadySaved) {
-    const saved = await saveWordToDB(result, source);
-    if (saved) wordbook.push({ ...result, id: saved.id, savedAt: Date.now(), source });
-    updateBadges();
-  }
+  const { alreadySaved } = await saveEnglishResult(result, source);
   renderResultEN(result, alreadySaved);
 }
 

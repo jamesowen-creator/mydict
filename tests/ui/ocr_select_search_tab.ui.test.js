@@ -22,7 +22,7 @@ const SETUP = `(() => {
   let t = 0; setInterval(() => { t++; cx.fillStyle = t % 2 ? '#fff' : '#fefefe'; cx.fillRect(0, 0, 1080, 1920); }, 100);
   navigator.mediaDevices.getUserMedia = async () => cam.captureStream(30);
   window.__cfg = { words: ['journey', 'harvest'], ai: 'ok', step2: 'same', aiDelay: 0 };
-  window.__log = { ai: 0, posts: 0 };
+  window.__log = { ai: 0, posts: 0, attempts: 0, bodies: [] };
   window.Tesseract = { createWorker: async () => ({
     recognize: () => new Promise(res => { const c = window.__cfg; setTimeout(() => res({ data: { text: c.words.join(' '), words: c.words.map((x, i) => ({ text: x, confidence: 92, bbox: { x0: 10, y0: 10 + i * 40, x1: 200, y1: 40 + i * 40 } })) } }), 30 + Math.random() * 70); }),
     terminate: async () => {}
@@ -49,7 +49,11 @@ const SETUP = `(() => {
       });
     }
     if (url.startsWith('/api/wordbook')) {
-      if (o && o.method === 'POST') { window.__log.posts++; return Promise.resolve(new Response(JSON.stringify({ id: window.__log.posts }), { status: 200 })); }
+      if (o && o.method === 'POST') {
+        window.__log.attempts++; window.__log.bodies.push(JSON.parse(o.body));
+        if (window.__cfg.postFail) return Promise.resolve(new Response('{}', { status: 500 }));
+        window.__log.posts++; return Promise.resolve(new Response(JSON.stringify({ id: window.__log.posts }), { status: 200 }));
+      }
       return Promise.resolve(new Response('[]', { status: 200 }));
     }
     return rf(u, o);
@@ -155,21 +159,65 @@ test('AI 무응답: 시간 초과 → 스피너 없음·버튼 활성·다시 �
   await page.close();
 });
 
-test('2차 호출 시간 초과: 1차 결과 유지·2차 영역에만 안내, 저장은 재시도 성공 뒤 1번', { skip: SKIP, timeout: 60000 }, async () => {
+const wbCount = (page, w) => page.eval(`wordbook.filter(x => x.word === '${w}' && x.lang === 'en').length`);
+
+// 작업267-3 (의도된 변경, 약화 아님): 이전 단언은 "시간 초과 → 저장 0회 → 재시도 성공 뒤 1회"였고,
+// 2차 일반 오류와 동작을 통일하기로 해서 "시간 초과 → 1차 저장 1회 → 재시도 성공 뒤에도 저장 호출 1회(재저장 없음), 단어장 같은 항목 갱신"으로 바꿨다.
+test('2차 호출 시간 초과: 1차 결과 유지·2차 영역에만 안내, 1차 저장 1회 → 재시도 성공 시 재저장 없이 같은 항목 갱신', { skip: SKIP, timeout: 60000 }, async () => {
   const page = await openDict();
   await page.eval(`window.__AI_TIMEOUT_MS = 600; window.__cfg.step2 = 'hang'; document.getElementById('search-input').value = 'journey'; doSearch(); 0`);
   await page.waitFor(`!!document.getElementById('detail-retry-btn')`, 4000, '2차 재시도 버튼');
   let s = await state(page);
   assert.equal(s.resultWord, 'journey', '1차 결과 유지'); assert.equal(s.skel, false, '스켈레톤 없음'); assert.equal(s.btnDisabled, false);
-  assert.equal(await page.eval('window.__log.posts'), 0, '반쪽 결과는 저장하지 않음');
+  assert.equal(await page.eval('window.__log.posts'), 1, '1차 결과를 저장(일반 오류 경로와 같음)');
+  assert.equal(await wbCount(page, 'journey'), 1);
+  assert.equal(await page.eval(`wordbook[0].similar === undefined && !wordbook[0].meanings[0].example`), true, '저장된 것은 1차 데이터');
   assert.equal(await page.eval(`document.querySelector('#search-result').innerText.includes('추가 정보를 불러오지 못했습니다')`), true);
+  const id = await page.eval(`wordbook[0].id`);
   await sleep(1200);
   assert.equal(await page.eval('window.__log.ai'), 2, '자동 재시도 없음');
   await page.eval(`window.__cfg.step2 = 'same'; window.__cfg.ai = 'ok'`);
   await page.click('#detail-retry-btn');
-  await page.waitFor(`!document.getElementById('detail-retry-btn') && !document.querySelector('#search-result .skel-block') && window.__log.posts === 1`, 4000, '재시도 성공·저장 1회');
+  await page.waitFor(`!document.getElementById('detail-retry-btn') && !document.querySelector('#search-result .skel-block') && document.querySelector('#search-result').innerText.includes('e')`, 4000, '재시도 성공');
   await sleep(400);
-  assert.equal(await page.eval('window.__log.posts'), 1, '중복 저장 없음');
+  assert.equal(await page.eval('window.__log.attempts'), 1, '재시도 성공 뒤에도 저장 호출은 1회(재저장 없음)');
+  assert.equal(await wbCount(page, 'journey'), 1, '단어장에 같은 단어 1개');
+  assert.equal(await page.eval(`wordbook[0].id`), id, '같은 항목(id 유지)');
+  assert.equal(await page.eval(`Array.isArray(wordbook[0].similar) && wordbook[0].meanings[0].example === 'e' && wordbook[0].source === 'manual'`), true, '2차 포함 데이터로 갱신');
+  assert.equal(await page.eval(`!!document.querySelector('#search-result .usage-example')`), true, '화면은 2차 포함 최종 렌더');
+  assert.deepEqual(page.errors, []);
+  await page.close();
+});
+
+test('2차 시간 초과와 2차 일반 오류는 저장 호출 횟수·데이터 형태가 같음', { skip: SKIP, timeout: 60000 }, async () => {
+  const run = async mode => {
+    const page = await openDict();
+    await page.eval(`window.__AI_TIMEOUT_MS = 600; window.__cfg.step2 = '${mode}'; document.getElementById('search-input').value = 'journey'; doSearch(); 0`);
+    await page.waitFor(`window.__log.posts === 1 && !document.querySelector('#search-result .skel-block')`, 5000, mode);
+    await sleep(300);
+    const out = await page.eval(`({ attempts: window.__log.attempts, body: window.__log.bodies[0], wb: wordbook.map(w => ({ ...w, savedAt: 0 })) })`);
+    await page.close();
+    return out;
+  };
+  const timeout = await run('hang'), general = await run('err502');
+  assert.equal(timeout.attempts, 1); assert.equal(general.attempts, 1);
+  assert.deepEqual(timeout.body, general.body, '저장 요청 본문(단어·언어·데이터·출처) 동일');
+  assert.deepEqual(timeout.wb, general.wb, '단어장 메모리 항목 동일');
+});
+
+test('1차 저장이 실패한 뒤 재시도 성공 → 새로 저장 정확히 1회, 중복 없음', { skip: SKIP, timeout: 60000 }, async () => {
+  const page = await openDict();
+  await page.eval(`window.__AI_TIMEOUT_MS = 600; window.__cfg.step2 = 'hang'; window.__cfg.postFail = true; document.getElementById('search-input').value = 'journey'; doSearch(); 0`);
+  await page.waitFor(`!!document.getElementById('detail-retry-btn')`, 4000);
+  assert.equal(await page.eval('window.__log.attempts'), 1, '1차 저장 시도'); assert.equal(await page.eval('window.__log.posts'), 0);
+  assert.equal(await wbCount(page, 'journey'), 0, '저장 실패 → 단어장에 없음');
+  await page.eval(`window.__cfg.step2 = 'same'; window.__cfg.postFail = false`);
+  await page.click('#detail-retry-btn');
+  await page.waitFor(`window.__log.posts === 1 && !document.getElementById('detail-retry-btn')`, 4000, '재시도 후 새로 저장');
+  await sleep(400);
+  assert.equal(await page.eval('window.__log.attempts'), 2); assert.equal(await page.eval('window.__log.posts'), 1);
+  assert.equal(await wbCount(page, 'journey'), 1, '중복 없음');
+  assert.equal(await page.eval(`Array.isArray(wordbook[0].similar)`), true, '2차 포함 데이터로 저장');
   assert.deepEqual(page.errors, []);
   await page.close();
 });
