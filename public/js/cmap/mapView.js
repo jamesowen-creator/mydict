@@ -18,6 +18,7 @@
   const M = {
     rootId: null, map: null, nodes: new Map(), edges: [], concepts: new Map(), topics: [], types: [],
     temp: new Map(), view: { tx: 0, ty: 0, scale: 1 }, ptrs: new Map(), gest: null, pinch: null, selected: null, picker: null, svg: null, busy: false,
+    status: null, preview: null, undo: null,   // 작업273-3: 저장 상태 { current_hash, save_status }, 최적화 미리보기 { pos, metrics }, 되돌리기 { pos }
   };
   let ED = null;   // 연결 대화상자 상태 { mode, edge, from, to, flips }
 
@@ -27,6 +28,7 @@
   // ── 위치 ──
   const isPlaced = n => n && n.x !== null && n.x !== undefined && n.y !== null && n.y !== undefined;
   function posOf(id) {
+    if (M.preview && M.preview.pos.has(id)) return M.preview.pos.get(id);
     const n = M.nodes.get(id);
     if (isPlaced(n)) return { x: n.x, y: n.y };
     return M.temp.get(id) || { x: 0, y: 0 };
@@ -56,7 +58,7 @@
     }
     for (const id of M.nodes.keys()) {
       const p = posOf(id), n = M.nodes.get(id);
-      nodeLayer.append(sv('g', { class: 'm-node' + (M.selected === id ? ' sel' : '') + (isPlaced(n) ? '' : ' temp'), 'data-node': id, 'data-t': 'node', transform: `translate(${p.x},${p.y})`, role: 'button', tabindex: 0, 'aria-label': termOf(id) + (M.selected === id ? ' (선택됨)' : '') },
+      nodeLayer.append(sv('g', { class: 'm-node' + (M.selected === id ? ' sel' : '') + (isPlaced(n) ? '' : ' temp') + (M.preview ? ' preview' : ''), 'data-node': id, 'data-t': 'node', transform: `translate(${p.x},${p.y})`, role: 'button', tabindex: 0, 'aria-label': termOf(id) + (M.selected === id ? ' (선택됨)' : '') },
         sv('rect', { width: G.NODE_W, height: G.NODE_H, rx: 10 }),
         sv('text', { x: G.NODE_W / 2, y: G.NODE_H / 2 + 5, 'text-anchor': 'middle', class: 'm-node-text' }, clipText(termOf(id), 9))));
     }
@@ -83,6 +85,7 @@
   }
   function renderHint() {
     const el = $('map-hint');
+    if (M.preview) { el.textContent = '미리보기예요. 마음에 들면 [적용], 아니면 [취소]를 눌러 주세요. 노드와 연결은 그대로이고 자리만 바뀌어요.'; return; }
     if (!M.nodes.size) { el.textContent = '아래 [개념 선택]에서 지도에 쓸 개념을 골라 보세요.'; return; }
     el.textContent = M.selected !== null
       ? '‘' + termOf(M.selected) + '’을(를) 골랐어요. 이어 줄 개념을 눌러 주세요. 같은 개념을 다시 누르면 취소돼요.'
@@ -101,6 +104,7 @@
     M.nodes = new Map(b.nodes.map(n => [n.concept_id, { x: n.x, y: n.y }]));
     M.edges = b.edges;
     M.selected = null; M.gest = null; M.pinch = null; M.ptrs.clear();
+    M.status = { current_hash: b.current_hash, save_status: b.save_status }; M.preview = null; M.undo = null;
     if (!M.picker) {
       M.picker = PP.create({
         onFirst: id => { M.selected = id; render(); },
@@ -120,8 +124,10 @@
     fit();
     render();
     renderPickPanel();
+    renderSave(); renderOptUi();
   }
   function close() {
+    M.preview = null; M.undo = null;       // 화면을 떠나면 되돌리기는 사라진다
     if (M.picker) M.picker.reset();
     M.gest = null; M.pinch = null; M.ptrs.clear();
     $('map-view').hidden = true;
@@ -163,12 +169,13 @@
       const r = await api('POST', '/api/cmap/maps/' + M.map.id + '/nodes', { concept_id: cid });
       if (!okStatus(r)) { mapMsg(errText(r)); return; }
       M.nodes.set(cid, { x: r.body.node.x, y: r.body.node.y });
+      setStatus(r.body.status, true);
       recomputeTemp(); ensureVisible(cid); render(); renderPickPanel();
       return;
     }
     // 빼기: 연결이 있으면 서버가 409 + 개수를 알려 주고, 확인창 뒤에 confirm=1 로 지운다
     const probe = await api('DELETE', '/api/cmap/maps/' + M.map.id + '/nodes/' + cid);
-    if (okStatus(probe)) { applyRemoval(cid); return; }
+    if (okStatus(probe)) { setStatus(probe.body.status, true); applyRemoval(cid); return; }
     if (probe.status === 409 && probe.body && probe.body.needs_confirm) {
       const n = (probe.body.counts && probe.body.counts.edges) || 0;
       openConfirm({
@@ -178,6 +185,7 @@
         action: async () => {
           const r = await api('DELETE', '/api/cmap/maps/' + M.map.id + '/nodes/' + cid + '?confirm=1');
           if (!okStatus(r)) return { failed: errText(r) };
+          setStatus(r.body.status, true);
           applyRemoval(cid);
           return {};
         },
@@ -229,6 +237,7 @@
         action: async () => {
           const r = await api('DELETE', '/api/cmap/edges/' + e.id);
           if (!okStatus(r) && r.status !== 404) return { failed: errText(r) };
+          if (okStatus(r)) setStatus(r.body.status, true);
           M.edges = M.edges.filter(x => x.id !== e.id);
           render();
           return {};
@@ -246,10 +255,84 @@
       else { const body = { label, relation_type: type }; if (ED.flips % 2 === 1) body.reverse = true; r = await api('PATCH', '/api/cmap/edges/' + ED.edge.id, body); }
       setBusy($('edge-ok'), false);
       if (!okStatus(r)) { $('edge-msg').textContent = errText(r); return; }
+      setStatus(r.body.status, true);
       if (ED.mode === 'create') M.edges.push(r.body.edge); else M.edges = M.edges.map(x => (x.id === r.body.edge.id ? r.body.edge : x));
       closeDlg($('edge-dlg'));
       render();
     });
+  }
+
+  // ── 저장 상태 · 배치 최적화(작업273-3) ──
+  // 저장 상태는 서버가 계산한 값(save_status)만 표시한다. 클라이언트는 해시를 계산하지 않는다.
+  function setStatus(st, semantic) {
+    if (st) M.status = { current_hash: st.current_hash, save_status: st.save_status };
+    if (semantic) { M.undo = null; renderOptUi(); }     // 노드·연결이 바뀌면 이전 배치로 되돌릴 수 없다
+    renderSave();
+  }
+  const fmtTime = iso => { const d = new Date(iso); return isNaN(d) ? '' : (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  function renderSave() {
+    const el = $('map-save-state'), st = M.status ? M.status.save_status : 'unsaved';
+    el.classList.toggle('changed', st === 'changed');
+    el.dataset.state = st;
+    el.textContent = st === 'saved' ? '저장됨' + (M.map && M.map.saved_at ? ' · ' + fmtTime(M.map.saved_at) : '') : st === 'changed' ? '저장 후 변경됨' : '저장 안 됨';
+    $('map-save').disabled = st === 'saved' || !!M.preview;
+  }
+  function renderOptUi() {
+    $('map-opt-bar').hidden = !M.preview;
+    $('map-undo').hidden = !M.undo || !!M.preview;
+    $('map-opt').disabled = !!M.preview;
+    if (M.preview) $('map-opt-info').textContent = '연결선 교차 ' + M.preview.metrics.crossingsBefore + '개 → ' + M.preview.metrics.crossingsAfter + '개';
+  }
+  async function save() {
+    if (M.busy) return;
+    M.busy = true; mapMsg('');
+    const r = await api('POST', '/api/cmap/maps/' + M.map.id + '/save');
+    M.busy = false;
+    if (!okStatus(r)) { mapMsg(errText(r, '저장하지 못했어요.')); return; }
+    M.map = r.body.map; setStatus(r.body.status, false);
+  }
+  function optimize() {
+    if (M.busy || M.preview) return;
+    mapMsg('');
+    if (M.nodes.size < 2) { mapMsg('노드가 2개 이상일 때 배치를 최적화할 수 있어요.'); return; }
+    const L = window.CmapLayout, rect = M.svg.getBoundingClientRect();
+    const ids = [...M.nodes.keys()].sort((a, b) => a - b);
+    const nodes = ids.map(id => ({ id, x: posOf(id).x, y: posOf(id).y }));
+    const res = L.optimizeLayout(nodes, M.edges.map(e => ({ from: e.from_concept_id, to: e.to_concept_id })), { bounds: L.suggestBounds(ids.length, rect.width / (rect.height || 1)) });
+    if (!res.metrics.changed) { mapMsg('지금 배치가 이미 정리돼 있어요. 바꿀 것이 없어요.'); return; }
+    if (M.picker) M.picker.reset();
+    M.selected = null;
+    M.preview = { pos: res.positions, before: new Map(nodes.map(n => [n.id, { x: n.x, y: n.y }])), metrics: res.metrics };
+    fit(); render(); renderSave(); renderOptUi();
+  }
+  function cancelPreview() {
+    if (!M.preview) return;
+    M.preview = null; fit(); render(); renderSave(); renderOptUi();
+  }
+  // 위치 일괄 저장(서버가 노드 집합·의미 해시를 검증). 성공하면 서버가 돌려준 위치를 화면에 반영한다.
+  async function putPositions(posMap) {
+    const positions = [...posMap].map(([id, p]) => ({ concept_id: id, x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 }));
+    const r = await api('PUT', '/api/cmap/maps/' + M.map.id + '/positions', { positions, base_hash: M.status.current_hash });
+    if (okStatus(r)) { for (const p of r.body.positions) M.nodes.set(p.concept_id, { x: p.x, y: p.y }); setStatus(r.body.status, false); }
+    return r;
+  }
+  async function applyPreview() {
+    if (!M.preview || M.busy) return;
+    M.busy = true; mapMsg('');
+    const pv = M.preview, r = await putPositions(pv.pos);
+    M.busy = false;
+    M.preview = null;
+    if (okStatus(r)) { M.undo = { pos: pv.before }; }
+    else mapMsg(r.body && r.body.stale ? '그 사이 지도가 바뀌어 적용하지 않았어요. 지도를 다시 열어 주세요.' : errText(r, '배치를 적용하지 못했어요. 원래 배치 그대로예요.'));
+    recomputeTemp(); fit(); render(); renderSave(); renderOptUi();
+  }
+  async function undoOptimize() {
+    if (!M.undo || M.busy) return;
+    M.busy = true; mapMsg('');
+    const r = await putPositions(M.undo.pos);
+    M.busy = false;
+    if (okStatus(r)) M.undo = null; else mapMsg(r.body && r.body.stale ? '그 사이 지도가 바뀌어 되돌리지 않았어요.' : errText(r, '되돌리지 못했어요.'));
+    recomputeTemp(); fit(); render(); renderSave(); renderOptUi();
   }
 
   // ── 제스처 ──
@@ -265,11 +348,17 @@
     svg.addEventListener('wheel', onWheel, { passive: false });
     svg.addEventListener('keydown', ev => {
       if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      if (M.preview) return;
       const nd = ev.target.closest && ev.target.closest('[data-node]'), ed = ev.target.closest && ev.target.closest('[data-edge]');
       if (nd) { ev.preventDefault(); M.picker.tap(Number(nd.dataset.node)); }
       else if (ed) { ev.preventDefault(); const e = M.edges.find(x => x.id === Number(ed.dataset.edge)); if (e) openEdgeDialog('edit', { edge: e, from: e.from_concept_id, to: e.to_concept_id }); }
     });
     $('map-fit').addEventListener('click', () => { fit(); });
+    $('map-save').addEventListener('click', save);
+    $('map-opt').addEventListener('click', optimize);
+    $('map-opt-apply').addEventListener('click', applyPreview);
+    $('map-opt-cancel').addEventListener('click', cancelPreview);
+    $('map-undo').addEventListener('click', undoOptimize);
     setupEdgeDialog();
   }
   const worldPerPx = () => 1 / M.view.scale;
@@ -280,7 +369,7 @@
     if (M.ptrs.size === 2) { startPinch(); return; }
     if (M.ptrs.size > 2) return;
     const t = ev.target.closest ? ev.target : null;
-    const nd = t && t.closest('[data-node]'), ed = t && t.closest('[data-edge]');
+    const nd = !M.preview && t && t.closest('[data-node]'), ed = !M.preview && t && t.closest('[data-edge]');   // 미리보기 중에는 노드·연결을 건드릴 수 없고 화면 이동·확대만 된다
     if (nd) {
       const id = Number(nd.dataset.node), n = M.nodes.get(id);
       M.gest = { kind: 'node', id, x: ev.clientX, y: ev.clientY, orig: { x: n.x, y: n.y }, start: posOf(id), moved: false, pid: ev.pointerId };
@@ -371,6 +460,8 @@
 
   window.CmapMap = {
     open, close,
+    // 테스트용 확인: 배치 최적화 미리보기 상태
+    _preview() { return M.preview ? { pos: [...M.preview.pos].map(([id, p]) => ({ id, ...p })), metrics: M.preview.metrics } : null; },
     togglePanel() { const p = $('map-pick-panel'); p.hidden = !p.hidden; $('map-pick-toggle').setAttribute('aria-expanded', String(!p.hidden)); },
     // 테스트 확인용(읽기 전용 사본)
     _state() { return { nodes: [...M.nodes].map(([id, n]) => ({ id, x: n.x, y: n.y })), edges: M.edges.map(e => ({ ...e })), view: { ...M.view }, selected: M.selected, mapId: M.map && M.map.id }; },

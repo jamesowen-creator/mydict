@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const T = require('../lib/cmap_topics');
 const AI = require('../lib/cmap_ai');
 const M = require('../lib/cmap_map');
+const H = require('../lib/cmap_hash');
 
 const router = express.Router();
 
@@ -414,6 +415,19 @@ async function usedInMaps(db, userId, topicIds) {
   return n;
 }
 
+// 작업273-3: 지도의 현재 의미(노드·간선)와 의미 해시. 해시 계산은 lib/cmap_hash.js 한 곳에서만 한다
+async function graphOf(db, mapId) {
+  const { rows: nodes } = await db.query('SELECT map_id, concept_id, x, y FROM cmap_map_nodes WHERE map_id = $1 ORDER BY concept_id', [mapId]);
+  const { rows: edges } = await db.query(`SELECT ${EDGE_COLS} FROM cmap_edges WHERE map_id = $1 ORDER BY id`, [mapId]);
+  return { nodes, edges, nodeIds: nodes.map(n => n.concept_id), hash: H.computeSemanticHash(nodes.map(n => n.concept_id), edges) };
+}
+// 저장 상태: 'unsaved'(저장 안 됨) | 'saved' | 'changed'(저장 후 변경됨)
+async function statusOf(db, mapId, userId) {
+  const { rows } = await db.query(`SELECT ${MAP_COLS} FROM cmap_maps WHERE id = $1 AND user_id = $2`, [mapId, userId]);
+  const g = await graphOf(db, mapId);
+  return { current_hash: g.hash, save_status: H.saveStatus(rows[0], g.hash) };
+}
+
 async function ownMap(db, mapId, userId, { lock = false } = {}) {
   const { rows } = await db.query(`SELECT ${MAP_COLS} FROM cmap_maps WHERE id = $1 AND user_id = $2${lock ? ' FOR UPDATE' : ''}`, [mapId, userId]);
   if (!rows.length) throw notFound('지도를 찾을 수 없습니다.');
@@ -447,7 +461,9 @@ router.get('/api/cmap/topics/:rootId/map', guard, handle(async req => {
     const { rows: nodes } = await c.query('SELECT map_id, concept_id, x, y FROM cmap_map_nodes WHERE map_id = $1 ORDER BY concept_id', [map.id]);
     const { rows: edges } = await c.query(`SELECT ${EDGE_COLS} FROM cmap_edges WHERE map_id = $1 ORDER BY id`, [map.id]);
     const tree = await treeOfMap(c, req.user.id, rootId);
+    const currentHash = H.computeSemanticHash(nodes.map(n => n.concept_id), edges);
     return { body: {
+      current_hash: currentHash, save_status: H.saveStatus(map, currentHash),
       map, nodes: nodes.map(n => ({ concept_id: n.concept_id, x: n.x, y: n.y })), edges,
       concepts: tree.concepts, topics: tree.topics.map(t => ({ id: t.id, parent_id: t.parent_id, title: t.title, sort_order: t.sort_order })),
       relation_types: M.RELATION_TYPES,
@@ -467,9 +483,9 @@ router.post('/api/cmap/maps/:id/nodes', guard, handle(async req => {
     if (!tree.concepts.some(x => x.id === cid)) throw bad('이 지도의 주제 안에 있는 개념만 지도에 쓸 수 있습니다.');
     const { rows: ex } = await c.query('SELECT map_id, concept_id, x, y FROM cmap_map_nodes WHERE map_id = $1', [id]);
     const have = ex.find(n => n.concept_id === cid);
-    if (have) return { body: { node: { concept_id: have.concept_id, x: have.x, y: have.y }, existing: true } };
+    if (have) return { body: { node: { concept_id: have.concept_id, x: have.x, y: have.y }, existing: true, status: await statusOf(c, id, req.user.id) } };
     const { rows } = await c.query('INSERT INTO cmap_map_nodes (map_id, concept_id) VALUES ($1, $2) RETURNING map_id, concept_id, x, y', [id, cid]);
-    return { status: 201, body: { node: { concept_id: rows[0].concept_id, x: rows[0].x, y: rows[0].y }, existing: false } };
+    return { status: 201, body: { node: { concept_id: rows[0].concept_id, x: rows[0].x, y: rows[0].y }, existing: false, status: await statusOf(c, id, req.user.id) } };
   });
 }));
 
@@ -489,7 +505,7 @@ router.delete('/api/cmap/maps/:id/nodes/:conceptId', guard, handle(async req => 
     }
     for (const e of touching) await c.query('DELETE FROM cmap_edges WHERE id = $1', [e.id]);
     await c.query('DELETE FROM cmap_map_nodes WHERE map_id = $1 AND concept_id = $2', [id, cid]);
-    return { body: { removed: cid, removed_edges: touching.length } };
+    return { body: { removed: cid, removed_edges: touching.length, status: await statusOf(c, id, req.user.id) } };
   });
 }));
 
@@ -529,7 +545,7 @@ router.post('/api/cmap/maps/:id/edges', guard, handle(async req => {
     const dir = M.normalizeDirection(a, b, type.value === undefined ? null : type.value);
     const { rows } = await c.query(`INSERT INTO cmap_edges (map_id, from_concept_id, to_concept_id, relation_type, label) VALUES ($1, $2, $3, $4, $5) RETURNING ${EDGE_COLS}`,
       [id, dir.from, dir.to, type.value === undefined ? null : type.value, label.value]);
-    return { status: 201, body: { edge: rows[0] } };
+    return { status: 201, body: { edge: rows[0], status: await statusOf(c, id, req.user.id) } };
   });
 }));
 
@@ -559,7 +575,7 @@ router.patch('/api/cmap/edges/:id', guard, handle(async req => {
     const dir = M.normalizeDirection(from, to, nextType);
     const { rows } = await c.query(`UPDATE cmap_edges SET from_concept_id = $1, to_concept_id = $2, relation_type = $3, label = $4 WHERE id = $5 RETURNING ${EDGE_COLS}`,
       [dir.from, dir.to, nextType === undefined ? null : nextType, label === undefined ? cur.label : label, id]);
-    return { body: { edge: rows[0] } };
+    return { body: { edge: rows[0], status: await statusOf(c, cur.map_id, req.user.id) } };
   });
 }));
 
@@ -571,7 +587,52 @@ router.delete('/api/cmap/edges/:id', guard, handle(async req => {
     if (!found.length) throw notFound('연결을 찾을 수 없습니다.');
     await ownMap(c, found[0].map_id, req.user.id, { lock: true });
     await c.query('DELETE FROM cmap_edges WHERE id = $1', [id]);
-    return { body: { deleted: id } };
+    return { body: { deleted: id, status: await statusOf(c, found[0].map_id, req.user.id) } };
+  });
+}));
+
+// ─── 작업273-3: 지도 저장 + 위치 일괄 저장(배치 최적화) ────────────────────────────────────────
+// [저장]: 서버가 DB 상태로 의미 해시를 계산해 semantic_hash 와 saved_at 을 기록한다(클라이언트가 보낸 값은 쓰지 않는다).
+// 현재 해시가 저장된 해시와 다르면 화면이 "저장 후 변경됨"을 보여 준다.
+router.post('/api/cmap/maps/:id/save', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('지도를 찾을 수 없습니다.');
+  return withTx(async c => {
+    await ownMap(c, id, req.user.id, { lock: true });
+    const g = await graphOf(c, id);
+    const { rows } = await c.query(`UPDATE cmap_maps SET semantic_hash = $1, saved_at = now(), updated_at = now() WHERE id = $2 AND user_id = $3 RETURNING ${MAP_COLS}`, [g.hash, id, req.user.id]);
+    return { body: { map: rows[0], status: { current_hash: g.hash, save_status: H.saveStatus(rows[0], g.hash) } } };
+  });
+}));
+
+// 위치 일괄 저장: 노드 집합이 DB 와 정확히 같을 때만 허용하고(없는 개념·빠진 노드·중복 거부), base_hash 가 있으면 현재 의미 해시와 같아야 하며(그 사이 지도가 바뀌었으면 거부),
+// 적용 전후의 의미 해시를 서버가 다시 계산해 달라지면 전체를 취소한다(개념 수·간선 수·종류·방향·문구 불변 검증). 전부 한 트랜잭션.
+router.put('/api/cmap/maps/:id/positions', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('지도를 찾을 수 없습니다.');
+  const body = bodyOf(req);
+  if (!Array.isArray(body.positions) || body.positions.length > 500) throw bad('positions 는 500개 이하의 배열이어야 합니다.');
+  if (has(body, 'base_hash') && typeof body.base_hash !== 'string') throw bad('base_hash 형식이 올바르지 않습니다.');
+  const items = [], seen = new Set();
+  for (const p of body.positions) {
+    if (!p || typeof p !== 'object' || typeof p.concept_id !== 'number' || parseId(String(p.concept_id)) === null) throw bad('positions 항목의 concept_id 가 올바르지 않습니다.');
+    if (seen.has(p.concept_id)) throw bad('같은 개념의 위치가 두 번 들어 있습니다.');
+    seen.add(p.concept_id);
+    const pos = M.readPosition(p.x, p.y);
+    if (pos.error) throw bad(pos.error);
+    items.push({ concept_id: p.concept_id, x: pos.value.x, y: pos.value.y });
+  }
+  return withTx(async c => {
+    await ownMap(c, id, req.user.id, { lock: true });
+    const before = await graphOf(c, id);
+    if (body.base_hash !== undefined && body.base_hash !== before.hash) throw conflict('지도가 그 사이에 바뀌었습니다. 다시 불러온 뒤에 배치를 최적화해 주세요.', { stale: true });
+    const have = new Set(before.nodeIds);
+    if (items.length !== have.size || items.some(p => !have.has(p.concept_id))) throw bad('지도의 노드와 보낸 위치의 개념이 달라 저장할 수 없습니다.');
+    for (const p of items) await c.query('UPDATE cmap_map_nodes SET x = $1, y = $2 WHERE map_id = $3 AND concept_id = $4', [p.x, p.y, id, p.concept_id]);
+    const after = await graphOf(c, id);
+    if (after.hash !== before.hash) throw conflict('위치를 바꾸는 중 지도의 의미(노드·연결)가 달라져 취소했습니다.', { semantic_changed: true });
+    const status = await statusOf(c, id, req.user.id);
+    return { body: { positions: after.nodes.map(n => ({ concept_id: n.concept_id, x: n.x, y: n.y })), status } };
   });
 }));
 

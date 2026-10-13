@@ -113,8 +113,13 @@
   .pick-row input { width: 22px; height: 22px; flex: none; accent-color: var(--color-accent-ink); }
   .pick-term { font-weight: 700; overflow-wrap: anywhere; }
   .pick-en { font-size: 13px; color: var(--color-text-sub); overflow-wrap: anywhere; }
+  .map-save-state { font-size: 13px; color: var(--color-text-sub); margin-right: auto; padding: 0 6px; }
+  .map-save-state.changed { color: var(--color-accent-ink); font-weight: 700; }
+  .map-opt-bar { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px 10px; background: var(--color-surface); border: 1px solid var(--color-accent-ink); border-radius: var(--radius-ctl); font-size: 13px; }
+  .map-opt-bar span { flex: 1 1 140px; }
+  .m-node.preview rect { stroke: var(--color-accent-ink); stroke-dasharray: 4 3; }
   #map-hint { min-height: 3.2em; }   /* 안내가 한 줄↔두 줄로 바뀌어도 캔버스가 밀리지 않게 높이를 고정 */
-  .map-canvas { position: relative; margin-top: 8px; height: calc(100dvh - var(--hdr-h, 65px) - 270px); min-height: 320px; border: 1px solid var(--color-line); border-radius: var(--card-radius); background: var(--color-surface); overflow: hidden; }
+  .map-canvas { position: relative; margin-top: 8px; height: calc(100dvh - var(--hdr-h, 65px) - 320px); min-height: 320px; border: 1px solid var(--color-line); border-radius: var(--card-radius); background: var(--color-surface); overflow: hidden; }
   .map-canvas .msg { position: absolute; left: 8px; right: 8px; bottom: 8px; margin: 0; padding: 6px 10px; background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-ctl); }   /* 오류 문구는 캔버스 위에 겹쳐 보여 캔버스를 밀지 않는다 */
   #map-svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
   .m-node rect { fill: var(--color-surface); stroke: var(--color-line-strong); stroke-width: 1.5; cursor: grab; }
@@ -136,6 +141,7 @@
 <script>MetisAppHeader.inject();</script>
 <script src="/js/map/mapCore.js?v=1"></script>
 <script src="/js/cmap/mapGeometry.js?v=1"></script>
+<script src="/js/cmap/layoutOptimize.js?v=1"></script>
 <script src="/js/cmap/pairPicker.js?v=1"></script>
 <script src="/js/cmap/mapView.js?v=1"></script>
 
@@ -203,9 +209,15 @@
       <button id="map-fit" class="btn text" type="button">전체 보기</button>
       <span id="map-count" class="hint"></span>
     </div>
+    <div class="map-tools">
+      <span id="map-save-state" class="map-save-state" role="status"></span>
+      <button id="map-save" class="btn text" type="button">저장</button>
+      <button id="map-opt" class="btn text" type="button">배치 최적화</button>
+      <button id="map-undo" class="btn text" type="button" hidden>되돌리기</button>
+    </div>
     <div id="map-pick-panel" class="map-pick" hidden><div id="map-pick-list"></div></div>
     <p id="map-hint" class="hint"></p>
-    <div class="map-canvas"><svg id="map-svg" role="group" aria-label="개념 지도"></svg><p id="map-msg" class="msg" role="alert"></p></div>
+    <div class="map-canvas"><div id="map-opt-bar" class="map-opt-bar" hidden><span id="map-opt-info"></span><button id="map-opt-apply" class="btn" type="button">적용</button><button id="map-opt-cancel" class="btn text" type="button">취소</button></div><svg id="map-svg" role="group" aria-label="개념 지도"></svg><p id="map-msg" class="msg" role="alert"></p></div>
   </div>
  </div>
 </div>
