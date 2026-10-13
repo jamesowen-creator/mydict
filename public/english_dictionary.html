@@ -1422,10 +1422,29 @@
   .ocr-mode button[aria-pressed=true]{color:var(--color-accent-ink);font-weight:800;border-bottom-color:var(--color-accent)}
   .ocr-scanner[data-mode=touch] .ocr-candidates,.ocr-scanner[data-mode=touch] .ocr-guide,.ocr-scanner[data-mode=touch] .ocr-controls{display:none}
   .ocr-scanner[data-mode=touch] .ocr-overlay{cursor:pointer}
-  .ocr-touch-bar{position:absolute;left:16px;right:16px;bottom:16px;margin:0 auto;width:fit-content;z-index:25;display:flex;align-items:center;gap:8px;max-width:calc(100% - 32px);padding:6px 12px;border-radius:var(--radius-ctl);background:rgba(255,255,255,.92);color:var(--color-text);font-size:14px;line-height:1.4}
+  .ocr-touch-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:var(--ctl-min-h);padding:0 16px;color:var(--color-text);font-size:14px;line-height:1.4}
   .ocr-touch-bar[hidden]{display:none}
   .ocr-touch-retake{flex:none;min-height:44px;padding:0 10px;border:none;background:transparent;color:var(--color-accent-ink);font-size:14px;font-weight:700}
   .ocr-touch-retake[hidden]{display:none}
+  /* 작업272-3: 선택 목록 시트. 패널 최대 높이의 약 40%, 목록은 시트 안에서 스크롤. 각 줄의 위/아래/삭제 버튼은 44px */
+  .ocr-sheet{display:none;position:absolute;left:0;right:0;bottom:0;z-index:30;max-height:40%;flex-direction:column;background:var(--color-surface);border-top:1px solid var(--color-line);padding-bottom:env(safe-area-inset-bottom)}
+  .ocr-scanner[data-mode=touch] .ocr-sheet{display:flex}
+  .ocr-sheet-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:6px 16px 0;flex:none}
+  .ocr-sheet-title{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--color-accent-ink)}
+  .ocr-sheet-count{font-size:12px;color:var(--color-text-sub)}
+  .ocr-picks{list-style:none;margin:0;padding:0 8px 0 16px;overflow-y:auto;flex:1 1 auto;min-height:0}
+  .ocr-picks:empty{display:none}
+  .ocr-pick{display:flex;align-items:center;gap:4px;min-height:var(--ctl-min-h);border-bottom:1px solid var(--color-line)}
+  .ocr-pick-n{flex:none;width:24px;font-size:13px;color:var(--color-text-sub)}
+  .ocr-pick-w{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:700}
+  .ocr-pick-btn{flex:none;width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;color:var(--color-text-sub)}
+  .ocr-pick-btn:disabled{opacity:.3}
+  .ocr-pick-btn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .ocr-picks-empty{margin:0;padding:6px 16px;font-size:13px;color:var(--color-text-sub)}
+  .ocr-picks-empty[hidden]{display:none}
+  .ocr-pick-go{flex:none;min-height:var(--ctl-min-h);margin:8px 16px 8px;border:none;border-radius:var(--radius-ctl);background:var(--color-accent-ink);color:var(--color-surface);font-size:15px;font-weight:700}
+  .ocr-pick-go:disabled{opacity:.4}
+  .ocr-box.picked{border-width:3px;background:rgba(226,88,59,.12)}
   /* 작업12: 하단 고정 nav 위로 띄워서 겹치지 않게 */
   /* 작업31: 텍스트 필 버튼 대신 원형 그레이스케일 아이콘 버튼으로 */
   /* 작업34: 아이콘 원형 버튼 대신 텍스트 전용 버튼으로 */
@@ -4211,7 +4230,14 @@ if ('serviceWorker' in navigator) {
     <div data-ocr-overlay class="ocr-overlay"></div>
     <canvas data-ocr-canvas hidden></canvas>
     <div data-ocr-candidates class="ocr-candidates"></div>
+  </div>
+  <!-- 작업272-3: 터치 모드의 선택 목록 시트(패널 아래쪽에 겹쳐 놓아 영상 영역 크기가 변하지 않게 함). 시트는 history 를 쓰지 않는다 -->
+  <div data-ocr-sheet class="ocr-sheet">
     <div data-ocr-touch-bar class="ocr-touch-bar" hidden><span data-ocr-touch-msg role="status"></span><button data-ocr-touch-retake type="button" class="ocr-touch-retake" hidden>다시 찍기</button></div>
+    <div class="ocr-sheet-head"><span class="ocr-sheet-title">선택한 단어</span><span data-ocr-pick-count class="ocr-sheet-count">0 / 20</span></div>
+    <ol data-ocr-picks class="ocr-picks"></ol>
+    <p data-ocr-picks-empty class="ocr-picks-empty">아직 담은 단어가 없어요. 화면의 단어를 눌러 담아 보세요.</p>
+    <button data-ocr-pick-go type="button" class="ocr-pick-go" disabled>검색 시작</button>
   </div>
   <div data-ocr-guide class="ocr-guide">
     <span class="ocr-corner ocr-corner-tl"></span>

@@ -3,6 +3,7 @@ import { createLiveEnglishOcrSession } from './liveEnglishOcrSession.js';
 import { deriveLiveOcrCandidates, preloadEnglishWordSet, normalizeToken } from './extractEnglishCandidates.js';
 import { projectOverlayRect, projectCropBox, computeGuideCrop, guideToVideoCrop } from './liveOverlayGeometry.js';
 import { filterTouchWords, pickTouchWord } from './touchWordPick.js';
+import { MAX_PICKS, addPick, movePick, removePick, hasPick } from './pickList.js';
 import { createCandidateStabilityTracker } from './ocrCandidateStability.js';
 
 // 작업7: 원 크기(56px)는 그대로 두고 아이콘만 22px -> 28px로 키워서
@@ -19,6 +20,9 @@ function describeCameraError(e) {
   if (name === 'SecurityError') return '보안 정책으로 카메라를 사용할 수 없습니다. HTTPS 환경에서 다시 시도해주세요.';
   return '라이브 카메라를 시작하지 못했습니다. 다시 시도해주세요.';
 }
+
+// 작업272-3: 터치 모드에서 담은 단어 목록. createOcrScanner 가 열 때마다 새로 만들어져도 목록은 유지한다(메모리만, 새로고침하면 사라짐)
+let sharedPicks = [];
 
 export function createOcrScanner(root, { onSelect } = {}) {
   const video = root.querySelector('[data-ocr-video]');
@@ -38,6 +42,10 @@ export function createOcrScanner(root, { onSelect } = {}) {
   const touchBar = root.querySelector('[data-ocr-touch-bar]');
   const touchMsg = root.querySelector('[data-ocr-touch-msg]');
   const retakeBtn = root.querySelector('[data-ocr-touch-retake]');
+  const picksEl = root.querySelector('[data-ocr-picks]');
+  const pickCountEl = root.querySelector('[data-ocr-pick-count]');
+  const picksEmptyEl = root.querySelector('[data-ocr-picks-empty]');
+  const pickGoBtn = root.querySelector('[data-ocr-pick-go]');
   const touch = { words: null, busy: false, seq: 0 };   // words: 스냅샷에서 인식한 단어(화면 좌표 rect 포함). seq: 낡은 인식 결과를 버리는 번호
   const state = {
     stream: null, session: null, timer: null, busy: false,
@@ -223,7 +231,15 @@ export function createOcrScanner(root, { onSelect } = {}) {
   }
   function showTouchHint() {
     if (state.mode !== 'touch') { setTouchMsg(''); return; }
-    setTouchMsg(state.cameraOpen ? '화면의 단어를 눌러 선택하세요.' : '카메라를 준비하는 중이에요.');
+    if (touch.words && touch.words.length) { setTouchMsg('다른 단어를 더 눌러 담거나, 다시 찍을 수 있어요.', { retake: true }); return; }
+    setTouchMsg(state.cameraOpen ? '화면의 단어를 눌러 담으세요.' : '카메라를 준비하는 중이에요.');
+  }
+  // 잠깐 보이는 안내(담음·이미 담김·가득 참 등). 2.5초 뒤 일반 안내로 돌아간다(그 사이 새 안내가 있으면 건드리지 않음)
+  let flashSeq = 0;
+  function flashTouchMsg(text, opts) {
+    setTouchMsg(text, opts);
+    const my = ++flashSeq;
+    setTimeout(() => { if (my === flashSeq && state.mode === 'touch') showTouchHint(); }, 2500);
   }
   function resetTouch() { touch.seq++; touch.busy = false; touch.words = null; }
   function resumeVideo() { try { const p = video.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* 무시 */ } }
@@ -281,7 +297,7 @@ export function createOcrScanner(root, { onSelect } = {}) {
       if (stale()) return;
       const words = filterTouchWords(data && data.words, normalizeToken).map(w => ({ ...w, rect: projectCropBox(w.bbox, crop) }));
       touch.words = words;
-      overlay.innerHTML = words.map(w => `<span class="ocr-box" style="left:${w.rect.left}px;top:${w.rect.top}px;width:${w.rect.width}px;height:${w.rect.height}px"></span>`).join('');
+      drawTouchBoxes();
       if (!words.length) { setTouchMsg('인식된 단어가 없어요.', { retake: true }); return; }
       finishPick(point);
     } catch (e) {
@@ -296,11 +312,60 @@ export function createOcrScanner(root, { onSelect } = {}) {
     }
   }
 
+  function drawTouchBoxes() {
+    const words = touch.words || [];
+    overlay.innerHTML = words.map(w => `<span class="ocr-box${hasPick(sharedPicks, w.text) ? ' picked' : ''}" style="left:${w.rect.left}px;top:${w.rect.top}px;width:${w.rect.width}px;height:${w.rect.height}px"></span>`).join('');
+  }
+
+  // 작업272-3: 터치한 단어는 바로 검색하지 않고 목록에 담는다. 같은 장면에서 이어서 더 담을 수 있다(영상은 멈춘 채, 다시 찍기로 새 장면)
   function finishPick(point) {
     const picked = pickTouchWord(touch.words, point);
-    if (!picked) { setTouchMsg('단어를 찾지 못했어요.', { retake: true }); return; }
+    if (!picked) { flashTouchMsg('단어를 찾지 못했어요.', { retake: true }); return; }
     const text = picked.word.text;
-    onSelect?.(text, 0, [text]);                             // 기존 흐름: 플래그 → 패널 닫기 → 검색 탭 → searchWord → 큐
+    const r = addPick(sharedPicks, text);
+    if (r.status === 'added') {
+      sharedPicks = r.list;
+      flashTouchMsg('‘' + text + '’ 담았어요.', { retake: true });
+    } else if (r.status === 'duplicate') {
+      flashTouchMsg('‘' + text + '’ 은(는) 이미 담겨 있어요.', { retake: true });
+    } else if (r.status === 'full') {
+      flashTouchMsg('한 번에 ' + MAX_PICKS + '개까지만 담을 수 있어요. 목록에서 지우고 담아 주세요.', { retake: true });
+    }
+    renderPicks();
+    drawTouchBoxes();
+  }
+
+  const ARROW_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 15 12 9 18 15"/></svg>';
+  const ARROW_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>';
+  const CLOSE_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>';
+  function renderPicks() {
+    if (!picksEl) return;
+    picksEl.textContent = '';
+    sharedPicks.forEach((w, i) => {
+      const li = document.createElement('li');
+      li.className = 'ocr-pick';
+      li.dataset.word = w;
+      const n = document.createElement('span'); n.className = 'ocr-pick-n'; n.textContent = String(i + 1);
+      const t = document.createElement('span'); t.className = 'ocr-pick-w'; t.textContent = w;
+      const mk = (cls, label, svg, disabled, fn) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'ocr-pick-btn ' + cls; b.setAttribute('aria-label', w + ' ' + label); b.innerHTML = svg; b.disabled = disabled;
+        b.onclick = fn;
+        return b;
+      };
+      li.append(n, t,
+        mk('up', '위로', ARROW_UP, i === 0, () => { sharedPicks = movePick(sharedPicks, i, -1); renderPicks(); }),
+        mk('down', '아래로', ARROW_DOWN, i === sharedPicks.length - 1, () => { sharedPicks = movePick(sharedPicks, i, 1); renderPicks(); }),
+        mk('del', '삭제', CLOSE_X, false, () => { sharedPicks = removePick(sharedPicks, i); renderPicks(); drawTouchBoxes(); }));
+      picksEl.append(li);
+    });
+    pickCountEl.textContent = sharedPicks.length + ' / ' + MAX_PICKS;
+    picksEmptyEl.hidden = sharedPicks.length > 0;
+    pickGoBtn.disabled = sharedPicks.length === 0;
+  }
+  if (pickGoBtn) {
+    // [검색 시작]: 첫 단어를 검색하고 목록 전체를 순차 검색 큐(n/N, 다음)로 넘긴다. 목록은 비우지 않는다
+    pickGoBtn.onclick = () => { if (sharedPicks.length) onSelect?.(sharedPicks[0], 0, sharedPicks.slice()); };
   }
 
   modeBtns.forEach(b => { b.onclick = () => setMode(b.dataset.ocrMode); });
@@ -315,6 +380,7 @@ export function createOcrScanner(root, { onSelect } = {}) {
   }
   root.dataset.mode = 'auto';
   modeBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ocrMode === 'auto')));
+  renderPicks();
 
   captureBtn.onclick = () => {
     if (!state.cameraOpen) { void start(); return; }
