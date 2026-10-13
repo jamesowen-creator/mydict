@@ -35,7 +35,10 @@ export function createOcrScanner(root, { onSelect } = {}) {
   const state = {
     stream: null, session: null, timer: null, busy: false,
     cameraOpen: false, paused: false,
-    history: [], cursor: -1
+    history: [], cursor: -1,
+    // 작업272-1: 세대 번호(취소 토큰). start()/stopCamera() 마다 바뀌어, 그 사이에 끝난 비동기 작업(카메라 열기·엔진 준비·인식)이
+    // 이미 종료된 세션의 상태를 건드리지 못하게 한다. starting: 시작 중 중복 시작 방지
+    gen: 0, starting: false
   };
   // 작업112: 같은 단어가 연속 프레임 동안 재인식돼야만 후보로 승인
   const stability = createCandidateStabilityTracker();
@@ -82,14 +85,18 @@ export function createOcrScanner(root, { onSelect } = {}) {
 
   async function scan() {
     if (state.busy || state.paused || !state.session) return;
+    const gen = state.gen, session = state.session;   // 작업272-1: 이 스캔이 속한 세션. 도중에 종료·재시작되면 gen 이 달라져 결과를 버린다
     state.busy = true;
     try {
       // 작업266: 스캔마다 눈에 보이는 가이드(.ocr-guide)의 화면 사각형을 읽어 영상 좌표로 바꾼 크롭을 쓴다(회전·창 크기 변경 반영)
       const crop = computeGuideCrop(video, guideEl);
       const blob = await captureLiveFrame(video, canvas, guide, crop);
+      if (gen !== state.gen) return;
       const imageSize = { width: canvas.width, height: canvas.height };
-      const data = await state.session.recognize(blob);
+      const data = await session.recognize(blob);
+      if (gen !== state.gen) return;
       const rawWords = await deriveLiveOcrCandidates(data, imageSize);
+      if (gen !== state.gen) return;
       // 작업112: 매 프레임(빈 프레임 포함) 넣어야 스트릭이 정확히 유지/리셋됨
       const words = stability.filter(rawWords).map(w => ({ ...w, crop }));
       if (words.length) {
@@ -99,67 +106,92 @@ export function createOcrScanner(root, { onSelect } = {}) {
         updateChrome();
       }
     } catch (e) {
-      showError('텍스트 인식 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+      if (gen === state.gen) showError('텍스트 인식 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
-      state.busy = false;
+      if (gen === state.gen) state.busy = false;
     }
   }
 
   async function start() {
+    if (state.starting || state.cameraOpen) return;   // 작업272-1: 시작 중·열린 상태에서 다시 눌러도 카메라를 또 열지 않는다
+    const gen = ++state.gen;
+    state.starting = true;
+    const mine = { stream: null, session: null };
+    const cancelled = () => gen !== state.gen;
+    // 취소된 시작이 자기가 연 자원만 정리한다(그 사이 새로 시작한 쪽의 상태는 건드리지 않는다)
+    const abandon = () => {
+      if (mine.stream) mine.stream.getTracks().forEach(t => t.stop());
+      if (mine.session) Promise.resolve(mine.session.terminate()).catch(() => {});
+    };
     showError('');
     void preloadEnglishWordSet(); // kick off in parallel with the camera prompt below
     try {
-      // 작업115: 720p -> 1080p. 작업114 실측 결과, 매우 작은/빽빽한 인쇄
-      // 텍스트에서 720p는 실패하는 경우가 많았고 1080p로만 올려도 대부분
-      // 회복됐음(반면 4K는 그 이상 추가 이득이 적어 채택 안 함). ideal은
-      // 강제 아님 - 카메라가 1080p를 지원 못 하면 브라우저가 에러 없이
-      // 가장 가까운 해상도로 자동 폴백하므로 구형 기기 호환성 리스크 없음.
-      // 가이드 박스 크롭(liveFrameCapture.js)과 오버레이 투영
-      // (liveOverlayGeometry.js) 모두 video.videoWidth/videoHeight를 실시간
-      // 조회해 비율로 계산하므로 이 값만 바꾸면 나머지는 자동으로 맞춰짐.
-      state.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false
-      });
-    } catch (e) {
-      showError(describeCameraError(e));
-      return;
-    }
-    try {
-      video.srcObject = state.stream;
-      await video.play();
-      const track = state.stream.getVideoTracks()[0];
-      const caps = track.getCapabilities?.() || {};
-      if (caps.torch) {
-        torchBtn.hidden = false;
-        torchBtn.onclick = () => {
-          const on = torchBtn.dataset.on === '1';
-          track.applyConstraints({ advanced: [{ torch: !on }] });
-          torchBtn.dataset.on = on ? '0' : '1';
-          torchBtn.classList.toggle('active', !on);
-        };
+      try {
+        // 작업115: 720p -> 1080p. 작업114 실측 결과, 매우 작은/빽빽한 인쇄
+        // 텍스트에서 720p는 실패하는 경우가 많았고 1080p로만 올려도 대부분
+        // 회복됐음(반면 4K는 그 이상 추가 이득이 적어 채택 안 함). ideal은
+        // 강제 아님 - 카메라가 1080p를 지원 못 하면 브라우저가 에러 없이
+        // 가장 가까운 해상도로 자동 폴백하므로 구형 기기 호환성 리스크 없음.
+        // 가이드 박스 크롭(liveFrameCapture.js)과 오버레이 투영
+        // (liveOverlayGeometry.js) 모두 video.videoWidth/videoHeight를 실시간
+        // 조회해 비율로 계산하므로 이 값만 바꾸면 나머지는 자동으로 맞춰짐.
+        mine.stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false
+        });
+      } catch (e) {
+        if (!cancelled()) showError(describeCameraError(e));
+        return;
       }
-      state.session = await createLiveEnglishOcrSession();
-    } catch (e) {
-      showError(e.message || '라이브 OCR 엔진을 준비하지 못했습니다. 다시 시도해주세요.');
-      stopCamera();
-      return;
+      if (cancelled()) { abandon(); return; }
+      state.stream = mine.stream;
+      try {
+        video.srcObject = mine.stream;
+        await video.play();
+        if (cancelled()) { abandon(); return; }
+        const track = mine.stream.getVideoTracks()[0];
+        const caps = track.getCapabilities?.() || {};
+        if (caps.torch) {
+          torchBtn.hidden = false;
+          torchBtn.onclick = () => {
+            const on = torchBtn.dataset.on === '1';
+            track.applyConstraints({ advanced: [{ torch: !on }] });
+            torchBtn.dataset.on = on ? '0' : '1';
+            torchBtn.classList.toggle('active', !on);
+          };
+        }
+        mine.session = await createLiveEnglishOcrSession();
+      } catch (e) {
+        if (cancelled()) { abandon(); return; }
+        showError(e.message || '라이브 OCR 엔진을 준비하지 못했습니다. 다시 시도해주세요.');
+        stopCamera();
+        return;
+      }
+      if (cancelled()) { abandon(); return; }   // 엔진 준비 중에 종료됨: 만든 세션을 바로 정리하고 스캔을 시작하지 않는다
+      state.session = mine.session;
+      state.cameraOpen = true;
+      state.paused = false;
+      state.timer = setInterval(scan, 2000);
+      updateChrome();
+      scan();
+    } finally {
+      if (!cancelled()) state.starting = false;
     }
-    state.cameraOpen = true;
-    state.paused = false;
-    state.timer = setInterval(scan, 2000);
-    updateChrome();
-    scan();
   }
 
   function stopCamera() {
+    state.gen++;            // 작업272-1: 진행 중인 시작·인식은 이제 취소된 것으로 본다
+    state.starting = false;
+    state.busy = false;
     clearInterval(state.timer);
     state.timer = null;
     state.stream?.getTracks().forEach(t => t.stop());
     state.stream = null;
     video.srcObject = null;
-    state.session?.terminate();
+    const session = state.session;
     state.session = null;
+    // terminate 는 오류를 삼키는 Promise 를 돌려준다. 기다리지 않아도 다음 세션 생성이 그 끝을 기다린다(liveEnglishOcrSession.js)
+    if (session) Promise.resolve(session.terminate()).catch(() => {});
     state.cameraOpen = false;
     state.paused = false;
     state.history = [];
