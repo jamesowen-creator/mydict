@@ -24,6 +24,7 @@ function createCmapDb() {
     if (typeof row.term !== 'string' || len(row.term) < 1 || len(row.term) > 80 || row.term.trim() === '') throw dbError('23514', 'cmap_concepts term check');
     if (row.english !== null && len(row.english) > 120) throw dbError('23514', 'cmap_concepts english check');
     if (row.memo !== null && len(row.memo) > 2000) throw dbError('23514', 'cmap_concepts memo check');
+    if (row.explanation_source !== null && row.explanation_source !== undefined && !['ai', 'manual'].includes(row.explanation_source)) throw dbError('23514', 'cmap_concepts explanation_source check');
     if (db.concepts.some(o => o !== self && o.id !== row.id && o.topic_id === row.topic_id && lower(o.term) === lower(row.term))) throw dbError('23505', 'duplicate key (cmap_concepts term)');
   }
   const ids = new Set();
@@ -52,6 +53,7 @@ function createCmapDb() {
   }
   const pick = (row, cols) => { const o = {}; for (const c of cols.split(',').map(s => s.trim())) o[c] = row[c] === undefined ? null : row[c]; return o; };
   const clone = r => ({ ...r });
+const jsonCol = (col, v) => (col === 'explanation' && typeof v === 'string' ? JSON.parse(v) : v);   // JSONB: 문자열 파라미터는 객체로 저장
 
   async function query(sqlRaw, params = []) {
     const sql = String(sqlRaw).replace(/\s+/g, ' ').trim();
@@ -80,8 +82,8 @@ function createCmapDb() {
       const vals = m[3].split(',').map(s => s.trim());
       const row = m[1] === 'cmap_topics'
         ? { id: db.seq.t++, created_at: new Date(), updated_at: new Date(), sort_order: 0 }
-        : { id: db.seq.c++, created_at: new Date(), updated_at: new Date(), sort_order: 0, content_source: 'manual', english: null, memo: null };
-      cols.forEach((c, i) => { const mm = vals[i].match(/^\$(\d+)$/); if (!mm) throw new Error('cmap_db: 지원하지 않는 VALUES'); row[c] = params[Number(mm[1]) - 1]; });
+        : { id: db.seq.c++, created_at: new Date(), updated_at: new Date(), sort_order: 0, content_source: 'manual', english: null, memo: null, explanation: null, explanation_source: null, explained_at: null };
+      cols.forEach((c, i) => { const mm = vals[i].match(/^\$(\d+)$/); if (!mm) throw new Error('cmap_db: 지원하지 않는 VALUES'); row[c] = jsonCol(c, params[Number(mm[1]) - 1]); });
       if (m[1] === 'cmap_topics') { checkTopic(row, null); db.topics.push(row); } else { checkConcept(row, null); db.concepts.push(row); }
       return { rows: [pick(row, m[4])], rowCount: 1 };
     }
@@ -89,7 +91,7 @@ function createCmapDb() {
       const sets = m[2].split(/,\s*/).map(s => {
         const mm = s.match(/^(\w+) = (\$(\d+)|now\(\))$/);
         if (!mm) throw new Error('cmap_db: 지원하지 않는 SET ' + s);
-        return [mm[1], mm[3] ? params[Number(mm[3]) - 1] : new Date()];
+        return [mm[1], mm[3] ? jsonCol(mm[1], params[Number(mm[3]) - 1]) : new Date()];
       });
       const hit = tableOf(m[1]).filter(conds(m[3], params));
       for (const row of hit) {

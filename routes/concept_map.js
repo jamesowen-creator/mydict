@@ -2,6 +2,7 @@ const express = require('express');
 const { pool } = require('../lib/db');
 const { requireAuth } = require('../middleware/auth');
 const T = require('../lib/cmap_topics');
+const AI = require('../lib/cmap_ai');
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ router.get('/api/cmap/status', guard, (req, res) => {
 // 변경 라우트는 트랜잭션 안에서 사용자의 주제 행을 FOR UPDATE 로 잠가, 동시 요청이 검사를 피해 가지 못하게 한다.
 const MAX_PG_INT = 2147483647;
 const TOPIC_COLS = 'id, parent_id, root_id, title, sort_order, created_at, updated_at';
-const CONCEPT_COLS = 'id, topic_id, term, english, memo, content_source, sort_order, created_at, updated_at';
+const CONCEPT_COLS = 'id, topic_id, term, english, memo, content_source, sort_order, explanation, explanation_source, explained_at, created_at, updated_at';
 const SERVER_ERROR = '서버 오류가 발생했습니다.';
 
 class HttpError extends Error {
@@ -246,11 +247,58 @@ function readConceptFields(body, { partial }) {
   return out;
 }
 
+// 작업273-1: 개념 저장 요청의 설명(explanation, explanation_source). 서버가 형태·길이를 다시 검증한다.
+//  - 키가 없으면 {} (변경 없음), explanation: null 이면 설명 지우기, 객체면 검증 후 값
+//  - 생성(POST)에서는 explanation_source('ai' | 'manual')가 필요하다. 수정(PATCH)에서는 클라이언트가 보낸 출처를 믿지 않는다(아래 PATCH 참고)
+function readExplanationFields(body, { requireSource }) {
+  const hasExp = has(body, 'explanation') && body.explanation !== undefined;
+  const src = body.explanation_source;
+  if (!hasExp) {
+    if (src !== undefined && src !== null) throw bad('explanation 없이는 explanation_source 를 쓸 수 없습니다.');
+    return {};
+  }
+  if (body.explanation === null) {
+    if (src !== undefined && src !== null) throw bad('설명을 지우는 요청에는 explanation_source 를 쓸 수 없습니다.');
+    return { explanation: null, explanation_source: null };
+  }
+  const e = AI.readExplanation(body.explanation);
+  if (e.error) throw bad(e.error);
+  if (requireSource && src !== 'ai' && src !== 'manual') throw bad("explanation_source 는 'ai' 또는 'manual' 이어야 합니다.");
+  return { explanation: e.value, explanation_source: requireSource ? src : undefined };
+}
+
 async function ownTopic(db, topicId, userId, { lock = false } = {}) {
   const { rows } = await db.query(`SELECT id, title FROM cmap_topics WHERE id = $1 AND user_id = $2${lock ? ' FOR UPDATE' : ''}`, [topicId, userId]);
   if (!rows.length) throw notFound('주제를 찾을 수 없습니다.');
   return rows[0];
 }
+
+// 작업273-1: 개념 검색 → AI 백과사전 설명(저장하지 않음). 클라이언트는 term 만 보내고, 주제 맥락(최상위 주제명·하위 주제 경로)은 서버가 DB 에서 읽는다.
+// 같은 주제에 같은 이름의 개념이 이미 있으면 AI 를 부르지 않고 기존 개념을 돌려준다. 하루 한도(CMAP_EXPLAIN_DAILY_CAP) 초과는 429.
+// AI 실패·검증 실패는 502 {ok:false, ai_error:true}(화면이 오류 카드 + 다시 시도를 보여 줌, 자동 재시도 없음)
+router.post('/api/cmap/topics/:id/explain', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('주제를 찾을 수 없습니다.');
+  const term = T.readName(bodyOf(req).term, T.TERM_MAX, '개념 이름');
+  if (term.error) throw bad(term.error);
+  const topics = await loadTopics(pool, req.user.id);
+  const idx = T.buildIndex(topics);
+  const topic = idx.byId.get(id);
+  if (!topic) throw notFound('주제를 찾을 수 없습니다.');
+  const { rows: existing } = await pool.query(`SELECT ${CONCEPT_COLS} FROM cmap_concepts WHERE topic_id = $1 AND user_id = $2 ORDER BY sort_order, id`, [id, req.user.id]);
+  const dup = existing.find(x => T.nameKey(x.term) === T.nameKey(term.value));
+  if (dup) return { body: { existing: true, concept: dup } };
+  if (await AI.countToday(req.user.id, AI.EXPLAIN_EVENT) >= AI.explainDailyCap()) {
+    throw new HttpError(429, `하루 ${AI.explainDailyCap()}건까지 AI 설명을 받을 수 있습니다.`);
+  }
+  const path = [];
+  for (let cur = topic; cur; cur = cur.parent_id === null || cur.parent_id === undefined ? null : idx.byId.get(cur.parent_id)) path.unshift(cur.title);
+  const input = AI.buildExplainInput({ path, term: term.value, siblings: existing.map(x => x.term) });
+  const ai = await AI.callExplainAI(req.user.id, input);
+  const v = ai.parsed === undefined ? null : AI.validateAiExplanation(ai.parsed);
+  if (!v) throw new HttpError(502, ai.aiError || AI.AI_ERROR_TEXT, { ai_error: true });
+  return { body: { existing: false, term: term.value, english: v.english, explanation: v.explanation, explanation_source: 'ai' } };
+}));
 
 router.get('/api/cmap/topics/:id/concepts', guard, handle(async req => {
   const id = parseId(req.params.id);
@@ -264,6 +312,7 @@ router.post('/api/cmap/topics/:id/concepts', guard, handle(async req => {
   const id = parseId(req.params.id);
   if (id === null) throw notFound('주제를 찾을 수 없습니다.');
   const f = readConceptFields(bodyOf(req), { partial: false });
+  const ex = readExplanationFields(bodyOf(req), { requireSource: true });
   return withTx(async c => {
     await ownTopic(c, id, req.user.id, { lock: true });
     const { rows: existing } = await c.query('SELECT id, term, sort_order FROM cmap_concepts WHERE topic_id = $1 AND user_id = $2', [id, req.user.id]);
@@ -272,8 +321,9 @@ router.post('/api/cmap/topics/:id/concepts', guard, handle(async req => {
     if (dup) throw conflict(`이 주제에 '${dup.term}' 개념이 이미 있습니다.`);
     const order = existing.reduce((m, x) => Math.max(m, Number(x.sort_order) || 0), 0) + 1;
     const { rows } = await c.query(
-      `INSERT INTO cmap_concepts (user_id, topic_id, term, english, memo, sort_order) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${CONCEPT_COLS}`,
-      [req.user.id, id, f.term, f.english === undefined ? null : f.english, f.memo === undefined ? null : f.memo, order]);
+      `INSERT INTO cmap_concepts (user_id, topic_id, term, english, memo, sort_order, explanation, explanation_source, explained_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ${CONCEPT_COLS}`,
+      [req.user.id, id, f.term, f.english === undefined ? null : f.english, f.memo === undefined ? null : f.memo, order,
+        ex.explanation ? JSON.stringify(ex.explanation) : null, ex.explanation ? ex.explanation_source : null, ex.explanation ? new Date() : null]);
     return { status: 201, body: { concept: rows[0] } };
   });
 }));
@@ -282,7 +332,8 @@ router.patch('/api/cmap/concepts/:id', guard, handle(async req => {
   const id = parseId(req.params.id);
   if (id === null) throw notFound('개념을 찾을 수 없습니다.');
   const f = readConceptFields(bodyOf(req), { partial: true });
-  if (!Object.keys(f).length) throw bad('변경할 항목이 없습니다.');
+  const ex = readExplanationFields(bodyOf(req), { requireSource: false });
+  if (!Object.keys(f).length && !Object.keys(ex).length) throw bad('변경할 항목이 없습니다.');
   return withTx(async c => {
     const { rows: cur } = await c.query(`SELECT ${CONCEPT_COLS} FROM cmap_concepts WHERE id = $1 AND user_id = $2 FOR UPDATE`, [id, req.user.id]);
     if (!cur.length) throw notFound('개념을 찾을 수 없습니다.');
@@ -293,9 +344,17 @@ router.patch('/api/cmap/concepts/:id', guard, handle(async req => {
       if (dup) throw conflict(`이 주제에 '${dup.term}' 개념이 이미 있습니다.`);
     }
     const next = { term: f.term !== undefined ? f.term : row.term, english: f.english !== undefined ? f.english : row.english, memo: f.memo !== undefined ? f.memo : row.memo };
+    // 설명: 내용이 저장된 것과 같으면 출처·시각을 그대로 두고, 다르면 사람이 고친 것이므로 출처는 항상 'manual'(클라이언트가 'ai' 라고 해도 믿지 않음). null 이면 지움
+    let expl = row.explanation, explSrc = row.explanation_source, explAt = row.explained_at;
+    if (ex.explanation === null) { expl = null; explSrc = null; explAt = null; }
+    else if (ex.explanation) {
+      const stored = row.explanation && typeof row.explanation === 'string' ? JSON.parse(row.explanation) : row.explanation;
+      const same = stored && AI.EXPLAIN_FIELDS.every(k => (stored[k] || '') === ex.explanation[k]);
+      if (!same) { expl = ex.explanation; explSrc = 'manual'; explAt = new Date(); }
+    }
     const { rows } = await c.query(
-      `UPDATE cmap_concepts SET term = $1, english = $2, memo = $3, updated_at = now() WHERE id = $4 AND user_id = $5 RETURNING ${CONCEPT_COLS}`,
-      [next.term, next.english, next.memo, id, req.user.id]);
+      `UPDATE cmap_concepts SET term = $1, english = $2, memo = $3, explanation = $4, explanation_source = $5, explained_at = $6, updated_at = now() WHERE id = $7 AND user_id = $8 RETURNING ${CONCEPT_COLS}`,
+      [next.term, next.english, next.memo, expl === null || expl === undefined ? null : JSON.stringify(expl), explSrc || null, explAt || null, id, req.user.id]);
     return { body: { concept: rows[0] } };
   });
 }));

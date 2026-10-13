@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const { createCmapDb } = require('../../helpers/cmap_db');
-const { startApp } = require('../../helpers/app');
+const { startApp, createAnthropicMock } = require('../../helpers/app');
 
 const PUBLIC = path.resolve(__dirname, '..', '..', '..', 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
@@ -15,7 +15,9 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 async function startCmapServer({ perm = true } = {}) {
   const db = createCmapDb();
   db.addUser(7, { perm_concept_map: perm });
-  const app = await startApp(['routes/concept_map.js'], { db });
+  const anthropic = createAnthropicMock();   // 작업273-1: AI 는 모의(실제 호출 없음). srv.anthropic.handler 로 응답을 정한다
+  anthropic.handler = () => { throw new Error('mock anthropic: handler 없음'); };
+  const app = await startApp(['routes/concept_map.js'], { db, anthropic });
   const state = { me: { id: 7, email: 'u7@example.com', name: '테스터', role: 'user', perm_concept_map: perm } };
   const secret = process.env.JWT_SECRET || 'mydict-jwt-secret';
 
@@ -49,7 +51,7 @@ async function startCmapServer({ perm = true } = {}) {
 
   return {
     url: 'http://127.0.0.1:' + server.address().port,
-    db, state,
+    db, state, anthropic,
     token: (id = 7) => jwt.sign({ id, email: 'u' + id + '@example.com' }, secret),
     close: async () => { await new Promise(r => server.close(r)); await app.close(); },
   };

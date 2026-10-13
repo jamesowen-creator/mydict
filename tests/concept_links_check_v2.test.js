@@ -111,7 +111,7 @@ test('실패 처리: ADD 가 실패해도 initDB 는 던지지 않고 ROLLBACK, 
   assert.ok(s.includes('ROLLBACK') && !s.includes('COMMIT'), 'COMMIT 없이 ROLLBACK 되어 옛 제약이 그대로 남는다(DDL 도 트랜잭션)');
   assert.ok(r.sqls.some(x => /^CREATE TABLE IF NOT EXISTS concept_quiz_attempts/.test(x.sql)), '다음 단계 계속 실행');
   assert.ok(r.logs.some(l => /\[DB\] init step failed: concept_links_relation_types_v2/.test(l)));
-  assert.deepEqual(r.logs.filter(l => l.startsWith('[DB] init done:')), ['[DB] init done: 총 27단계, 실패 1단계 (실패: concept_links_relation_types_v2)']);
+  assert.deepEqual(r.logs.filter(l => l.startsWith('[DB] init done:')), ['[DB] init done: 총 28단계, 실패 1단계 (실패: concept_links_relation_types_v2)']);
   assert.equal(r.released, true);
 });
 
@@ -134,9 +134,9 @@ test('선행 단계(concept_links) 가 실패하면 이 단계는 건너뜀: 제
   assert.ok(!r.sqls.some(x => isSelect(x.sql) || /LOCK TABLE concept_links/.test(x.sql)));
 });
 
-test('단계 위치: concept_links_user_edited 바로 뒤, concept_quiz_attempts 앞이고 총 27단계', async () => {
+test('단계 위치: concept_links_user_edited 바로 뒤, concept_quiz_attempts 앞이고 총 28단계', async () => {
   const r = await recordInit();
-  assert.equal(r.result.total, 27);   // 작업270-1·271-1: 개념 지도 3단계 추가(24→27)
+  assert.equal(r.result.total, 28);   // 작업270-1·271-1·273-1: 개념 지도 4단계 추가(24→28)
   const order = r.sqls.map(x => x.sql);
   assert.ok(order.findIndex(s => /ADD COLUMN IF NOT EXISTS user_edited/.test(s)) < order.indexOf(SELECT_SQL));
   assert.ok(order.indexOf(ADD_SQL) < order.findIndex(s => /^CREATE TABLE IF NOT EXISTS concept_quiz_attempts/.test(s)));
