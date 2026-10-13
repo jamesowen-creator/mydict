@@ -188,10 +188,11 @@ async function gateServer(ready, timeoutMs) {
   return { get, close: () => new Promise(r => { server.closeAllConnections && server.closeAllConnections(); server.close(r); }) };
 }
 
-test('/api 대기: initDB가 끝날 때까지 /api 요청은 기다리고, "/"와 정적 파일은 즉시 응답', async () => {
+test('/api 대기: initDB가 끝날 때까지 /api 요청은 기다리고, "/"와 정적 파일은 즉시 응답', async t => {
   let release;
   const ready = new Promise(r => { release = r; });
   const s = await gateServer(ready, 15000);
+  t.after(() => s.close());   // 작업273-1b: 단언이 실패해도 서버를 닫는다(안 닫으면 테스트 프로세스가 끝나지 않음)
   const pending = s.get('/api/ping');
   const fast = await Promise.all([s.get('/'), s.get('/sw.js')]);
   assert.deepEqual(fast.map(f => f.status), [200, 200]);
@@ -204,32 +205,36 @@ test('/api 대기: initDB가 끝날 때까지 /api 요청은 기다리고, "/"�
   assert.ok(r.ms >= 280, '지연된 만큼 기다렸다가 처리: ' + r.ms);
   const after = await s.get('/api/ping');
   assert.ok(after.ms < 300, '끝난 뒤에는 바로 처리');
-  await s.close();
 });
 
-test('/api 대기: 시간 초과(여기서는 300ms)가 지나면 기다리지 않고 그대로 처리', async () => {
+test('/api 대기: 시간 초과(여기서는 300ms)가 지나면 기다리지 않고 그대로 처리', async t => {
   const s = await gateServer(new Promise(() => { }), 300);
+  t.after(() => s.close());   // 작업273-1b
   const r = await s.get('/api/ping');
   assert.equal(r.status, 200);
   assert.ok(r.ms >= 250 && r.ms < 1500, '시간 초과 후 처리: ' + r.ms);
-  await s.close();
 });
 
-test('/api 대기: initDB가 실패(거부)해도 처리하고, Promise가 없으면 기다리지 않음', async () => {
+test('/api 대기: initDB가 실패(거부)해도 처리하고, Promise가 없으면 기다리지 않음', async t => {
   let rej;
   const failing = new Promise((_, r) => { rej = r; });
   const s = await gateServer(failing, 15000);
+  t.after(() => s.close());   // 작업273-1b: 단언이 실패해도 서버를 닫는다
   const p = s.get('/api/ping');
   setTimeout(() => rej(new Error('db down')), 100);
   const r = await p;
   assert.equal(r.status, 200);
   assert.ok(r.ms < 2000);
-  await s.close();
+  // 작업273-1b: 예전에는 "Promise 가 없으면 n.ms < 300(절대 시간)"이라 느린 환경에서 실패했다. 같은 요청을 initDB 가 일부러 3초 걸리는 서버(대조군)에도 보내
+  // "기다리지 않는 쪽의 응답 시간 < 대조군 시간의 절반"으로 비교한다(대조군은 실제로 그만큼 기다렸다는 것도 함께 확인).
   const none = await gateServer(null, 15000);
-  const n = await none.get('/api/ping');
-  assert.equal(n.status, 200);
-  assert.ok(n.ms < 300);
-  await none.close();
+  t.after(() => none.close());
+  const slow = await gateServer(new Promise(r => setTimeout(r, 3000)), 15000);
+  t.after(() => slow.close());
+  const [n, w] = await Promise.all([none.get('/api/ping'), slow.get('/api/ping')]);
+  assert.equal(n.status, 200); assert.equal(w.status, 200);
+  assert.ok(w.ms >= 2500, '대조군은 initDB 가 끝날 때까지 기다림: ' + w.ms);
+  assert.ok(n.ms < w.ms / 2, 'Promise 가 없으면 기다리지 않음(대조군 ' + w.ms + 'ms 의 절반 이내): ' + n.ms);
 });
 
 test('/api 대기: 기본 대기 시간은 15초', () => {
