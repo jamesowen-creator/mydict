@@ -30,7 +30,9 @@ async function openWordbook(width) {
   await page.waitFor("!!document.querySelector('.metis-app-header-logo') && !!document.querySelector('nav')", 12000);
   const rows = Object.entries(SEED).flatMap(([lang, ws]) => ws.map(([word, t]) => ({ word, lang, ...(t === undefined ? {} : { savedAt: t }) })));
   await page.eval(`wordbook = ${JSON.stringify(rows)}; showPage('wordbook')`);
-  await sleep(150);
+  // 작업272-5: 고정 150ms 대기는 전체 테스트처럼 느린 환경에서 레이아웃이 끝나기 전에 위치를 읽어 실패했다(버튼 top 0,0).
+  // 정렬 버튼 두 개가 모두 보이고 크기·위치가 계산될 때까지 기다린다(상한 8초, 넘으면 원인이 보이는 메시지로 실패)
+  await page.waitFor("(() => { const b = [...document.querySelectorAll('.wb-sort-btn')]; return b.length === 2 && b.every(x => { const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.top > 0; }); })()", 8000, '정렬 버튼 두 개가 보이고 위치가 계산됨');
   return page;
 }
 const words = page => page.eval("[...document.querySelectorAll('.word-chip-text')].map(e => e.textContent)");
