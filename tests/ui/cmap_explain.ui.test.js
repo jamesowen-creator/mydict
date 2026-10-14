@@ -11,12 +11,19 @@ let browser;
 test.before(async () => { if (SKIP) return; browser = await launchBrowser(); });
 test.after(async () => { if (browser) await browser.close(); });
 
+// 274-2: AI 응답·새 저장 형태 = 개념학습과 같은 4항목(정의·예시·쉬운 설명·더 깊게 설명). OLD 는 273-1 에서 저장한 옛 4항목 형태(호환 확인용)
 const GOOD = {
   english: 'acceleration',
   definition: '속도가 시간에 따라 변하는 정도를 나타내는 양입니다.',
-  in_context: '역학에서 힘이 물체의 운동을 어떻게 바꾸는지 설명할 때 쓰입니다.',
   example: '출발하는 버스가 점점 빨라질 때 가속도가 있습니다.',
-  confusion: '속도와 달리 빨라지는 정도를 뜻합니다.',
+  simple_text: '얼마나 빨리 빨라지는지를 나타내요.',
+  deeper_text: '속도의 시간에 대한 변화율이며 방향도 가집니다.',
+};
+const OLD = {
+  definition: '옛 정의입니다.',
+  in_context: '옛 맥락입니다.',
+  example: '옛 예입니다.',
+  confusion: '옛 헷갈림입니다.',
 };
 
 async function open(t, { cap } = {}) {
@@ -62,17 +69,17 @@ test('설명 흐름: 검색 → 카드(4항목·영문·"AI 설명 · 확인 필
   assert.equal(await page.text('#explain-card .e-term'), '가속도');
   assert.equal(await page.eval("document.getElementById('explain-english').value"), 'acceleration');
   const vals = await page.eval("[...document.querySelectorAll('#explain-card [data-t=explain-field]')].map(t => [t.dataset.k, t.value])");
-  assert.deepEqual(vals, [['definition', GOOD.definition], ['in_context', GOOD.in_context], ['example', GOOD.example], ['confusion', GOOD.confusion]]);
+  assert.deepEqual(vals, [['definition', GOOD.definition], ['example', GOOD.example], ['simple_text', GOOD.simple_text], ['deeper_text', GOOD.deeper_text]]);
   assert.equal(await page.count('#concept-list [data-t=concept]'), 0, '저장 전에는 목록에 없음');
   assert.equal(srv.anthropic.calls.length, 1);
   await page.click('#explain-save');
   await page.waitFor("document.querySelectorAll('#concept-list [data-t=concept]').length === 1", 4000);
   assert.equal(await page.eval("document.getElementById('explain-card').hidden"), true, '저장하면 카드가 닫힘');
   assert.equal(await page.eval("document.getElementById('explain-term').value"), '');
-  assert.deepEqual(rows(srv), [{ term: '가속도', english: 'acceleration', source: 'ai', ex: { definition: GOOD.definition, in_context: GOOD.in_context, example: GOOD.example, confusion: GOOD.confusion } }]);
+  assert.deepEqual(rows(srv), [{ term: '가속도', english: 'acceleration', source: 'ai', ex: { definition: GOOD.definition, example: GOOD.example, simple_text: GOOD.simple_text, deeper_text: GOOD.deeper_text } }]);
   assert.equal(await page.text('#concept-list [data-t=explanation-source]'), 'AI 설명 · 확인 필요');
   assert.equal(await page.eval("document.querySelector('#concept-list details').open"), true, '방금 저장한 개념은 설명이 펼쳐져 보임');
-  assert.match(await page.text('#concept-list details dl'), /속도가 시간에 따라 변하는 정도/);
+  assert.match(await page.text('#concept-list details .e-secs'), /속도가 시간에 따라 변하는 정도/);
   assert.equal(await page.hasHorizontalScroll(), false);
   noErrors(page);
 });
@@ -241,17 +248,43 @@ test('개념 대화상자의 설명 입력·수정: 직접 쓴 설명은 manual,
   await page.waitFor(`(document.querySelector('#concept-list [data-id="${ai.id}"] .c-memo') || {}).textContent === '메모만 추가'`, 4000, '목록 갱신(메모)');
   // 설명 고치면 manual
   await clickUntilDialogOpen(page, editBtn());
-  await page.type('#concept-ex-confusion', '내가 고친 문장');
+  await page.type('#concept-ex-deeper_text', '내가 고친 문장');
   await page.click('#concept-ok');
   await page.waitFor("!document.getElementById('concept-dlg').open", 4000);
   assert.equal(srv.db.concepts.find(c => c.id === ai.id).explanation_source, 'manual');
   await page.waitFor(`(document.querySelector('#concept-list [data-id="${ai.id}"] [data-t=explanation-source]') || {}).textContent === '직접 쓴 설명'`, 4000, '목록 갱신(출처)');
   // 모두 비우면 설명 삭제
   await clickUntilDialogOpen(page, editBtn());
-  for (const k of ['definition', 'in_context', 'example', 'confusion']) await page.type('#concept-ex-' + k, '');
+  for (const k of ['definition', 'example', 'simple_text', 'deeper_text']) await page.type('#concept-ex-' + k, '');
   await page.click('#concept-ok');
   await page.waitFor("!document.getElementById('concept-dlg').open", 4000);
   assert.equal(srv.db.concepts.find(c => c.id === ai.id).explanation, null);
   await page.waitFor(`!document.querySelector('#concept-list [data-id="${ai.id}"] details')`, 4000);
   noErrors(page);
+});
+
+test('설명 표시(274-2): 개념학습과 같은 항목·순서(정의·예시·쉬운 설명·더 깊게 설명), 예시는 인용 스타일, 옛 4항목 형태는 읽을 수 있는 항목만 표시되고 고쳐도 사라지지 않는다', { skip: SKIP, timeout: 60000 }, async t => {
+  const { srv, page } = await open(t);
+  const topic = await withTopic(page);
+  const nw = (await seed(page, 'POST', `/api/cmap/topics/${topic.id}/concepts`, { term: '신형', explanation: { definition: GOOD.definition, deeper_text: GOOD.deeper_text }, explanation_source: 'ai' })).concept;
+  const full = (await seed(page, 'POST', `/api/cmap/topics/${topic.id}/concepts`, { term: '전체', explanation: GOOD, explanation_source: 'ai' })).concept;
+  const old = (await seed(page, 'POST', `/api/cmap/topics/${topic.id}/concepts`, { term: '구형', explanation: OLD, explanation_source: 'ai' })).concept;
+  await page.eval('refresh()');
+  await page.waitFor("document.querySelectorAll('#concept-list [data-t=concept]').length === 3", 4000);
+  const view = id => page.eval(`[...document.querySelectorAll('#concept-list [data-id="${id}"] .e-sec')].map(e => [e.dataset.f, e.querySelector('.sec-label').textContent, e.classList.contains('quote'), e.querySelector('p').textContent])`);
+  assert.deepEqual(await view(full.id), [['definition', '정의', false, GOOD.definition], ['example', '예시', true, GOOD.example], ['simple_text', '쉬운 설명', false, GOOD.simple_text], ['deeper_text', '더 깊게 설명', false, GOOD.deeper_text]]);
+  assert.deepEqual((await view(nw.id)).map(x => x[0]), ['definition', 'deeper_text'], '비어 있는 항목은 표시하지 않음');
+  assert.deepEqual(await view(old.id), [['definition', '정의', false, OLD.definition], ['example', '예시', true, OLD.example], ['in_context', '이 주제에서의 의미', false, OLD.in_context], ['confusion', '헷갈리기 쉬운 점', false, OLD.confusion]], '옛 형태: 읽을 수 있는 항목만, 옛 항목은 뒤에');
+  // 대화상자: 옛 항목 입력칸은 값이 있는 개념에서만 보이고, 메모만 고쳐도 설명(옛 항목 포함)은 그대로 남는다
+  await clickUntilDialogOpen(page, `#concept-list [data-t=concept][data-id="${old.id}"] [data-t=concept-edit]`);
+  assert.equal(await page.eval("document.getElementById('concept-legacy-in_context').hidden || document.getElementById('concept-legacy-confusion').hidden"), false);
+  assert.equal(await page.eval("document.getElementById('concept-ex-in_context').value"), OLD.in_context);
+  await page.type('#concept-memo', '메모');
+  await page.click('#concept-ok');
+  await page.waitFor("!document.getElementById('concept-dlg').open", 4000);
+  assert.deepEqual(srv.db.concepts.find(c => c.id === old.id).explanation, OLD, '옛 형태 설명은 그대로');
+  assert.equal(srv.db.concepts.find(c => c.id === old.id).explanation_source, 'ai');
+  await page.waitFor(`(document.querySelector('#concept-list [data-id="${old.id}"] .c-memo') || {}).textContent === '메모'`, 4000);
+  await clickUntilDialogOpen(page, `#concept-list [data-t=concept][data-id="${nw.id}"] [data-t=concept-edit]`);
+  assert.equal(await page.eval("document.getElementById('concept-legacy-in_context').hidden && document.getElementById('concept-legacy-confusion').hidden"), true, '새 형태 개념에는 옛 항목 입력칸이 없음');
 });

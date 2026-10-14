@@ -363,7 +363,7 @@ router.patch('/api/cmap/concepts/:id', guard, handle(async req => {
     if (ex.explanation === null) { expl = null; explSrc = null; explAt = null; }
     else if (ex.explanation) {
       const stored = row.explanation && typeof row.explanation === 'string' ? JSON.parse(row.explanation) : row.explanation;
-      const same = stored && AI.EXPLAIN_FIELDS.every(k => (stored[k] || '') === ex.explanation[k]);
+      const same = stored && AI.ALL_FIELDS.every(k => (typeof stored[k] === 'string' ? stored[k].trim() : '') === (ex.explanation[k] || ''));
       if (!same) { expl = ex.explanation; explSrc = 'manual'; explAt = new Date(); }
     }
     const { rows } = await c.query(

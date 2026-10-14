@@ -358,3 +358,19 @@ test('모듈 규칙: 목표 길이는 개념당 100자·상한 2500자, 한도 �
   process.env.CMAP_NARRATE_DAILY_CAP = '3'; assert.equal(N.narrateDailyCap(), 3);
   delete process.env.CMAP_NARRATE_DAILY_CAP;
 });
+
+test('해설 입력의 설명 항목(274-2): 새 항목(정의·예시·쉬운 설명·더 깊게 설명)과 옛 4항목 형태를 모두 읽고, 항목당 300자까지만 넣는다(해설 출력 구조·검증은 그대로)', async t => {
+  const s = await setup(); t.after(() => s.t.close());
+  const w = await s.world({ save: false });
+  const nw = await s.concept(w.sci.id, { term: '관성', explanation: { definition: '정의입니다.', example: '예시입니다.', simple_text: '쉬운 설명입니다.', deeper_text: '깊'.repeat(500) }, explanation_source: 'ai' });
+  const old = await s.concept(w.sci.id, { term: '마찰', explanation: { definition: '옛 정의', in_context: '옛 맥락', example: '옛 예', confusion: '옛 헷갈림' }, explanation_source: 'ai' });
+  for (const c of [nw, old]) await s.call('POST', `/api/cmap/maps/${w.map.id}/nodes`, { concept_id: c.id });
+  await s.call('POST', `/api/cmap/maps/${w.map.id}/save`);
+  s.anthropic.handler = () => JSON.stringify(good(w, { story: [{ text: '힘 가속도 질량 에너지 관성 마찰 이야기입니다.', concept_ids: [...Object.values(w.ids).filter(i => i !== w.ids.vel), nw.id, old.id] }] }));
+  const r = await w.nar();
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const data = dataOf(s.anthropic.calls[0].messages[0].content)['지도 개념'];
+  assert.deepEqual(data.find(c => c['용어'] === '관성')['저장된 설명'], { '정의': '정의입니다.', '예시': '예시입니다.', '쉬운 설명': '쉬운 설명입니다.', '더 깊게 설명': '깊'.repeat(300) });
+  assert.deepEqual(data.find(c => c['용어'] === '마찰')['저장된 설명'], { '정의': '옛 정의', '예시': '옛 예', '맥락': '옛 맥락', '헷갈리는 점': '옛 헷갈림' });
+  assert.deepEqual(r.body.narration.content.story.length, 1);
+});

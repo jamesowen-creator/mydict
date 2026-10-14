@@ -101,9 +101,12 @@
   .c-expl { margin-top: 4px; }
   .c-expl summary { min-height: var(--ctl-min-h); display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--color-accent-ink); font-weight: 700; font-size: 14px; }
   .c-expl .e-src { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--color-accent-ink); }
-  .c-expl dl { margin: 0 0 8px; }
-  .c-expl dt { margin-top: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--color-text-sub); }
-  .c-expl dd { margin: 2px 0 0; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  /* 274-2: 개념학습(concept_study.html)의 설명 표시와 같은 방식 — 항목 라벨(12px/700/자간 0.04em/강조색, 아래 2px 선) + 문단, 예시는 왼쪽 강조선 */
+  .e-sec { margin-top: 12px; }
+  .e-sec > .sec-label { display: block; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 2px solid var(--color-accent); }
+  .e-sec p { font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .e-sec.quote p { border-left: 2px solid var(--color-accent); padding-left: 12px; }
+  .c-expl .e-secs { margin-bottom: 8px; }
 
   /* 작업273-2: 지도 화면 */
   .map-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 12px; }
@@ -330,10 +333,12 @@
     <div class="field"><label for="concept-english">영문 표기 (선택)</label><input id="concept-english" type="text" maxlength="120" autocomplete="off"></div>
     <div class="field"><label for="concept-memo">메모 (선택)</label><textarea id="concept-memo" maxlength="2000"></textarea></div>
     <p class="sec-label" style="margin-top:14px">설명 (선택)</p>
-    <div class="field"><label for="concept-ex-definition">정의</label><textarea id="concept-ex-definition" maxlength="220"></textarea></div>
-    <div class="field"><label for="concept-ex-in_context">이 주제에서의 의미</label><textarea id="concept-ex-in_context" maxlength="220"></textarea></div>
-    <div class="field"><label for="concept-ex-example">쉬운 예</label><textarea id="concept-ex-example" maxlength="150"></textarea></div>
-    <div class="field"><label for="concept-ex-confusion">헷갈리기 쉬운 점</label><textarea id="concept-ex-confusion" maxlength="150"></textarea></div>
+    <div class="field"><label for="concept-ex-definition">정의</label><textarea id="concept-ex-definition" maxlength="2000"></textarea></div>
+    <div class="field"><label for="concept-ex-example">예시</label><textarea id="concept-ex-example" maxlength="1000"></textarea></div>
+    <div class="field"><label for="concept-ex-simple_text">쉬운 설명</label><textarea id="concept-ex-simple_text" maxlength="1000"></textarea></div>
+    <div class="field"><label for="concept-ex-deeper_text">더 깊게 설명</label><textarea id="concept-ex-deeper_text" maxlength="1000"></textarea></div>
+    <div class="field" id="concept-legacy-in_context" hidden><label for="concept-ex-in_context">이 주제에서의 의미 (이전 형태)</label><textarea id="concept-ex-in_context" maxlength="220"></textarea></div>
+    <div class="field" id="concept-legacy-confusion" hidden><label for="concept-ex-confusion">헷갈리기 쉬운 점 (이전 형태)</label><textarea id="concept-ex-confusion" maxlength="150"></textarea></div>
     <p id="concept-msg" class="msg" role="alert"></p>
     <div class="btn-row"><button id="concept-cancel" class="btn text" type="button">취소</button><button id="concept-ok" class="btn" type="submit">저장</button></div>
   </form>
@@ -639,14 +644,24 @@ function renderConcepts() {
   }
 }
 // 저장된 설명 보기(접힘). AI 가 만든 설명에는 "AI 설명 · 확인 필요"를 붙인다(고쳐서 직접 쓴 설명은 "직접 쓴 설명")
-const EXPLAIN_LABELS = { definition: '정의', in_context: '이 주제에서의 의미', example: '쉬운 예', confusion: '헷갈리기 쉬운 점' };
+// 274-2: 설명 항목은 개념학습과 같다(정의 · 예시 · 쉬운 설명 · 더 깊게 설명). 273-1 에서 저장한 옛 형태의 항목(이 주제에서의 의미 · 헷갈리기 쉬운 점)은 값이 있을 때만 뒤에 덧붙여 보여 준다.
+const EXPLAIN_LABELS = { definition: '정의', example: '예시', simple_text: '쉬운 설명', deeper_text: '더 깊게 설명' };
+const EXPLAIN_LEGACY_LABELS = { in_context: '이 주제에서의 의미', confusion: '헷갈리기 쉬운 점' };
+const EXPLAIN_VIEW_LABELS = Object.assign({}, EXPLAIN_LABELS, EXPLAIN_LEGACY_LABELS);
+const EXPLAIN_MAXLEN = { definition: 2000, example: 1000, simple_text: 1000, deeper_text: 1000 };
+function explanationSections(expl) {
+  const box = h('div', { class: 'e-secs' });
+  for (const k of Object.keys(EXPLAIN_VIEW_LABELS)) {
+    const v = expl && typeof expl[k] === 'string' ? expl[k].trim() : '';
+    if (v) box.append(h('div', { class: 'e-sec' + (k === 'example' ? ' quote' : ''), 'data-f': k }, h('span', { class: 'sec-label', text: EXPLAIN_VIEW_LABELS[k] }), h('p', { text: v })));
+  }
+  return box;
+}
 function explanationBlock(c) {
   if (!c.explanation) return null;
-  const dl = h('dl', {});
-  for (const k of Object.keys(EXPLAIN_LABELS)) if (c.explanation[k]) dl.append(h('dt', { text: EXPLAIN_LABELS[k] }), h('dd', { text: c.explanation[k] }));
   const open = c.id === S.highlightId;
   return h('details', { class: 'c-expl', 'data-t': 'explanation', open },
-    h('summary', {}, '설명 보기', h('span', { class: 'e-src', 'data-t': 'explanation-source', text: c.explanation_source === 'ai' ? 'AI 설명 · 확인 필요' : '직접 쓴 설명' })), dl);
+    h('summary', {}, '설명 보기', h('span', { class: 'e-src', 'data-t': 'explanation-source', text: c.explanation_source === 'ai' ? 'AI 설명 · 확인 필요' : '직접 쓴 설명' })), explanationSections(c.explanation));
 }
 let editingConcept = null;
 function openConceptDialog(c) {
@@ -655,7 +670,8 @@ function openConceptDialog(c) {
   $('concept-term').value = c ? c.term : '';
   $('concept-english').value = c && c.english ? c.english : '';
   $('concept-memo').value = c && c.memo ? c.memo : '';
-  for (const k of Object.keys(EXPLAIN_LABELS)) $('concept-ex-' + k).value = c && c.explanation && c.explanation[k] ? c.explanation[k] : '';
+  for (const k of Object.keys(EXPLAIN_VIEW_LABELS)) $('concept-ex-' + k).value = c && c.explanation && c.explanation[k] ? c.explanation[k] : '';
+  for (const k of Object.keys(EXPLAIN_LEGACY_LABELS)) $('concept-legacy-' + k).hidden = !(c && c.explanation && c.explanation[k]);   // 옛 형태의 항목은 값이 있는 개념에서만 보이고, 고쳐도 조용히 사라지지 않는다
   $('concept-msg').textContent = '';
   openDlg($('concept-dlg'));
   $('concept-term').focus();
@@ -669,7 +685,7 @@ $('concept-form').addEventListener('submit', async ev => {
   const body = { term, english: $('concept-english').value, memo: $('concept-memo').value };
   // 설명: 한 항목이라도 쓰면 설명으로 보낸다(처음 쓰는 설명의 출처는 manual, 고친 AI 설명은 서버가 manual 로 바꿈). 모두 비우면 설명을 지운다
   const ex = {};
-  for (const k of Object.keys(EXPLAIN_LABELS)) ex[k] = $('concept-ex-' + k).value;
+  for (const k of Object.keys(EXPLAIN_VIEW_LABELS)) ex[k] = $('concept-ex-' + k).value;
   if (Object.values(ex).some(v => v.trim())) {
     if (!ex.definition.trim()) { $('concept-msg').textContent = '설명을 쓰려면 정의를 먼저 입력해 주세요.'; return; }
     body.explanation = ex;
@@ -757,7 +773,7 @@ function renderExplain() {
   // ready: 4항목을 읽고 고칠 수 있다
   const fields = h('div', {});
   for (const k of Object.keys(EXPLAIN_LABELS)) {
-    const ta = h('textarea', { id: 'explain-f-' + k, maxlength: 250, 'data-t': 'explain-field', 'data-k': k });
+    const ta = h('textarea', { id: 'explain-f-' + k, maxlength: EXPLAIN_MAXLEN[k], 'data-t': 'explain-field', 'data-k': k });
     ta.value = e.fields[k];
     ta.addEventListener('input', () => { e.fields[k] = ta.value; });
     fields.append(h('div', { class: 'field' }, h('label', { for: 'explain-f-' + k, text: EXPLAIN_LABELS[k] }), ta));
