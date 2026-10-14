@@ -1,6 +1,6 @@
 # METIS-3 오케스트레이터 인수인계 (새 채팅 시작용)
 
-기준일: 2026-10-14. 이 채팅의 역할과 작업 규칙, 현재 위치를 적은 문서. 자세한 기록은 각 문서 참고.
+기준일: 2026-10-15. 이 채팅의 역할과 작업 규칙, 현재 위치를 적은 문서. 자세한 기록은 각 문서 참고.
 
 ## 역할
 - James(셀로/LGU+ 기획팀, 비개발자)가 이 채팅을 "오케스트레이터"로 사용. 나는 별도 Claude Code 세션(Windows, C:\dev\metis3-app)에 줄 **작업 지시 블록**을 쓰고, 붙여준 결과 보고를 검토해 다음 단계를 정하고, 프로젝트 문서(claude/*)를 관리한다. 코드를 직접 볼 수 없다.
@@ -23,13 +23,14 @@
 - 비밀이 들어 있을 수 있는 파일(.env 등)을 검토해 달라고 하면 먼저 경고. keys\(정답표) 폴더는 판정 전에는 열지 않는다.
 - Railway 변수 값은 열람·기록하지 않는다. **jamesowen API 키는 앱이 쓰므로 삭제 금지.**
 
-## 현재 위치 (2026-10-14)
-- origin/master = 0346f0f (275-5), 작업 트리 깨끗. sw.js CACHE_NAME metis-v31. DB init 총 34단계.
-- **개념 지도 구현 완료**(1~5b, UI 개편, 개념학습 의존 제거, 모르는 개념 표시, 표시 개념 퀴즈) 및 **OCR 터치 선택(272)** 배포. 작업↔커밋 표, 구현 결정, 향후 과제, 확인 대기 목록은 **claude/concept-map-progress-275.md**. 설계 배경은 claude/concept-map-redesign.md.
-- **사용자 폰 확인은 전부 보류**(2026-10-14): Railway 로그 "[DB] init done: 총 34단계, 실패 0단계", 개념 지도 화면 전체, 275-4·275-5, OCR 터치 선택. 새 캐시(v31)를 받으려면 앱을 완전히 닫았다가 재실행.
-- 합의된 향후 과제(미착수): 복습 고도화 2단계(주관식·음성 답변·AI 평가 피드백, 리마인딩 방식 미정, Haiku 먼저), 개념 지도 vs 개념학습 비교 후 하나 삭제.
-- 변경 금지 파일(매 작업 diff 0줄 확인): concept_study.html, routes/concept_study.js, lib/concept_links_b2.js, public/js/map/mapCore.js, voice_study.html. 개념 지도 코드는 개념학습 파일을 불러오지 않는다(275-1).
+## 현재 위치 (2026-10-15)
+- origin/master = caa10fd (278-1), 작업 트리 깨끗. sw.js CACHE_NAME metis-v32. DB init 총 35단계. 전체 테스트 974건 통과(6분 3초).
+- **개념 지도 구현 완료**(1~5b, UI 개편, 개념학습 의존 제거, 모르는 개념 표시, 표시 개념 퀴즈, **말로 설명하기(주관식·음성 답변·AI 평가) + 최근 부족 목록**) 및 **OCR 터치 선택(272)** 배포. 작업↔커밋 표, 구현 결정, 향후 과제, 확인 대기 목록은 **claude/concept-map-progress-275.md**(6b에 2단계 상세). 설계 배경은 claude/concept-map-redesign.md.
+- **사용자 폰 확인은 전부 보류**(2026-10-14): Railway 로그 "[DB] init done: 총 35단계, 실패 0단계", 개념 지도 화면 전체, 275-4·275-5, 278-1(말로 설명하기), OCR 터치 선택. 새 캐시(v32)를 받으려면 앱을 완전히 닫았다가 재실행.
+- 합의된 향후 과제(미착수): 리마인딩 확장(목록에서 재출제·간격 반복 등, 필요할 때 검토), 개념 지도 vs 개념학습 비교 후 하나 삭제.
+- 2단계 설계 결정(2026-10-14): 질문 문장 없이 개념 이름만 제시, 녹음 원문은 보여 주거나 저장하지 않고 AI가 정리한 요약만 표시·저장, 전사 확인 단계 없음, 한도 전사 20/일·평가 30/일, 리마인딩은 최근 부족 목록만. 개념학습에는 주관식 평가가 원래 없었음(277-1 조사).
+- 변경 금지 파일(매 작업 diff 0줄 확인): concept_study.html, routes/concept_study.js, lib/concept_links_b2.js, public/js/map/mapCore.js, voice_study.html. 개념 지도 코드는 개념학습 파일을 불러오지 않는다(275-1, 278-1에서도 유지).
 - 이전 위치(2026-10-10, 정리 작업 완료, 음성 지도 이식, 227 지도 품질, 디자인 적용 245~255)의 상세는 claude/cleanup-plan.md, claude/voice-map-214.md, claude/map-quality-227.md, claude/design-principles-238.md 참고. 그때의 사용자 확인 대기(사전 폰 지도, Console 비용)는 미확인으로 남음. Railway에는 lucky-truth의 metis3-app + Postgres-dyGe(운영 DB)만 남음.
 - UI 통일·하단 내비 이력은 claude/ui-unify-plan.md, claude/bottom-nav-plan.md. 이식용 원칙은 claude/design-principles-portable.md, 저장소의 확정 원칙은 docs/design/design-principles.md. 관리자 화면·권한 구조는 claude/admin-permissions-243.md. 그 밖: concept-study-design/phase2, voice-study-design, voice-map-214, digest-reading-plan.
-- 디자인 문서(design-principles-238.md)는 255까지의 경과이고, 256~275의 디자인 관련 변경(입력 포커스, 섹션 라벨, OCR 밝은 패널, 토큰 44개, design_lint 기준선)은 concept-map-progress-275.md 9절에 기록. 다음 문서 갱신 때 합칠 수 있음.
-- 작업 방식 메모: 지시문에서 커밋과 푸시를 한 명령으로 잇지 않는다(245-1 사고). Claude Code PC의 시각 표기가 KST 표기인데 실제로는 UTC 값이라 9시간 이르니 보고 시각은 믿지 말고 필요하면 사용자 시각으로 확인.
+- 디자인 문서(design-principles-238.md)는 255까지의 경과이고, 256~278의 디자인 관련 변경(입력 포커스, 섹션 라벨, OCR 밝은 패널, 토큰 44개, design_lint 기준선)은 concept-map-progress-275.md 9절에 기록. 다음 문서 갱신 때 합칠 수 있음.
+- 작업 방식 메모: 지시문에서 커밋과 푸시를 한 명령으로 잇지 않는다(245-1 사고). Claude Code PC의 시각 표기가 KST 표기인데 실제로는 UTC 값이라 9시간 이르니 보고 시각은 믿지 말고 필요하면 사용자 시각으로 확인. 결과 보고가 안 오면 transcript를 검색해 도착 여부를 확인하고, 필요하면 읽기 전용 상태 확인 블록을 쓴다(278-1 사례).
