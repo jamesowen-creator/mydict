@@ -817,19 +817,9 @@ function renderExplain() {
       h('div', { class: 'btn-row' }, h('button', { class: 'btn', type: 'button', 'data-t': 'explain-close', text: '확인', onclick: () => { S.highlightId = null; closeExplain(); renderConcepts(); } })));
     return;
   }
-  // ready: 4항목을 읽고 고칠 수 있다
-  const fields = h('div', {});
-  for (const k of Object.keys(EXPLAIN_LABELS)) {
-    const ta = h('textarea', { id: 'explain-f-' + k, maxlength: EXPLAIN_MAXLEN[k], 'data-t': 'explain-field', 'data-k': k });
-    ta.value = e.fields[k];
-    ta.addEventListener('input', () => { e.fields[k] = ta.value; });
-    fields.append(h('div', { class: 'field' }, h('label', { for: 'explain-f-' + k, text: EXPLAIN_LABELS[k] }), ta));
-  }
-  const en = h('input', { id: 'explain-english', type: 'text', maxlength: 120, autocomplete: 'off', 'aria-label': '영문 표기' });
-  en.value = e.english;
-  en.addEventListener('input', () => { e.english = en.value; });
+  // ready: 275-3 — 저장된 개념의 "설명 보기"와 같은 읽기 렌더러(explanationSections)로 보여 준다. 입력칸은 [수정]을 누르면 이 카드 안에서만 나타난다.
   const msg = h('p', { class: 'msg', role: 'alert', id: 'explain-msg', 'data-t': 'explain-msg' });
-  const saveBtn = h('button', { class: 'btn', type: 'button', id: 'explain-save', 'data-t': 'explain-save', text: '저장' });
+  const saveBtn = h('button', { class: 'btn text', type: 'button', id: 'explain-save', 'data-t': 'explain-save', text: '저장' });
   saveBtn.addEventListener('click', async () => {
     if (!e.fields.definition.trim()) { msg.textContent = '정의는 비워 둘 수 없습니다.'; return; }
     const edited = Object.keys(EXPLAIN_LABELS).some(k => e.fields[k].trim() !== e.orig[k].trim());
@@ -843,15 +833,41 @@ function renderExplain() {
     closeExplain();
     await refresh();
   });
+  if (!e.editing) {
+    card.append(
+      h('div', { class: 'e-term', text: e.term }),
+      e.english ? h('div', { class: 'c-en', 'data-t': 'explain-english-text', text: e.english }) : null,
+      h('p', { class: 'sec-label', 'data-t': 'explain-label', style: 'margin-top:4px', text: 'AI 설명 · 확인 필요' }),
+      explanationSections(e.fields), msg,
+      h('div', { class: 'btn-row' },
+        h('button', { class: 'btn text', type: 'button', 'data-t': 'explain-close', text: '닫기', onclick: closeExplain }),
+        h('button', { class: 'btn text', type: 'button', 'data-t': 'explain-again', text: '다시 설명', onclick: () => requestExplain(e.term) }),
+        h('button', { class: 'btn text', type: 'button', id: 'explain-edit', 'data-t': 'explain-edit', text: '수정', onclick: () => { e.snap = { fields: Object.assign({}, e.fields), english: e.english }; e.editing = true; renderExplain(); const f = card.querySelector('textarea'); if (f) f.focus(); } }),
+        saveBtn));
+    return;
+  }
+  // 수정 상태: 입력칸(자동 높이) + [취소](수정 전 값으로 되돌려 읽기 형태로) + [완료](이 카드에 반영하고 읽기 형태로)
+  const fields = h('div', {});
+  for (const k of Object.keys(EXPLAIN_LABELS)) {
+    const ta = h('textarea', { id: 'explain-f-' + k, maxlength: EXPLAIN_MAXLEN[k], 'data-t': 'explain-field', 'data-k': k });
+    ta.value = e.fields[k];
+    ta.addEventListener('input', () => { e.fields[k] = ta.value; });
+    fields.append(h('div', { class: 'field' }, h('label', { for: 'explain-f-' + k, text: EXPLAIN_LABELS[k] }), ta));
+  }
+  const en = h('input', { id: 'explain-english', type: 'text', maxlength: 120, autocomplete: 'off', 'aria-label': '영문 표기' });
+  en.value = e.english;
+  en.addEventListener('input', () => { e.english = en.value; });
   card.append(
     h('div', { class: 'e-term', text: e.term }),
     h('p', { class: 'sec-label', 'data-t': 'explain-label', style: 'margin-top:4px', text: 'AI 설명 · 확인 필요' }),
     h('div', { class: 'field' }, h('label', { for: 'explain-english', text: '영문 표기 (선택)' }), en),
     fields, msg,
     h('div', { class: 'btn-row' },
-      h('button', { class: 'btn text', type: 'button', 'data-t': 'explain-cancel', text: '취소', onclick: closeExplain }),
-      h('button', { class: 'btn text', type: 'button', 'data-t': 'explain-again', text: '다시 설명', onclick: () => requestExplain(e.term) }),
-      saveBtn));
+      h('button', { class: 'btn text', type: 'button', 'data-t': 'explain-cancel', text: '취소', onclick: () => { e.fields = Object.assign({}, e.snap.fields); e.english = e.snap.english; e.editing = false; renderExplain(); } }),
+      h('button', { class: 'btn text', type: 'button', id: 'explain-done', 'data-t': 'explain-done', text: '완료', onclick: () => {
+        if (!e.fields.definition.trim()) { msg.textContent = '정의는 비워 둘 수 없습니다.'; return; }
+        e.editing = false; renderExplain();
+      } })));
   growAll(card);
 }
 

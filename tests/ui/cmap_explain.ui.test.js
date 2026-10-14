@@ -67,9 +67,11 @@ test('설명 흐름: 검색 → 카드(4항목·영문·"AI 설명 · 확인 필
   await waitReady(page);
   assert.equal(await page.text('#explain-card [data-t=explain-label]'), 'AI 설명 · 확인 필요');
   assert.equal(await page.text('#explain-card .e-term'), '가속도');
-  assert.equal(await page.eval("document.getElementById('explain-english').value"), 'acceleration');
-  const vals = await page.eval("[...document.querySelectorAll('#explain-card [data-t=explain-field]')].map(t => [t.dataset.k, t.value])");
-  assert.deepEqual(vals, [['definition', GOOD.definition], ['example', GOOD.example], ['simple_text', GOOD.simple_text], ['deeper_text', GOOD.deeper_text]]);
+  assert.equal(await page.text('#explain-card [data-t=explain-english-text]'), 'acceleration');
+  // 275-3: 읽기 형태(저장된 설명 보기와 같은 렌더러) — 항목 이름 + 본문, 입력칸 없음
+  const secs = await page.eval("[...document.querySelectorAll('#explain-card .e-sec')].map(e => [e.dataset.f, e.querySelector('.sec-label').textContent, e.querySelector('p').textContent])");
+  assert.deepEqual(secs, [['definition', '정의', GOOD.definition], ['example', '예시', GOOD.example], ['simple_text', '쉬운 설명', GOOD.simple_text], ['deeper_text', '더 깊게 설명', GOOD.deeper_text]]);
+  assert.equal(await page.count('#explain-card textarea'), 0, '처음에는 입력칸이 없음');
   assert.equal(await page.count('#concept-list [data-t=concept]'), 0, '저장 전에는 목록에 없음');
   assert.equal(srv.anthropic.calls.length, 1);
   await page.click('#explain-save');
@@ -89,7 +91,11 @@ test('저장 전에 문구를 고치면 source=manual 로 저장되고 목록에
   await withTopic(page);
   await search(page, '속도');
   await waitReady(page);
+  await page.click('#explain-edit');
   await page.type('#explain-f-example', '내가 고친 예');
+  await page.click('#explain-done');
+  assert.equal(await page.count('#explain-card textarea'), 0, '완료하면 읽기 형태로 돌아옴');
+  assert.equal(await page.text('#explain-card .e-sec[data-f=example] p'), '내가 고친 예', '고친 값이 반영됨');
   await page.click('#explain-save');
   await page.waitFor("document.querySelectorAll('#concept-list [data-t=concept]').length === 1", 4000);
   assert.equal(rows(srv)[0].source, 'manual'); assert.equal(rows(srv)[0].ex.example, '내가 고친 예');
@@ -104,13 +110,17 @@ test('[다시 설명]은 AI 를 다시 부르고(호출 2회), [취소]는 아�
   await waitReady(page);
   srv.anthropic.handler = () => JSON.stringify({ ...GOOD, definition: '두 번째 설명의 정의입니다.' });
   await page.click('[data-t=explain-again]');
-  await page.waitFor("document.getElementById('explain-f-definition') && document.getElementById('explain-f-definition').value === '두 번째 설명의 정의입니다.'", 6000);
+  await page.waitFor("(document.querySelector('#explain-card .e-sec[data-f=definition] p') || {}).textContent === '두 번째 설명의 정의입니다.'", 6000);
   assert.equal(srv.anthropic.calls.length, 2);
+  await page.click('#explain-edit');
   await page.type('#explain-f-definition', '   ');
-  await page.click('#explain-save');
+  await page.click('#explain-done');
   assert.match(await page.text('#explain-msg'), /정의는 비워 둘 수 없습니다/);
   assert.equal(srv.db.concepts.length, 0, '정의가 비면 서버에 요청하지 않음');
   await page.click('[data-t=explain-cancel]');
+  assert.equal(await page.count('#explain-card textarea'), 0, '취소하면 읽기 형태로 돌아옴');
+  assert.equal(await page.text('#explain-card .e-sec[data-f=definition] p'), '두 번째 설명의 정의입니다.', '취소하면 수정 전 값');
+  await page.click('[data-t=explain-close]');
   assert.equal((await cardState(page)).hidden, true);
   assert.equal(srv.db.concepts.length, 0, '취소하면 저장되지 않음');
   noErrors(page);
@@ -179,7 +189,7 @@ test('하루 한도: 한도를 넘으면 429 안내만(다시 시도 버튼 없�
   await withTopic(page);
   await search(page, '가속도');
   await waitReady(page);
-  await page.click('[data-t=explain-cancel]');
+  await page.click('[data-t=explain-close]');
   await search(page, '속도');
   await page.waitFor("!!document.querySelector('#explain-card [data-t=explain-error]')", 6000);
   assert.match(await page.text('[data-t=explain-error]'), /하루 1건/);
@@ -287,4 +297,41 @@ test('설명 표시(274-2): 개념학습과 같은 항목·순서(정의·예시
   await page.waitFor(`(document.querySelector('#concept-list [data-id="${old.id}"] .c-memo') || {}).textContent === '메모'`, 4000);
   await clickUntilDialogOpen(page, `#concept-list [data-t=concept][data-id="${nw.id}"] [data-t=concept-edit]`);
   assert.equal(await page.eval("document.getElementById('concept-legacy-in_context').hidden && document.getElementById('concept-legacy-confusion').hidden"), true, '새 형태 개념에는 옛 항목 입력칸이 없음');
+});
+
+test('설명 카드(275-3): 처음에는 입력칸이 0개, [수정]이면 입력칸 4개(영문 포함)가 카드 안에 나타나고 [취소]하면 다시 0개, [완료] 뒤 [저장]하면 고친 값이 manual 로 저장·표시된다', { skip: SKIP, timeout: 60000 }, async t => {
+  const { srv, page } = await open(t);
+  await withTopic(page);
+  await search(page, '가속도');
+  await waitReady(page);
+  const inputs = () => page.eval("document.querySelectorAll('#explain-card textarea, #explain-card input').length");
+  assert.equal(await inputs(), 0, '① 처음에는 textarea·input 이 없음');
+  assert.equal(await page.eval("document.querySelectorAll('textarea').length === document.querySelectorAll('#concept-dlg textarea').length"), true, '화면의 textarea 는 대화상자 것뿐');
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#explain-card .btn-row button')].map(b => b.textContent)"), ['닫기', '다시 설명', '수정', '저장'], '읽기 형태의 버튼(텍스트 버튼)');
+  assert.equal(await page.eval("[...document.querySelectorAll('#explain-card .btn-row button')].every(b => getComputedStyle(b).backgroundColor === 'rgba(0, 0, 0, 0)' && b.getBoundingClientRect().height >= 44)"), true, '텍스트 버튼·44px 이상');
+  // ② 수정 → 입력칸 4개 + 영문
+  await page.click('#explain-edit');
+  assert.equal(await page.count('#explain-card textarea'), 4);
+  assert.equal(await page.eval("document.getElementById('explain-english').value"), 'acceleration');
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#explain-card [data-t=explain-field]')].map(t => [t.dataset.k, t.value])"), [['definition', GOOD.definition], ['example', GOOD.example], ['simple_text', GOOD.simple_text], ['deeper_text', GOOD.deeper_text]]);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#explain-card .btn-row button')].map(b => b.textContent)"), ['취소', '완료']);
+  await page.type('#explain-f-simple_text', '취소할 수정');
+  await page.click('[data-t=explain-cancel]');
+  assert.equal(await inputs(), 0, '② 취소하면 다시 0개');
+  assert.equal(await page.text('#explain-card .e-sec[data-f=simple_text] p'), GOOD.simple_text, '취소하면 수정 전 값');
+  // ③ 수정 → 완료 → 저장
+  await page.click('#explain-edit');
+  await page.type('#explain-f-deeper_text', '저장할 수정 문장');
+  await page.type('#explain-english', 'inertia');
+  await page.click('#explain-done');
+  assert.equal(await inputs(), 0, '③ 완료하면 읽기 형태로 복귀');
+  assert.equal(await page.text('#explain-card .e-sec[data-f=deeper_text] p'), '저장할 수정 문장');
+  assert.equal(await page.text('#explain-card [data-t=explain-english-text]'), 'inertia');
+  assert.equal(srv.db.concepts.length, 0, '완료만으로는 저장되지 않음');
+  await page.click('#explain-save');
+  await page.waitFor("document.querySelectorAll('#concept-list [data-t=concept]').length === 1", 4000);
+  assert.equal(rows(srv)[0].source, 'manual'); assert.equal(rows(srv)[0].english, 'inertia'); assert.equal(rows(srv)[0].ex.deeper_text, '저장할 수정 문장');
+  assert.equal(await page.text('#concept-list details .e-sec[data-f=deeper_text] p'), '저장할 수정 문장', '목록의 설명 보기에도 반영');
+  assert.equal(await page.eval("document.getElementById('explain-card').hidden"), true);
+  noErrors(page);
 });

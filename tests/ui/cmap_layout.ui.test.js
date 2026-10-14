@@ -79,7 +79,7 @@ test('주제 화면: 주제 트리·개념 목록·설명 카드가 내부 스�
   const { srv, page } = await open(t);
   await world(page, srv);
   await page.eval("document.getElementById('explain-term').value = '관성'; document.getElementById('explain-form').requestSubmit(); 0");
-  await page.waitFor("!document.getElementById('explain-card').hidden && !!document.querySelector('#explain-card textarea')", 6000, '설명 카드');
+  await page.waitFor("!document.getElementById('explain-card').hidden && !!document.querySelector('#explain-card [data-t=explain-save]')", 6000, '설명 카드');
   await audit(page, '주제 화면');
   await longPage(page);
   assert.ok(await pageScrolls(page) > 500, '페이지 전체가 스크롤됨');
@@ -229,7 +229,9 @@ test('수정 화면 입력칸(이전 형태 항목 포함)과 설명 카드 입�
   // 설명 카드(AI 결과)
   srv.anthropic.handler = () => JSON.stringify({ ...EXPL, definition: LONG.slice(0, 290), example: LONG.slice(0, 190), simple_text: LONG.slice(0, 240), deeper_text: LONG.slice(0, 240) });
   await page.eval("document.getElementById('explain-term').value = '관성'; document.getElementById('explain-form').requestSubmit(); 0");
-  await page.waitFor("!!document.querySelector('#explain-card textarea')", 6000, '설명 카드');
+  await page.waitFor("!!document.querySelector('#explain-card [data-t=explain-edit]')", 6000, '설명 카드');
+  await page.click('#explain-edit');                                          // 275-3: 입력칸은 [수정]을 눌렀을 때만 나타난다
+  await page.waitFor("!!document.querySelector('#explain-card textarea')", 4000, '수정 입력칸');
   const cards = await page.eval("[...document.querySelectorAll('#explain-card textarea')].map(t => { const cs = getComputedStyle(t); return { id: t.id, sh: t.scrollHeight, ch: t.clientHeight, resize: cs.resize, ov: cs.overflowY, h: t.getBoundingClientRect().height }; })");
   assert.equal(cards.length, 4);
   for (const c of cards) { assert.equal(c.resize, 'none'); assert.equal(c.ov, 'hidden'); assert.ok(Math.abs(c.sh - c.ch) <= 1 && c.h > 80, JSON.stringify(c)); }
