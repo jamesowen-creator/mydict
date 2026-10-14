@@ -126,6 +126,16 @@
   .map-tab.sel { background: var(--color-accent-ink); border-color: var(--color-accent-ink); color: var(--color-surface); }
   .m-node.hl rect { stroke: var(--color-accent-ink); stroke-width: 3.5; }
   .m-node.dim { opacity: 0.35; }
+  /* 275-4: "모르는 개념" 표시(읽기 전용 시트). 해설 강조(.hl: 코랄 굵은 테두리)와 구분: 면 색(surface-2) + 진한 빨강 테두리 + 오른쪽 위 물음표 배지(SVG) */
+  .m-node.marked rect { fill: var(--color-surface-2); }
+  .m-node.marked:not(.hl) rect { stroke: var(--color-danger-ink); stroke-width: 3; }
+  .m-mark circle { fill: var(--color-danger-ink); stroke: var(--color-surface); stroke-width: 2; }
+  .m-mark text { font-size: 13px; font-weight: 700; fill: var(--color-surface); pointer-events: none; }
+  .map-popup { position: absolute; z-index: 3; pointer-events: none;   /* 팝업은 눌러서 쓰는 것이 아니다: 눌러도 아래 지도가 받아 "밖 클릭"·"다른 개념 클릭"으로 처리된다 */
+    min-height: 44px; padding: 10px 14px; background: var(--color-surface); border: 1px solid var(--color-line-strong); border-radius: var(--card-radius); }
+  .map-popup .p-term { font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+  .map-popup .p-text { margin-top: 4px; font-size: 14px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .map-popup .p-note { margin-top: 4px; font-size: 12px; color: var(--color-text-sub); }
   #narr-panel { display: none; padding-top: 12px; padding-bottom: 32px; }
   #review-panel, #quiz-panel { display: none; }
   #review-panel { padding-top: 12px; padding-bottom: 32px; }
@@ -209,6 +219,7 @@
 <script src="/js/cmap/mapGeometry.js?v=1"></script>
 <script src="/js/cmap/layoutOptimize.js?v=1"></script>
 <script src="/js/cmap/pairPicker.js?v=1"></script>
+<script src="/js/cmap/markState.js?v=1"></script>
 <script src="/js/cmap/mapView.js?v=1"></script>
 <script src="/js/cmap/narrateView.js?v=1"></script>
 <script src="/js/cmap/reviewView.js?v=1"></script>
@@ -300,6 +311,7 @@
   <div id="map-canvas" class="map-canvas">
     <div id="map-opt-bar" class="map-opt-bar" hidden><span id="map-opt-info"></span><button id="map-opt-apply" class="btn" type="button">적용</button><button id="map-opt-cancel" class="btn text" type="button">취소</button></div>
     <svg id="map-svg" role="group" aria-label="개념 지도"></svg>
+    <div id="map-popup" class="map-popup" role="status" hidden></div>
     <div class="map-overlay-top"><span id="map-save-state" class="map-save-state" role="status"></span><span id="map-count" class="hint"></span></div>
     <div class="map-overlay-bottom"><p id="map-hint"></p><p id="map-msg" class="msg" role="alert"></p></div>
   </div>

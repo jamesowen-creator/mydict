@@ -373,6 +373,35 @@ router.patch('/api/cmap/concepts/:id', guard, handle(async req => {
   });
 }));
 
+// 작업275-4: 팝업용 한 줄 설명. 저장된 설명(새 4항목·옛 4항목 형태 모두)의 정의, 없으면 읽을 수 있는 첫 항목, 설명이 없으면 null. 길면 140자에서 자른다
+const BRIEF_MAX = 140;
+function briefOf(explanation) {
+  const first = AI.explanationEntries(explanation)[0];
+  if (!first) return null;
+  const chars = Array.from(first[1].replace(/\s+/g, ' '));
+  return chars.length > BRIEF_MAX ? chars.slice(0, BRIEF_MAX).join('') + '…' : chars.join('');
+}
+
+// "모르는 개념" 표시 설정·해제(개념 id 단위, 멱등). 본인 개념만. 표시는 사용자별이며 지도와 무관하다
+router.put('/api/cmap/concepts/:id/mark', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('개념을 찾을 수 없습니다.');
+  const body = bodyOf(req);
+  if (typeof body.marked !== 'boolean') throw bad('marked 는 true 또는 false 여야 합니다.');
+  const { rows: own } = await pool.query('SELECT id FROM cmap_concepts WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+  if (!own.length) throw notFound('개념을 찾을 수 없습니다.');
+  if (!body.marked) {
+    await pool.query('DELETE FROM cmap_concept_marks WHERE user_id = $1 AND concept_id = $2', [req.user.id, id]);
+    return { body: { concept_id: id, marked: false } };
+  }
+  const { rows: have } = await pool.query('SELECT concept_id FROM cmap_concept_marks WHERE user_id = $1 AND concept_id = $2', [req.user.id, id]);
+  if (!have.length) {
+    try { await pool.query('INSERT INTO cmap_concept_marks (user_id, concept_id) VALUES ($1, $2) RETURNING concept_id', [req.user.id, id]); }
+    catch (err) { if (!(err && err.code === '23505')) throw err; }      // 동시에 같은 표시가 먼저 들어간 경우도 성공(멱등)
+  }
+  return { body: { concept_id: id, marked: true } };
+}));
+
 router.delete('/api/cmap/concepts/:id', guard, handle(async req => {
   const id = parseId(req.params.id);
   if (id === null) throw notFound('개념을 찾을 수 없습니다.');
@@ -442,7 +471,7 @@ async function treeOfMap(db, userId, rootTopicId) {
   const root = idx.byId.get(rootTopicId);
   const topics = root ? [root, ...T.descendants(idx, rootTopicId)] : [];
   const set = new Set(topics.map(t => t.id));
-  const { rows } = await db.query('SELECT id, topic_id, term, english FROM cmap_concepts WHERE user_id = $1 ORDER BY sort_order, id', [userId]);
+  const { rows } = await db.query('SELECT id, topic_id, term, english, explanation FROM cmap_concepts WHERE user_id = $1 ORDER BY sort_order, id', [userId]);
   return { topics, concepts: rows.filter(x => set.has(x.topic_id)) };
 }
 
@@ -464,10 +493,14 @@ router.get('/api/cmap/topics/:rootId/map', guard, handle(async req => {
     const { rows: edges } = await c.query(`SELECT ${EDGE_COLS} FROM cmap_edges WHERE map_id = $1 ORDER BY id`, [map.id]);
     const tree = await treeOfMap(c, req.user.id, rootId);
     const currentHash = H.computeSemanticHash(nodes.map(n => n.concept_id), edges);
+    // 작업275-4: 팝업용 한 줄 설명(brief = 저장된 설명의 정의, 없으면 읽을 수 있는 첫 항목)과 이 사용자의 "모르는 개념" 표시. 설명 전체는 보내지 않는다
+    const { rows: markRows } = await c.query('SELECT concept_id FROM cmap_concept_marks WHERE user_id = $1', [req.user.id]);
+    const inTree = new Set(tree.concepts.map(x => x.id));
     return { body: {
       current_hash: currentHash, save_status: H.saveStatus(map, currentHash),
       map, nodes: nodes.map(n => ({ concept_id: n.concept_id, x: n.x, y: n.y })), edges,
-      concepts: tree.concepts, topics: tree.topics.map(t => ({ id: t.id, parent_id: t.parent_id, title: t.title, sort_order: t.sort_order })),
+      marked_concept_ids: markRows.map(r => r.concept_id).filter(id => inTree.has(id)).sort((a, b) => a - b),
+      concepts: tree.concepts.map(x => ({ id: x.id, topic_id: x.topic_id, term: x.term, english: x.english, brief: briefOf(x.explanation) })), topics: tree.topics.map(t => ({ id: t.id, parent_id: t.parent_id, title: t.title, sort_order: t.sort_order })),
       relation_types: M.RELATION_TYPES,
     } };
   });

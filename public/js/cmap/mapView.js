@@ -5,7 +5,7 @@
 // 모든 연결은 사용자가 직접 만든다(AI 제안 없음). 제스처: 노드 위 드래그 = 노드 이동(끝나면 위치 저장), 빈 곳 드래그 = 화면 이동, 두 손가락 = 확대·축소, 노드 탭 = 연결용 선택.
 (function () {
   'use strict';
-  const G = window.CmapGeometry, PP = window.CmapPairPicker;
+  const G = window.CmapGeometry, PP = window.CmapPairPicker, MS = window.CmapMarkState;
   const TAP_PX = 6;   // 이 거리(px) 안에서 손을 떼면 탭, 넘으면 드래그
   const READ_FLOOR = 12 / 13;          // 열 때 노드 글자가 화면에서 12px 이상이 되는 배율(개념학습의 MAP_READ_PX / MAP_FONT_UNITS 와 같음)
   const ZMIN = 0.05, ZMAX = 3;         // 확대·축소 한도(개념학습의 MAP_MIN_SCALE / MAP_MAX_SCALE 와 같음)
@@ -23,10 +23,12 @@
     rootId: null, map: null, nodes: new Map(), edges: [], concepts: new Map(), topics: [], types: [],
     temp: new Map(), view: { tx: 0, ty: 0, scale: 1 }, ptrs: new Map(), gest: null, pinch: null, selected: null, picker: null, svg: null, busy: false,
     sheet: { open: false, scrollY: 0, ignorePop: false }, needFit: false,
+    marks: new Set(), serverMarks: new Set(), popup: null,   // 275-4: 모르는 개념 표시(화면 상태 / 서버가 확인해 준 상태), 팝업이 열린 개념 id
     mode: 'map', quiz: null, hl: new Set(), status: null, preview: null, undo: null,   // 작업273-3: 저장 상태 { current_hash, save_status }, 최적화 미리보기 { pos, metrics }, 되돌리기 { pos }
   };
   const listeners = { open: [], close: [], status: [], mode: [], quizpair: [], sheet: [], sheetclose: [] };   // 작업273-4: 해설 탭(narrateView.js)이 구독
   const emit = (ev, arg) => { for (const fn of listeners[ev]) { try { fn(arg); } catch (e) { console.error(e); } } };
+  const isRo = () => M.mode === 'narr' || M.mode === 'review';        // 읽기 전용 시트: 개념을 누르면 간략 설명 팝업 + 모르는 개념 표시(편집 시트·퀴즈에서는 동작하지 않음)
   const locked = () => !!M.preview || M.mode !== 'map';              // 미리보기·해설 탭에서는 노드·연결을 건드릴 수 없고 화면 이동·확대만 된다
   let ED = null;   // 연결 대화상자 상태 { mode, edge, from, to, flips }
 
@@ -68,9 +70,11 @@
     }
     for (const id of M.nodes.keys()) {
       const p = posOf(id), n = M.nodes.get(id);
-      nodeLayer.append(sv('g', { class: 'm-node' + (M.selected === id ? ' sel' : '') + (isPlaced(n) ? '' : ' temp') + (M.preview ? ' preview' : '') + (M.hl.size ? (M.hl.has(id) ? ' hl' : ' dim') : ''), 'data-node': id, 'data-t': 'node', transform: `translate(${p.x},${p.y})`, role: 'button', tabindex: 0, 'aria-label': termOf(id) + (M.selected === id ? ' (선택됨)' : '') },
+      const marked = isRo() && M.marks.has(id);
+      nodeLayer.append(sv('g', { class: 'm-node' + (M.selected === id ? ' sel' : '') + (isPlaced(n) ? '' : ' temp') + (M.preview ? ' preview' : '') + (M.hl.size ? (M.hl.has(id) ? ' hl' : ' dim') : '') + (marked ? ' marked' : ''), 'data-node': id, 'data-t': 'node', transform: `translate(${p.x},${p.y})`, role: 'button', tabindex: 0, 'aria-label': termOf(id) + (M.selected === id ? ' (선택됨)' : '') + (marked ? ' (모르는 개념으로 표시됨)' : '') },
         sv('rect', { width: G.NODE_W, height: G.NODE_H, rx: 10 }),
-        sv('text', { x: G.NODE_W / 2, y: G.NODE_H / 2 + 5, 'text-anchor': 'middle', class: 'm-node-text' }, clipText(termOf(id), 9))));
+        sv('text', { x: G.NODE_W / 2, y: G.NODE_H / 2 + 5, 'text-anchor': 'middle', class: 'm-node-text' }, clipText(termOf(id), 9)),
+        marked ? sv('g', { class: 'm-mark' }, sv('circle', { cx: G.NODE_W - 4, cy: 4, r: 10 }), sv('text', { x: G.NODE_W - 4, y: 9, 'text-anchor': 'middle' }, '?')) : null));
     }
     svg.append(defs, edgeLayer, nodeLayer);
     applyView();
@@ -89,6 +93,69 @@
     const r = M.svg.getBoundingClientRect();
     const cw = r.width || 1, ch = r.height || 1;
     M.svg.setAttribute('viewBox', `${M.view.tx} ${M.view.ty} ${cw / M.view.scale} ${ch / M.view.scale}`);
+    placePopup();
+  }
+
+  // ── 간략 설명 팝업과 모르는 개념 표시(작업275-4) ──
+  // 상태 전이는 markState.js(순수 함수)에 있다. 여기서는 화면 반영·서버 저장만 한다. 팝업은 이미 불러온 데이터(brief)만 쓰며 서버를 부르지 않는다.
+  function renderPopup() {
+    const el = $('map-popup');
+    if (!M.sheet.open || M.popup === null || !isRo()) { el.hidden = true; return; }
+    const c = M.concepts.get(M.popup);
+    el.textContent = '';
+    el.append(h('div', { class: 'p-term', text: c ? c.term : '?' }), h('div', { class: 'p-text', text: c && c.brief ? c.brief : '설명이 아직 없습니다' }), h('div', { class: 'p-note', text: '모르는 개념으로 표시했어요.' }));
+    el.hidden = false;
+    placePopup();
+  }
+  // 개념 근처(아래, 자리가 없으면 위)에 두고 캔버스 밖으로 나가지 않게 보정한다
+  function placePopup() {
+    const el = $('map-popup');
+    if (!el || el.hidden || M.popup === null || !M.svg) return;
+    const nd = M.svg.querySelector('[data-node="' + M.popup + '"] rect');
+    if (!nd) return;
+    const cv = $('map-canvas').getBoundingClientRect(), r = nd.getBoundingClientRect();
+    const w = Math.max(120, Math.min(280, cv.width - 16));
+    el.style.width = w + 'px';
+    const ph = el.offsetHeight;
+    let left = r.left + r.width / 2 - cv.left - w / 2;
+    left = Math.max(8, Math.min(cv.width - w - 8, left));
+    let top = r.bottom - cv.top + 8;
+    if (top + ph > cv.height - 8) top = r.top - cv.top - ph - 8;
+    top = Math.max(8, Math.min(cv.height - ph - 8, top));
+    el.style.left = left + 'px'; el.style.top = top + 'px';
+  }
+  function hidePopup() { M.popup = null; const el = $('map-popup'); if (el) el.hidden = true; }
+  function closePopupOnly() {
+    if (M.popup === null) return;
+    const r = MS.closePopup({ marked: M.marks, popupId: M.popup });
+    M.marks = r.marked; hidePopup();
+  }
+  function markClick(id) {
+    const r = MS.clickConcept({ marked: M.marks, popupId: M.popup }, id);
+    M.marks = r.marked; M.popup = r.popupId;
+    render(); renderPopup();
+    if (r.change) pushMark(r.change.id);
+  }
+  // 낙관적 갱신: 이미 화면에 반영했고, 서버에는 개념별로 한 번에 하나씩 보낸다(연타는 마지막 상태만 유효). 실패하면 서버가 확인해 준 상태로 되돌리고 안내한다
+  const markInflight = new Set();
+  async function pushMark(id) {
+    if (markInflight.has(id)) return;
+    markInflight.add(id);
+    try {
+      let sent;
+      do {
+        sent = M.marks.has(id);
+        const r = await api('PUT', '/api/cmap/concepts/' + id + '/mark', { marked: sent });
+        if (!okStatus(r)) {
+          if (M.serverMarks.has(id)) M.marks.add(id); else M.marks.delete(id);
+          if (M.popup === id) hidePopup();
+          mapMsg('표시를 저장하지 못했어요. 원래대로 돌려놨어요.');
+          render();
+          return;
+        }
+        if (sent) M.serverMarks.add(id); else M.serverMarks.delete(id);
+      } while (M.marks.has(id) !== sent);
+    } finally { markInflight.delete(id); }
   }
   // 시트가 닫혀 있으면 크기를 알 수 없으므로 다음에 열 때 맞춘다(needFit). opts.open = 시트를 열 때: 전체가 들어오게 맞추되 글자가 너무 작아지면(READ_FLOOR 미만) 줄이지 않고 왼쪽 위부터 보여 준다(개념학습과 같음)
   function fit(opts) {
@@ -144,6 +211,7 @@
         onPair: (a, bb) => { M.selected = null; render(); if (M.mode === 'quiz') emit('quizpair', { a, b: bb }); else onPair(a, bb); },
       });
     } else M.picker.reset();
+    M.marks = new Set(b.marked_concept_ids || []); M.serverMarks = new Set(M.marks); hidePopup();
     M.svg = $('map-svg');
     $('main-view').hidden = true;
     $('map-view').hidden = false;
@@ -411,6 +479,7 @@
     if (M.mode === mode && !silent) return;
     if (mode !== 'map' && M.preview) cancelPreview();
     M.mode = mode;
+    hidePopup();
     if (M.picker) M.picker.reset();
     M.selected = null; M.gest = null; M.pinch = null; M.ptrs.clear();
     const cl = $('map-view').classList;
@@ -454,6 +523,7 @@
   function closeSheetUi(restore) {
     if (!M.sheet.open) return;
     M.sheet.open = false;
+    hidePopup();
     if (M.picker) M.picker.reset();
     M.selected = null; M.gest = null; M.pinch = null; M.ptrs.clear();
     $('map-pick-panel').hidden = true; $('map-pick-toggle').setAttribute('aria-expanded', 'false');
@@ -496,11 +566,13 @@
     svg.addEventListener('wheel', onWheel, { passive: false });
     svg.addEventListener('keydown', ev => {
       if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      if (isRo()) { const rn = ev.target.closest && ev.target.closest('[data-node]'); if (rn) { ev.preventDefault(); markClick(Number(rn.dataset.node)); } return; }
       if (locked() && M.mode !== 'quiz') return;
       const nd = ev.target.closest && ev.target.closest('[data-node]'), ed = ev.target.closest && ev.target.closest('[data-edge]');
       if (nd) { ev.preventDefault(); M.picker.tap(Number(nd.dataset.node)); }
       else if (ed) { ev.preventDefault(); const e = M.edges.find(x => x.id === Number(ed.dataset.edge)); if (e) openEdgeDialog('edit', { edge: e, from: e.from_concept_id, to: e.to_concept_id }); }
     });
+    $('map-sheet').addEventListener('pointerdown', ev => { if (M.popup !== null && !$('map-popup').contains(ev.target) && !M.svg.contains(ev.target)) closePopupOnly(); });   // 팝업·지도 밖(툴바 등)을 누르면 팝업만 닫는다
     $('map-fit').addEventListener('click', () => { fit(); });
     $('map-zoom-in').addEventListener('click', () => zoomBy(1.25));
     $('map-zoom-out').addEventListener('click', () => zoomBy(0.8));
@@ -543,7 +615,8 @@
     } else if (ed) {
       M.gest = { kind: 'edge', id: Number(ed.dataset.edge), x: ev.clientX, y: ev.clientY, moved: false, pid: ev.pointerId };
     } else {
-      M.gest = { kind: 'pan', x: ev.clientX, y: ev.clientY, tx: M.view.tx, ty: M.view.ty, moved: false, pid: ev.pointerId };
+      const rn = isRo() && !M.preview && t && t.closest('[data-node]');   // 읽기 전용 시트: 노드 위에서 시작해도 드래그는 화면 이동(pan)이고, 거의 안 움직이고 떼면 클릭으로 처리한다
+      M.gest = { kind: 'pan', x: ev.clientX, y: ev.clientY, tx: M.view.tx, ty: M.view.ty, moved: false, pid: ev.pointerId, tapNode: rn ? Number(rn.dataset.node) : null };
     }
   }
   function onMove(ev) {
@@ -590,7 +663,10 @@
       const e = M.edges.find(x => x.id === g.id);
       if (e) openEdgeDialog('edit', { edge: e, from: e.from_concept_id, to: e.to_concept_id });
     } else if (g.kind === 'pan') {
-      if (!g.moved) M.picker.reset();                  // 빈 곳을 가볍게 누르면 선택 취소
+      if (!g.moved) {                                  // 빈 곳을 가볍게 누르면 선택 취소(읽기 전용 시트에서는 개념 클릭 또는 팝업 닫기)
+        if (g.tapNode !== null && g.tapNode !== undefined) markClick(g.tapNode); else if (isRo()) closePopupOnly();
+        M.picker.reset();
+      }
     }
   }
   function onCancel(ev) {
@@ -647,6 +723,7 @@
     _preview() { return M.preview ? { pos: [...M.preview.pos].map(([id, p]) => ({ id, ...p })), metrics: M.preview.metrics } : null; },
     togglePanel() { const p = $('map-pick-panel'); p.hidden = !p.hidden; $('map-pick-toggle').setAttribute('aria-expanded', String(!p.hidden)); if (M.sheet.open) applyView(); },
     // 테스트 확인용(읽기 전용 사본)
+    _marks() { return { marked: [...M.marks].sort((a, b) => a - b), server: [...M.serverMarks].sort((a, b) => a - b), popup: M.popup }; },
     _highlight() { return [...M.hl].sort((a, b) => a - b); },
     _state() { return { mode: M.mode, nodes: [...M.nodes].map(([id, n]) => ({ id, x: n.x, y: n.y })), edges: M.edges.map(e => ({ ...e })), view: { ...M.view }, selected: M.selected, mapId: M.map && M.map.id }; },
   };
