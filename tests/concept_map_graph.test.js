@@ -6,7 +6,8 @@ const assert = require('node:assert/strict');
 const { createCmapDb } = require('./helpers/cmap_db');
 const { startApp } = require('./helpers/app');
 const M = require('../lib/cmap_map');
-const { PREDICATES } = require('../lib/concept_links_b2');
+// 275-1: 개념학습 모듈을 불러오지 않는다. 관계 5종은 개념 지도 기준 고정값(값·순서)
+const PREDICATES = ['사용', '일부', '종류', '일으킴', '구별'];
 
 async function setup() {
   const db = createCmapDb();
@@ -30,7 +31,7 @@ async function setup() {
 }
 const fail = (r, status) => { assert.equal(r.status, status, JSON.stringify(r.body)); assert.equal(r.body.ok, false); };
 
-test('관계 종류 코드는 lib/concept_links_b2.js PREDICATES 와 같다(읽기만)', () => {
+test('관계 종류 5종은 개념 지도 상수와 고정값이 같다(값·순서)', () => {
   assert.deepEqual(M.RELATION_TYPES, PREDICATES);
   assert.deepEqual(M.RELATION_TYPES, ['사용', '일부', '종류', '일으킴', '구별']);
 });

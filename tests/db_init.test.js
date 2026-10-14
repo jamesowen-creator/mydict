@@ -336,8 +336,9 @@ test('개념 지도(273-2): cmap_maps·cmap_map_nodes·cmap_edges 의 제약(5�
   assert.match(nodes, /map_id\s+INTEGER NOT NULL REFERENCES cmap_maps\(id\) ON DELETE CASCADE/);
   assert.match(nodes, /concept_id\s+INTEGER NOT NULL REFERENCES cmap_concepts\(id\) ON DELETE CASCADE/);
   assert.match(nodes, /x\s+REAL,/); assert.match(nodes, /y\s+REAL,/); assert.match(nodes, /PRIMARY KEY \(map_id, concept_id\)/);
-  // 간선: 관계 종류 5종 CHECK 는 lib/concept_links_b2.js PREDICATES 와 같은 코드명
-  const { PREDICATES } = require('../lib/concept_links_b2');
+  // 간선: 관계 종류 5종 CHECK 는 개념 지도 상수(lib/cmap_map.js RELATION_TYPES)·고정 5개 값과 같은 코드명
+  const PREDICATES = require('../lib/cmap_map').RELATION_TYPES;
+  assert.deepEqual(PREDICATES, ['사용', '일부', '종류', '일으킴', '구별'], '고정 5개 값');
   assert.ok(edges.includes("relation_type TEXT CHECK (relation_type IS NULL OR relation_type IN (" + PREDICATES.map(p => "'" + p + "'").join(', ') + "))"), '5종 CHECK = PREDICATES: ' + edges.slice(edges.indexOf('relation_type'), edges.indexOf('relation_type') + 140));
   assert.match(edges, /label\s+TEXT NOT NULL CHECK \(char_length\(label\) BETWEEN 1 AND 40 AND btrim\(label\) <> ''\)/);
   assert.match(edges, /CHECK \(from_concept_id <> to_concept_id\)/);

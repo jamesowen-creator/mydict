@@ -1,7 +1,7 @@
 // 작업273-2: 개념 지도 화면의 "지도" 보기 — 지도에 쓸 개념 선택, 노드 드래그 배치, 노드 A 탭 → B 탭 연결, 연결 수정·삭제.
 // 클래식 스크립트(window.CmapMap). concept_map.html 의 인라인 스크립트가 먼저 정의한 전역($, h, api, okStatus, errText, openDlg, closeDlg, openConfirm, S, byId, ...)과
 // 공용 /js/map/mapCore.js 의 읽기 전용 도구(sv, clipText, edgeGeom), /js/cmap/mapGeometry.js·pairPicker.js 를 호출 시점에 사용한다(공용 코드는 수정하지 않음).
-// 274-4: 지도는 페이지 안의 작은 캔버스가 아니라 <dialog id="map-sheet"> 안에 크게 그린다(모바일 = 전체 화면 시트, 768px 이상 = 큰 팝업). 열고 닫기·맞춤·확대/축소는 개념학습(concept_study.html)의 지도 팝업 방식을 따랐다.
+// 274-4: 지도는 페이지 안의 작은 캔버스가 아니라 <dialog id="map-sheet"> 안에 크게 그린다(모바일 = 전체 화면 시트, 768px 이상 = 큰 팝업). 열고 닫기·맞춤·확대/축소는 개념학습의 지도 팝업 방식을 따랐다.
 // 모든 연결은 사용자가 직접 만든다(AI 제안 없음). 제스처: 노드 위 드래그 = 노드 이동(끝나면 위치 저장), 빈 곳 드래그 = 화면 이동, 두 손가락 = 확대·축소, 노드 탭 = 연결용 선택.
 (function () {
   'use strict';

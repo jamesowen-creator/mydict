@@ -59,7 +59,7 @@ test('소스 확인: server.js 라우터 등록, /api/me 와 신규 가입 INSER
   const root = path.join(__dirname, '..');
   const read = f => fs.readFileSync(path.join(root, f), 'utf8');
   const server = read('server.js');
-  assert.ok(server.indexOf("require('./routes/concept_study')") < server.indexOf("require('./routes/concept_map')"), '개념 지도 라우터는 기존 라우터 뒤에 한 줄');
+  assert.equal(server.split("app.use(require('./routes/concept_map'));").length - 1, 1, '개념 지도 라우터 등록은 한 줄');
   const auth = read('routes/auth.js');
   assert.match(auth, /perm_voice_study, perm_concept_study, perm_concept_map\s+FROM users WHERE id = \$1/, '/api/me SELECT 에 열 포함');
   assert.match(auth, /perm_concept_map: false/, 'DB 없는 응답은 닫힘');
