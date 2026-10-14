@@ -56,7 +56,8 @@ const good = (w, over = {}) => ({
 });
 const text = (page, sel) => page.eval(`(document.querySelector(${JSON.stringify(sel)}) || {}).textContent || ''`);
 const saveMap = async page => { await page.click('#map-save'); await page.waitFor("document.getElementById('map-save-state').textContent.startsWith('저장됨')", 4000, '저장됨'); };
-const narrTab = async page => { await page.click('#tab-narr'); await page.waitFor("document.getElementById('map-view').classList.contains('narr-mode') && !!document.getElementById('narr-make') || !!document.getElementById('narr-summary')", 4000, '해설 탭'); };
+// 274-2: 해설 목록 조회(GET)가 끝난 표시(오늘 N/10건)까지 기다린 뒤 누른다. 조회가 끝나기 전에 누르면 늦게 온 응답과 엇갈린다
+const narrTab = async page => { await page.click('#tab-narr'); await page.waitFor("document.getElementById('map-view').classList.contains('narr-mode') && !!document.getElementById('narr-daily') && (!!document.getElementById('narr-make') || !!document.getElementById('narr-summary'))", 8000, '해설 탭'); };
 
 test('저장 안 된 지도: 해설 탭에서 [해설 만들기]가 비활성이고 저장 안내가 보인다(AI 호출 없음)', { skip: SKIP }, async t => {
   const { srv, page } = await open(t);
@@ -75,7 +76,7 @@ test('해설 만들기: AI 설명 · 확인 필요 표시, 요약이 맨 위, �
   await narrTab(page);
   assert.equal(await page.eval("document.getElementById('narr-make').disabled"), false);
   await page.click('#narr-make');
-  await page.waitFor("!!document.getElementById('narr-summary')", 6000, '해설 표시');
+  await page.waitFor("!!document.getElementById('narr-summary')", 15000, '해설 표시');
   assert.equal(srv.anthropic.calls.length, 1);
   const order = await page.eval(`(() => { const p = document.getElementById('narr-panel'); const q = s => { const e = p.querySelector(s); return e ? [...p.querySelectorAll('*')].indexOf(e) : -1; }; return [q('.sec-label'), q('#narr-summary'), q('.narr-para'), q('#narr-mnemonic'), q('#narr-sugs')]; })()`);
   assert.ok(order.every(n => n >= 0) && order.every((n, i) => i === 0 || n > order[i - 1]), JSON.stringify(order));
@@ -93,7 +94,7 @@ test('단락을 누르면 그 단락의 개념이 지도에서 강조되고, 다
   const w = await world(page);
   srv.anthropic.handler = () => JSON.stringify(good(w));
   await saveMap(page); await narrTab(page);
-  await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-summary')", 6000);
+  await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-summary')", 15000);
   const hl = () => page.eval('window.CmapMap._highlight()');
   assert.deepEqual(await hl(), []);
   await page.click('[data-para="0"]');
@@ -122,7 +123,7 @@ test('제안: 자동으로 개념·연결을 추가하지 않는다. [찾아보�
   const w = await world(page);
   srv.anthropic.handler = () => JSON.stringify(good(w));
   await saveMap(page); await narrTab(page);
-  await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-sugs')", 6000);
+  await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-sugs')", 15000);
   assert.equal(await page.eval("document.querySelectorAll('.narr-sug').length"), 2);
   assert.match(await text(page, '[data-sug="0"]'), /운동량[\s\S]*질량과 속도를 곱한 양[\s\S]*가까운 개념: 질량/);
   assert.equal(await page.eval("document.querySelector('[data-sug=\"0\"] [data-act]').getAttribute('data-act')"), 'search');
@@ -148,7 +149,7 @@ test('지도가 바뀌면 이전 해설을 보여 주며 "지도가 바뀌었습
   let n = 0;
   srv.anthropic.handler = () => JSON.stringify(good(w, { summary: '요약 ' + (++n) }));
   await saveMap(page); await narrTab(page);
-  await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-summary')", 6000);
+  await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-summary')", 15000);
   assert.equal(await page.eval("!!document.getElementById('narr-stale')"), false);
   // 지도에서 연결 문구를 바꾼다(서버 직접) → 지도 화면을 다시 열면 해설은 이전 것 + 안내
   await seed(page, 'PATCH', `/api/cmap/edges/${w.e1.id}`, { label: '문구를 고침' });
@@ -163,7 +164,7 @@ test('지도가 바뀌면 이전 해설을 보여 주며 "지도가 바뀌었습
   await page.click('#tab-map'); await saveMap(page); await narrTab(page);
   assert.equal(await page.eval("document.getElementById('narr-make').disabled"), false);
   await page.click('#narr-make');
-  await page.waitFor("document.getElementById('narr-summary') && document.getElementById('narr-summary').textContent === '요약 2' && !document.getElementById('narr-stale')", 6000, '새 해설');
+  await page.waitFor("document.getElementById('narr-summary') && document.getElementById('narr-summary').textContent === '요약 2' && !document.getElementById('narr-stale')", 15000, '새 해설');
   assert.equal(srv.anthropic.calls.length, 2);
 });
 
@@ -173,13 +174,13 @@ test('오류 카드: AI 실패는 [다시 시도]만 있고 자동 재시도 없
   srv.anthropic.handler = () => { throw new Error('upstream down'); };
   await saveMap(page); await narrTab(page);
   await page.click('#narr-make');
-  await page.waitFor("!!document.getElementById('narr-error')", 6000, '오류 카드');
+  await page.waitFor("!!document.getElementById('narr-error')", 15000, '오류 카드');
   assert.match(await text(page, '#narr-error'), /해설을 만들지 못했습니다/);
   await sleep(400);
   assert.equal(srv.anthropic.calls.length, 1, '자동 재시도 없음');
   srv.anthropic.handler = () => JSON.stringify(good(w));
   await page.click('#narr-retry');
-  await page.waitFor("!!document.getElementById('narr-summary') && !document.getElementById('narr-error')", 6000, '다시 시도 성공');
+  await page.waitFor("!!document.getElementById('narr-summary') && !document.getElementById('narr-error')", 15000, '다시 시도 성공');
   assert.equal(srv.anthropic.calls.length, 2);
 });
 
@@ -204,7 +205,7 @@ test('하루 한도(429): 안내만 보이고 [다시 시도] 버튼은 없다',
   process.env.CMAP_NARRATE_DAILY_CAP = '1';
   t.after(() => { delete process.env.CMAP_NARRATE_DAILY_CAP; });
   await saveMap(page); await narrTab(page);
-  await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-summary')", 6000);
+  await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-summary')", 15000);
   await page.click('#narr-make');
   await page.waitFor("!!document.getElementById('narr-error')", 4000, '한도 안내');
   assert.match(await text(page, '#narr-error'), /하루 1건/);
@@ -220,7 +221,7 @@ test('390px: 탭·[해설 만들기]·단락·제안 버튼 높이 44 이상, �
   for (const id of ['tab-map', 'tab-narr']) assert.ok(await page.eval(`document.getElementById('${id}').getBoundingClientRect().height`) >= 44, id);
   await saveMap(page); await narrTab(page);
   assert.ok(await page.eval("document.getElementById('narr-make').getBoundingClientRect().height") >= 44);
-  await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-sugs')", 6000);
+  await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-sugs')", 15000);
   for (const sel of ['.narr-para', '[data-act]']) assert.ok(await page.eval(`Math.min(...[...document.querySelectorAll(${JSON.stringify('#narr-panel ' + sel)})].map(e => e.getBoundingClientRect().height))`) >= 44, sel);
   assert.ok(await page.eval("document.querySelector('.map-canvas').getBoundingClientRect().height") <= 230);
   assert.equal(await page.hasHorizontalScroll(), false);

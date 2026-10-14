@@ -31,6 +31,14 @@ async function open(t, { cap } = {}) {
   await sleep(150);
   return { srv, page };
 }
+// 274-2: 대화상자가 닫힌 뒤 목록이 다시 그려지는 중에 누르면 클릭이 유실되므로(요소 교체), 대화상자가 열릴 때까지 다시 누른다
+async function clickUntilDialogOpen(page, sel) {
+  for (let i = 0; i < 4; i++) {
+    try { await page.click(sel); } catch (e) { await sleep(150); continue; }
+    try { await page.waitFor("document.getElementById('concept-dlg').open", 1500); return; } catch (e) { /* 다시 시도 */ }
+  }
+  await page.waitFor("document.getElementById('concept-dlg').open", 3000, '개념 대화상자');
+}
 const seed = (page, method, url, body) => page.eval(`(async () => { const r = await api(${JSON.stringify(method)}, ${JSON.stringify(url)}, ${JSON.stringify(body)}); return r.body; })()`);
 async function withTopic(page, title = '물리') {
   const t = (await seed(page, 'POST', '/api/cmap/topics', { title })).topic;
@@ -224,23 +232,22 @@ test('개념 대화상자의 설명 입력·수정: 직접 쓴 설명은 manual,
   await page.eval('refresh()');
   await page.waitFor("document.querySelectorAll('#concept-list [data-t=concept]').length === 2", 4000);
   const editBtn = term => `#concept-list [data-t=concept][data-id="${ai.id}"] [data-t=concept-edit]`;
-  await page.click(editBtn());
-  await page.waitFor("document.getElementById('concept-dlg').open", 3000);
+  await clickUntilDialogOpen(page, editBtn());
   assert.equal(await page.eval("document.getElementById('concept-ex-definition').value"), GOOD.definition);
   await page.type('#concept-memo', '메모만 추가');
   await page.click('#concept-ok');
   await page.waitFor("!document.getElementById('concept-dlg').open", 4000);
   assert.equal(srv.db.concepts.find(c => c.id === ai.id).explanation_source, 'ai', '설명을 건드리지 않으면 AI 설명 표시 유지');
+  await page.waitFor(`(document.querySelector('#concept-list [data-id="${ai.id}"] .c-memo') || {}).textContent === '메모만 추가'`, 4000, '목록 갱신(메모)');
   // 설명 고치면 manual
-  await page.click(editBtn());
-  await page.waitFor("document.getElementById('concept-dlg').open", 3000);
+  await clickUntilDialogOpen(page, editBtn());
   await page.type('#concept-ex-confusion', '내가 고친 문장');
   await page.click('#concept-ok');
   await page.waitFor("!document.getElementById('concept-dlg').open", 4000);
   assert.equal(srv.db.concepts.find(c => c.id === ai.id).explanation_source, 'manual');
+  await page.waitFor(`(document.querySelector('#concept-list [data-id="${ai.id}"] [data-t=explanation-source]') || {}).textContent === '직접 쓴 설명'`, 4000, '목록 갱신(출처)');
   // 모두 비우면 설명 삭제
-  await page.click(editBtn());
-  await page.waitFor("document.getElementById('concept-dlg').open", 3000);
+  await clickUntilDialogOpen(page, editBtn());
   for (const k of ['definition', 'in_context', 'example', 'confusion']) await page.type('#concept-ex-' + k, '');
   await page.click('#concept-ok');
   await page.waitFor("!document.getElementById('concept-dlg').open", 4000);
