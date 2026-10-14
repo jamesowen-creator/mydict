@@ -18,11 +18,11 @@
   const M = {
     rootId: null, map: null, nodes: new Map(), edges: [], concepts: new Map(), topics: [], types: [],
     temp: new Map(), view: { tx: 0, ty: 0, scale: 1 }, ptrs: new Map(), gest: null, pinch: null, selected: null, picker: null, svg: null, busy: false,
-    mode: 'map', hl: new Set(), status: null, preview: null, undo: null,   // 작업273-3: 저장 상태 { current_hash, save_status }, 최적화 미리보기 { pos, metrics }, 되돌리기 { pos }
+    mode: 'map', quiz: null, hl: new Set(), status: null, preview: null, undo: null,   // 작업273-3: 저장 상태 { current_hash, save_status }, 최적화 미리보기 { pos, metrics }, 되돌리기 { pos }
   };
-  const listeners = { open: [], close: [], status: [], mode: [] };   // 작업273-4: 해설 탭(narrateView.js)이 구독
+  const listeners = { open: [], close: [], status: [], mode: [], quizpair: [] };   // 작업273-4: 해설 탭(narrateView.js)이 구독
   const emit = (ev, arg) => { for (const fn of listeners[ev]) { try { fn(arg); } catch (e) { console.error(e); } } };
-  const locked = () => !!M.preview || M.mode === 'narr';              // 미리보기·해설 탭에서는 노드·연결을 건드릴 수 없고 화면 이동·확대만 된다
+  const locked = () => !!M.preview || M.mode !== 'map';              // 미리보기·해설 탭에서는 노드·연결을 건드릴 수 없고 화면 이동·확대만 된다
   let ED = null;   // 연결 대화상자 상태 { mode, edge, from, to, flips }
 
   const termOf = id => (M.concepts.get(id) ? M.concepts.get(id).term : '?');
@@ -31,6 +31,7 @@
   // ── 위치 ──
   const isPlaced = n => n && n.x !== null && n.x !== undefined && n.y !== null && n.y !== undefined;
   function posOf(id) {
+    if (M.mode === 'quiz' && M.quiz && M.quiz.pos.has(id)) return M.quiz.pos.get(id);
     if (M.preview && M.preview.pos.has(id)) return M.preview.pos.get(id);
     const n = M.nodes.get(id);
     if (isPlaced(n)) return { x: n.x, y: n.y };
@@ -44,6 +45,7 @@
 
   // ── 그리기 ──
   function render() {
+    if (M.mode === 'quiz' && M.quiz) return renderQuiz();
     const svg = M.svg;
     svg.textContent = '';
     const defs = sv('defs', {}, sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '8', markerHeight: '8', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-path' })));
@@ -77,7 +79,7 @@
   }
   function fit() {
     const r = M.svg.getBoundingClientRect();
-    M.view = G.fitView([...M.nodes.keys()].map(posOf), r.width, r.height);
+    M.view = G.fitView((M.mode === 'quiz' && M.quiz ? M.quiz.nodes.map(n => n.id) : [...M.nodes.keys()]).map(posOf), r.width, r.height);
     applyView();
   }
   // 새 노드가 지금 보이는 영역 밖에 놓이면 전체가 보이도록 맞춘다(보이는 노드는 사용자가 정한 확대·이동을 그대로 둔다)
@@ -107,12 +109,12 @@
     M.nodes = new Map(b.nodes.map(n => [n.concept_id, { x: n.x, y: n.y }]));
     M.edges = b.edges;
     M.selected = null; M.gest = null; M.pinch = null; M.ptrs.clear();
-    M.status = { current_hash: b.current_hash, save_status: b.save_status }; M.preview = null; M.undo = null; M.hl = new Set();
+    M.status = { current_hash: b.current_hash, save_status: b.save_status }; M.preview = null; M.undo = null; M.hl = new Set(); M.quiz = null;
     if (!M.picker) {
       M.picker = PP.create({
         onFirst: id => { M.selected = id; render(); },
         onCancel: () => { M.selected = null; render(); },
-        onPair: (a, bb) => { M.selected = null; render(); onPair(a, bb); },
+        onPair: (a, bb) => { M.selected = null; render(); if (M.mode === 'quiz') emit('quizpair', { a, b: bb }); else onPair(a, bb); },
       });
     } else M.picker.reset();
     M.svg = $('map-svg');
@@ -132,7 +134,7 @@
     emit('open');
   }
   function close() {
-    M.preview = null; M.undo = null; M.hl = new Set(); setMode('map', true);
+    M.preview = null; M.undo = null; M.hl = new Set(); M.quiz = null; setMode('map', true);
     emit('close');       // 화면을 떠나면 되돌리기는 사라진다
     if (M.picker) M.picker.reset();
     M.gest = null; M.pinch = null; M.ptrs.clear();
@@ -342,15 +344,48 @@
     recomputeTemp(); fit(); render(); renderSave(); renderOptUi();
   }
 
-  // ── 탭(지도 | 해설)과 강조(작업273-4) ──
+  // ── 연결 퀴즈 화면(작업273-5): 서버가 준 노드를 흩어 놓고 사용자가 이은 답을 그린다(정답 간선은 이 화면에 없다) ──
+  function scatter(nodes) {
+    const ids = nodes.map(n => n.id).sort((a, b) => a - b);
+    let s = 7919 + ids.length * 31;
+    const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+    const pos = new Map();
+    ids.forEach((id, i) => pos.set(id, { x: (i % 2) * (G.NODE_W + 60) + Math.floor(rnd() * 24), y: Math.floor(i / 2) * (G.NODE_H + 50) + Math.floor(rnd() * 16) }));
+    return pos;
+  }
+  function renderQuiz() {
+    const svg = M.svg, q = M.quiz;
+    svg.textContent = '';
+    const defs = sv('defs', {}, sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '8', markerHeight: '8', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-path' })));
+    const edgeLayer = sv('g', { class: 'm-edges' }), nodeLayer = sv('g', { class: 'm-nodes' });
+    for (const a of q.answers) {
+      const geo = edgeGeom(posOf(a.from), posOf(a.to));
+      edgeLayer.append(sv('g', { class: 'm-edge', 'data-answer': a.from + '-' + a.to },
+        sv('path', { d: geo.d, class: 'm-edge-line', 'marker-end': a.type === '구별' ? null : 'url(#m-arrow)' }),
+        sv('text', { x: geo.mx, y: geo.my - 4, class: 'm-edge-label', 'text-anchor': 'middle' }, a.type ? a.type : '')));
+    }
+    for (const n of q.nodes) {
+      const p = posOf(n.id);
+      nodeLayer.append(sv('g', { class: 'm-node' + (M.selected === n.id ? ' sel' : ''), 'data-node': n.id, 'data-t': 'node', transform: `translate(${p.x},${p.y})`, role: 'button', tabindex: 0, 'aria-label': n.term + (M.selected === n.id ? ' (선택됨)' : '') },
+        sv('rect', { width: G.NODE_W, height: G.NODE_H, rx: 10 }),
+        sv('text', { x: G.NODE_W / 2, y: G.NODE_H / 2 + 5, 'text-anchor': 'middle', class: 'm-node-text' }, clipText(n.term, 9))));
+    }
+    svg.append(defs, edgeLayer, nodeLayer);
+    applyView();
+  }
+
+  // ── 탭(지도 | 해설 | 복습)과 강조(작업273-4) ──
   function setMode(mode, silent) {
     if (M.mode === mode && !silent) return;
-    if (mode === 'narr' && M.preview) cancelPreview();
+    if (mode !== 'map' && M.preview) cancelPreview();
     M.mode = mode;
     if (M.picker) M.picker.reset();
     M.selected = null; M.gest = null; M.pinch = null; M.ptrs.clear();
-    $('map-view').classList.toggle('narr-mode', mode === 'narr');
-    for (const [id, m] of [['tab-map', 'map'], ['tab-narr', 'narr']]) { $(id).setAttribute('aria-selected', String(mode === m)); $(id).classList.toggle('sel', mode === m); }
+    const cl = $('map-view').classList;
+    cl.toggle('side-mode', mode !== 'map');
+    for (const m of ['narr', 'review', 'quiz']) cl.toggle(m + '-mode', mode === m);
+    for (const [id, m] of [['tab-map', 'map'], ['tab-narr', 'narr'], ['tab-review', 'review']]) { $(id).setAttribute('aria-selected', String(mode === m)); $(id).classList.toggle('sel', mode === m); }
     if (!silent) { if (M.svg) { requestAnimationFrame(() => { fit(); render(); }); } emit('mode', mode); }
   }
   function highlight(ids) {
@@ -374,7 +409,7 @@
     svg.addEventListener('wheel', onWheel, { passive: false });
     svg.addEventListener('keydown', ev => {
       if (ev.key !== 'Enter' && ev.key !== ' ') return;
-      if (locked()) return;
+      if (locked() && M.mode !== 'quiz') return;
       const nd = ev.target.closest && ev.target.closest('[data-node]'), ed = ev.target.closest && ev.target.closest('[data-edge]');
       if (nd) { ev.preventDefault(); M.picker.tap(Number(nd.dataset.node)); }
       else if (ed) { ev.preventDefault(); const e = M.edges.find(x => x.id === Number(ed.dataset.edge)); if (e) openEdgeDialog('edit', { edge: e, from: e.from_concept_id, to: e.to_concept_id }); }
@@ -395,10 +430,10 @@
     if (M.ptrs.size === 2) { startPinch(); return; }
     if (M.ptrs.size > 2) return;
     const t = ev.target.closest ? ev.target : null;
-    const nd = !locked() && t && t.closest('[data-node]'), ed = !locked() && t && t.closest('[data-edge]');   // 미리보기 중에는 노드·연결을 건드릴 수 없고 화면 이동·확대만 된다
+    const nd = (!locked() || M.mode === 'quiz') && t && t.closest('[data-node]'), ed = !locked() && t && t.closest('[data-edge]');   // 미리보기 중에는 노드·연결을 건드릴 수 없고 화면 이동·확대만 된다
     if (nd) {
       const id = Number(nd.dataset.node), n = M.nodes.get(id);
-      M.gest = { kind: 'node', id, x: ev.clientX, y: ev.clientY, orig: { x: n.x, y: n.y }, start: posOf(id), moved: false, pid: ev.pointerId };
+      M.gest = { kind: 'node', id, x: ev.clientX, y: ev.clientY, orig: { x: n.x, y: n.y }, start: posOf(id), moved: false, pid: ev.pointerId, noDrag: M.mode === 'quiz' };   // 퀴즈에서는 노드를 옮기지 않고 탭만 받는다
     } else if (ed) {
       M.gest = { kind: 'edge', id: Number(ed.dataset.edge), x: ev.clientX, y: ev.clientY, moved: false, pid: ev.pointerId };
     } else {
@@ -415,6 +450,7 @@
     if (!g.moved && Math.hypot(dx, dy) < TAP_PX) return;
     g.moved = true;
     if (g.kind === 'node') {
+      if (g.noDrag) return;
       const n = M.nodes.get(g.id);
       n.x = g.start.x + dx * worldPerPx(); n.y = g.start.y + dy * worldPerPx();
       render();
@@ -437,6 +473,7 @@
     if (!g || ev.pointerId !== g.pid) return;
     if (g.kind === 'node') {
       if (!g.moved) { M.picker.tap(g.id); return; }
+      if (g.noDrag) return;
       const n = M.nodes.get(g.id);
       const x = Math.round(n.x * 10) / 10, y = Math.round(n.y * 10) / 10;
       const r = await api('PATCH', '/api/cmap/maps/' + M.map.id + '/nodes/' + g.id, { x, y });
@@ -491,6 +528,11 @@
     mapId() { return M.map ? M.map.id : null; },
     rootId() { return M.rootId; },
     topicOfConcept(id) { const c = M.concepts.get(id); return c ? c.topic_id : null; },
+    // 연결 퀴즈(작업273-5): begin 으로 화면을 퀴즈 모드로 바꾸고, setAnswers 로 사용자가 이은 연결을 그리며, end 로 끝낸다(모드는 호출한 쪽이 정함)
+    quizBegin(nodes) { M.quiz = { nodes: nodes.map(n => ({ id: n.id, term: n.term })), pos: scatter(nodes), answers: [] }; M.selected = null; if (M.picker) M.picker.reset(); setMode('quiz'); },
+    quizSetAnswers(list) { if (M.quiz) { M.quiz.answers = list.map(a => ({ from: a.from, to: a.to, type: a.type || null })); render(); } },
+    quizEnd() { M.quiz = null; M.selected = null; if (M.picker) M.picker.reset(); },
+    edgeCount() { return M.edges.length; },
     openPick() { $('map-pick-panel').hidden = false; $('map-pick-toggle').setAttribute('aria-expanded', 'true'); },
     // 테스트용 확인: 배치 최적화 미리보기 상태
     _preview() { return M.preview ? { pos: [...M.preview.pos].map(([id, p]) => ({ id, ...p })), metrics: M.preview.metrics } : null; },

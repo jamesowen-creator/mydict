@@ -6,6 +6,7 @@ const AI = require('../lib/cmap_ai');
 const M = require('../lib/cmap_map');
 const H = require('../lib/cmap_hash');
 const N = require('../lib/cmap_narrate');
+const Q = require('../lib/cmap_quiz');
 
 const router = express.Router();
 
@@ -702,6 +703,50 @@ router.post('/api/cmap/maps/:id/narrate', guard, handle(async req => {
       narration: { id: row.id, content: jsonOf(row.content), model: row.model, created_at: row.created_at, source_hash: row.source_hash },
       stale: false, current_hash: ctx.hash, save_status: 'saved', concepts: conceptList(ctx),
       daily: { used: await AI.countToday(req.user.id, N.NARRATE_EVENT), cap },
+    } };
+  });
+}));
+
+// ─── 작업273-5: 연결 퀴즈(AI 없음) ──────────────────────────────────────────────────────────
+// 시작: 저장된 지도의 노드 목록(id·용어·영문)과 시작 시점의 의미 해시만 돌려준다(정답 간선은 보내지 않는다).
+// 제출: 저장된 지도의 현재 해시가 시작 때의 해시와 다르면(그 사이 지도가 바뀜) 채점하지 않고 409. 채점은 서버가 저장된 지도의 간선으로 한다.
+async function savedGraph(db, userId, mapId, { lock = false, expectHash = null } = {}) {
+  const map = await ownMap(db, mapId, userId, { lock });
+  const g = await graphOf(db, mapId);
+  if (expectHash !== null && g.hash !== expectHash) throw conflict('퀴즈를 푸는 동안 지도가 바뀌어 채점하지 않았습니다. 퀴즈를 다시 시작해 주세요.', { stale: true });
+  if (H.saveStatus(map, g.hash) !== 'saved') throw conflict('저장된 지도에서만 퀴즈를 풀 수 있습니다. 지도를 먼저 [저장]해 주세요.', { needs_save: true });
+  const { rows } = await db.query('SELECT id, term, english FROM cmap_concepts WHERE user_id = $1 ORDER BY sort_order, id', [userId]);
+  const have = new Set(g.nodeIds);
+  return { map, g, concepts: rows.filter(c => have.has(c.id)) };
+}
+
+router.post('/api/cmap/maps/:id/quiz/start', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('지도를 찾을 수 없습니다.');
+  const { g, concepts } = await savedGraph(pool, req.user.id, id);
+  if (!g.edges.length) throw bad('연결이 있는 지도에서만 퀴즈를 풀 수 있습니다.');
+  return { body: { source_hash: g.hash, nodes: concepts.map(c => ({ id: c.id, term: c.term, english: c.english || null })) } };
+}));
+
+router.post('/api/cmap/maps/:id/quiz/submit', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('지도를 찾을 수 없습니다.');
+  const body = bodyOf(req);
+  if (typeof body.source_hash !== 'string' || !/^[0-9a-f]{64}$/.test(body.source_hash)) throw bad('source_hash 가 올바르지 않습니다.');
+  return withTx(async c => {
+    const { g, concepts } = await savedGraph(c, req.user.id, id, { lock: true, expectHash: body.source_hash });
+    const ans = Q.readAnswers(body.answers, g.nodeIds);
+    if (ans.error) throw bad(ans.error);
+    const r = Q.grade(g.edges, ans.value);
+    const term = new Map(concepts.map(x => [x.id, x.term]));
+    const named = e => ({ ...e, from_term: term.get(e.from_concept_id), to_term: term.get(e.to_concept_id) });
+    const { rows } = await c.query(
+      'INSERT INTO cmap_quiz_attempts (user_id, map_id, source_hash, pair_score, type_score, direction_score) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at',
+      [req.user.id, id, g.hash, r.scores.pair.ratio, r.scores.type.ratio, r.scores.direction.ratio]);
+    return { status: 201, body: {
+      attempt_id: rows[0].id, source_hash: g.hash, scores: r.scores,
+      correct: r.correct.map(named), missed: r.missed.map(named), extras: r.extras.map(named),
+      wrong: r.wrong.map(w => ({ expected: named(w.expected), answer: named(w.answer), problems: w.problems })),
     } };
   });
 }));

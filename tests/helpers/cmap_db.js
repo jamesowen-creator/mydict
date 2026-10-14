@@ -8,13 +8,13 @@ function dbError(code, message) { const e = new Error(message); e.code = code; r
 const lower = s => String(s).toLowerCase();
 const len = s => Array.from(String(s)).length;
 const REL = ['사용', '일부', '종류', '일으킴', '구별'];
-const TABLES = ['cmap_topics', 'cmap_concepts', 'cmap_maps', 'cmap_map_nodes', 'cmap_edges', 'cmap_narrations'];
+const TABLES = ['cmap_topics', 'cmap_concepts', 'cmap_maps', 'cmap_map_nodes', 'cmap_edges', 'cmap_narrations', 'cmap_quiz_attempts'];
 
 function createCmapDb() {
   const base = createMockDb();
-  const db = { base, topics: [], concepts: [], maps: [], nodes: [], edges: [], narrations: [], seq: { t: 1, c: 1, m: 1, e: 1, n: 1 }, snap: null, queries: [], failOn: null, tables: base.tables, trackUsage: base.trackUsage, addUser: base.addUser };
-  const list = name => ({ cmap_topics: db.topics, cmap_concepts: db.concepts, cmap_maps: db.maps, cmap_map_nodes: db.nodes, cmap_edges: db.edges, cmap_narrations: db.narrations })[name];
-  const setList = (name, arr) => { const k = { cmap_topics: 'topics', cmap_concepts: 'concepts', cmap_maps: 'maps', cmap_map_nodes: 'nodes', cmap_edges: 'edges', cmap_narrations: 'narrations' }[name]; db[k] = arr; };
+  const db = { base, topics: [], concepts: [], maps: [], nodes: [], edges: [], narrations: [], attempts: [], seq: { t: 1, c: 1, m: 1, e: 1, n: 1, q: 1 }, snap: null, queries: [], failOn: null, tables: base.tables, trackUsage: base.trackUsage, addUser: base.addUser };
+  const list = name => ({ cmap_topics: db.topics, cmap_concepts: db.concepts, cmap_maps: db.maps, cmap_map_nodes: db.nodes, cmap_edges: db.edges, cmap_narrations: db.narrations, cmap_quiz_attempts: db.attempts })[name];
+  const setList = (name, arr) => { const k = { cmap_topics: 'topics', cmap_concepts: 'concepts', cmap_maps: 'maps', cmap_map_nodes: 'nodes', cmap_edges: 'edges', cmap_narrations: 'narrations', cmap_quiz_attempts: 'attempts' }[name]; db[k] = arr; };
 
   // ── 제약 ──
   function checkTopic(row, self) {
@@ -54,6 +54,11 @@ function createCmapDb() {
     if (!db.maps.some(m => m.id === row.map_id)) throw dbError('23503', 'cmap_narrations map FK');
     if (!row.source_hash || row.content === null || row.content === undefined || !row.model) throw dbError('23502', 'cmap_narrations not null');
   }
+  function checkAttempt(row) {   // 작업273-5: map FK, NOT NULL
+    if (!db.maps.some(m => m.id === row.map_id)) throw dbError('23503', 'cmap_quiz_attempts map FK');
+    if (!row.source_hash || row.user_id === undefined || row.user_id === null) throw dbError('23502', 'cmap_quiz_attempts not null');
+    for (const v of [row.pair_score, row.type_score, row.direction_score]) if (v !== null && v !== undefined && !Number.isFinite(v)) throw dbError('22003', 'cmap_quiz_attempts real');
+  }
   const ids = new Set();
   function checkTopicRefs() {   // NO ACTION: 문장 끝에 남은 주제가 사라진 주제를 가리키면 오류
     ids.clear(); db.topics.forEach(t => ids.add(t.id));
@@ -76,6 +81,7 @@ function createCmapDb() {
       db.nodes = db.nodes.filter(n => !mids.has(n.map_id));
       db.edges = db.edges.filter(e => !mids.has(e.map_id));
       db.narrations = db.narrations.filter(n => !mids.has(n.map_id));
+      db.attempts = db.attempts.filter(n => !mids.has(n.map_id));
     } else if (table === 'cmap_concepts') {
       const cids = new Set(removed.map(c => c.id));
       const gone = db.nodes.filter(n => cids.has(n.concept_id));
@@ -99,7 +105,7 @@ function createCmapDb() {
   const pick = (row, cols) => { const o = {}; for (const c of cols.split(',').map(s => s.trim())) o[c] = row[c] === undefined ? null : row[c]; return o; };
   const clone = r => ({ ...r });
   const jsonCol = (col, v) => ((col === 'explanation' || col === 'content') && typeof v === 'string' ? JSON.parse(v) : v);   // JSONB: 문자열 파라미터는 객체로 저장
-  const checkers = { cmap_topics: checkTopic, cmap_concepts: checkConcept, cmap_maps: checkMap, cmap_map_nodes: checkNode, cmap_edges: checkEdge, cmap_narrations: checkNarration };
+  const checkers = { cmap_topics: checkTopic, cmap_concepts: checkConcept, cmap_maps: checkMap, cmap_map_nodes: checkNode, cmap_edges: checkEdge, cmap_narrations: checkNarration, cmap_quiz_attempts: checkAttempt };
   const newRow = {
     cmap_topics: () => ({ id: db.seq.t++, created_at: new Date(), updated_at: new Date(), sort_order: 0 }),
     cmap_concepts: () => ({ id: db.seq.c++, created_at: new Date(), updated_at: new Date(), sort_order: 0, content_source: 'manual', english: null, memo: null, explanation: null, explanation_source: null, explained_at: null }),
@@ -107,6 +113,7 @@ function createCmapDb() {
     cmap_map_nodes: () => ({ x: null, y: null }),
     cmap_edges: () => ({ id: db.seq.e++, created_at: new Date(), relation_type: null }),
     cmap_narrations: () => ({ id: db.seq.n++, created_at: new Date() }),
+    cmap_quiz_attempts: () => ({ id: db.seq.q++, created_at: new Date() }),
   };
   const sortBy = (rows, order) => {
     const cols = order.split(',').map(s => s.trim());
@@ -119,10 +126,10 @@ function createCmapDb() {
     if (!/cmap_|^(BEGIN|COMMIT|ROLLBACK)$/i.test(sql)) return base.pool.query(sqlRaw, params);
     db.queries.push(sql);
     if (db.failOn && db.failOn.test(sql)) throw new Error('cmap_db: 주입된 오류');
-    if (/^BEGIN$/i.test(sql)) { db.snap = JSON.stringify({ t: db.topics, c: db.concepts, m: db.maps, n: db.nodes, e: db.edges, a: db.narrations, seq: db.seq }); return { rows: [], rowCount: 0 }; }
+    if (/^BEGIN$/i.test(sql)) { db.snap = JSON.stringify({ t: db.topics, c: db.concepts, m: db.maps, n: db.nodes, e: db.edges, a: db.narrations, q: db.attempts, seq: db.seq }); return { rows: [], rowCount: 0 }; }
     if (/^COMMIT$/i.test(sql)) { checkDeferredRefs(); checkTopicRefs(); db.snap = null; return { rows: [], rowCount: 0 }; }
     if (/^ROLLBACK$/i.test(sql)) {
-      if (db.snap) { const s = JSON.parse(db.snap); db.topics = s.t; db.concepts = s.c; db.maps = s.m; db.nodes = s.n; db.edges = s.e; db.narrations = s.a; db.seq = s.seq; db.snap = null; }
+      if (db.snap) { const s = JSON.parse(db.snap); db.topics = s.t; db.concepts = s.c; db.maps = s.m; db.nodes = s.n; db.edges = s.e; db.narrations = s.a; db.attempts = s.q; db.seq = s.seq; db.snap = null; }
       return { rows: [], rowCount: 0 };
     }
     let m;
@@ -178,7 +185,7 @@ function createCmapDb() {
   db.pool = { query, connect: async () => db.client };
   // 테스트 편의
   db.topicBy = (userId, title) => db.topics.find(t => t.user_id === userId && t.title === title);
-  db.snapshot = () => JSON.stringify({ t: db.topics, c: db.concepts, m: db.maps, n: db.nodes, e: db.edges, a: db.narrations });
+  db.snapshot = () => JSON.stringify({ t: db.topics, c: db.concepts, m: db.maps, n: db.nodes, e: db.edges, a: db.narrations, q: db.attempts });
   return db;
 }
 

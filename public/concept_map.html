@@ -124,9 +124,20 @@
   .m-node.hl rect { stroke: var(--color-accent-ink); stroke-width: 3.5; }
   .m-node.dim { opacity: 0.35; }
   #narr-panel { display: none; padding-top: 12px; padding-bottom: 32px; }
-  #map-view.narr-mode #narr-panel { display: block; }
-  #map-view.narr-mode .map-only { display: none; }
-  #map-view.narr-mode .map-canvas { height: 220px; min-height: 0; }
+  #review-panel, #quiz-panel { display: none; padding-top: 12px; padding-bottom: 32px; }
+  #map-view.narr-mode #narr-panel, #map-view.review-mode #review-panel, #map-view.quiz-mode #quiz-panel { display: block; }
+  #map-view.side-mode .map-only { display: none; }
+  #map-view.side-mode .map-canvas { height: 220px; min-height: 0; }
+  #map-view.quiz-mode .map-canvas { height: 340px; }
+  .quiz-answers { margin: 8px 0 0; padding: 0; list-style: none; }
+  .quiz-answers li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--ctl-min-h); padding: 0 0 0 12px; margin-top: 6px; border: 1px solid var(--color-line); border-radius: var(--radius-ctl); background: var(--color-surface); font-size: 14px; overflow-wrap: anywhere; }
+  .quiz-scores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+  .quiz-score { padding: 10px 8px; border: 1px solid var(--color-line); border-radius: var(--card-radius); background: var(--color-surface); text-align: center; }
+  .quiz-score b { display: block; font-size: 18px; }
+  .quiz-score span { display: block; font-size: 12px; color: var(--color-text-sub); }
+  .quiz-list { margin: 4px 0 0; padding-left: 20px; font-size: 14px; }
+  .quiz-list li { margin-top: 6px; overflow-wrap: anywhere; }
+  .quiz-list .sub { display: block; font-size: 13px; color: var(--color-text-sub); }
   .narr-summary { margin: 4px 0 8px; font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
   .narr-para { display: block; width: 100%; margin-top: 8px; padding: 12px; text-align: left; border: 1px solid var(--color-line); border-radius: var(--card-radius); background: var(--color-surface); color: var(--color-text); font-size: 15px; line-height: 1.7; min-height: var(--ctl-min-h); }
   .narr-para.sel { border-color: var(--color-accent-ink); border-width: 2px; }
@@ -175,6 +186,7 @@
 <script src="/js/cmap/pairPicker.js?v=1"></script>
 <script src="/js/cmap/mapView.js?v=1"></script>
 <script src="/js/cmap/narrateView.js?v=1"></script>
+<script src="/js/cmap/reviewView.js?v=1"></script>
 
 <div id="loading" role="status"><p>불러오는 중…</p></div>
 
@@ -235,7 +247,7 @@
     <h1 id="map-title" class="screen-bar-title"></h1>
   </div>
   <div class="wrap">
-    <div class="map-tabs" role="tablist" aria-label="지도 보기"><button id="tab-map" class="map-tab sel" type="button" role="tab" aria-selected="true">지도</button><button id="tab-narr" class="map-tab" type="button" role="tab" aria-selected="false">해설</button></div>
+    <div class="map-tabs" role="tablist" aria-label="지도 보기"><button id="tab-map" class="map-tab sel" type="button" role="tab" aria-selected="true">지도</button><button id="tab-narr" class="map-tab" type="button" role="tab" aria-selected="false">해설</button><button id="tab-review" class="map-tab" type="button" role="tab" aria-selected="false">복습</button></div>
     <div class="map-tools map-only">
       <button id="map-pick-toggle" class="btn text" type="button" aria-expanded="false" aria-controls="map-pick-panel">개념 선택</button>
       <button id="map-fit" class="btn text" type="button">전체 보기</button>
@@ -251,6 +263,8 @@
     <p id="map-hint" class="hint map-only"></p>
     <div class="map-canvas"><div id="map-opt-bar" class="map-opt-bar" hidden><span id="map-opt-info"></span><button id="map-opt-apply" class="btn" type="button">적용</button><button id="map-opt-cancel" class="btn text" type="button">취소</button></div><svg id="map-svg" role="group" aria-label="개념 지도"></svg><p id="map-msg" class="msg" role="alert"></p></div>
     <div id="narr-panel" aria-live="polite"></div>
+    <div id="review-panel" aria-live="polite"></div>
+    <div id="quiz-panel" aria-live="polite"></div>
   </div>
  </div>
 </div>
@@ -294,6 +308,17 @@
     <p id="edge-type-hint" class="hint"></p>
     <p id="edge-msg" class="msg" role="alert"></p>
     <div class="btn-row"><button id="edge-delete" class="btn text" type="button" hidden>연결 삭제</button><button id="edge-cancel" class="btn text" type="button">취소</button><button id="edge-ok" class="btn" type="submit">저장</button></div>
+  </form>
+</dialog>
+
+<dialog id="quiz-dlg" aria-labelledby="quiz-heading">
+  <form id="quiz-form" novalidate>
+    <h3 id="quiz-heading">연결 추가</h3>
+    <p id="quiz-pair" class="edge-pair"></p>
+    <div class="field"><label for="quiz-type">관계 종류 (선택)</label>
+      <select id="quiz-type"><option value="">선택 안 함</option><option value="사용">사용(의존)</option><option value="일부">일부</option><option value="종류">종류</option><option value="일으킴">일으킴</option><option value="구별">구별(방향 없음)</option></select></div>
+    <p class="hint">방향은 누른 순서(앞 → 뒤)예요. 관계 문구는 퀴즈에서 묻지 않아요.</p>
+    <div class="btn-row"><button id="quiz-cancel" class="btn text" type="button">취소</button><button id="quiz-add" class="btn" type="submit">추가</button></div>
   </form>
 </dialog>
 
