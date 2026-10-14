@@ -1,6 +1,6 @@
 # METIS-3 오케스트레이터 인수인계 (새 채팅 시작용)
 
-기준일: 2026-10-10. 이 채팅의 역할과 작업 규칙, 현재 위치를 적은 문서. 자세한 기록은 각 문서 참고.
+기준일: 2026-10-14. 이 채팅의 역할과 작업 규칙, 현재 위치를 적은 문서. 자세한 기록은 각 문서 참고.
 
 ## 역할
 - James(셀로/LGU+ 기획팀, 비개발자)가 이 채팅을 "오케스트레이터"로 사용. 나는 별도 Claude Code 세션(Windows, C:\dev\metis3-app)에 줄 **작업 지시 블록**을 쓰고, 붙여준 결과 보고를 검토해 다음 단계를 정하고, 프로젝트 문서(claude/*)를 관리한다. 코드를 직접 볼 수 없다.
@@ -11,6 +11,7 @@
 - 말투는 존댓말. 문서는 간결·직관, **확인된 사실과 추정을 구분**(hallucination 경계).
 - "매번 확인": 수정 전에 합의된 방향을 한 줄로 확인하고, 수정 후에는 합의 대비 달라진 점을 보고(Claude Code 보고의 [어긋남]).
 - API 비용이 드는 작업은 **Haiku 먼저 제안**, Opus는 꼭 필요할 때만 물어보고. 비용 승인 없이 API 호출하지 않는다.
+- **(2026-10-13~14 추가) 새 지시 블록은 결과 보고가 와서 검토된 뒤에만, 한 번에 하나씩 만든다.** 보충 블록을 여러 개 겹치지 않는다(사용자: "자꾸 꼬여"). 변형 확인은 블록에서 명시한 경우에만. 테스트는 관련 묶음만, 전체는 배치 끝에만(부하성 UI 실패는 해당 파일만 2회까지 재실행). 새 테스트는 t.after로 서버·페이지를 닫는다. 품질 판단은 나중에 사용자가 폰에서 한꺼번에. 모든 UI 작업은 디자인 원칙을 지킨다. 커밋 메시지 끝에 Co-Authored-By와 Claude-Session 두 줄. 자세한 내용은 claude/concept-map-progress-275.md 8절.
 - 가벼운 절차: 관련 테스트만, 커밋 1개, 보고 15줄 이내. 첫 실행 실패가 있으면 푸시 보류 → 내용·의도 확인 후 승인(의도된 기대값 변경만 승인).
 - 테스트: `node --test "tests/**/*.test.js"`, UI 테스트는 tests/ui/*. tests/legacy는 기본 실행에 포함됨(옛 회귀 8개를 run_all.test.js가 모의 DB·가짜 SDK로 실행, 외부 접근 없음, 약 10초, 유지 결정 235-3). Claude Code 임시폴더의 옛 테스트는 실행 금지.
 - 공용 파일 수정 금지(계획된 경우만): public/css/common/*, public/js/common/*, sw.js, home, admin, server.js, routes, lib. 프로세스 종료는 본인 PID만. **운영 DB는 Claude Code가 접근하지 않는다.** DB·서비스 삭제는 백업과 항목별 사용자 동의가 있어야 한다.
@@ -22,13 +23,13 @@
 - 비밀이 들어 있을 수 있는 파일(.env 등)을 검토해 달라고 하면 먼저 경고. keys\(정답표) 폴더는 판정 전에는 열지 않는다.
 - Railway 변수 값은 열람·기록하지 않는다. **jamesowen API 키는 앱이 쓰므로 삭제 금지.**
 
-## 현재 위치 (2026-10-10)
-- origin/master = 566a216 (255-1 관리자 정리) 이후 문서 갱신 커밋이 있으면 그 위. 디자인 적용 커밋: ca0abe4·268cd79(245-1), 9471a25(247-1), 6bc19f5(249-1), 1df5af2(251-1), 9fb7e4e(253-1), a5e7d8f(254-1), 91cd718·566a216(255-1). 그 앞: e77ed8d(243-2 관리자 화면), a826a6d(242-1 공용 변수), 57ac3a7(237-2 mapCore.js). 전체 테스트 626건 통과(약 4분, 254에서 db_init.test.js가 한 번 13분 멈췄다가 재실행으로 통과, 원인 미확정). 227 마지막 코드 커밋 24c13a4 (227-25). 227 지도 품질 작업은 B2 연결 생성, 가독성, 인사이트 패널, 허브 규칙(B3), 나누기 제안(4a)까지 배포 완료. 상세는 **claude/map-quality-227.md**.
-- 사용자 확인 대기: 폰에서 지도(이웃 보기, 글자 크기, 연결 카드, "지도에서 읽기" 패널), 개념 추가 시 연결 품질, 연결 6개 이상 개념에서 나누기 제안, Console 비용(추정 개념당 약 1센트), Console 입력 토큰으로 227-25 효과 확인.
-- 사용자 결정(2026-10-10): 실사용 확인(폰 지도, Console 비용)은 건너뛰고 음성 지도 이식을 먼저 마친 뒤 정리 작업으로 진행. 위 확인 항목은 미확인으로 남음. 음성 지도 이식 기록은 claude/voice-map-214.md의 229 절.
-- 저장소 markdown_20261010\claude\ 사본은 236-1에서 cleanup-plan, orchestrator-handover를 Project 문서와 맞춤(map-quality-227, voice-map-214는 232-3 이후 변경 없음). 이후 문서 변경은 지시문에 내용을 담아 Claude Code가 직접 수정.
-- 정리 작업(2026-10-10): **완료.** Railway에는 lucky-truth의 metis3-app + Postgres-dyGe(운영 DB)만 남음. Console의 Voca. 키 삭제(jamesowen 키는 앱 사용). C:\dev 실험 폴더 3개 삭제, 3개 보관. 저장소 안 불필요 파일 삭제(235-2). voice_concepts·concept_migrations 코드·테이블, tests/legacy는 유지 결정. 남은 선택 사항: C:\dev\null 삭제 여부. 상세는 **claude/cleanup-plan.md**.
-- UI 통일·하단 내비 이력은 claude/ui-unify-plan.md, claude/bottom-nav-plan.md. 디자인 원칙 확정·공용 변수·화면 적용 경과(238~255)는 claude/design-principles-238.md, 이식용 원칙은 claude/design-principles-portable.md, 저장소의 확정 원칙은 docs/design/design-principles.md. 관리자 화면·권한 구조는 claude/admin-permissions-243.md. 그 밖: concept-study-design/phase2, voice-study-design, voice-map-214, digest-reading-plan.
-- 디자인 적용(2026-10-10~11): 완료. 사용자 화면 6개와 관리자를 푸른 계열 원칙 변수로 정리(상세·열린 항목은 claude/design-principles-238.md). tokens.css 신규 변수 43개(--color-danger-ink 포함), sw.js CACHE_NAME metis-v9.
-- 다음 후보(2026-10-11): 서버 권한 검사 추가(문학·한입·과학·퀴즈·팟캐스트, admin-permissions-243.md), 디자인 열린 항목(팟캐스트·OCR 값, 알약류, 이모지 🧠, 어긋남 방지 테스트), 지도 공용 모듈 B안(폰 확인 후), 폰 폭 admin 헤더 높이 조정. 사용자 확인 대기(폰 지도, Console 비용)는 미확인. 사용자 폰 확인 보고는 사전만 있음.
+## 현재 위치 (2026-10-14)
+- origin/master = 0346f0f (275-5), 작업 트리 깨끗. sw.js CACHE_NAME metis-v31. DB init 총 34단계.
+- **개념 지도 구현 완료**(1~5b, UI 개편, 개념학습 의존 제거, 모르는 개념 표시, 표시 개념 퀴즈) 및 **OCR 터치 선택(272)** 배포. 작업↔커밋 표, 구현 결정, 향후 과제, 확인 대기 목록은 **claude/concept-map-progress-275.md**. 설계 배경은 claude/concept-map-redesign.md.
+- **사용자 폰 확인은 전부 보류**(2026-10-14): Railway 로그 "[DB] init done: 총 34단계, 실패 0단계", 개념 지도 화면 전체, 275-4·275-5, OCR 터치 선택. 새 캐시(v31)를 받으려면 앱을 완전히 닫았다가 재실행.
+- 합의된 향후 과제(미착수): 복습 고도화 2단계(주관식·음성 답변·AI 평가 피드백, 리마인딩 방식 미정, Haiku 먼저), 개념 지도 vs 개념학습 비교 후 하나 삭제.
+- 변경 금지 파일(매 작업 diff 0줄 확인): concept_study.html, routes/concept_study.js, lib/concept_links_b2.js, public/js/map/mapCore.js, voice_study.html. 개념 지도 코드는 개념학습 파일을 불러오지 않는다(275-1).
+- 이전 위치(2026-10-10, 정리 작업 완료, 음성 지도 이식, 227 지도 품질, 디자인 적용 245~255)의 상세는 claude/cleanup-plan.md, claude/voice-map-214.md, claude/map-quality-227.md, claude/design-principles-238.md 참고. 그때의 사용자 확인 대기(사전 폰 지도, Console 비용)는 미확인으로 남음. Railway에는 lucky-truth의 metis3-app + Postgres-dyGe(운영 DB)만 남음.
+- UI 통일·하단 내비 이력은 claude/ui-unify-plan.md, claude/bottom-nav-plan.md. 이식용 원칙은 claude/design-principles-portable.md, 저장소의 확정 원칙은 docs/design/design-principles.md. 관리자 화면·권한 구조는 claude/admin-permissions-243.md. 그 밖: concept-study-design/phase2, voice-study-design, voice-map-214, digest-reading-plan.
+- 디자인 문서(design-principles-238.md)는 255까지의 경과이고, 256~275의 디자인 관련 변경(입력 포커스, 섹션 라벨, OCR 밝은 패널, 토큰 44개, design_lint 기준선)은 concept-map-progress-275.md 9절에 기록. 다음 문서 갱신 때 합칠 수 있음.
 - 작업 방식 메모: 지시문에서 커밋과 푸시를 한 명령으로 잇지 않는다(245-1 사고). Claude Code PC의 시각 표기가 KST 표기인데 실제로는 UTC 값이라 9시간 이르니 보고 시각은 믿지 말고 필요하면 사용자 시각으로 확인.
