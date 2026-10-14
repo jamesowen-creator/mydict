@@ -21,6 +21,9 @@ async function open(t) {
   await sleep(150);
   return { srv, page };
 }
+// 274-4: 지도는 시트(<dialog>) 안에 있다. 지도 조작 전에 [지도 열기]로 시트를 열고, 주제 화면으로 가기 전·다른 탭으로 가기 전에 닫는다
+const openSheet = async page => { await page.click('#map-open'); await page.waitFor("document.getElementById('map-sheet').open", 4000, '지도 시트'); };
+const closeSheet = async page => { await page.click('#map-sheet-close'); await page.waitFor("!document.getElementById('map-sheet').open", 4000, '지도 시트 닫힘'); };
 const seed = (page, method, url, body) => page.eval(`(async () => { const r = await api(${JSON.stringify(method)}, ${JSON.stringify(url)}, ${JSON.stringify(body)}); return r.body; })()`);
 async function world(page) {
   const sci = (await seed(page, 'POST', '/api/cmap/topics', { title: '과학' })).topic;
@@ -44,7 +47,7 @@ const good = w => ({
   suggestions: [{ term: '운동량', reason: '힘과 이어지는 양입니다', near_concept_id: w.c.mass }],
 });
 const text = (page, sel) => page.eval(`(document.querySelector(${JSON.stringify(sel)}) || {}).textContent || ''`);
-const saveMap = async page => { await page.click('#tab-map'); await page.click('#map-save'); await page.waitFor("document.getElementById('map-save-state').textContent.startsWith('저장됨')", 4000, '저장됨'); };
+const saveMap = async page => { await page.click('#tab-map'); await openSheet(page); await page.click('#map-save'); await page.waitFor("document.getElementById('map-save-state').textContent.startsWith('저장됨')", 4000, '저장됨'); await closeSheet(page); };
 const reviewTab = async page => { await page.click('#tab-review'); await page.waitFor("document.getElementById('map-view').classList.contains('review-mode') && !!document.getElementById('quiz-start')", 4000, '복습 탭'); };
 async function makeNarration(page, srv, w) {
   srv.anthropic.handler = () => JSON.stringify(good(w));
@@ -84,10 +87,12 @@ test('복습: 최신 해설을 새 구조(요약·이야기 단락·기억용·�
   assert.match(await text(page, '#review-panel .sec-label'), /연결|AI 설명/);
   assert.equal(await page.eval("[...document.querySelectorAll('#review-panel .sec-label')].some(e => e.textContent === 'AI 설명 · 확인 필요')"), true);
   assert.equal(await page.eval("!!document.getElementById('narr-make') && document.getElementById('review-panel').contains(document.getElementById('narr-make'))"), false, '해설 만들기 버튼 없음');
-  assert.equal(await page.eval("document.querySelectorAll('#review-panel [data-act]').length"), 0, '제안에 동작 버튼 없음');
+  assert.equal(await page.eval("document.querySelectorAll('#review-panel [data-act]:not([data-act=show-map])').length"), 0, '제안에 동작 버튼 없음(단락의 지도에서 보기만 있음)');
   const before = srv.anthropic.calls.length;
-  await page.click('#review-panel [data-para="1"]');
+  await page.click('#review-panel [data-para="1"] [data-act=show-map]');
+  await page.waitFor("document.getElementById('map-sheet').open", 4000, '읽기 전용 시트');
   assert.deepEqual(await page.eval('window.CmapMap._highlight()'), [w.c.iso]);
+  assert.equal(await page.eval("document.getElementById('map-sheet').classList.contains('ro')"), true);
   assert.equal(srv.anthropic.calls.length, before, '복습은 AI 를 부르지 않음');
   assert.equal((await page.eval('window.CmapMap._state()')).selected, null);
 });
@@ -99,7 +104,7 @@ test('퀴즈 흐름: 정답 간선·문구가 화면에 없고, 탭-탭으로 �
   await page.click('#quiz-start');
   await page.waitFor("document.getElementById('map-view').classList.contains('quiz-mode') && document.querySelectorAll('[data-node]').length === 4", 6000, '퀴즈 화면');
   assert.equal(await page.eval("document.querySelectorAll('.m-edge').length"), 0, '정답 연결선은 그리지 않음');
-  const body = await page.eval("document.getElementById('map-view').innerText");
+  const body = await page.eval("document.getElementById('map-sheet').innerText + document.getElementById('map-view').innerText");
   assert.ok(!/만든다|클수록|일으킴|사용/.test(body), '정답 문구·종류가 화면에 없음');
   // 노드는 서버 위치가 아니라 흩어 놓은 위치(지도의 저장 위치와 다름)
   // 1) 가속도 → 힘 (쌍은 맞지만 방향 반대, 종류 일으킴)
@@ -153,14 +158,16 @@ test('퀴즈 도중 지도가 바뀌면 채점하지 않고 안내 + [다시 시
   assert.equal(srv.db.attempts.length, 0);
 });
 
-test('퀴즈 중 탭을 바꾸면 퀴즈가 끝나고 지도 보기로 돌아온다', { skip: SKIP }, async t => {
+test('퀴즈 중 시트를 닫으면(닫기) 퀴즈가 끝나고 복습으로 돌아온다 — 정답 연결은 시트 밖에서 다시 보임', { skip: SKIP }, async t => {
   const { page } = await open(t);
   await world(page);
   await saveMap(page); await reviewTab(page);
   await page.click('#quiz-start');
-  await page.waitFor("document.getElementById('map-view').classList.contains('quiz-mode')", 6000);
-  await page.click('#tab-map');
-  assert.equal(await page.eval("document.getElementById('map-view').classList.contains('quiz-mode') || document.getElementById('map-view').classList.contains('side-mode')"), false);
+  await page.waitFor("document.getElementById('map-view').classList.contains('quiz-mode') && document.getElementById('map-sheet').open", 6000);
+  await page.click('#map-sheet-close');
+  await page.waitFor("!document.getElementById('map-sheet').open", 4000);
+  assert.equal(await page.eval("document.getElementById('map-view').classList.contains('quiz-mode')"), false);
+  assert.equal(await page.eval("document.getElementById('map-view').classList.contains('review-mode')"), true);
   assert.equal(await page.eval("document.querySelectorAll('.m-edge').length"), 2, '실제 지도의 연결이 다시 보임');
   assert.equal((await page.eval('window.CmapReview._state()')).quiz, null);
 });

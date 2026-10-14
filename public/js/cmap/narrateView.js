@@ -2,7 +2,7 @@
 // 클래식 스크립트(window.CmapNarr). concept_map.html 의 인라인 전역($, h, api, okStatus, errText, refresh, selectTopic)과 window.CmapMap(mapView.js)의 공개 함수를 호출 시점에 사용한다.
 // - 클라이언트는 지도 id 만 서버에 보낸다(입력은 서버가 DB 에서 만듦). 저장 상태·stale 판단은 서버가 준 해시를 비교만 한다(해시는 계산하지 않음).
 // - 40초 안에 응답이 없으면 요청을 끊고 오류 카드(+ [다시 시도]). 자동 재시도 없음. 하루 한도(429)는 안내만.
-// - 단락을 누르면 그 단락의 개념이 지도에서 강조된다. 제안은 어떤 경우에도 개념·연결을 자동으로 추가하지 않는다
+// - 단락의 [지도에서 보기]를 누르면 지도 시트가 열리고 그 단락의 개념이 강조된다(274-4). 제안은 어떤 경우에도 개념·연결을 자동으로 추가하지 않는다
 //   ([찾아보기] = 개념 검색 입력칸에 용어만 채움, 이미 저장된 개념 = 개념 선택 패널을 열어 안내).
 (function () {
   'use strict';
@@ -50,11 +50,12 @@
     render();
   }
 
-  function pickPara(i) {
+  // 274-4: 단락의 [지도에서 보기] → 지도 시트(읽기 전용)가 열리고 그 단락의 개념이 강조된다
+  function showPara(i) {
     const p = N.data && N.data.narration && N.data.narration.content.story[i];
     if (!p) return;
-    N.para = N.para === i ? null : i;
-    window.CmapMap.highlight(N.para === null ? [] : p.concept_ids);
+    N.para = i;
+    window.CmapMap.showOnMap(p.concept_ids);
     render();
   }
 
@@ -112,9 +113,10 @@
       box.append(h('p', { class: 'sec-label', text: 'AI 설명 · 확인 필요' }));
       box.append(h('p', { class: 'narr-summary', id: 'narr-summary', text: c.summary }));
       c.story.forEach((p, i) => {
-        box.append(h('button', { type: 'button', class: 'narr-para' + (N.para === i ? ' sel' : ''), 'data-para': i, 'aria-pressed': N.para === i ? 'true' : 'false', onclick: () => pickPara(i) },
+        box.append(h('div', { class: 'narr-para' + (N.para === i ? ' sel' : ''), 'data-para': i },
           h('span', { class: 'narr-text', text: p.text }),
-          h('span', { class: 'narr-cap', text: '다루는 개념: ' + p.concept_ids.map(termOf).join(' · ') })));
+          h('span', { class: 'narr-cap', text: '다루는 개념: ' + p.concept_ids.map(termOf).join(' · ') }),
+          h('div', { class: 'narr-para-row' }, h('button', { class: 'btn text', type: 'button', 'data-act': 'show-map', onclick: () => showPara(i), text: '지도에서 보기' }))));
       });
       if (c.mnemonic && c.mnemonic.length) {
         box.append(h('p', { class: 'sec-label narr-sec', text: '기억용' }));

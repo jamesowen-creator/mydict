@@ -30,11 +30,11 @@
 
   // ── 복습 ──
   let para = null;
-  function pickPara(i) {
+  function showPara(i) {                                  // 274-4: [지도에서 보기] → 읽기 전용 시트가 열리고 그 단락의 개념이 강조된다
     const p = nar() && nar().content.story[i];
     if (!p) return;
-    para = para === i ? null : i;
-    window.CmapMap.highlight(para === null ? [] : p.concept_ids);
+    para = i;
+    window.CmapMap.showOnMap(p.concept_ids);
     renderReview();
   }
   function renderReview() {
@@ -44,7 +44,9 @@
     const saved = isSaved(), edges = window.CmapMap.edgeCount();
     // 퀴즈 시작
     const canQuiz = saved && edges > 0;
-    box.append(h('div', { class: 'narr-actions', style: 'justify-content:flex-start;margin-top:0' }, h('button', { class: 'btn', type: 'button', id: 'quiz-start', disabled: !canQuiz, onclick: startQuiz, text: '연결 퀴즈 시작' })));
+    box.append(h('div', { class: 'narr-actions', style: 'justify-content:flex-start;margin-top:0' },
+      h('button', { class: 'btn text', type: 'button', id: 'review-open-map', onclick: () => window.CmapMap.showOnMap([]), text: '지도 열기' }),
+      h('button', { class: 'btn', type: 'button', id: 'quiz-start', disabled: !canQuiz, onclick: startQuiz, text: '연결 퀴즈 시작' })));
     box.append(h('p', { class: 'hint', id: 'quiz-start-note', text: !saved ? '저장된 지도에서만 퀴즈를 풀 수 있어요. 지도 탭에서 [저장]을 눌러 주세요.' : edges === 0 ? '연결이 있는 지도에서만 퀴즈를 풀 수 있어요.' : '지도의 노드만 보여 줍니다. 두 노드를 차례로 눌러 연결을 떠올려 보세요.' }));
     if (Rv.msg) box.append(h('p', { class: 'msg', id: 'review-msg', role: 'alert', text: Rv.msg }));
     if (saved === false && status() && status().save_status === 'changed') box.append(h('p', { class: 'hint', text: '지도가 저장한 뒤에 바뀌었어요. 위 지도는 지금 상태입니다.' }));
@@ -55,9 +57,10 @@
     box.append(h('p', { class: 'sec-label', text: 'AI 설명 · 확인 필요' }));
     box.append(h('p', { class: 'narr-summary', id: 'review-summary', text: c.summary }));
     c.story.forEach((p, i) => {
-      box.append(h('button', { type: 'button', class: 'narr-para' + (para === i ? ' sel' : ''), 'data-para': i, 'aria-pressed': para === i ? 'true' : 'false', onclick: () => pickPara(i) },
+      box.append(h('div', { class: 'narr-para' + (para === i ? ' sel' : ''), 'data-para': i },
         h('span', { class: 'narr-text', text: p.text }),
-        h('span', { class: 'narr-cap', text: '다루는 개념: ' + p.concept_ids.map(termOf).join(' · ') })));
+        h('span', { class: 'narr-cap', text: '다루는 개념: ' + p.concept_ids.map(termOf).join(' · ') }),
+        h('div', { class: 'narr-para-row' }, h('button', { class: 'btn text', type: 'button', 'data-act': 'show-map', onclick: () => showPara(i), text: '지도에서 보기' }))));
     });
     if (c.mnemonic && c.mnemonic.length) {
       box.append(h('p', { class: 'sec-label narr-sec', text: '기억용' }));
@@ -98,10 +101,11 @@
     openDlg($('quiz-dlg'));
   }
   function removeAnswer(i) { Rv.quiz.answers.splice(i, 1); Rv.quiz.error = ''; syncAnswers(); renderQuiz(); }
-  function quitQuiz(toMode) {
+  function quitQuiz(toMode, keepSheet) {
     Rv.quiz = null; pending = null;
     window.CmapMap.quizEnd();
     window.CmapMap.setMode(toMode || 'review');
+    if (!keepSheet) window.CmapMap.closeSheet();                  // 퀴즈가 끝나면 시트를 닫는다([다시 풀기]는 시트를 그대로 둔 채 새 퀴즈)
   }
   async function submitQuiz() {
     const q = Rv.quiz, id = window.CmapMap.mapId();
@@ -132,7 +136,7 @@
       h('button', { class: 'btn text', type: 'button', 'data-del': i, onclick: () => removeAnswer(i), text: '삭제' })))));
     box.append(h('div', { class: 'narr-actions' },
       h('button', { class: 'btn text', type: 'button', id: 'quiz-quit', onclick: () => quitQuiz('review'), text: '그만두기' }),
-      q.stale ? h('button', { class: 'btn', type: 'button', id: 'quiz-restart', onclick: () => { quitQuiz('review'); startQuiz(); }, text: '다시 시작' })
+      q.stale ? h('button', { class: 'btn', type: 'button', id: 'quiz-restart', onclick: () => { quitQuiz('review', true); startQuiz(); }, text: '다시 시작' })
         : h('button', { class: 'btn', type: 'button', id: 'quiz-submit', disabled: q.submitting || !q.answers.length, onclick: submitQuiz, text: q.submitting ? '채점 중…' : '제출' })));
   }
   function section(title, id, items, build, empty) {
@@ -158,7 +162,7 @@
     box.append(h('p', { class: 'hint', text: '지도에 없는 연결은 틀린 것으로 세지 않아요. 지도에 더할 만한 연결인지 생각해 보세요.' }));
     box.append(h('div', { class: 'narr-actions' },
       h('button', { class: 'btn text', type: 'button', id: 'quiz-back', onclick: () => quitQuiz('review'), text: '복습으로 돌아가기' }),
-      h('button', { class: 'btn', type: 'button', id: 'quiz-again', onclick: () => { quitQuiz('review'); startQuiz(); }, text: '다시 풀기' })));
+      h('button', { class: 'btn', type: 'button', id: 'quiz-again', onclick: () => { quitQuiz('review', true); startQuiz(); }, text: '다시 풀기' })));
   }
 
   function init() {
@@ -178,6 +182,9 @@
       else if (mode !== 'quiz') { if (Rv.quiz) { Rv.quiz = null; M.quizEnd(); } para = null; }
     });
     M.on('quizpair', onQuizPair);
+    M.on('sheetclose', () => {                                    // 시트를 닫으면(닫기·ESC·뒤로 가기) 진행 중이던 퀴즈는 끝난다
+      if (Rv.quiz) { Rv.quiz = null; pending = null; M.quizEnd(); M.setMode('review'); }
+    });
     M.on('open', reset); M.on('close', reset);
     M.on('status', () => { if (Rv.loaded && $('map-view') && !$('map-view').hidden && M._state().mode === 'review') renderReview(); });
   }

@@ -89,48 +89,52 @@ test('주제 화면: 주제 트리·개념 목록·설명 카드가 내부 스�
   assert.equal(card.sh, card.ch);
 });
 
-test('지도 탭: 개념 선택 목록이 내부 스크롤 없이 모두 보이고(페이지가 늘어남) 캔버스는 높이 고정', { skip: SKIP }, async t => {
+test('지도 탭: 페이지에는 [지도 열기]와 한 줄 상태만 있고 캔버스는 시트 안에 있다. 개념 선택 목록은 시트 안(대화상자 예외)에서만 스크롤된다', { skip: SKIP }, async t => {
   const { srv, page } = await open(t);
   const w = await world(page, srv);
   await page.click('#act-map');
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000, '지도 화면');
-  const canvasH = () => page.eval("document.querySelector('.map-canvas').getBoundingClientRect().height");
-  const h0 = await canvasH();
-  assert.equal(Math.round(h0), Math.round(Math.min(0.62 * 844, 560)), '캔버스 높이 고정값');
+  assert.equal(await page.eval("document.getElementById('map-canvas').offsetParent === null"), true, '페이지에는 지도 캔버스가 없음');
+  assert.match(await page.eval("document.getElementById('map-meta').textContent"), /^개념 4개 · 연결 2개 · 저장됨$/);
+  await audit(page, '지도 탭(페이지)');
+  assert.ok(await minHeight(page, '#map-open') >= 44); assert.ok(await minHeight(page, '.map-tab') >= 44);
+  await page.click('#map-open');
+  await page.waitFor("document.getElementById('map-sheet').open", 4000, '지도 시트');
   await page.click('#map-pick-toggle');
   await page.waitFor(`document.querySelectorAll('#map-pick-list .pick-row').length === ${w.ids.length}`, 4000, '선택 목록');
-  assert.equal(await canvasH(), h0, '선택 목록을 열어도 캔버스 높이는 그대로');
-  const box = await page.eval("(() => { const p = document.getElementById('map-pick-panel'), l = document.getElementById('map-pick-list'); return { ov: getComputedStyle(p).overflowY, ph: p.getBoundingClientRect().height, lh: l.getBoundingClientRect().height, bottom: l.getBoundingClientRect().bottom + window.scrollY }; })()");
-  assert.equal(box.ov, 'visible'); assert.ok(box.ph >= box.lh - 1 && box.lh > 844 * 0.4, `목록이 잘리지 않고 화면의 40%보다 김: ${JSON.stringify(box)}`);
-  await audit(page, '지도 탭');
-  await longPage(page);
-  assert.ok(await pageScrolls(page) > 500);
+  const box = await page.eval("(() => { const d = document.getElementById('map-sheet'), p = document.getElementById('map-pick-panel'), c = document.getElementById('map-canvas'); return { inDialog: d.contains(p), ov: getComputedStyle(p).overflowY, ph: p.getBoundingClientRect().height, dh: d.getBoundingClientRect().height, sh: p.scrollHeight, ch: p.clientHeight, canvasH: c.getBoundingClientRect().height }; })()");
+  assert.equal(box.inDialog, true); assert.equal(box.ov, 'auto', '시트(대화상자) 안이라 선택 목록은 안에서 스크롤');
+  assert.ok(box.sh > box.ch && box.ph <= box.dh * 0.46, JSON.stringify(box));
+  assert.ok(box.canvasH >= 160, '선택 목록을 열어도 지도가 남아 있음');
   assert.ok(await minHeight(page, '#map-pick-list .pick-row') >= 44);
-  assert.ok(await minHeight(page, '.map-tab') >= 44);
+  assert.equal(await page.hasHorizontalScroll(), false);
 });
 
-test('캔버스 제스처와 페이지 스크롤: 캔버스 밖 휠은 페이지를 스크롤하고, 캔버스 위 휠은 확대·축소만 하며 페이지는 움직이지 않는다', { skip: SKIP }, async t => {
+test('캔버스 제스처와 페이지 스크롤: 시트가 열려 있는 동안 배경 페이지는 스크롤되지 않고, 캔버스 위 휠은 확대만 한다(캔버스에서 시작한 스크롤이 페이지를 막던 한계는 시트로 해결)', { skip: SKIP }, async t => {
   const { srv, page } = await open(t);
   await world(page, srv);
   await page.click('#act-map');
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000);
-  await page.eval('window.scrollTo(0, 0); 0');
+  await page.eval("document.body.style.minHeight = '3000px'; window.scrollTo(0, 300); 0");
+  const y0 = await page.eval('window.scrollY');
+  assert.ok(y0 > 0);
+  await page.eval("document.getElementById('map-open').click(); 0");   // 마우스 클릭은 버튼을 화면 가운데로 스크롤하므로 스크롤 위치를 그대로 두고 연다
+  await page.waitFor("document.getElementById('map-sheet').open", 4000);
+  assert.equal(await page.eval("getComputedStyle(document.documentElement).overflow"), 'hidden', '시트가 열려 있으면 배경 스크롤 잠금');
   const c = await page.eval("(() => { const r = document.getElementById('map-svg').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()");
+  const yOpen = await page.eval('window.scrollY');
   const scale0 = (await page.eval('window.CmapMap._state()')).view.scale;
   await page.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: c.x, y: c.y, deltaX: 0, deltaY: -120 });
   assert.ok((await page.eval('window.CmapMap._state()')).view.scale > scale0, '캔버스 위 휠 = 확대');
-  assert.equal(await page.eval('window.scrollY'), 0, '캔버스 위 휠은 페이지를 스크롤하지 않음');
-  await page.click('#map-pick-toggle');                                   // 선택 목록을 열어 페이지를 길게 만든다(목록은 캔버스보다 위에 있음)
-  await page.waitFor("document.querySelectorAll('#map-pick-list .pick-row').length > 10", 4000);
-  await page.eval('window.scrollTo(0, 400); 0');
-  const before = await page.eval('window.scrollY');
-  await page.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 200, y: 700, deltaX: 0, deltaY: 200 });
+  assert.equal(await page.eval('window.scrollY'), yOpen, '배경 페이지는 움직이지 않음');
+  assert.equal(await page.eval("getComputedStyle(document.getElementById('map-svg')).touchAction"), 'none', '캔버스는 제스처 전용');
+  await page.click('#map-sheet-close');
+  await page.waitFor("!document.getElementById('map-sheet').open", 4000);
+  assert.equal(await page.eval('window.scrollY'), y0, '닫으면 원래 스크롤 위치로 돌아옴');
+  assert.notEqual(await page.eval("getComputedStyle(document.documentElement).overflow"), 'hidden', '닫으면 페이지 스크롤 가능');
+  await page.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 200, y: 500, deltaX: 0, deltaY: 200 });
   await sleep(200);
-  assert.ok(await page.eval('window.scrollY') > before, '캔버스 밖 휠 = 페이지 스크롤');
-  // 터치 영역: 캔버스는 touch-action none(제스처 전용), 그 밖은 기본(페이지 스크롤 가능)
-  assert.equal(await page.eval("getComputedStyle(document.getElementById('map-svg')).touchAction"), 'none');
-  assert.notEqual(await page.eval("getComputedStyle(document.getElementById('map-pick-list')).touchAction"), 'none');
-  assert.notEqual(await page.eval("getComputedStyle(document.body).touchAction"), 'none');
+  assert.ok(await page.eval('window.scrollY') > y0, '시트 밖(페이지)에서는 휠로 스크롤됨');
 });
 
 test('해설·복습·퀴즈 결과 화면: 내부 스크롤·박스 없음, 줄 높이 44px 이상, 페이지 전체 스크롤', { skip: SKIP }, async t => {
@@ -143,7 +147,9 @@ test('해설·복습·퀴즈 결과 화면: 내부 스크롤·박스 없음, 줄
   await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-summary')", 6000);
   await audit(page, '해설 탭');
   assert.ok(await minHeight(page, '.narr-para') >= 44); assert.ok(await minHeight(page, '.narr-sug [data-act]') >= 44);
-  await page.click('[data-para="0"]');
+  await page.click('[data-para="0"] [data-act=show-map]');
+  await page.waitFor("document.getElementById('map-sheet').open", 4000);
+  await page.click('#map-sheet-close'); await page.waitFor("!document.getElementById('map-sheet').open", 4000);
   await audit(page, '해설 탭(단락 선택)');
   assert.equal(await page.eval("getComputedStyle(document.querySelector('.narr-para.sel')).borderLeftWidth"), '3px', '선택은 왼쪽 막대로 표시');
   // 복습

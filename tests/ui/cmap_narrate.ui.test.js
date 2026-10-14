@@ -22,6 +22,9 @@ async function open(t) {
   await sleep(150);
   return { srv, page };
 }
+// 274-4: 지도는 시트(<dialog>) 안에 있다. 지도 조작 전에 [지도 열기]로 시트를 열고, 주제 화면으로 가기 전·다른 탭으로 가기 전에 닫는다
+const openSheet = async page => { await page.click('#map-open'); await page.waitFor("document.getElementById('map-sheet').open", 4000, '지도 시트'); };
+const closeSheet = async page => { await page.click('#map-sheet-close'); await page.waitFor("!document.getElementById('map-sheet').open", 4000, '지도 시트 닫힘'); };
 const seed = (page, method, url, body) => page.eval(`(async () => { const r = await api(${JSON.stringify(method)}, ${JSON.stringify(url)}, ${JSON.stringify(body)}); return r.body; })()`);
 // 과학 > 물리. 지도: 힘·가속도·질량·에너지(고립), 연결 2개. 저장된 개념 중 지도에 없는 것: 속도(물리)
 async function world(page) {
@@ -55,7 +58,7 @@ const good = (w, over = {}) => ({
   ...over,
 });
 const text = (page, sel) => page.eval(`(document.querySelector(${JSON.stringify(sel)}) || {}).textContent || ''`);
-const saveMap = async page => { await page.click('#map-save'); await page.waitFor("document.getElementById('map-save-state').textContent.startsWith('저장됨')", 4000, '저장됨'); };
+const saveMap = async page => { await page.click('#tab-map'); await openSheet(page); await page.click('#map-save'); await page.waitFor("document.getElementById('map-save-state').textContent.startsWith('저장됨')", 4000, '저장됨'); await closeSheet(page); };
 // 274-2: 해설 목록 조회(GET)가 끝난 표시(오늘 N/10건)까지 기다린 뒤 누른다. 조회가 끝나기 전에 누르면 늦게 온 응답과 엇갈린다
 const narrTab = async page => { await page.click('#tab-narr'); await page.waitFor("document.getElementById('map-view').classList.contains('narr-mode') && !!document.getElementById('narr-daily') && (!!document.getElementById('narr-make') || !!document.getElementById('narr-summary'))", 8000, '해설 탭'); };
 
@@ -97,23 +100,28 @@ test('단락을 누르면 그 단락의 개념이 지도에서 강조되고, 다
   await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-summary')", 15000);
   const hl = () => page.eval('window.CmapMap._highlight()');
   assert.deepEqual(await hl(), []);
-  await page.click('[data-para="0"]');
+  assert.equal(await page.eval("document.getElementById('map-sheet').open"), false, '해설 탭에서는 지도 시트가 닫혀 있음(지도는 페이지에 없음)');
+  await page.click('[data-para="0"] [data-act=show-map]');                       // 274-4: 단락의 [지도에서 보기] → 시트가 열리고 그 단락의 개념이 강조됨
+  await page.waitFor("document.getElementById('map-sheet').open", 4000, '지도 시트');
   assert.deepEqual(await hl(), [w.c.force, w.c.acc, w.c.mass].sort((a, b) => a - b));
   assert.equal(await page.eval("document.querySelectorAll('.m-node.hl').length"), 3);
   assert.equal(await page.eval("document.querySelectorAll('.m-node.dim').length"), 1);
-  assert.equal(await page.eval("document.querySelector('[data-para=\"0\"]').getAttribute('aria-pressed')"), 'true');
-  await page.click('[data-para="1"]');
-  assert.deepEqual(await hl(), [w.c.iso]);
-  assert.equal(await page.eval("document.querySelectorAll('.m-node.hl').length"), 1);
-  await page.click('[data-para="1"]');
-  assert.deepEqual(await hl(), []);
-  assert.equal(await page.eval("document.querySelectorAll('.m-node.hl, .m-node.dim').length"), 0);
+  assert.equal(await page.eval("document.getElementById('map-sheet').classList.contains('ro')"), true, '해설에서 여는 시트는 읽기 전용');
+  assert.equal(await page.eval("['map-pick-toggle', 'map-save', 'map-opt'].every(id => getComputedStyle(document.getElementById(id)).display === 'none')"), true, '편집 도구는 숨겨짐');
   await page.click(`[data-node="${w.c.force}"] rect`);
   assert.equal((await page.eval('window.CmapMap._state()')).selected, null, '해설 탭에서는 연결용 선택이 되지 않음');
+  await closeSheet(page);
+  assert.equal(await page.eval("document.querySelector('[data-para=\"0\"]').classList.contains('sel')"), true, '선택한 단락 표시는 남음');
+  await page.click('[data-para="1"] [data-act=show-map]');
+  await page.waitFor("document.getElementById('map-sheet').open", 4000);
+  assert.deepEqual(await hl(), [w.c.iso]);
+  assert.equal(await page.eval("document.querySelectorAll('.m-node.hl').length"), 1);
+  await closeSheet(page);
   // 지도 탭으로 돌아오면 강조가 사라지고 다시 선택할 수 있다
-  await page.click('[data-para="0"]');
   await page.click('#tab-map');
   assert.deepEqual(await hl(), []);
+  await openSheet(page);
+  assert.equal(await page.eval("document.querySelectorAll('.m-node.hl, .m-node.dim').length"), 0);
   await page.click(`[data-node="${w.c.force}"] rect`);
   assert.equal((await page.eval('window.CmapMap._state()')).selected, w.c.force);
 });
@@ -132,9 +140,10 @@ test('제안: 자동으로 개념·연결을 추가하지 않는다. [찾아보�
   const before = { nodes: srv.db.nodes.length, edges: srv.db.edges.length, concepts: srv.db.concepts.length, ai: srv.anthropic.calls.length };
   // 저장된 개념 → 지도 탭 + 개념 선택 패널 열림 + 체크는 그대로(사용자가 직접)
   await page.click('[data-sug="1"] [data-act]');
-  await page.waitFor("!document.getElementById('map-pick-panel').hidden", 3000, '개념 선택 패널');
+  await page.waitFor("document.getElementById('map-sheet').open && !document.getElementById('map-pick-panel').hidden", 3000, '시트 + 개념 선택 패널');
   assert.equal((await page.eval('window.CmapMap._state()')).mode, 'map');
   assert.equal(await page.eval(`document.getElementById('pick-${w.c.vel}').checked`), false);
+  await closeSheet(page);
   // 찾아보기 → 주제·개념 화면의 검색칸에 용어만 채워짐
   await page.click('#tab-narr'); await page.waitFor("!!document.getElementById('narr-sugs')", 4000);
   await page.click('[data-sug="0"] [data-act]');
@@ -223,6 +232,6 @@ test('390px: 탭·[해설 만들기]·단락·제안 버튼 높이 44 이상, �
   assert.ok(await page.eval("document.getElementById('narr-make').getBoundingClientRect().height") >= 44);
   await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-sugs')", 15000);
   for (const sel of ['.narr-para', '[data-act]']) assert.ok(await page.eval(`Math.min(...[...document.querySelectorAll(${JSON.stringify('#narr-panel ' + sel)})].map(e => e.getBoundingClientRect().height))`) >= 44, sel);
-  assert.ok(await page.eval("document.querySelector('.map-canvas').getBoundingClientRect().height") <= 230);
+  assert.equal(await page.eval("document.getElementById('map-canvas').offsetParent === null"), true, '지도 캔버스는 페이지에 없고(시트 안) 시트가 닫혀 있으면 보이지 않음');
   assert.equal(await page.hasHorizontalScroll(), false);
 });

@@ -109,14 +109,13 @@
   .c-expl .e-secs { margin-bottom: 8px; }
 
   /* 작업273-2: 지도 화면 */
-  .map-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 12px; }
-  .map-pick { margin-top: 4px; border-top: 1px solid var(--color-line); }   /* 274-2: 내부 스크롤·박스 없음, 페이지가 함께 스크롤됨 */
+  .map-pick { flex: 0 0 auto; max-height: 45%; overflow-y: auto; border-top: 1px solid var(--color-line); padding: 0 16px 8px; }   /* 시트(<dialog>) 안이라 내부 스크롤 허용 */
   .pick-topic { margin: 12px 0 0; }
   .pick-row { display: flex; align-items: center; gap: 10px; min-height: var(--ctl-min-h); cursor: pointer; border-bottom: 1px solid var(--color-line); }
   .pick-row input { width: 22px; height: 22px; flex: none; accent-color: var(--color-accent-ink); }
   .pick-term { font-weight: 700; overflow-wrap: anywhere; }
   .pick-en { font-size: 13px; color: var(--color-text-sub); overflow-wrap: anywhere; }
-  .map-save-state { font-size: 13px; color: var(--color-text-sub); margin-right: auto; padding: 0 6px; }
+  .map-save-state { font-size: 12px; color: var(--color-text-sub); }
   .map-save-state.changed { color: var(--color-accent-ink); font-weight: 700; }
   .map-opt-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px 12px; background: var(--color-surface); border-bottom: 1px solid var(--color-accent-ink); font-size: 13px; }
   .map-opt-bar span { flex: 1 1 140px; }
@@ -127,11 +126,10 @@
   .m-node.hl rect { stroke: var(--color-accent-ink); stroke-width: 3.5; }
   .m-node.dim { opacity: 0.35; }
   #narr-panel { display: none; padding-top: 12px; padding-bottom: 32px; }
-  #review-panel, #quiz-panel { display: none; padding-top: 12px; padding-bottom: 32px; }
-  #map-view.narr-mode #narr-panel, #map-view.review-mode #review-panel, #map-view.quiz-mode #quiz-panel { display: block; }
+  #review-panel, #quiz-panel { display: none; }
+  #review-panel { padding-top: 12px; padding-bottom: 32px; }
+  #map-view.narr-mode #narr-panel, #map-view.review-mode #review-panel { display: block; }
   #map-view.side-mode .map-only { display: none; }
-  #map-view.side-mode .map-canvas { height: 220px; min-height: 0; }
-  #map-view.quiz-mode .map-canvas { height: 340px; }
   .quiz-answers { margin: 8px 0 0; padding: 0; list-style: none; }
   .quiz-answers li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--ctl-min-h); border-bottom: 1px solid var(--color-line); font-size: 14px; overflow-wrap: anywhere; }
   .quiz-scores { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 8px; border-top: 1px solid var(--color-line); border-bottom: 1px solid var(--color-line); }
@@ -163,9 +161,31 @@
   .narr-loading { margin: 0 0 8px; font-size: 14px; color: var(--color-text-sub); }
   .narr-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   .narr-daily { text-align: right; }
-  #map-hint { min-height: 3.2em; }   /* 안내가 한 줄↔두 줄로 바뀌어도 캔버스가 밀리지 않게 높이를 고정 */
-  .map-canvas { position: relative; margin-top: 8px; height: min(62dvh, 560px); min-height: 320px; border-top: 1px solid var(--color-line); border-bottom: 1px solid var(--color-line); background: var(--color-surface); overflow: hidden; }   /* 274-2: 높이 고정(제스처 영역), 캔버스 밖을 만지면 페이지가 스크롤됨 */
-  .map-canvas .msg { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 6px 12px; background: var(--color-surface); border-top: 1px solid var(--color-line); }   /* 오류 문구는 캔버스 위에 겹쳐 보여 캔버스를 밀지 않는다 */
+  /* 274-4: 지도 시트(개념학습 map-sheet 와 같은 구조): 모바일 = 전체 화면, 768px 이상 = 큰 팝업. 시트 가장자리는 구분선만 쓴다 */
+  html.map-open, html.map-open body { overflow: hidden; }
+  dialog.map-sheet { padding: 0; border: none; border-radius: 0; margin: 0; max-width: none; max-height: none; width: 100vw; height: 100vh; height: 100dvh; overscroll-behavior: contain; overflow: hidden; }
+  dialog.map-sheet[open] { display: flex; flex-direction: column; }
+  @media (min-width: 768px) {
+    dialog.map-sheet { margin: auto; width: min(1200px, calc(100vw - 48px)); height: calc(100vh - 48px); height: calc(100dvh - 48px); border: 1px solid var(--color-line); border-radius: var(--card-radius); }
+  }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 8px 16px; border-bottom: 1px solid var(--color-line); }
+  .sheet-head h2 { margin: 0; font-size: 18px; font-weight: 800; min-width: 0; overflow-wrap: anywhere; }
+  .sheet-tools { display: flex; justify-content: space-around; align-items: stretch; gap: 2px; padding: 2px 4px; border-bottom: 1px solid var(--color-line); }
+  .tool { flex: 1 1 0; min-width: 44px; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0 2px; background: transparent; border: none; color: var(--color-accent-ink); font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .tool svg.ic { width: 20px; height: 20px; }
+  .map-sheet.ro .edit-only, .map-sheet.quiz-mode .edit-only { display: none; }
+  .map-sheet.quiz-mode .map-overlay-top { display: none; }   /* 퀴즈 중에는 연결 수 등 정답에 가까운 정보를 보이지 않는다 */
+  .map-canvas { position: relative; flex: 1 1 auto; min-height: 160px; background: var(--color-surface); overflow: hidden; }   /* 시트 안의 지도 영역(제스처 전용) */
+  .map-overlay-top { position: absolute; top: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; gap: 0 10px; padding: 4px 12px; pointer-events: none; }
+  .map-overlay-top .hint { margin-top: 0; font-size: 12px; }
+  .map-overlay-bottom { position: absolute; left: 0; right: 0; bottom: 0; pointer-events: none; }
+  .map-overlay-bottom p { margin: 0; padding: 6px 12px; background: var(--color-surface); border-top: 1px solid var(--color-line); font-size: 13px; color: var(--color-text-sub); }
+  .map-overlay-bottom p:empty { display: none; }
+  .map-overlay-bottom p.msg { color: var(--color-danger-ink); }
+  .map-sheet.quiz-mode #quiz-panel { display: block; flex: 0 1 auto; max-height: 55%; overflow-y: auto; padding: 8px 16px 16px; border-top: 1px solid var(--color-line); }
+  .map-open-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding-top: 16px; }
+  .map-open-row .hint { margin-top: 0; }
+  .narr-para-row { margin-left: -10px; }
   #map-svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
   .m-node rect { fill: var(--color-surface); stroke: var(--color-line-strong); stroke-width: 1.5; cursor: grab; }
   .m-node.sel rect { fill: var(--color-surface-2); stroke: var(--color-accent); stroke-width: 2.5; }
@@ -173,7 +193,7 @@
   .m-node:focus-visible rect { stroke: var(--color-text); stroke-width: 2.5; }
   .m-node-text { font-size: 13px; font-weight: 700; fill: var(--color-text); pointer-events: none; }
   .m-edge-line { fill: none; stroke: var(--color-text-sub); stroke-width: 1.6; pointer-events: none; }
-  .m-edge-hit { fill: none; stroke: transparent; stroke-width: 22; cursor: pointer; }
+  .m-edge-hit { fill: none; stroke: transparent; stroke-width: 28; vector-effect: non-scaling-stroke; pointer-events: stroke; cursor: pointer; }   /* 눈에 안 보이는 클릭 영역: 화면 28px 고정(개념학습과 같음) */
   .m-edge-label { font-size: 12px; fill: var(--color-text-sub); paint-order: stroke; stroke: var(--color-surface); stroke-width: 4px; pointer-events: none; }
   .m-arrow-path { fill: var(--color-text-sub); }
   .edge-pair { margin-top: 12px; font-size: 16px; font-weight: 800; overflow-wrap: anywhere; }
@@ -252,26 +272,39 @@
   </div>
   <div class="wrap">
     <div class="map-tabs" role="tablist" aria-label="지도 보기"><button id="tab-map" class="map-tab sel" type="button" role="tab" aria-selected="true">지도</button><button id="tab-narr" class="map-tab" type="button" role="tab" aria-selected="false">해설</button><button id="tab-review" class="map-tab" type="button" role="tab" aria-selected="false">복습</button></div>
-    <div class="map-tools map-only">
-      <button id="map-pick-toggle" class="btn text" type="button" aria-expanded="false" aria-controls="map-pick-panel">개념 선택</button>
-      <button id="map-fit" class="btn text" type="button">전체 보기</button>
-      <span id="map-count" class="hint"></span>
+    <div id="map-page" class="map-only">
+      <div class="map-open-row"><button id="map-open" class="btn" type="button">지도 열기</button><span id="map-meta" class="hint"></span></div>
+      <p id="map-page-note" class="hint" role="status"></p>
     </div>
-    <div class="map-tools map-only">
-      <span id="map-save-state" class="map-save-state" role="status"></span>
-      <button id="map-save" class="btn text" type="button">저장</button>
-      <button id="map-opt" class="btn text" type="button">배치 최적화</button>
-      <button id="map-undo" class="btn text" type="button" hidden>되돌리기</button>
-    </div>
-    <div id="map-pick-panel" class="map-pick map-only" hidden><div id="map-pick-list"></div></div>
-    <p id="map-hint" class="hint map-only"></p>
-    <div class="map-canvas"><div id="map-opt-bar" class="map-opt-bar" hidden><span id="map-opt-info"></span><button id="map-opt-apply" class="btn" type="button">적용</button><button id="map-opt-cancel" class="btn text" type="button">취소</button></div><svg id="map-svg" role="group" aria-label="개념 지도"></svg><p id="map-msg" class="msg" role="alert"></p></div>
     <div id="narr-panel" aria-live="polite"></div>
     <div id="review-panel" aria-live="polite"></div>
-    <div id="quiz-panel" aria-live="polite"></div>
   </div>
  </div>
 </div>
+
+<dialog id="map-sheet" class="map-sheet" aria-labelledby="map-sheet-title">
+  <div class="sheet-head">
+    <h2 id="map-sheet-title">지도</h2>
+    <button id="map-sheet-close" class="btn text" type="button" aria-label="지도 닫기">닫기</button>
+  </div>
+  <div class="sheet-tools" role="toolbar" aria-label="지도 도구">
+    <button id="map-pick-toggle" class="tool edit-only" type="button" aria-expanded="false" aria-controls="map-pick-panel"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg><span>개념 선택</span></button>
+    <button id="map-save" class="tool edit-only" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><path d="M8 20v-6h8v6"/></svg><span>저장</span></button>
+    <button id="map-opt" class="tool edit-only" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 6h8M7 8l4 8M17 8l-4 8"/></svg><span>배치 최적화</span></button>
+    <button id="map-undo" class="tool edit-only" type="button" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg><span>되돌리기</span></button>
+    <button id="map-fit" class="tool" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>전체 보기</span></button>
+    <button id="map-zoom-in" class="tool" type="button" aria-label="확대"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5M11 8v6M8 11h6"/></svg><span>확대</span></button>
+    <button id="map-zoom-out" class="tool" type="button" aria-label="축소"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5M8 11h6"/></svg><span>축소</span></button>
+  </div>
+  <div id="map-canvas" class="map-canvas">
+    <div id="map-opt-bar" class="map-opt-bar" hidden><span id="map-opt-info"></span><button id="map-opt-apply" class="btn" type="button">적용</button><button id="map-opt-cancel" class="btn text" type="button">취소</button></div>
+    <svg id="map-svg" role="group" aria-label="개념 지도"></svg>
+    <div class="map-overlay-top"><span id="map-save-state" class="map-save-state" role="status"></span><span id="map-count" class="hint"></span></div>
+    <div class="map-overlay-bottom"><p id="map-hint"></p><p id="map-msg" class="msg" role="alert"></p></div>
+  </div>
+  <div id="map-pick-panel" class="map-pick edit-only" hidden><div id="map-pick-list"></div></div>
+  <div id="quiz-panel" aria-live="polite"></div>
+</dialog>
 
 <dialog id="name-dlg" aria-labelledby="name-heading">
   <form id="name-form" novalidate>

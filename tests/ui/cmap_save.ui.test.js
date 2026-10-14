@@ -21,6 +21,9 @@ async function open(t) {
   await sleep(150);
   return { srv, page };
 }
+// 274-4: 지도는 시트(<dialog>) 안에 있다. 지도 조작 전에 [지도 열기]로 시트를 열고, 주제 화면으로 가기 전·다른 탭으로 가기 전에 닫는다
+const openSheet = async page => { await page.click('#map-open'); await page.waitFor("document.getElementById('map-sheet').open", 4000, '지도 시트'); };
+const closeSheet = async page => { await page.click('#map-sheet-close'); await page.waitFor("!document.getElementById('map-sheet').open", 4000, '지도 시트 닫힘'); };
 const seed = (page, method, url, body) => page.eval(`(async () => { const r = await api(${JSON.stringify(method)}, ${JSON.stringify(url)}, ${JSON.stringify(body)}); return r.body; })()`);
 // 과학 트리: 개념 a b c d 를 지도에 넣고, 교차하는 연결 두 개(a-b, c-d)를 만든 뒤 지도 화면을 연다
 async function world(page) {
@@ -40,6 +43,8 @@ async function world(page) {
   await page.waitFor("!document.getElementById('concepts-sec').hidden", 4000);
   await page.click('#act-map');
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000, '지도 화면');
+  await openSheet(page);
+  await page.click('#map-fit');                       // 열 때는 글자 크기 하한 때문에 넓은 지도의 오른쪽이 잘릴 수 있어, 테스트는 전체 보기로 맞춘다
   return { sci, c, map };
 }
 const serverMap = (page, sci) => seed(page, 'GET', `/api/cmap/topics/${sci.id}/map`);
@@ -133,6 +138,7 @@ test('되돌리기는 화면을 떠나면 사라지고, 적용 뒤 노드·연�
   await page.click('#map-opt');
   const bar = await page.eval("!document.getElementById('map-opt-bar').hidden");
   if (bar) { await page.click('#map-opt-apply'); await page.waitFor("!document.getElementById('map-undo').hidden", 6000); }
+  await closeSheet(page);
   await page.click('#map-back'); await page.waitFor("!document.getElementById('main-view').hidden", 4000);
   await page.click('#act-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000);
   assert.equal(await page.eval("document.getElementById('map-undo').hidden"), true);

@@ -1,11 +1,15 @@
 // 작업273-2: 개념 지도 화면의 "지도" 보기 — 지도에 쓸 개념 선택, 노드 드래그 배치, 노드 A 탭 → B 탭 연결, 연결 수정·삭제.
 // 클래식 스크립트(window.CmapMap). concept_map.html 의 인라인 스크립트가 먼저 정의한 전역($, h, api, okStatus, errText, openDlg, closeDlg, openConfirm, S, byId, ...)과
 // 공용 /js/map/mapCore.js 의 읽기 전용 도구(sv, clipText, edgeGeom), /js/cmap/mapGeometry.js·pairPicker.js 를 호출 시점에 사용한다(공용 코드는 수정하지 않음).
+// 274-4: 지도는 페이지 안의 작은 캔버스가 아니라 <dialog id="map-sheet"> 안에 크게 그린다(모바일 = 전체 화면 시트, 768px 이상 = 큰 팝업). 열고 닫기·맞춤·확대/축소는 개념학습(concept_study.html)의 지도 팝업 방식을 따랐다.
 // 모든 연결은 사용자가 직접 만든다(AI 제안 없음). 제스처: 노드 위 드래그 = 노드 이동(끝나면 위치 저장), 빈 곳 드래그 = 화면 이동, 두 손가락 = 확대·축소, 노드 탭 = 연결용 선택.
 (function () {
   'use strict';
   const G = window.CmapGeometry, PP = window.CmapPairPicker;
   const TAP_PX = 6;   // 이 거리(px) 안에서 손을 떼면 탭, 넘으면 드래그
+  const READ_FLOOR = 12 / 13;          // 열 때 노드 글자가 화면에서 12px 이상이 되는 배율(개념학습의 MAP_READ_PX / MAP_FONT_UNITS 와 같음)
+  const ZMIN = 0.05, ZMAX = 3;         // 확대·축소 한도(개념학습의 MAP_MIN_SCALE / MAP_MAX_SCALE 와 같음)
+  const zclamp = s => Math.max(ZMIN, Math.min(ZMAX, s));
   const TYPE_HINT = {
     '': '관계 종류는 선택 사항이에요. 문구만 써도 됩니다.',
     '사용': '앞 개념이 뒤 개념을 쓰거나, 뒤 개념에 기대는 관계예요.',
@@ -18,9 +22,10 @@
   const M = {
     rootId: null, map: null, nodes: new Map(), edges: [], concepts: new Map(), topics: [], types: [],
     temp: new Map(), view: { tx: 0, ty: 0, scale: 1 }, ptrs: new Map(), gest: null, pinch: null, selected: null, picker: null, svg: null, busy: false,
+    sheet: { open: false, scrollY: 0, ignorePop: false }, needFit: false,
     mode: 'map', quiz: null, hl: new Set(), status: null, preview: null, undo: null,   // 작업273-3: 저장 상태 { current_hash, save_status }, 최적화 미리보기 { pos, metrics }, 되돌리기 { pos }
   };
-  const listeners = { open: [], close: [], status: [], mode: [], quizpair: [] };   // 작업273-4: 해설 탭(narrateView.js)이 구독
+  const listeners = { open: [], close: [], status: [], mode: [], quizpair: [], sheet: [], sheetclose: [] };   // 작업273-4: 해설 탭(narrateView.js)이 구독
   const emit = (ev, arg) => { for (const fn of listeners[ev]) { try { fn(arg); } catch (e) { console.error(e); } } };
   const locked = () => !!M.preview || M.mode !== 'map';              // 미리보기·해설 탭에서는 노드·연결을 건드릴 수 없고 화면 이동·확대만 된다
   let ED = null;   // 연결 대화상자 상태 { mode, edge, from, to, flips }
@@ -71,15 +76,35 @@
     applyView();
     renderHint();
     $('map-count').textContent = '지도에 ' + M.nodes.size + '개 · 연결 ' + M.edges.length + '개';
+    updateMeta();
+  }
+  // 페이지 본문의 한 줄 상태(개념 수 · 연결 수 · 저장 상태)
+  function updateMeta() {
+    const el = $('map-meta');
+    if (!el) return;
+    const st = M.status ? M.status.save_status : 'unsaved';
+    el.textContent = '개념 ' + M.nodes.size + '개 · 연결 ' + M.edges.length + '개 · ' + (st === 'saved' ? '저장됨' : st === 'changed' ? '저장 후 변경됨' : '저장 안 됨');
   }
   function applyView() {
     const r = M.svg.getBoundingClientRect();
     const cw = r.width || 1, ch = r.height || 1;
     M.svg.setAttribute('viewBox', `${M.view.tx} ${M.view.ty} ${cw / M.view.scale} ${ch / M.view.scale}`);
   }
-  function fit() {
+  // 시트가 닫혀 있으면 크기를 알 수 없으므로 다음에 열 때 맞춘다(needFit). opts.open = 시트를 열 때: 전체가 들어오게 맞추되 글자가 너무 작아지면(READ_FLOOR 미만) 줄이지 않고 왼쪽 위부터 보여 준다(개념학습과 같음)
+  function fit(opts) {
+    if (!M.sheet.open) { M.needFit = true; return; }
     const r = M.svg.getBoundingClientRect();
-    M.view = G.fitView((M.mode === 'quiz' && M.quiz ? M.quiz.nodes.map(n => n.id) : [...M.nodes.keys()]).map(posOf), r.width, r.height);
+    const pts = (M.mode === 'quiz' && M.quiz ? M.quiz.nodes.map(n => n.id) : [...M.nodes.keys()]).map(posOf);
+    let v = { scale: 1, tx: 0, ty: 0 };
+    if (pts.length && r.width > 0 && r.height > 0) {                  // 전체가 들어오는 배율(최대 1, 하한은 확대·축소와 같은 0.05). 개념학습의 [화면 맞춤]처럼 아주 큰 지도도 전체가 보인다
+      const x0 = Math.min(...pts.map(p => p.x)) - 24, y0 = Math.min(...pts.map(p => p.y)) - 24;
+      const x1 = Math.max(...pts.map(p => p.x + G.NODE_W)) + 24, y1 = Math.max(...pts.map(p => p.y + G.NODE_H)) + 24;
+      const scale = zclamp(Math.min(1, r.width / (x1 - x0), r.height / (y1 - y0)));
+      v = { scale, tx: (x0 + x1) / 2 - r.width / scale / 2, ty: (y0 + y1) / 2 - r.height / scale / 2 };
+      if (opts && opts.open && scale < READ_FLOOR) v = { scale: READ_FLOOR, tx: x0 - 8 / READ_FLOOR, ty: y0 };
+    }
+    M.view = v;
+    M.needFit = false;
     applyView();
   }
   // 새 노드가 지금 보이는 영역 밖에 놓이면 전체가 보이도록 맞춘다(보이는 노드는 사용자가 정한 확대·이동을 그대로 둔다)
@@ -91,12 +116,14 @@
   function renderHint() {
     const el = $('map-hint');
     if (M.preview) { el.textContent = '미리보기예요. 마음에 들면 [적용], 아니면 [취소]를 눌러 주세요. 노드와 연결은 그대로이고 자리만 바뀌어요.'; return; }
-    if (!M.nodes.size) { el.textContent = '아래 [개념 선택]에서 지도에 쓸 개념을 골라 보세요.'; return; }
+    if (M.mode !== 'map') { el.textContent = ''; return; }
+    if (!M.nodes.size) { el.textContent = '[개념 선택]에서 지도에 쓸 개념을 골라 보세요.'; return; }
     el.textContent = M.selected !== null
       ? '‘' + termOf(M.selected) + '’을(를) 골랐어요. 이어 줄 개념을 눌러 주세요. 같은 개념을 다시 누르면 취소돼요.'
       : '노드를 끌어 옮기고, 두 노드를 차례로 눌러 연결해요. 연결선을 누르면 고칠 수 있어요.';
   }
   const mapMsg = t => { $('map-msg').textContent = t || ''; };
+  const pageNote = t => { const el = $('map-page-note'); if (el) el.textContent = t || ''; };
 
   // ── 열기·닫기 ──
   async function open(rootId) {
@@ -121,6 +148,8 @@
     $('main-view').hidden = true;
     $('map-view').hidden = false;
     $('map-title').textContent = '지도 · ' + b.map.title;
+    $('map-sheet-title').textContent = '지도 · ' + b.map.title;
+    pageNote('');
     $('map-pick-panel').hidden = true;
     $('map-pick-toggle').setAttribute('aria-expanded', 'false');
     mapMsg('');
@@ -134,6 +163,7 @@
     emit('open');
   }
   function close() {
+    if (M.sheet.open) closeSheetUi(false);
     M.preview = null; M.undo = null; M.hl = new Set(); M.quiz = null; setMode('map', true);
     emit('close');       // 화면을 떠나면 되돌리기는 사라진다
     if (M.picker) M.picker.reset();
@@ -285,6 +315,7 @@
     el.dataset.state = st;
     el.textContent = st === 'saved' ? '저장됨' + (M.map && M.map.saved_at ? ' · ' + fmtTime(M.map.saved_at) : '') : st === 'changed' ? '저장 후 변경됨' : '저장 안 됨';
     $('map-save').disabled = st === 'saved' || !!M.preview;
+    updateMeta();
   }
   function renderOptUi() {
     $('map-opt-bar').hidden = !M.preview;
@@ -385,15 +416,71 @@
     const cl = $('map-view').classList;
     cl.toggle('side-mode', mode !== 'map');
     for (const m of ['narr', 'review', 'quiz']) cl.toggle(m + '-mode', mode === m);
+    sheetLayout();
     for (const [id, m] of [['tab-map', 'map'], ['tab-narr', 'narr'], ['tab-review', 'review']]) { $(id).setAttribute('aria-selected', String(mode === m)); $(id).classList.toggle('sel', mode === m); }
-    if (!silent) { if (M.svg) { requestAnimationFrame(() => { fit(); render(); }); } emit('mode', mode); }
+    if (!silent) { if (M.svg) { render(); requestAnimationFrame(() => { fit(); render(); }); } emit('mode', mode); }
+  }
+  // 강조할 개념 목록. 시트가 열려 있으면 그 개념들이 보이도록 맞추고, 닫혀 있으면 다음에 열 때 맞춘다
+  function fitHighlight() {
+    if (!M.sheet.open || !M.nodes.size) return;
+    if (M.hl.size) { const r = M.svg.getBoundingClientRect(); M.view = G.fitView([...M.hl].map(posOf), r.width, r.height); M.needFit = false; applyView(); } else fit();
   }
   function highlight(ids) {
     M.hl = new Set((ids || []).filter(id => M.nodes.has(id)));
-    if (M.svg && M.nodes.size) {
-      if (M.hl.size) { const r = M.svg.getBoundingClientRect(); M.view = G.fitView([...M.hl].map(posOf), r.width, r.height); applyView(); } else fit();
-    }
+    if (M.sheet.open) { fitHighlight(); render(); } else M.needFit = true;
+  }
+
+  // ── 지도 시트(작업274-4) ──
+  // 열기: 배경 스크롤 잠금 + showModal + 브라우저 기록 한 칸(뒤로 가기로 닫기). 닫기: [닫기] · ESC · 뒤로 가기. 닫으면 선택·제스처·미리보기 상태를 정리하고 원래 스크롤 위치로 돌린다.
+  function sheetLayout() {
+    const d = $('map-sheet');
+    d.classList.toggle('ro', M.mode === 'narr' || M.mode === 'review');   // 해설·복습에서 여는 시트는 읽기 전용(편집 도구 숨김)
+    d.classList.toggle('quiz-mode', M.mode === 'quiz');
+  }
+  function openSheet() {
+    if (M.sheet.open || !M.svg) return;
+    M.sheet.open = true; M.sheet.scrollY = window.scrollY;
+    document.documentElement.classList.add('map-open');
+    sheetLayout();
+    const d = $('map-sheet');
+    try { if (!d.open) d.showModal(); } catch (e) { d.setAttribute('open', ''); }
+    try { history.pushState({ metisCmapSheet: true }, ''); } catch (e) { /* 무시 */ }
+    mapMsg('');
+    fit({ open: true });
+    if (M.hl.size) fitHighlight();
     render();
+    emit('sheet', true);
+  }
+  function closeSheetUi(restore) {
+    if (!M.sheet.open) return;
+    M.sheet.open = false;
+    if (M.picker) M.picker.reset();
+    M.selected = null; M.gest = null; M.pinch = null; M.ptrs.clear();
+    $('map-pick-panel').hidden = true; $('map-pick-toggle').setAttribute('aria-expanded', 'false');
+    for (const id of ['edge-dlg', 'quiz-dlg']) { const dl = $(id); if (dl && dl.open) closeDlg(dl); }
+    const note = M.preview ? '배치 최적화 미리보기를 취소했어요. 노드와 연결은 그대로예요.' : '';
+    if (M.preview) cancelPreview();
+    const d = $('map-sheet');
+    try { if (d.open) d.close(); } catch (e) { d.removeAttribute('open'); }
+    document.documentElement.classList.remove('map-open');
+    if (restore) window.scrollTo(0, M.sheet.scrollY);
+    pageNote(note);
+    const opener = $('map-open'); if (opener && M.mode === 'map') { try { opener.focus({ preventScroll: true }); } catch (e) { /* 무시 */ } }
+    M.needFit = true;
+    emit('sheetclose', { mode: M.mode });
+  }
+  function closeSheet() {
+    if (!M.sheet.open) return;
+    closeSheetUi(true);
+    if (history.state && history.state.metisCmapSheet) { M.sheet.ignorePop = true; history.back(); }   // 우리가 쌓은 기록 한 칸을 되돌린다
+  }
+  function zoomBy(f) {
+    if (!M.sheet.open) return;
+    const r = M.svg.getBoundingClientRect();
+    const cx = M.view.tx + r.width / M.view.scale / 2, cy = M.view.ty + r.height / M.view.scale / 2;
+    M.view.scale = zclamp(M.view.scale * f);
+    M.view.tx = cx - r.width / M.view.scale / 2; M.view.ty = cy - r.height / M.view.scale / 2;
+    applyView();
   }
 
   // ── 제스처 ──
@@ -415,6 +502,25 @@
       else if (ed) { ev.preventDefault(); const e = M.edges.find(x => x.id === Number(ed.dataset.edge)); if (e) openEdgeDialog('edit', { edge: e, from: e.from_concept_id, to: e.to_concept_id }); }
     });
     $('map-fit').addEventListener('click', () => { fit(); });
+    $('map-zoom-in').addEventListener('click', () => zoomBy(1.25));
+    $('map-zoom-out').addEventListener('click', () => zoomBy(0.8));
+    $('map-open').addEventListener('click', openSheet);
+    $('map-sheet-close').addEventListener('click', closeSheet);
+    $('map-sheet').addEventListener('cancel', ev => { ev.preventDefault(); closeSheet(); });   // ESC
+    window.addEventListener('popstate', () => {
+      if (M.sheet.ignorePop) { M.sheet.ignorePop = false; return; }
+      if (M.sheet.open) closeSheetUi(true);
+    });
+    if (window.ResizeObserver) {                                                              // 화면 회전·창 크기 변경: 너비가 바뀌면 다시 맞춘다
+      let lastW = 0;
+      new ResizeObserver(es => {
+        const w = es[0].contentRect.width;
+        if (!M.sheet.open || !w) { lastW = 0; return; }
+        if (lastW && Math.abs(w - lastW) > 1) { fit({ open: true }); render(); }
+        else applyView();                                                                  // 높이만 바뀐 경우(선택 패널 열기·닫기, 퀴즈 패널): 보이는 영역 비율을 다시 맞춰 노드가 튀지 않게 한다
+        lastW = w;
+      }).observe($('map-canvas'));
+    }
     $('map-save').addEventListener('click', save);
     $('map-opt').addEventListener('click', optimize);
     $('map-opt-apply').addEventListener('click', applyPreview);
@@ -507,7 +613,7 @@
     const [p1, p2] = [...M.ptrs.values()];
     const rect = M.svg.getBoundingClientRect();
     const mx = (p1.x + p2.x) / 2 - rect.left, my = (p1.y + p2.y) / 2 - rect.top;
-    M.view.scale = G.clampScale(M.pinch.scale * (Math.hypot(p1.x - p2.x, p1.y - p2.y) / M.pinch.dist));
+    M.view.scale = zclamp(M.pinch.scale * (Math.hypot(p1.x - p2.x, p1.y - p2.y) / M.pinch.dist));
     M.view.tx = M.pinch.wx - mx / M.view.scale; M.view.ty = M.pinch.wy - my / M.view.scale;
     applyView();
   }
@@ -516,27 +622,30 @@
     const rect = M.svg.getBoundingClientRect();
     const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
     const wx = M.view.tx + mx / M.view.scale, wy = M.view.ty + my / M.view.scale;
-    M.view.scale = G.clampScale(M.view.scale * (ev.deltaY < 0 ? 1.15 : 1 / 1.15));
+    M.view.scale = zclamp(M.view.scale * (ev.deltaY < 0 ? 1.15 : 1 / 1.15));
     M.view.tx = wx - mx / M.view.scale; M.view.ty = wy - my / M.view.scale;
     applyView();
   }
 
   window.CmapMap = {
-    open, close, setMode, highlight,
+    open, close, setMode, highlight, openSheet, closeSheet,
+    isSheetOpen() { return M.sheet.open; },
+    // 해설·복습에서 "지도에서 보기": 그 개념들을 강조하고 시트를 연다(이미 열려 있으면 강조만 바꾼다)
+    showOnMap(ids) { highlight(ids); openSheet(); },
     on(ev, fn) { if (listeners[ev]) listeners[ev].push(fn); },
     status() { return M.status ? { ...M.status } : null; },
     mapId() { return M.map ? M.map.id : null; },
     rootId() { return M.rootId; },
     topicOfConcept(id) { const c = M.concepts.get(id); return c ? c.topic_id : null; },
     // 연결 퀴즈(작업273-5): begin 으로 화면을 퀴즈 모드로 바꾸고, setAnswers 로 사용자가 이은 연결을 그리며, end 로 끝낸다(모드는 호출한 쪽이 정함)
-    quizBegin(nodes) { M.quiz = { nodes: nodes.map(n => ({ id: n.id, term: n.term })), pos: scatter(nodes), answers: [] }; M.selected = null; if (M.picker) M.picker.reset(); setMode('quiz'); },
+    quizBegin(nodes) { M.quiz = { nodes: nodes.map(n => ({ id: n.id, term: n.term })), pos: scatter(nodes), answers: [] }; M.selected = null; if (M.picker) M.picker.reset(); setMode('quiz'); if (M.sheet.open) { fit({ open: true }); render(); } else openSheet(); },
     quizSetAnswers(list) { if (M.quiz) { M.quiz.answers = list.map(a => ({ from: a.from, to: a.to, type: a.type || null })); render(); } },
     quizEnd() { M.quiz = null; M.selected = null; if (M.picker) M.picker.reset(); },
     edgeCount() { return M.edges.length; },
-    openPick() { $('map-pick-panel').hidden = false; $('map-pick-toggle').setAttribute('aria-expanded', 'true'); },
+    openPick() { openSheet(); $('map-pick-panel').hidden = false; $('map-pick-toggle').setAttribute('aria-expanded', 'true'); applyView(); },
     // 테스트용 확인: 배치 최적화 미리보기 상태
     _preview() { return M.preview ? { pos: [...M.preview.pos].map(([id, p]) => ({ id, ...p })), metrics: M.preview.metrics } : null; },
-    togglePanel() { const p = $('map-pick-panel'); p.hidden = !p.hidden; $('map-pick-toggle').setAttribute('aria-expanded', String(!p.hidden)); },
+    togglePanel() { const p = $('map-pick-panel'); p.hidden = !p.hidden; $('map-pick-toggle').setAttribute('aria-expanded', String(!p.hidden)); if (M.sheet.open) applyView(); },
     // 테스트 확인용(읽기 전용 사본)
     _highlight() { return [...M.hl].sort((a, b) => a - b); },
     _state() { return { mode: M.mode, nodes: [...M.nodes].map(([id, n]) => ({ id, x: n.x, y: n.y })), edges: M.edges.map(e => ({ ...e })), view: { ...M.view }, selected: M.selected, mapId: M.map && M.map.id }; },

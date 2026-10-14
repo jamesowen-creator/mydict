@@ -31,10 +31,13 @@ async function world(page, { openMap = true } = {}) {
   await page.eval('refresh()');
   await page.eval(`selectTopic(${sci.id}); 0`);
   await page.waitFor("!document.getElementById('concepts-sec').hidden", 4000);
-  if (openMap) { await page.waitFor("document.querySelectorAll('#concept-list > *').length >= 3", 6000, '개념 목록 표시(레이아웃 안정)'); await hittable(page, '#act-map'); await page.click('#act-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000, '지도 화면'); }
+  if (openMap) { await page.waitFor("document.querySelectorAll('#concept-list > *').length >= 3", 6000, '개념 목록 표시(레이아웃 안정)'); await hittable(page, '#act-map'); await page.click('#act-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000, '지도 화면'); await openSheet(page); }
   return { sci, phys, c };
 }
 const state = page => page.eval('window.CmapMap._state()');
+// 274-4: 지도는 시트(<dialog>) 안에 있다. 지도 조작 전에 [지도 열기]로 시트를 열고, 주제 화면으로 가기 전에 닫는다
+const openSheet = async page => { await page.click('#map-open'); await page.waitFor("document.getElementById('map-sheet').open", 4000, '지도 시트'); };
+const closeSheet = async page => { await page.click('#map-sheet-close'); await page.waitFor("!document.getElementById('map-sheet').open", 4000, '지도 시트 닫힘'); };
 // 조건이 참이 될 때까지 기다린다(테스트 프로세스 쪽 값, 예: 가짜 DB). 274-1: 드래그 저장 요청·응답이 끝나기를 기다리는 데 쓴다
 async function until(fn, ms, label) {
   const end = Date.now() + ms; let last;
@@ -118,8 +121,10 @@ test('노드 드래그: 끝나면 위치가 저장되고(임시 → 배치), 다
   assert.ok(srv.db.nodes.find(n => n.concept_id === c.b.id).x === null, '건드리지 않은 노드는 미배치 그대로');
   assert.ok(scale > 0);
   // 다시 열어도 같은 자리
+  await closeSheet(page);
   await page.click('#map-back'); await page.waitFor("!document.getElementById('main-view').hidden", 4000);
   await page.click('#act-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000);
+  await openSheet(page);
   await page.waitFor(`document.querySelector('[data-node="${c.a.id}"]') !== null`, 4000);
   const st2 = (await state(page)).nodes.find(n => n.id === c.a.id);
   assert.ok(Math.abs(st2.x - st.x) < 0.2 && Math.abs(st2.y - st.y) < 0.2, '다시 열어도 저장된 위치');
@@ -323,6 +328,7 @@ test('주제·개념 화면과의 연결: 지도에 쓰이는 가지의 이동 �
   const { sci, phys, c } = await world(page);
   const other = (await seed(page, 'POST', '/api/cmap/topics', { title: '수학' })).topic;
   await pickAll(page, [c.d.id]);
+  await closeSheet(page);
   await page.click('#map-back'); await page.waitFor("!document.getElementById('main-view').hidden", 4000);
   await page.eval('refresh()');
   await page.eval(`selectTopic(${phys.id}); 0`);
