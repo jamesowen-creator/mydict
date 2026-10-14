@@ -197,6 +197,24 @@
   .map-open-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding-top: 16px; }
   .map-open-row .hint { margin-top: 0; }
   .narr-para-row { margin-left: -10px; }
+  /* 278-1: 말로 설명하기(복습 탭). 박스 없이 라벨·간격·1px 선, 판정은 아이콘 + 글자(색만으로 구분하지 않음) */
+  #answer-panel { padding-top: 12px; padding-bottom: 32px; }
+  .answer-term { margin-top: 8px; font-size: 22px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+  .answer-mic-row { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+  .mic-btn { flex: none; width: 64px; height: 64px; border: none; border-radius: 50%; background: var(--color-accent-ink); color: var(--color-surface); display: inline-flex; align-items: center; justify-content: center; }
+  .mic-btn[aria-pressed=true] { background: var(--color-danger-ink); }
+  .mic-btn .mic-ic { width: 28px; height: 28px; }
+  .answer-verdict { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 18px; font-weight: 700; }
+  .answer-verdict.v-ok { color: var(--color-ok-ink); } .answer-verdict.v-part { color: var(--color-accent-ink); } .answer-verdict.v-low { color: var(--color-danger-ink); }
+  .answer-text { margin-top: 4px; font-size: 15px; line-height: 1.7; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .answer-recent { margin: 4px 0 0; padding: 0; list-style: none; }
+  .answer-recent > li { padding: 10px 0; border-bottom: 1px solid var(--color-line); }
+  .ar-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; }
+  .ar-term { font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+  .ar-verdict { flex: none; font-size: 13px; font-weight: 700; }
+  .ar-verdict.v-part { color: var(--color-accent-ink); } .ar-verdict.v-low { color: var(--color-danger-ink); } .ar-verdict.v-ok { color: var(--color-ok-ink); }
+  .ar-gaps { margin: 4px 0 0; padding-left: 20px; font-size: 14px; } .ar-gaps li { margin-top: 2px; overflow-wrap: anywhere; }
+  .ar-sup { margin: 4px 0 0; font-size: 13px; color: var(--color-text-sub); overflow-wrap: anywhere; }
   #map-svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
   .m-node rect { fill: var(--color-surface); stroke: var(--color-line-strong); stroke-width: 1.5; cursor: grab; }
   .m-node.sel rect { fill: var(--color-surface-2); stroke: var(--color-accent); stroke-width: 2.5; }
@@ -223,6 +241,8 @@
 <script src="/js/cmap/mapView.js?v=1"></script>
 <script src="/js/cmap/narrateView.js?v=1"></script>
 <script src="/js/cmap/reviewView.js?v=1"></script>
+<script src="/js/cmap/micRecorder.js?v=1"></script>
+<script src="/js/cmap/answerView.js?v=1"></script>
 
 <div id="loading" role="status"><p>불러오는 중…</p></div>
 
@@ -290,6 +310,7 @@
     </div>
     <div id="narr-panel" aria-live="polite"></div>
     <div id="review-panel" aria-live="polite"></div>
+    <div id="answer-panel" aria-live="polite" hidden></div>
   </div>
  </div>
 </div>

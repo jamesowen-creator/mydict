@@ -57,7 +57,7 @@ const nodeIds = page => page.eval("[...document.querySelectorAll('[data-node]')]
 
 test('버튼: 표시가 없으면 0개 표시·비활성 + 안내, 표시가 있으면 개수·활성, 연결 없는 표시 개념은 목록으로 알린다. 기존 전체 퀴즈 버튼은 그대로', { skip: SKIP }, async t => {
   const { page } = await open(t);
-  await world(page);
+  const w = await world(page);
   await reviewTab(page);
   assert.equal(await text(page, '#quiz-marked-count'), '표시한 개념 0개');
   assert.equal(await page.eval("document.getElementById('quiz-start-marked').disabled"), true);
@@ -67,10 +67,9 @@ test('버튼: 표시가 없으면 0개 표시·비활성 + 안내, 표시가 있
   assert.ok(await page.eval("document.getElementById('quiz-start-marked').getBoundingClientRect().height") >= 44);
   // 표시가 있는 지도: 새로 열어서 확인(b: 출제 가능, f: 연결 없음)
   await page.click('#map-back'); await page.waitFor("!document.getElementById('main-view').hidden", 4000);
-  const sci = await page.eval('S.selectedId');
-  const ids = await page.eval("(() => { const o = {}; for (const c of S.concepts) o[c.term] = c.id; return o; })()");
-  await seed(page, 'PUT', `/api/cmap/concepts/${ids['b개념']}/mark`, { marked: true });
-  await seed(page, 'PUT', `/api/cmap/concepts/${ids['f개념']}/mark`, { marked: true });
+  const sci = w.sci.id;
+  await seed(page, 'PUT', `/api/cmap/concepts/${w.ids.b}/mark`, { marked: true });
+  await seed(page, 'PUT', `/api/cmap/concepts/${w.ids.f}/mark`, { marked: true });
   await gotoMap(page, sci);
   await reviewTab(page);
   await page.waitFor("document.getElementById('quiz-marked-count').textContent === '표시한 개념 2개'", 4000);

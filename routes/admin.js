@@ -108,7 +108,7 @@ router.get('/api/admin/stats', requireAdmin, async (req, res) => {
       const sttModel = process.env.VOICE_STT_MODEL || 'gpt-4o-mini-transcribe';
       const sttPerMin = Number.isFinite(sttEnv) && sttEnv >= 0 ? sttEnv : (Object.prototype.hasOwnProperty.call(sttTable, sttModel) ? sttTable[sttModel] : 0.006);
       for (const r of rows) {
-        if (r.event_type === 'search' || r.event_type === 'ai' || r.event_type === 'summary' || r.event_type === 'quiz' || r.event_type === 'chat' || r.event_type === 'link' || r.event_type === 'image_aux' || r.event_type === 'concept' || r.event_type === 'concept_link' || r.event_type === 'cmap_explain' || r.event_type === 'cmap_narrate' || r.event_type === 'cmap_narrate_retry') {
+        if (r.event_type === 'search' || r.event_type === 'ai' || r.event_type === 'summary' || r.event_type === 'quiz' || r.event_type === 'chat' || r.event_type === 'link' || r.event_type === 'image_aux' || r.event_type === 'concept' || r.event_type === 'concept_link' || r.event_type === 'cmap_explain' || r.event_type === 'cmap_narrate' || r.event_type === 'cmap_narrate_retry' || r.event_type === 'cmap_answer') {
           anthropic += (Number(r.input_tokens) / 1_000_000) * 1.00;
           anthropic += (Number(r.output_tokens) / 1_000_000) * 5.00;
         }
@@ -116,7 +116,7 @@ router.get('/api/admin/stats', requireAdmin, async (req, res) => {
         if (r.event_type === 'tts') {
           openai += (Number(r.char_count) / 1000) * 0.030;
         }
-        if (r.event_type === 'stt' || r.event_type === 'concept_stt') {   // 개념학습 음성 입력(작업206)도 같은 오디오 초 × 분당 단가
+        if (r.event_type === 'stt' || r.event_type === 'concept_stt' || r.event_type === 'cmap_stt') {   // 개념학습 음성 입력(작업206)도 같은 오디오 초 × 분당 단가
           openai += (Number(r.char_count) / 60) * sttPerMin;
         }
       }

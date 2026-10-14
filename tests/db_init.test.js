@@ -17,7 +17,7 @@ const STEPS = ['client_encoding', 'users', 'users_name_repair', 'wordbook', 'tts
   'voice_quiz_attempts', 'voice_concepts', 'voice_links', 'voice_links_user_edit', 'voice_images', 'concept_user_permission', 'concept_studies', 'concept_items', 'concept_links',
   'concept_links_user_edited', 'concept_links_relation_types_v2', 'concept_quiz_attempts', 'concept_migrations_table', 'concept_migration_v1', 'concept_migration_v2',
   'cmap_user_permission', 'cmap_topics', 'cmap_concepts', 'cmap_concept_explanation',
-  'cmap_maps', 'cmap_map_nodes', 'cmap_edges', 'cmap_narrations', 'cmap_quiz_attempts', 'cmap_concept_marks'];   // 작업270-1·271-1·273-1·273-2·273-4·273-5·275-4: 마지막 열 단계가 개념 지도용으로 추가됨
+  'cmap_maps', 'cmap_map_nodes', 'cmap_edges', 'cmap_narrations', 'cmap_quiz_attempts', 'cmap_concept_marks', 'cmap_answer_attempts'];   // 작업270-1·271-1·273-1·273-2·273-4·273-5·275-4·278-1: 마지막 열한 단계가 개념 지도용으로 추가됨
 const summaryOf = r => r.logs.filter(l => l.startsWith('[DB] init done:'));
 const failedLogs = r => r.logs.filter(l => l.startsWith('[DB] init step failed:'));
 const sqlText = r => r.sqls.map(x => x.sql);
@@ -32,11 +32,11 @@ function splitRelStep(sqls) {
 }
 
 // 작업270-1: 개념 지도 단계(cmap_user_permission, cmap_topics, cmap_concepts)의 문장은 맨 끝에 더해졌다. 그 문장들만 따로 떼어 내고 나머지는 기존 기준과 같음을 단언한다(의도된 변경).
-const CMAP_SQL = /perm_concept_map|cmap_topics|idx_cmap_topics_|cmap_concepts|idx_cmap_concepts_|cmap_maps|idx_cmap_maps_|cmap_map_nodes|cmap_edges|idx_cmap_edges_|cmap_narrations|cmap_quiz_attempts|idx_cmap_quiz_attempts_|cmap_concept_marks/;
+const CMAP_SQL = /perm_concept_map|cmap_topics|idx_cmap_topics_|cmap_concepts|idx_cmap_concepts_|cmap_maps|idx_cmap_maps_|cmap_map_nodes|cmap_edges|idx_cmap_edges_|cmap_narrations|cmap_quiz_attempts|idx_cmap_quiz_attempts_|cmap_concept_marks|cmap_answer_attempts|idx_cmap_answer_attempts_/;
 function withoutCmap(sqls) {
   const cmap = sqls.filter(x => CMAP_SQL.test(x.sql));
   const rest = sqls.filter(x => !CMAP_SQL.test(x.sql));
-  assert.equal(cmap.length, 21, '개념 지도 문장 수(users 열 1 + cmap_topics 1+4 + cmap_concepts 1+2 + 설명 열 3 + cmap_maps 1+1 + cmap_map_nodes 1 + cmap_edges 1+1 + cmap_narrations 1 + cmap_quiz_attempts 1+1 + cmap_concept_marks 1)');
+  assert.equal(cmap.length, 23, '개념 지도 문장 수(users 열 1 + cmap_topics 1+4 + cmap_concepts 1+2 + 설명 열 3 + cmap_maps 1+1 + cmap_map_nodes 1 + cmap_edges 1+1 + cmap_narrations 1 + cmap_quiz_attempts 1+1 + cmap_concept_marks 1 + cmap_answer_attempts 1+1)');
   assert.equal(sqls.indexOf(cmap[0]), rest.length, '개념 지도 문장은 모두 맨 끝에 연속으로 있다');
   return { cmap, rest };
 }
@@ -69,13 +69,13 @@ for (const scenario of ['fresh', 'v1done']) {
   });
 }
 
-test('정상: 34단계 모두 성공, 요약 로그 "실패 0단계", 반환값, client 반환', async () => {
+test('정상: 35단계 모두 성공, 요약 로그 "실패 0단계", 반환값, client 반환', async () => {
   const r = await recordInit();
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 34단계, 실패 0단계']);
-  assert.deepEqual(r.result, { total: 34, failed: [], skipped: [] });
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 35단계, 실패 0단계']);
+  assert.deepEqual(r.result, { total: 35, failed: [], skipped: [] });
   assert.equal(failedLogs(r).length, 0);
   assert.equal(r.released, true);
-  assert.equal(STEPS.length, 34);
+  assert.equal(STEPS.length, 35);
 });
 
 test('중간 단계(voice_notes)가 실패해도 이후 단계가 계속 실행되고, 실패 이름과 요약이 로그에 남음', async () => {
@@ -85,7 +85,7 @@ test('중간 단계(voice_notes)가 실패해도 이후 단계가 계속 실행�
   const fl = failedLogs(r);
   assert.equal(fl.length, 1);
   assert.match(fl[0], /^\[DB\] init step failed: voice_notes: 주입된 오류/);
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 34단계, 실패 1단계 (실패: voice_notes)']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 35단계, 실패 1단계 (실패: voice_notes)']);
   const sqls = sqlText(r);
   assert.ok(sqls.some(s => /^ALTER TABLE concept_links ADD COLUMN IF NOT EXISTS user_edited/.test(s)), '뒤쪽 user_edited ALTER도 실행됨');
   assert.ok(sqls.some(s => /^CREATE TABLE IF NOT EXISTS concept_quiz_attempts/.test(s)));
@@ -103,7 +103,7 @@ test('이름 복구 단계의 조회가 실패해도 다음 단계(wordbook 이�
 test('여러 단계 실패: 요약에 실패 이름이 순서대로 나열됨', async () => {
   const r = await recordInit({ failOn: /^(CREATE TABLE IF NOT EXISTS tts_cache|CREATE TABLE IF NOT EXISTS concept_quiz_attempts)/ });
   assert.deepEqual(r.result.failed, ['tts_cache', 'concept_quiz_attempts']);
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 34단계, 실패 2단계 (실패: tts_cache, concept_quiz_attempts)']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 35단계, 실패 2단계 (실패: tts_cache, concept_quiz_attempts)']);
   assert.equal(failedLogs(r).length, 2);
   assert.ok(sqlText(r).some(s => /^CREATE TABLE IF NOT EXISTS concept_migrations/.test(s)));
 });
@@ -127,7 +127,7 @@ test('선행 DDL 단계가 실패하면 마이그레이션 v1·v2는 건너뛰�
   assert.equal(sqls.filter(x => x === 'BEGIN').length, 1, '마이그레이션 트랜잭션은 시작하지 않음(BEGIN 1번은 작업227-9 의 CHECK 확장 단계)');
   assert.ok(!sqls.some(x => /^INSERT INTO concept_migrations/.test(x)), '마이그레이션 완료 표시도 남기지 않음');
   assert.ok(!sqls.some(s => /FROM voice_concepts/.test(s)), '원본 voice_concepts를 읽지 않음');
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 34단계, 실패 1단계 (실패: concept_items), 건너뜀 2단계 (건너뜀: concept_migration_v1, concept_migration_v2)']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 35단계, 실패 1단계 (실패: concept_items), 건너뜀 2단계 (건너뜀: concept_migration_v1, concept_migration_v2)']);
 });
 
 test('선행 단계 중 하나(voice_concepts, concept_migrations_table)만 실패해도 마이그레이션 건너뜀', async () => {
@@ -384,4 +384,23 @@ test('개념 지도(273-5): cmap_quiz_attempts 는 지도 삭제 시 함께 삭�
   assert.ok(text.some(s => /^CREATE INDEX IF NOT EXISTS idx_cmap_quiz_attempts_map ON cmap_quiz_attempts\(map_id, created_at\)$/.test(s)));
   const r2 = await recordInit({ failOn: /^CREATE TABLE IF NOT EXISTS cmap_maps/ });
   assert.ok(r2.result.skipped.includes('cmap_quiz_attempts'));
+});
+
+test('개념 지도(278-1): cmap_answer_attempts 는 요약·판정·피드백만 저장(원문 열 없음)·개념/사용자 삭제 시 CASCADE·판정과 입력 방식 CHECK·마지막 단계이며, 선행 단계 실패 시 건너뜀', async () => {
+  const r = await recordInit();
+  const text = withoutCmap(r.sqls).cmap.map(x => x.sql);
+  const at = re => text.findIndex(s => re.test(s));
+  const t = text.find(s => /^CREATE TABLE IF NOT EXISTS cmap_answer_attempts/.test(s));
+  assert.ok(t);
+  assert.ok(at(/^CREATE TABLE IF NOT EXISTS cmap_answer_attempts/) > at(/^CREATE TABLE IF NOT EXISTS cmap_quiz_attempts/), '맨 끝');
+  assert.match(t, /user_id\s+INTEGER NOT NULL REFERENCES users\(id\) ON DELETE CASCADE/);
+  assert.match(t, /concept_id\s+INTEGER NOT NULL REFERENCES cmap_concepts\(id\) ON DELETE CASCADE/);
+  assert.match(t, /verdict\s+TEXT NOT NULL CHECK \(verdict IN \('충분', '부분적', '부족'\)\)/);
+  assert.match(t, /input_mode\s+TEXT NOT NULL CHECK \(input_mode IN \('voice', 'text'\)\)/);
+  for (const c of ['summary', 'strengths', 'gaps', 'supplement']) assert.match(t, new RegExp(c + '\\s'));
+  assert.doesNotMatch(t, /transcript|raw_text|answer_text|audio|input_text|original/i, '전사·입력 원문·오디오 열 없음');
+  assert.doesNotMatch(t, /DROP|TRUNCATE/);
+  assert.ok(text.some(s => /^CREATE INDEX IF NOT EXISTS idx_cmap_answer_attempts_user_created ON cmap_answer_attempts\(user_id, created_at DESC\)$/.test(s)));
+  const r2 = await recordInit({ failOn: /^CREATE TABLE IF NOT EXISTS cmap_concepts/ });
+  assert.ok(r2.result.skipped.includes('cmap_answer_attempts'));
 });

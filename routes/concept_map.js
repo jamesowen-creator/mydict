@@ -7,6 +7,8 @@ const M = require('../lib/cmap_map');
 const H = require('../lib/cmap_hash');
 const N = require('../lib/cmap_narrate');
 const Q = require('../lib/cmap_quiz');
+const STT = require('../lib/cmap_stt');
+const ANS = require('../lib/cmap_answer');
 
 const router = express.Router();
 
@@ -829,6 +831,82 @@ router.post('/api/cmap/maps/:id/quiz/submit', guard, handle(async req => {
     if (mode === 'marked') { out.mode = 'marked'; out.mastered = Q.masteredOf(sc.edges, r.correct, sc.marked.filter(m => !sc.isolated.includes(m))).map(cid => ({ id: cid, term: term.get(cid) })); }
     return { status: 201, body: out };
   });
+}));
+
+// ─── 작업278-1: 말로 설명하기(주관식) — 음성(또는 직접 입력) 답변을 저장된 설명과 비교해 AI(Haiku)가 평가 ─────────────────
+// 개념 이름만 제시하고 사용자가 설명한다. 오디오·전사(입력) 원문은 저장하지도 응답에 담지도 로그에 남기지도 않는다. AI 가 정리한 요약·판정·피드백만 응답하고 cmap_answer_attempts 에 저장한다.
+// 한도: 전사 CMAP_STT_DAILY_CAP(기본 20, 이벤트 cmap_stt), 평가 CMAP_ANSWER_DAILY_CAP(기본 30, 이벤트 cmap_answer). 한도 확인은 외부 호출 전에 한다.
+async function answerTarget(db, userId, conceptId) {
+  const { rows } = await db.query('SELECT id, term, explanation FROM cmap_concepts WHERE id = $1 AND user_id = $2', [conceptId, userId]);
+  if (!rows.length) throw notFound('개념을 찾을 수 없습니다.');
+  const entries = AI.explanationEntries(rows[0].explanation);
+  if (!entries.length) throw bad('이 개념에는 저장된 설명이 없어 평가할 수 없습니다. 먼저 설명을 저장해 주세요.', { no_explanation: true });
+  return { id: rows[0].id, term: rows[0].term, entries };
+}
+async function checkAnswerCap(userId, event, cap, text) {
+  if (await AI.countToday(userId, event) >= cap) throw new HttpError(429, `하루 ${cap}회까지 ${text}`);
+}
+// 평가 + 저장. answer 는 모델로만 가고 이 함수의 반환값·DB 에는 들어가지 않는다
+async function evaluateAndSave(userId, target, answer, mode) {
+  const ev = await ANS.evaluateAnswer(userId, ANS.buildAnswerInput({ term: target.term, entries: target.entries, answer }));
+  if (ev.aiError) throw new HttpError(ev.status || 502, ev.aiError, { ai_error: true });
+  const v = ev.value;
+  const { rows } = await pool.query(
+    'INSERT INTO cmap_answer_attempts (user_id, concept_id, verdict, summary, strengths, gaps, supplement, input_mode) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at',
+    [userId, target.id, v.verdict, v.summary, JSON.stringify(v.strengths), JSON.stringify(v.gaps), v.supplement, mode]);
+  return { status: 201, body: { id: rows[0].id, concept_id: target.id, term: target.term, verdict: v.verdict, summary: v.summary, strengths: v.strengths, gaps: v.gaps, supplement: v.supplement, input_mode: mode, created_at: rows[0].created_at } };
+}
+
+router.post('/api/cmap/concepts/:id/answer/voice', guard, STT.requireAudioType, STT.audioBody, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('개념을 찾을 수 없습니다.');
+  const audio = req.body;
+  if (!Buffer.isBuffer(audio) || audio.length === 0) throw bad('녹음 데이터가 비어 있습니다.');
+  const target = await answerTarget(pool, req.user.id, id);
+  await checkAnswerCap(req.user.id, STT.STT_EVENT, STT.sttDailyCap(), '음성으로 설명할 수 있습니다.');
+  await checkAnswerCap(req.user.id, ANS.ANSWER_EVENT, ANS.answerDailyCap(), 'AI 평가를 받을 수 있습니다.');
+  const tr = await STT.transcribe(req.user.id, audio, STT.audioBaseType(req), req.headers['x-audio-seconds']);
+  if (tr.error) throw new HttpError(tr.status, tr.error);
+  if (!tr.text) throw new HttpError(422, '음성이 인식되지 않았어요. 조용한 곳에서 다시 말해 주세요.', { no_speech: true });   // 평가 호출 없음(전사 사용량은 기록됨)
+  return evaluateAndSave(req.user.id, target, tr.text, 'voice');
+}));
+
+router.post('/api/cmap/concepts/:id/answer/text', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('개념을 찾을 수 없습니다.');
+  const text = bodyOf(req).text;
+  if (typeof text !== 'string' || !text.trim()) throw bad('설명을 입력해 주세요.');
+  if (T.charLen(text.trim()) > ANS.ANSWER_MAX_CHARS) throw bad(`설명은 ${ANS.ANSWER_MAX_CHARS}자 이하여야 합니다.`);
+  const target = await answerTarget(pool, req.user.id, id);
+  await checkAnswerCap(req.user.id, ANS.ANSWER_EVENT, ANS.answerDailyCap(), 'AI 평가를 받을 수 있습니다.');
+  return evaluateAndSave(req.user.id, target, text.trim(), 'text');
+}));
+
+// 최근 부족 목록: 개념별 최신 시도가 '부분적'·'부족'인 것만, 최근 순 최대 20개(이후 시도가 '충분'이면 빠진다). 다시 출제하는 기능은 없다
+const RECENT_MAX = 20;
+router.get('/api/cmap/answers/recent', guard, handle(async req => {
+  const { rows } = await pool.query('SELECT id, concept_id, verdict, gaps, supplement, created_at FROM cmap_answer_attempts WHERE user_id = $1 ORDER BY id', [req.user.id]);
+  const latest = new Map();
+  for (const r of rows) latest.set(r.concept_id, r);                       // id 오름차순이므로 마지막이 최신 시도
+  const { rows: cs } = await pool.query('SELECT id, term FROM cmap_concepts WHERE user_id = $1', [req.user.id]);
+  const term = new Map(cs.map(c => [c.id, c.term]));
+  const items = [...latest.values()].filter(r => r.verdict !== '충분' && term.has(r.concept_id))
+    .sort((a, b) => b.id - a.id).slice(0, RECENT_MAX)
+    .map(r => ({ concept_id: r.concept_id, term: term.get(r.concept_id), verdict: r.verdict, gaps: typeof r.gaps === 'string' ? JSON.parse(r.gaps) : (r.gaps || []), supplement: r.supplement, created_at: r.created_at }));
+  return { body: { items } };
+}));
+
+// 말로 설명하기 대상: 이 지도의 주제 트리 안 개념 중 사용자가 표시한 개념 가운데 저장된 설명이 있는 것(서버가 DB 의 표시로 계산)
+router.get('/api/cmap/maps/:id/answer-targets', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('지도를 찾을 수 없습니다.');
+  const map = await ownMap(pool, id, req.user.id);
+  const tree = await treeOfMap(pool, req.user.id, map.root_topic_id);
+  const { rows } = await pool.query('SELECT concept_id FROM cmap_concept_marks WHERE user_id = $1', [req.user.id]);
+  const marked = new Set(rows.map(r => r.concept_id));
+  const markedInTree = tree.concepts.filter(c => marked.has(c.id));
+  const targets = markedInTree.filter(c => AI.explanationEntries(c.explanation).length > 0).map(c => ({ id: c.id, term: c.term }));
+  return { body: { targets, marked_count: markedInTree.length, without_explanation: markedInTree.length - targets.length } };
 }));
 
 module.exports = router;

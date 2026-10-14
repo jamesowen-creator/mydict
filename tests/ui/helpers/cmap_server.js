@@ -33,6 +33,7 @@ async function startCmapServer({ perm = true } = {}) {
           const headers = {};
           if (req.headers.authorization) headers.Authorization = req.headers.authorization;
           if (req.headers['content-type']) headers['Content-Type'] = req.headers['content-type'];
+          if (req.headers['x-audio-seconds']) headers['X-Audio-Seconds'] = req.headers['x-audio-seconds'];   // 278-1: 음성 답변의 녹음 길이
           const r = await fetch(app.base + req.url, { method: req.method, headers, body: ['GET', 'HEAD'].includes(req.method) || !body.length ? undefined : body });
           res.writeHead(r.status, { 'Content-Type': 'application/json' });
           res.end(Buffer.from(await r.arrayBuffer()));

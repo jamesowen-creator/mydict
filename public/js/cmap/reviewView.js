@@ -63,6 +63,8 @@
       h('span', { class: 'hint', id: 'quiz-marked-count', style: 'margin-top:0', text: mi ? '표시한 개념 ' + nMarked + '개' : '' })));
     if (mi && nMarked === 0) box.append(h('p', { class: 'hint', id: 'quiz-marked-hint', text: '지도에서 모르는 개념을 눌러 표시해 보세요' }));
     if (mi && mi.isolated.length) box.append(h('p', { class: 'hint', id: 'quiz-marked-isolated', text: '연결이 없어 출제할 수 없음: ' + mi.isolated.map(x => x.term).join(', ') }));
+    box.append(h('div', { id: 'answer-entry' }));                    // 278-1: 말로 설명하기 진입 영역 + 최근 부족 목록(answerView.js 가 채움)
+    if (window.CmapAnswer) window.CmapAnswer.renderEntry();
     box.append(h('p', { class: 'hint', id: 'quiz-start-note', text: !saved ? '저장된 지도에서만 퀴즈를 풀 수 있어요. 지도 탭에서 [저장]을 눌러 주세요.' : edges === 0 ? '연결이 있는 지도에서만 퀴즈를 풀 수 있어요.' : '지도의 노드만 보여 줍니다. 두 노드를 차례로 눌러 연결을 떠올려 보세요.' }));
     if (Rv.msg) box.append(h('p', { class: 'msg', id: 'review-msg', role: 'alert', text: Rv.msg }));
     if (Rv.fallback) box.append(h('div', { class: 'narr-actions', style: 'justify-content:flex-start;margin-top:0' }, h('button', { class: 'btn text', type: 'button', id: 'quiz-start-all-fallback', onclick: () => startQuiz('all'), text: '전체 퀴즈로 풀기' })));
