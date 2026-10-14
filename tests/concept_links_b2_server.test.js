@@ -316,13 +316,14 @@ test('연결 수 계산은 227-22 와 같은 정의: 보류 개념과의 연결�
   await close();
 });
 
-test('나누기 규칙: 연결 수 5 는 기존 프롬프트 그대로, 6 부터 규칙 문구가 더해짐(그 밖은 글자 그대로 같음)', async () => {
+test('나누기 규칙: 연결 수 5 는 기존 프롬프트 그대로, 6 부터 규칙 문구가 더해짐(그 밖은 글자 그대로 같음)', async t => {
   const five = await withLinks('b2', 5);
+  t.after(() => five.close());
   await five.call('POST', `${S}/${five.sid}/explore`, { text: '광합성', from_item_id: five.cur.id });
   const sysBelow = five.anthropic.calls[0].system;
   assert.doesNotMatch(sysBelow, /나누기 제안/);
-  await five.close();
   const six = await withLinks('b2', 6);
+  t.after(() => six.close());
   await six.call('POST', `${S}/${six.sid}/explore`, { text: '광합성', from_item_id: six.cur.id });
   const sysAt = six.anthropic.calls[0].system;
   assert.match(sysAt, /\[나누기 제안\]/);
@@ -335,7 +336,6 @@ test('나누기 규칙: 연결 수 5 는 기존 프롬프트 그대로, 6 부터
   assert.equal(exploreInput(six.anthropic.calls[0])['현재 개념의 연결 수'], 6);
   // 응답 형식·제안 개수·관계 종류 상한은 그대로(같은 JSON 형식 줄, MAX_SUGGESTIONS 3)
   assert.ok(sysAt.endsWith(sysBelow.slice(sysBelow.indexOf('JSON만 출력한다:'))));
-  await six.close();
 });
 
 test('연결 수 조회가 실패해도 explore 는 정상: 연결 수 없이, 기존 프롬프트 그대로', async () => {
