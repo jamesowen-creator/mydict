@@ -753,34 +753,81 @@ async function savedGraph(db, userId, mapId, { lock = false, expectHash = null }
   return { map, g, concepts: rows.filter(c => have.has(c.id)) };
 }
 
+// 작업275-5: 출제 범위. mode 'all' = 지도 전체(기존), 'marked' = 이 사용자가 표시한 개념과 이어진 연결만. 표시는 항상 서버가 DB 에서 읽는다(클라이언트가 보낸 목록은 쓰지 않음).
+const QUIZ_MODES = ['all', 'marked'];
+function quizMode(body) {
+  if (body.mode === undefined) return 'all';
+  if (!QUIZ_MODES.includes(body.mode)) throw bad("mode 는 'all' 또는 'marked' 여야 합니다.");
+  return body.mode;
+}
+async function markedScope(db, userId, g) {
+  const { rows } = await db.query('SELECT concept_id FROM cmap_concept_marks WHERE user_id = $1', [userId]);
+  return Q.scopeFor(g.edges, g.nodeIds, rows.map(r => r.concept_id));
+}
+
+// 표시한 개념 퀴즈를 시작하기 전에 보여 줄 정보(표시 개수·연결 없는 개념·출제 연결 수). 저장 여부와 상관없이 현재 지도 기준이다
+router.get('/api/cmap/maps/:id/quiz/marked-info', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('지도를 찾을 수 없습니다.');
+  await ownMap(pool, id, req.user.id);
+  const g = await graphOf(pool, id);
+  const sc = await markedScope(pool, req.user.id, g);
+  const { rows } = await pool.query('SELECT id, term FROM cmap_concepts WHERE user_id = $1', [req.user.id]);
+  const term = new Map(rows.map(c => [c.id, c.term]));
+  const named = ids => ids.map(cid => ({ id: cid, term: term.get(cid) }));
+  return { body: { marked: named(sc.marked), isolated: named(sc.isolated), scope_edges: sc.edges.length, ready: sc.edges.length >= 2 } };
+}));
+
 router.post('/api/cmap/maps/:id/quiz/start', guard, handle(async req => {
   const id = parseId(req.params.id);
   if (id === null) throw notFound('지도를 찾을 수 없습니다.');
+  const mode = quizMode(bodyOf(req));
   const { g, concepts } = await savedGraph(pool, req.user.id, id);
-  if (!g.edges.length) throw bad('연결이 있는 지도에서만 퀴즈를 풀 수 있습니다.');
-  return { body: { source_hash: g.hash, nodes: concepts.map(c => ({ id: c.id, term: c.term, english: c.english || null })) } };
+  if (mode === 'all') {
+    if (!g.edges.length) throw bad('연결이 있는 지도에서만 퀴즈를 풀 수 있습니다.');
+    return { body: { source_hash: g.hash, nodes: concepts.map(c => ({ id: c.id, term: c.term, english: c.english || null })) } };
+  }
+  const sc = await markedScope(pool, req.user.id, g);
+  const term = new Map(concepts.map(c => [c.id, c.term]));
+  const named = ids => ids.map(cid => ({ id: cid, term: term.get(cid) }));
+  if (!sc.marked.length) throw bad('표시한 개념이 없습니다. 지도에서 모르는 개념을 눌러 표시해 보세요.', { no_marks: true });
+  if (sc.edges.length < 2) throw bad('표시한 개념에 이어진 연결이 부족해 퀴즈를 만들 수 없습니다(연결 2개 이상 필요).', { too_few: true, scope_edges: sc.edges.length, isolated: named(sc.isolated) });
+  const show = new Set(sc.nodeIds);
+  return { body: {
+    mode: 'marked', source_hash: g.hash, scope_key: sc.key, isolated: named(sc.isolated),
+    nodes: concepts.filter(c => show.has(c.id)).map(c => ({ id: c.id, term: c.term, english: c.english || null, marked: sc.markedSet.has(c.id) })),
+  } };
 }));
 
 router.post('/api/cmap/maps/:id/quiz/submit', guard, handle(async req => {
   const id = parseId(req.params.id);
   if (id === null) throw notFound('지도를 찾을 수 없습니다.');
   const body = bodyOf(req);
+  const mode = quizMode(body);
   if (typeof body.source_hash !== 'string' || !/^[0-9a-f]{64}$/.test(body.source_hash)) throw bad('source_hash 가 올바르지 않습니다.');
   return withTx(async c => {
     const { g, concepts } = await savedGraph(c, req.user.id, id, { lock: true, expectHash: body.source_hash });
-    const ans = Q.readAnswers(body.answers, g.nodeIds);
+    let nodeIds = g.nodeIds, edges = g.edges, sc = null;
+    if (mode === 'marked') {
+      sc = await markedScope(c, req.user.id, g);
+      if (typeof body.scope_key !== 'string' || body.scope_key !== sc.key) throw conflict('퀴즈를 푸는 동안 표시한 개념이 바뀌어 채점하지 않았습니다. 퀴즈를 다시 시작해 주세요.', { stale: true, scope_changed: true });
+      nodeIds = sc.nodeIds; edges = sc.edges;
+    }
+    const ans = Q.readAnswers(body.answers, nodeIds);
     if (ans.error) throw bad(ans.error);
-    const r = Q.grade(g.edges, ans.value);
+    const r = Q.grade(edges, ans.value);
     const term = new Map(concepts.map(x => [x.id, x.term]));
     const named = e => ({ ...e, from_term: term.get(e.from_concept_id), to_term: term.get(e.to_concept_id) });
     const { rows } = await c.query(
       'INSERT INTO cmap_quiz_attempts (user_id, map_id, source_hash, pair_score, type_score, direction_score) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at',
       [req.user.id, id, g.hash, r.scores.pair.ratio, r.scores.type.ratio, r.scores.direction.ratio]);
-    return { status: 201, body: {
+    const out = {
       attempt_id: rows[0].id, source_hash: g.hash, scores: r.scores,
       correct: r.correct.map(named), missed: r.missed.map(named), extras: r.extras.map(named),
       wrong: r.wrong.map(w => ({ expected: named(w.expected), answer: named(w.answer), problems: w.problems })),
-    } };
+    };
+    if (mode === 'marked') { out.mode = 'marked'; out.mastered = Q.masteredOf(sc.edges, r.correct, sc.marked.filter(m => !sc.isolated.includes(m))).map(cid => ({ id: cid, term: term.get(cid) })); }
+    return { status: 201, body: out };
   });
 }));
 

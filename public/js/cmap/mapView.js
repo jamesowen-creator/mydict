@@ -466,9 +466,11 @@
     }
     for (const n of q.nodes) {
       const p = posOf(n.id);
-      nodeLayer.append(sv('g', { class: 'm-node' + (M.selected === n.id ? ' sel' : ''), 'data-node': n.id, 'data-t': 'node', transform: `translate(${p.x},${p.y})`, role: 'button', tabindex: 0, 'aria-label': n.term + (M.selected === n.id ? ' (선택됨)' : '') },
+      // 275-5: 표시한 개념 퀴즈에서는 표시한 개념에 물음표 배지·표시 색을 둔다(색만으로 구분하지 않음). 전체 퀴즈의 노드에는 표시 정보가 없다
+      nodeLayer.append(sv('g', { class: 'm-node' + (M.selected === n.id ? ' sel' : '') + (n.marked ? ' marked' : ''), 'data-node': n.id, 'data-t': 'node', transform: `translate(${p.x},${p.y})`, role: 'button', tabindex: 0, 'aria-label': n.term + (M.selected === n.id ? ' (선택됨)' : '') + (n.marked ? ' (표시한 개념)' : '') },
         sv('rect', { width: G.NODE_W, height: G.NODE_H, rx: 10 }),
-        sv('text', { x: G.NODE_W / 2, y: G.NODE_H / 2 + 5, 'text-anchor': 'middle', class: 'm-node-text' }, clipText(n.term, 9))));
+        sv('text', { x: G.NODE_W / 2, y: G.NODE_H / 2 + 5, 'text-anchor': 'middle', class: 'm-node-text' }, clipText(n.term, 9)),
+        n.marked ? sv('g', { class: 'm-mark' }, sv('circle', { cx: G.NODE_W - 4, cy: 4, r: 10 }), sv('text', { x: G.NODE_W - 4, y: 9, 'text-anchor': 'middle' }, '?')) : null));
     }
     svg.append(defs, edgeLayer, nodeLayer);
     applyView();
@@ -714,7 +716,7 @@
     rootId() { return M.rootId; },
     topicOfConcept(id) { const c = M.concepts.get(id); return c ? c.topic_id : null; },
     // 연결 퀴즈(작업273-5): begin 으로 화면을 퀴즈 모드로 바꾸고, setAnswers 로 사용자가 이은 연결을 그리며, end 로 끝낸다(모드는 호출한 쪽이 정함)
-    quizBegin(nodes) { M.quiz = { nodes: nodes.map(n => ({ id: n.id, term: n.term })), pos: scatter(nodes), answers: [] }; M.selected = null; if (M.picker) M.picker.reset(); setMode('quiz'); if (M.sheet.open) { fit({ open: true }); render(); } else openSheet(); },
+    quizBegin(nodes) { M.quiz = { nodes: nodes.map(n => ({ id: n.id, term: n.term, marked: n.marked === true })), pos: scatter(nodes), answers: [] }; M.selected = null; if (M.picker) M.picker.reset(); setMode('quiz'); if (M.sheet.open) { fit({ open: true }); render(); } else openSheet(); },
     quizSetAnswers(list) { if (M.quiz) { M.quiz.answers = list.map(a => ({ from: a.from, to: a.to, type: a.type || null })); render(); } },
     quizEnd() { M.quiz = null; M.selected = null; if (M.picker) M.picker.reset(); },
     edgeCount() { return M.edges.length; },
@@ -723,6 +725,13 @@
     _preview() { return M.preview ? { pos: [...M.preview.pos].map(([id, p]) => ({ id, ...p })), metrics: M.preview.metrics } : null; },
     togglePanel() { const p = $('map-pick-panel'); p.hidden = !p.hidden; $('map-pick-toggle').setAttribute('aria-expanded', String(!p.hidden)); if (M.sheet.open) applyView(); },
     // 테스트 확인용(읽기 전용 사본)
+    // 275-5: 퀴즈 결과에서 사용자가 직접 누르는 [표시 해제](자동 해제 없음). 성공하면 화면 상태도 맞춘다
+    async unmarkConcept(id) {
+      const r = await api('PUT', '/api/cmap/concepts/' + id + '/mark', { marked: false });
+      if (!okStatus(r)) return false;
+      M.marks.delete(id); M.serverMarks.delete(id);
+      return true;
+    },
     _marks() { return { marked: [...M.marks].sort((a, b) => a - b), server: [...M.serverMarks].sort((a, b) => a - b), popup: M.popup }; },
     _highlight() { return [...M.hl].sort((a, b) => a - b); },
     _state() { return { mode: M.mode, nodes: [...M.nodes].map(([id, n]) => ({ id, x: n.x, y: n.y })), edges: M.edges.map(e => ({ ...e })), view: { ...M.view }, selected: M.selected, mapId: M.map && M.map.id }; },

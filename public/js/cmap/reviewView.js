@@ -5,7 +5,7 @@
 //   점수 3종(연결 찾기·관계 종류·방향)은 따로 보여 주고, 지도에 없는 연결은 "지도에 없는 연결"로 따로 표시하며 감점하지 않는다.
 (function () {
   'use strict';
-  const Rv = { data: null, loaded: false, seq: 0, msg: '', quiz: null };
+  const Rv = { data: null, loaded: false, seq: 0, msg: '', quiz: null, minfo: null, fallback: false };   // minfo = 표시한 개념 퀴즈 안내 정보(서버 계산)
 
   const status = () => window.CmapMap.status();
   const isSaved = () => { const s = status(); return !!s && s.save_status === 'saved'; };
@@ -15,7 +15,7 @@
   const quizTerm = id => { const n = Rv.quiz && Rv.quiz.nodes.find(x => x.id === id); return n ? n.term : '?'; };
   const pct = s => (s.total === 0 ? '해당 없음' : s.hit + '/' + s.total + ' (' + Math.round(s.ratio * 100) + '%)');
 
-  function reset() { Rv.seq++; Rv.data = null; Rv.loaded = false; Rv.msg = ''; Rv.quiz = null; window.CmapMap.quizEnd(); window.CmapMap.highlight([]); }
+  function reset() { Rv.seq++; Rv.data = null; Rv.loaded = false; Rv.msg = ''; Rv.quiz = null; Rv.minfo = null; Rv.fallback = false; window.CmapMap.quizEnd(); window.CmapMap.highlight([]); }
 
   async function load() {
     const id = window.CmapMap.mapId();
@@ -26,6 +26,16 @@
     if (okStatus(r)) Rv.data = r.body; else Rv.msg = errText(r, '해설을 불러오지 못했습니다.');
     Rv.loaded = true;
     renderReview();
+    loadInfo();
+  }
+  // 275-5: 표시한 개념 수·연결 없는 표시 개념·출제 가능 여부(서버가 DB 의 표시와 지도로 계산)
+  async function loadInfo() {
+    const id = window.CmapMap.mapId();
+    if (!id) return;
+    const r = await api('GET', '/api/cmap/maps/' + id + '/quiz/marked-info');
+    if (id !== window.CmapMap.mapId()) return;
+    Rv.minfo = okStatus(r) ? r.body : null;
+    if (Rv.loaded && window.CmapMap._state().mode === 'review') renderReview();
   }
 
   // ── 복습 ──
@@ -47,8 +57,15 @@
     box.append(h('div', { class: 'narr-actions', style: 'justify-content:flex-start;margin-top:0' },
       h('button', { class: 'btn text', type: 'button', id: 'review-open-map', onclick: () => window.CmapMap.showOnMap([]), text: '지도 열기' }),
       h('button', { class: 'btn', type: 'button', id: 'quiz-start', disabled: !canQuiz, onclick: startQuiz, text: '연결 퀴즈 시작' })));
+    const mi = Rv.minfo, nMarked = mi ? mi.marked.length : 0;
+    box.append(h('div', { class: 'narr-actions', style: 'justify-content:flex-start;margin-top:0;align-items:center' },
+      h('button', { class: 'btn text', type: 'button', id: 'quiz-start-marked', disabled: !saved || !mi || nMarked === 0, onclick: () => startQuiz('marked'), text: '표시한 개념 퀴즈' }),
+      h('span', { class: 'hint', id: 'quiz-marked-count', style: 'margin-top:0', text: mi ? '표시한 개념 ' + nMarked + '개' : '' })));
+    if (mi && nMarked === 0) box.append(h('p', { class: 'hint', id: 'quiz-marked-hint', text: '지도에서 모르는 개념을 눌러 표시해 보세요' }));
+    if (mi && mi.isolated.length) box.append(h('p', { class: 'hint', id: 'quiz-marked-isolated', text: '연결이 없어 출제할 수 없음: ' + mi.isolated.map(x => x.term).join(', ') }));
     box.append(h('p', { class: 'hint', id: 'quiz-start-note', text: !saved ? '저장된 지도에서만 퀴즈를 풀 수 있어요. 지도 탭에서 [저장]을 눌러 주세요.' : edges === 0 ? '연결이 있는 지도에서만 퀴즈를 풀 수 있어요.' : '지도의 노드만 보여 줍니다. 두 노드를 차례로 눌러 연결을 떠올려 보세요.' }));
     if (Rv.msg) box.append(h('p', { class: 'msg', id: 'review-msg', role: 'alert', text: Rv.msg }));
+    if (Rv.fallback) box.append(h('div', { class: 'narr-actions', style: 'justify-content:flex-start;margin-top:0' }, h('button', { class: 'btn text', type: 'button', id: 'quiz-start-all-fallback', onclick: () => startQuiz('all'), text: '전체 퀴즈로 풀기' })));
     if (saved === false && status() && status().save_status === 'changed') box.append(h('p', { class: 'hint', text: '지도가 저장한 뒤에 바뀌었어요. 위 지도는 지금 상태입니다.' }));
     // 최신 해설(읽기 전용)
     if (!nar()) { box.append(h('p', { class: 'hint', id: 'review-no-narr', text: '아직 만든 해설이 없어요. 해설 탭에서 만들 수 있어요.' })); return; }
@@ -74,13 +91,21 @@
   }
 
   // ── 퀴즈 ──
-  async function startQuiz() {
+  async function startQuiz(mode) {
     const id = window.CmapMap.mapId();
     if (!id) return;
-    Rv.msg = '';
-    const r = await api('POST', '/api/cmap/maps/' + id + '/quiz/start');
-    if (!okStatus(r)) { Rv.msg = errText(r, '퀴즈를 시작하지 못했어요.'); renderReview(); return; }
-    Rv.quiz = { source_hash: r.body.source_hash, nodes: r.body.nodes, answers: [], result: null, error: '', submitting: false, stale: false };
+    mode = mode === 'marked' ? 'marked' : 'all';
+    Rv.msg = ''; Rv.fallback = false;
+    const r = await api('POST', '/api/cmap/maps/' + id + '/quiz/start', mode === 'marked' ? { mode: 'marked' } : undefined);   // 전체 퀴즈는 기존 요청 그대로(본문 없음)
+    if (!okStatus(r)) {
+      Rv.msg = errText(r, '퀴즈를 시작하지 못했어요.');
+      if (r.body && r.body.too_few) {                                        // 표시한 개념에 이어진 연결이 부족: 안내하고 전체 퀴즈를 권한다
+        Rv.fallback = true;
+        if (r.body.isolated && r.body.isolated.length) Rv.msg += ' 연결이 없어 출제할 수 없음: ' + r.body.isolated.map(x => x.term).join(', ');
+      }
+      renderReview(); loadInfo(); return;
+    }
+    Rv.quiz = { mode, scope_key: r.body.scope_key || null, source_hash: r.body.source_hash, nodes: r.body.nodes, answers: [], result: null, error: '', submitting: false, stale: false };
     para = null;
     window.CmapMap.highlight([]);
     window.CmapMap.quizBegin(r.body.nodes);
@@ -111,11 +136,13 @@
     const q = Rv.quiz, id = window.CmapMap.mapId();
     if (!q || q.submitting || q.result || !id) return;
     q.submitting = true; q.error = ''; renderQuiz();
-    const r = await api('POST', '/api/cmap/maps/' + id + '/quiz/submit', { source_hash: q.source_hash, answers: q.answers.map(a => ({ from_concept_id: a.from, to_concept_id: a.to, relation_type: a.type })) });
+    const body = { source_hash: q.source_hash, answers: q.answers.map(a => ({ from_concept_id: a.from, to_concept_id: a.to, relation_type: a.type })) };
+    if (q.mode === 'marked') { body.mode = 'marked'; body.scope_key = q.scope_key; }
+    const r = await api('POST', '/api/cmap/maps/' + id + '/quiz/submit', body);
     if (Rv.quiz !== q) return;
     q.submitting = false;
     if (okStatus(r)) q.result = r.body;
-    else if (r.status === 409 && r.body && r.body.stale) q.stale = true, q.error = '퀴즈를 푸는 동안 지도가 바뀌어 채점하지 않았어요. 다시 시작해 주세요.';
+    else if (r.status === 409 && r.body && r.body.stale) q.stale = true, q.error = r.body.scope_changed ? '퀴즈를 푸는 동안 표시한 개념이 바뀌어 채점하지 않았어요. 다시 시작해 주세요.' : '퀴즈를 푸는 동안 지도가 바뀌어 채점하지 않았어요. 다시 시작해 주세요.';
     else q.error = errText(r, '채점하지 못했어요. 잠시 후 다시 시도해 주세요.');
     renderQuiz();
   }
@@ -127,8 +154,8 @@
     box.textContent = '';
     if (!q) return;
     if (q.result) { renderResult(box, q.result); return; }
-    box.append(h('p', { class: 'sec-label', text: '연결 퀴즈' }));
-    box.append(h('p', { class: 'hint', id: 'quiz-hint', text: '두 개념을 차례로 눌러 서로 이어져 있다고 생각하는 연결을 추가해 보세요. 방향은 누른 순서(앞 → 뒤)예요.' }));
+    box.append(h('p', { class: 'sec-label', text: q.mode === 'marked' ? '표시한 개념 퀴즈' : '연결 퀴즈' }));
+    box.append(h('p', { class: 'hint', id: 'quiz-hint', text: q.mode === 'marked' ? '물음표 배지가 붙은 개념이 모르는 개념으로 표시한 개념이에요. 그 개념과 이어진 연결을 두 개념을 차례로 눌러 추가해 보세요. 방향은 누른 순서(앞 → 뒤)예요.' : '두 개념을 차례로 눌러 서로 이어져 있다고 생각하는 연결을 추가해 보세요. 방향은 누른 순서(앞 → 뒤)예요.' }));
     if (q.error) box.append(h('p', { class: 'msg', id: 'quiz-error', role: 'alert', text: q.error }));
     box.append(h('p', { class: 'sec-label narr-sec', text: '내가 이은 연결 ' + q.answers.length + '개' }));
     box.append(h('ul', { class: 'quiz-answers', id: 'quiz-answers' }, q.answers.map((a, i) => h('li', { 'data-i': i },
@@ -136,7 +163,7 @@
       h('button', { class: 'btn text', type: 'button', 'data-del': i, onclick: () => removeAnswer(i), text: '삭제' })))));
     box.append(h('div', { class: 'narr-actions' },
       h('button', { class: 'btn text', type: 'button', id: 'quiz-quit', onclick: () => quitQuiz('review'), text: '그만두기' }),
-      q.stale ? h('button', { class: 'btn', type: 'button', id: 'quiz-restart', onclick: () => { quitQuiz('review', true); startQuiz(); }, text: '다시 시작' })
+      q.stale ? h('button', { class: 'btn', type: 'button', id: 'quiz-restart', onclick: () => { const m = q.mode; quitQuiz('review', true); startQuiz(m); }, text: '다시 시작' })
         : h('button', { class: 'btn', type: 'button', id: 'quiz-submit', disabled: q.submitting || !q.answers.length, onclick: submitQuiz, text: q.submitting ? '채점 중…' : '제출' })));
   }
   function section(title, id, items, build, empty) {
@@ -159,10 +186,29 @@
       section('못 찾은 연결', 'res-missed', r.missed, e => h('li', { text: line(e, true) }), '없어요.'),
       section('지도에 없는 연결', 'res-extras', r.extras, e => h('li', { text: line(e, false) }), '없어요.'),
     ]) for (const el of part) box.append(el);
-    box.append(h('p', { class: 'hint', text: '지도에 없는 연결은 틀린 것으로 세지 않아요. 지도에 더할 만한 연결인지 생각해 보세요.' }));
+    box.append(h('p', { class: 'hint', text: r.mode === 'marked' ? '표시한 개념과 이어진 연결만 채점해요. 그 밖의 연결은 추가 연결로만 보여 주고 틀린 것으로 세지 않아요.' : '지도에 없는 연결은 틀린 것으로 세지 않아요. 지도에 더할 만한 연결인지 생각해 보세요.' }));
+    if (r.mode === 'marked') renderMastered(box, r.mastered || []);
+    const again = Rv.quiz ? Rv.quiz.mode : 'all';
     box.append(h('div', { class: 'narr-actions' },
       h('button', { class: 'btn text', type: 'button', id: 'quiz-back', onclick: () => quitQuiz('review'), text: '복습으로 돌아가기' }),
-      h('button', { class: 'btn', type: 'button', id: 'quiz-again', onclick: () => { quitQuiz('review', true); startQuiz(); }, text: '다시 풀기' })));
+      h('button', { class: 'btn', type: 'button', id: 'quiz-again', onclick: () => { quitQuiz('review', true); startQuiz(again); }, text: '다시 풀기' })));
+  }
+
+  // 표시한 개념 중 이어진 출제 연결을 모두 맞힌 개념: [표시 해제]는 사용자가 직접 누른다(제안만, 자동 해제 없음)
+  function renderMastered(box, list) {
+    box.append(h('p', { class: 'sec-label narr-sec', text: '모두 맞힌 표시 개념 ' + list.length + '개' }));
+    if (!list.length) { box.append(h('p', { class: 'hint', id: 'res-mastered-empty', text: '아직 없어요.' })); return; }
+    box.append(h('p', { class: 'hint', text: '이어진 연결을 모두 맞혔어요. 표시를 풀지는 직접 정해요(자동으로 해제되지 않아요).' }));
+    box.append(h('ul', { class: 'quiz-answers', id: 'res-mastered' }, list.map(m => {
+      const btn = h('button', { class: 'btn text', type: 'button', 'data-act': 'unmark', 'data-id': m.id, text: '표시 해제' });
+      const li = h('li', { 'data-id': m.id }, h('span', { text: m.term }), btn);
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        const ok = await window.CmapMap.unmarkConcept(m.id);
+        if (ok) { btn.textContent = '해제됨'; loadInfo(); } else { btn.disabled = false; btn.textContent = '다시 시도'; }
+      });
+      return li;
+    })));
   }
 
   function init() {
@@ -184,6 +230,7 @@
     M.on('quizpair', onQuizPair);
     M.on('sheetclose', () => {                                    // 시트를 닫으면(닫기·ESC·뒤로 가기) 진행 중이던 퀴즈는 끝난다
       if (Rv.quiz) { Rv.quiz = null; pending = null; M.quizEnd(); M.setMode('review'); }
+      if (M._state().mode === 'review') loadInfo();                  // 시트에서 표시를 바꿨을 수 있으므로 표시한 개념 수를 다시 가져온다
     });
     M.on('open', reset); M.on('close', reset);
     M.on('status', () => { if (Rv.loaded && $('map-view') && !$('map-view').hidden && M._state().mode === 'review') renderReview(); });
