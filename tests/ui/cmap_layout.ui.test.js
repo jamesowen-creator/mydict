@@ -179,3 +179,70 @@ test('대화상자는 내용이 화면보다 길면 안에서 스크롤된다(�
   const r = await page.eval("(() => { const d = document.getElementById('concept-dlg'); return { ov: getComputedStyle(d).overflowY, sh: d.scrollHeight, ch: d.clientHeight }; })()");
   assert.equal(r.ov, 'auto'); assert.ok(r.sh > r.ch, '내용이 더 길어 안에서 스크롤');
 });
+
+// 275-2: 입력칸(textarea)은 내용에 맞춰 높이가 늘어나고 칸 안 스크롤·크기 조절 손잡이가 없다
+const TA_STATE = id => `(() => { const t = document.getElementById(${JSON.stringify(id)}); const cs = getComputedStyle(t); return { h: t.getBoundingClientRect().height, sh: t.scrollHeight, ch: t.clientHeight, resize: cs.resize, ov: cs.overflowY, maxh: cs.maxHeight, maxlen: t.maxLength }; })()`;
+const LONG = '긴 문장을 계속 이어서 쓰면 한 줄이 넘어가고 여러 줄이 됩니다. '.repeat(8);
+test('수정 화면 입력칸: 내용이 길면 높이가 늘어나 안쪽 스크롤이 없고, 크기 조절 손잡이 없음, 최대 높이 없음, 글자수 한도 유지, 비우면 줄어들고 화면 폭이 바뀌어도 다시 맞춘다', { skip: SKIP }, async t => {
+  const { srv, page } = await open(t);
+  await world(page, srv, { n: 2 });
+  await page.click('#add-concept-btn');
+  await page.waitFor("document.getElementById('concept-dlg').open", 3000, '개념 대화상자');
+  const fields = [['concept-memo', 2000], ['concept-ex-definition', 2000], ['concept-ex-example', 1000], ['concept-ex-simple_text', 1000], ['concept-ex-deeper_text', 1000]];
+  const init = {};
+  for (const [id, max] of fields) {
+    const s0 = await page.eval(TA_STATE(id));
+    assert.equal(s0.resize, 'none', id + ' 크기 조절 손잡이 없음'); assert.equal(s0.ov, 'hidden', id); assert.equal(s0.maxh, 'none', id + ' 최대 높이 없음'); assert.equal(s0.maxlen, max, id + ' 글자수 한도 유지');
+    assert.ok(s0.h >= 60 && s0.sh <= s0.ch + 1, id + ' 빈 칸도 안쪽 스크롤 없음: ' + JSON.stringify(s0));
+    init[id] = s0.h;
+    await page.type('#' + id, LONG);
+    const s1 = await page.eval(TA_STATE(id));
+    assert.ok(s1.h > s0.h + 40, `${id}: 길어지면 높이가 늘어남 ${s0.h} → ${s1.h}`);
+    assert.ok(Math.abs(s1.sh - s1.ch) <= 1, `${id}: 안쪽 스크롤 없음(scrollHeight = clientHeight): ${JSON.stringify(s1)}`);
+  }
+  // 화면 폭이 좁아져 줄 수가 늘어도 다시 맞춘다
+  const before = await page.eval(TA_STATE('concept-ex-deeper_text'));
+  await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 700, deviceScaleFactor: 1, mobile: true });
+  await sleep(300);
+  const narrow = await page.eval(TA_STATE('concept-ex-deeper_text'));
+  assert.ok(narrow.h >= before.h && Math.abs(narrow.sh - narrow.ch) <= 1, `좁은 폭 재계산: ${before.h} → ${narrow.h}`);
+  assert.equal(await page.hasHorizontalScroll(), false);
+  // 비우면 최소 높이로 줄어든다
+  await page.type('#concept-ex-definition', '');
+  const cleared = await page.eval(TA_STATE('concept-ex-definition'));
+  assert.ok(cleared.h <= init['concept-ex-definition'] + 24, '비우면 줄어듦(폭이 좁아져 최소 높이가 조금 달라질 수 있음): ' + cleared.h);
+});
+
+test('수정 화면 입력칸(이전 형태 항목 포함)과 설명 카드 입력칸도 같은 방식: 값을 채울 때 높이가 맞춰지고 안쪽 스크롤이 없다', { skip: SKIP }, async t => {
+  const { srv, page } = await open(t);
+  const w = await world(page, srv, { n: 2 });
+  const old = (await seed(page, 'POST', `/api/cmap/topics/${w.sci.id}/concepts`, { term: '구형', explanation: { definition: LONG, in_context: LONG.slice(0, 200), example: LONG, confusion: LONG.slice(0, 140) }, explanation_source: 'ai' })).concept;
+  await page.eval('refresh()');
+  await page.waitFor(`!!document.querySelector('#concept-list [data-id="${old.id}"] [data-t=concept-edit]')`, 4000);
+  await page.click(`#concept-list [data-id="${old.id}"] [data-t=concept-edit]`);
+  await page.waitFor("document.getElementById('concept-dlg').open", 3000);
+  for (const id of ['concept-ex-definition', 'concept-ex-in_context', 'concept-ex-example', 'concept-ex-confusion']) {
+    const st = await page.eval(TA_STATE(id));
+    assert.equal(st.resize, 'none'); assert.ok(st.h > 100 && Math.abs(st.sh - st.ch) <= 1, id + ': ' + JSON.stringify(st));
+  }
+  await page.click('#concept-cancel');
+  // 설명 카드(AI 결과)
+  srv.anthropic.handler = () => JSON.stringify({ ...EXPL, definition: LONG.slice(0, 290), example: LONG.slice(0, 190), simple_text: LONG.slice(0, 240), deeper_text: LONG.slice(0, 240) });
+  await page.eval("document.getElementById('explain-term').value = '관성'; document.getElementById('explain-form').requestSubmit(); 0");
+  await page.waitFor("!!document.querySelector('#explain-card textarea')", 6000, '설명 카드');
+  const cards = await page.eval("[...document.querySelectorAll('#explain-card textarea')].map(t => { const cs = getComputedStyle(t); return { id: t.id, sh: t.scrollHeight, ch: t.clientHeight, resize: cs.resize, ov: cs.overflowY, h: t.getBoundingClientRect().height }; })");
+  assert.equal(cards.length, 4);
+  for (const c of cards) { assert.equal(c.resize, 'none'); assert.equal(c.ov, 'hidden'); assert.ok(Math.abs(c.sh - c.ch) <= 1 && c.h > 80, JSON.stringify(c)); }
+});
+
+test('모든 textarea(숨겨진 것 포함)는 안쪽 스크롤 없음·크기 조절 손잡이 없음, 입력 포커스는 코랄 테두리 + 링(outline 없음)', { skip: SKIP }, async t => {
+  const { srv, page } = await open(t);
+  await world(page, srv, { n: 2 });
+  const all = await page.eval("[...document.querySelectorAll('textarea')].map(t => { const cs = getComputedStyle(t); return { id: t.id, ov: cs.overflowY, resize: cs.resize }; })");
+  assert.ok(all.length >= 6);
+  for (const a of all) { assert.equal(a.ov, 'hidden', a.id); assert.equal(a.resize, 'none', a.id); }
+  await page.click('#add-concept-btn'); await page.waitFor("document.getElementById('concept-dlg').open", 3000);
+  await page.eval("document.getElementById('concept-memo').focus(); 0");
+  const f = await page.eval("(() => { const cs = getComputedStyle(document.getElementById('concept-memo')); return { outline: cs.outlineStyle, shadow: cs.boxShadow !== 'none', border: cs.borderTopColor }; })()");
+  assert.ok(f.outline === 'none' && f.shadow, JSON.stringify(f));
+});

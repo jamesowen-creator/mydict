@@ -28,6 +28,7 @@
     margin: 0 auto;
   }
   button, input, textarea, select { font-family: inherit; font-size: inherit; color: inherit; }
+  textarea { resize: none; overflow-y: hidden; }   /* 275-2: 칸 안 스크롤·크기 조절 손잡이 없음. 높이는 내용에 맞춰 늘어남(autoGrow) */
   button { cursor: pointer; }
   button:disabled { opacity: 0.45; cursor: default; }
   :focus-visible { outline: 2px solid var(--color-text); outline-offset: 2px; }
@@ -78,7 +79,7 @@
   dialog .field { margin-top: 14px; }
   dialog label { display: block; font-size: 14px; font-weight: 700; margin-bottom: 4px; }
   dialog input, dialog textarea, dialog select { width: 100%; min-height: var(--ctl-min-h); padding: 8px 12px; border: 1px solid var(--color-line-strong); border-radius: var(--input-radius); background: var(--color-surface); }
-  dialog textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
+  dialog textarea { min-height: 72px; line-height: 1.5; }
   dialog .body-text { margin-top: 12px; white-space: pre-line; overflow-wrap: anywhere; }
   dialog .btn-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
   /* 입력창 포커스: 코랄 테두리 + 링, outline 없음 */
@@ -94,7 +95,7 @@
   .explain-card .field { margin-top: 12px; }
   .explain-card label { display: block; margin-bottom: 4px; font-size: 14px; font-weight: 700; }
   .explain-card input, .explain-card textarea { width: 100%; min-height: var(--ctl-min-h); padding: 8px 12px; border: 1px solid var(--color-line-strong); border-radius: var(--input-radius); background: var(--color-surface); }
-  .explain-card textarea { min-height: 72px; resize: vertical; line-height: 1.5; }
+  .explain-card textarea { min-height: 72px; line-height: 1.5; }
   .explain-card .e-note { margin-top: 8px; font-size: 14px; color: var(--color-text-sub); }
   .explain-card .btn-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 14px; }
   .c-item.hl { background: var(--color-surface-2); border-radius: var(--radius-ctl); padding-left: 8px; padding-right: 8px; }
@@ -439,6 +440,18 @@ function openDlg(dlg) { try { dlg.showModal(); } catch (e) { dlg.setAttribute('o
 function closeDlg(dlg) { try { dlg.close(); } catch (e) { dlg.removeAttribute('open'); } }
 function setBusy(btn, on) { btn.disabled = on; }
 
+// 275-2: textarea 는 내용 길이에 맞춰 높이가 자동으로 늘어난다(입력 시, 값을 채울 때, 화면 크기·글꼴 변경 시). 안쪽 스크롤은 없고 최대 높이도 없다
+function autoGrow(ta) {
+  if (!ta || ta.getClientRects().length === 0) return;      // 숨겨진 칸은 크기를 잴 수 없으므로 보일 때 다시 맞춘다
+  ta.style.height = 'auto';
+  ta.style.height = (ta.scrollHeight + ta.offsetHeight - ta.clientHeight) + 'px';
+}
+function growAll(root) { (root || document).querySelectorAll('textarea').forEach(autoGrow); }
+document.addEventListener('input', ev => { if (ev.target && ev.target.tagName === 'TEXTAREA') autoGrow(ev.target); });
+window.addEventListener('resize', () => growAll());
+window.addEventListener('orientationchange', () => growAll());
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => growAll());
+
 // ── 불러오기 ──
 async function loadTopics() {
   const r = await api('GET', '/api/cmap/topics');
@@ -707,6 +720,7 @@ function openConceptDialog(c) {
   for (const k of Object.keys(EXPLAIN_LEGACY_LABELS)) $('concept-legacy-' + k).hidden = !(c && c.explanation && c.explanation[k]);   // 옛 형태의 항목은 값이 있는 개념에서만 보이고, 고쳐도 조용히 사라지지 않는다
   $('concept-msg').textContent = '';
   openDlg($('concept-dlg'));
+  growAll($('concept-dlg'));
   $('concept-term').focus();
 }
 $('add-concept-btn').addEventListener('click', () => openConceptDialog(null));
@@ -838,6 +852,7 @@ function renderExplain() {
       h('button', { class: 'btn text', type: 'button', 'data-t': 'explain-cancel', text: '취소', onclick: closeExplain }),
       h('button', { class: 'btn text', type: 'button', 'data-t': 'explain-again', text: '다시 설명', onclick: () => requestExplain(e.term) }),
       saveBtn));
+  growAll(card);
 }
 
 $('explain-form').addEventListener('submit', ev => {
