@@ -31,10 +31,18 @@ async function world(page, { openMap = true } = {}) {
   await page.eval('refresh()');
   await page.eval(`selectTopic(${sci.id}); 0`);
   await page.waitFor("!document.getElementById('concepts-sec').hidden", 4000);
-  if (openMap) { await page.click('#act-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000, '지도 화면'); }
+  if (openMap) { await page.waitFor("document.querySelectorAll('#concept-list > *').length >= 3", 6000, '개념 목록 표시(레이아웃 안정)'); await hittable(page, '#act-map'); await page.click('#act-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000, '지도 화면'); }
   return { sci, phys, c };
 }
 const state = page => page.eval('window.CmapMap._state()');
+// 조건이 참이 될 때까지 기다린다(테스트 프로세스 쪽 값, 예: 가짜 DB). 274-1: 드래그 저장 요청·응답이 끝나기를 기다리는 데 쓴다
+async function until(fn, ms, label) {
+  const end = Date.now() + ms; let last;
+  while (Date.now() < end) { try { last = await fn(); if (last) return last; } catch (e) { last = e.message; } await sleep(40); }
+  throw new Error('until 시간 초과: ' + label + ' (마지막 값 ' + JSON.stringify(last) + ')');
+}
+// 클릭 대상이 실제로 눌릴 수 있을 때까지(다른 요소에 가려지지 않을 때까지) 기다린다
+const hittable = (page, sel) => page.waitFor(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e || e.disabled) return false; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!t && (t === e || e.contains(t)); })()`, 6000, sel + ' 클릭 가능');
 const pickAll = async (page, ids) => {
   await page.click('#map-pick-toggle');
   for (const id of ids) { await page.click(`#pick-${id}`); await page.waitFor(`document.querySelector('[data-node="${id}"]') !== null`, 4000, '노드 ' + id); }
@@ -102,6 +110,8 @@ test('노드 드래그: 끝나면 위치가 저장되고(임시 → 배치), 다
   await page.waitFor(`document.querySelector('[data-node="${c.a.id}"]') && !document.querySelector('[data-node="${c.a.id}"]').classList.contains('temp')`, 4000, '배치됨');
   const after = await nodeRect(page, c.a.id);
   assert.ok(Math.abs(after.l - before.l - 60) <= 1.5 && Math.abs(after.t - before.t - 40) <= 1.5, `화면에서 (60, 40)만큼 이동: ${after.l - before.l}, ${after.t - before.t}`);
+  // 드래그 중에는 이미 '배치됨'으로 보이므로, 저장 요청이 끝나 서버 값이 생기고 화면에 응답이 반영될 때까지 기다린 뒤 비교한다(단언 내용은 그대로)
+  await until(async () => { const n = srv.db.nodes.find(x => x.concept_id === c.a.id), v = (await state(page)).nodes.find(x => x.id === c.a.id); return n && n.x !== null && v && Math.abs(n.x - v.x) < 0.2 && Math.abs(n.y - v.y) < 0.2; }, 6000, '드래그 저장 응답 반영');
   const stored = srv.db.nodes.find(n => n.concept_id === c.a.id);
   const st = (await state(page)).nodes.find(n => n.id === c.a.id);
   assert.ok(Math.abs(stored.x - st.x) < 0.2 && Math.abs(stored.y - st.y) < 0.2, '서버 저장값 = 화면 값');
