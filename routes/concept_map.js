@@ -331,9 +331,11 @@ router.post('/api/cmap/topics/:id/explain', guard, handle(async req => {
       const { rows: cur } = await c.query(`SELECT ${CONCEPT_COLS} FROM cmap_concepts WHERE id = $1 AND user_id = $2 FOR UPDATE`, [target.id, req.user.id]);
       if (!cur.length) throw notFound('개념을 찾을 수 없습니다.');
       const english = cur[0].english || v.english || null;
+      const kept = AI.deepenOf(cur[0].explanation);          // 282-1: [다시 설명]은 정의·예시만 다시 만들고 심화 항목은 보존한다
+      const nextExpl = kept.length ? Object.assign({}, v.explanation, { deepen: kept }) : v.explanation;
       const { rows } = await c.query(
         `UPDATE cmap_concepts SET english = $1, explanation = $2, explanation_source = $3, explained_at = $4, updated_at = now() WHERE id = $5 AND user_id = $6 RETURNING ${CONCEPT_COLS}`,
-        [english, explJson, 'ai', new Date(), target.id, req.user.id]);
+        [english, JSON.stringify(nextExpl), 'ai', new Date(), target.id, req.user.id]);
       return { body: { existing: false, regenerated: true, concept: rows[0] } };
     }
     const { rows: now } = await c.query('SELECT id, term, sort_order FROM cmap_concepts WHERE topic_id = $1 AND user_id = $2', [id, req.user.id]);
@@ -396,7 +398,7 @@ router.patch('/api/cmap/concepts/:id', guard, handle(async req => {
     if (ex.explanation === null) { expl = null; explSrc = null; explAt = null; }
     else if (ex.explanation) {
       const stored = row.explanation && typeof row.explanation === 'string' ? JSON.parse(row.explanation) : row.explanation;
-      const same = stored && AI.ALL_FIELDS.every(k => (typeof stored[k] === 'string' ? stored[k].trim() : '') === (ex.explanation[k] || ''));
+      const same = stored && AI.ALL_FIELDS.every(k => (typeof stored[k] === 'string' ? stored[k].trim() : '') === (ex.explanation[k] || '')) && JSON.stringify(AI.deepenOf(stored)) === JSON.stringify(ex.explanation.deepen || []);
       if (!same) { expl = ex.explanation; explSrc = 'manual'; explAt = new Date(); }
     }
     const { rows } = await c.query(
@@ -433,6 +435,49 @@ router.put('/api/cmap/concepts/:id/mark', guard, handle(async req => {
     catch (err) { if (!(err && err.code === '23505')) throw err; }      // 동시에 같은 표시가 먼저 들어간 경우도 성공(멱등)
   }
   return { body: { concept_id: id, marked: true } };
+}));
+
+// 작업282-1: 심화 개념 추가. 누를 때마다 설명 JSON 의 deepen 배열 끝에 항목 하나를 더한다(덮어쓰기 없음, 최대 3개, 항목당 350자 이하).
+// 이미 3개면 AI 호출 전 409, 같은 개념의 생성이 진행 중이면 409(서버에서도 중복 방지), 하루 한도는 설명 생성(cmap_explain)과 합산해 초과 시 AI 호출 전 429,
+// AI 실패·검증 실패는 502 {ai_error:true}(내부 재시도 없음, 아무것도 추가하지 않음). 저장 직전에 잠금을 잡고 개수를 다시 확인한다.
+const deepenBusy = new Set();
+router.post('/api/cmap/concepts/:id/deepen', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('개념을 찾을 수 없습니다.');
+  const { rows: cur } = await pool.query(`SELECT ${CONCEPT_COLS} FROM cmap_concepts WHERE id = $1 AND user_id = $2`, [id, req.user.id]);
+  if (!cur.length) throw notFound('개념을 찾을 수 없습니다.');
+  const row = cur[0];
+  const expl = typeof row.explanation === 'string' ? (() => { try { return JSON.parse(row.explanation); } catch (e) { return null; } })() : row.explanation;
+  if (!expl || typeof expl.definition !== 'string' || !expl.definition.trim()) throw bad('정의가 있는 개념에서만 심화 개념을 만들 수 있습니다.');
+  const have = AI.deepenOf(expl);
+  if (have.length >= AI.DEEPEN_MAX) throw conflict(`심화 개념은 ${AI.DEEPEN_MAX}개까지 만들 수 있습니다.`);
+  const key = req.user.id + ':' + id;
+  if (deepenBusy.has(key)) throw conflict('이 개념의 심화 설명을 만드는 중입니다. 잠시 기다려 주세요.');
+  deepenBusy.add(key);
+  try {
+    if (await AI.countToday(req.user.id, AI.EXPLAIN_EVENT) >= AI.explainDailyCap()) {
+      throw new HttpError(429, `하루 ${AI.explainDailyCap()}건까지 AI 설명을 받을 수 있습니다.`);
+    }
+    const topics = await loadTopics(pool, req.user.id);
+    const idx = T.buildIndex(topics);
+    const path = [];
+    for (let t = idx.byId.get(row.topic_id); t; t = t.parent_id === null || t.parent_id === undefined ? null : idx.byId.get(t.parent_id)) path.unshift(t.title);
+    if (!path.length) throw notFound('개념을 찾을 수 없습니다.');
+    const input = AI.buildDeepenInput({ path, term: row.term, definition: expl.definition, example: expl.example, deepen: have });
+    const ai = await AI.callExplainAI(req.user.id, input, AI.deepenSystemPrompt(have.length), 700);
+    const v = ai.parsed === undefined ? null : AI.validateDeepen(ai.parsed);
+    if (!v) throw new HttpError(502, ai.aiError || AI.AI_ERROR_TEXT, { ai_error: true });
+    return await withTx(async c => {
+      const { rows: now } = await c.query(`SELECT ${CONCEPT_COLS} FROM cmap_concepts WHERE id = $1 AND user_id = $2 FOR UPDATE`, [id, req.user.id]);
+      if (!now.length) throw notFound('개념을 찾을 수 없습니다.');
+      const stored = typeof now[0].explanation === 'string' ? JSON.parse(now[0].explanation) : now[0].explanation;
+      const list = AI.deepenOf(stored);
+      if (list.length >= AI.DEEPEN_MAX) throw conflict(`심화 개념은 ${AI.DEEPEN_MAX}개까지 만들 수 있습니다.`);
+      const next = Object.assign({}, stored, { deepen: list.concat(v.text) });
+      const { rows } = await c.query(`UPDATE cmap_concepts SET explanation = $1, updated_at = now() WHERE id = $2 AND user_id = $3 RETURNING ${CONCEPT_COLS}`, [JSON.stringify(next), id, req.user.id]);
+      return { body: { concept: rows[0] } };
+    });
+  } finally { deepenBusy.delete(key); }
 }));
 
 router.delete('/api/cmap/concepts/:id', guard, handle(async req => {

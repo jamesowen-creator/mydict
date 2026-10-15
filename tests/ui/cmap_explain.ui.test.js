@@ -78,7 +78,7 @@ test('검색 즉시 저장: 입력 바에서 검색하면 정의·예시 2항목
   const id = await page.eval(`Number(document.querySelector('${item}').dataset.id)`);
   assert.deepEqual(await secs(page, id), [['definition', '정의', false, GOOD.definition], ['example', '예시', true, GOOD.example]], '항목명 + 본문, 예시는 왼쪽 막대(quote)');
   assert.equal(await page.text(`${item} [data-t=explanation-source]`), 'AI 설명 · 확인 필요');
-  assert.deepEqual(await page.eval(`[...document.querySelectorAll('${item} .c-tools button')].map(b => b.textContent)`), ['다시 설명', '수정', '삭제']);
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll('${item} .c-tools button')].map(b => b.textContent)`), ['심화 개념+', '다시 설명', '수정', '삭제'], '버튼 순서(282-1)');
   assert.equal(await page.eval(`[...document.querySelectorAll('${item} .c-tools button')].every(b => b.getBoundingClientRect().height >= 44)`), true, '터치 44px');
   assert.match(await page.text('#topic-list [data-t=node] .t-count').catch(() => '개념 1'), /개념 1/);
   assert.equal(await page.hasHorizontalScroll(), false);
@@ -378,5 +378,108 @@ test('검색한 개념이 다른 화면과 이어진다: 저장된 2항목 개�
   await tabIn(page, 'map');
   await page.waitFor("!document.getElementById('mapmk-view').hidden", 4000);
   assert.equal(topic.id !== undefined, true);
+  noErrors(page);
+});
+
+// ───── 282-1: 심화 개념 ([심화 개념+]) ─────
+const deepBtn = '#concept-list [data-t=concept-deepen]';
+const deepItems = page => page.eval("[...document.querySelectorAll('#concept-list .e-sec[data-f=deepen]')].map(e => [e.querySelector('.sec-label').textContent, e.querySelector('p').textContent])");
+const deepOf = srv => { const e = srv.db.concepts[0].explanation; return (typeof e === 'string' ? JSON.parse(e) : e).deepen; };
+
+test('[심화 개념+]: 누르면 "생성 중…"으로 바뀌고 비활성(중복 클릭 방지), 성공하면 "심화 개념 1"이 읽기 형태로 쌓이고 "1/3" 표시, 3개가 되면 버튼 비활성 + "3/3"', { skip: SKIP, timeout: 60000 }, async t => {
+  const { srv, page } = await open(t);
+  await withTopic(page);
+  await search(page, '콜금리'); await waitCount(page, 1);
+  assert.equal(await page.count('[data-t=deepen-count]'), 0, '항목이 없으면 개수 표시 없음');
+  assert.ok(await page.eval(`document.querySelector('${deepBtn}').getBoundingClientRect().height >= 44`), '터치 44px');
+  const texts = ['작동 원리를 전문 용어로 설명한 첫 항목입니다.', '실무 쟁점을 다룬 둘째 항목입니다.', '구별과 한계를 다룬 셋째 항목입니다.'];
+  for (let i = 0; i < 3; i++) {
+    srv.anthropic.handler = async () => { await sleep(500); return JSON.stringify({ deepen: texts[i] }); };
+    const before = srv.anthropic.calls.length;
+    await page.click(deepBtn);
+    await page.waitFor(`document.querySelector('${deepBtn}').disabled && document.querySelector('${deepBtn}').textContent === '생성 중…'`, 3000, '생성 중');
+    await page.waitFor(`document.querySelectorAll('#concept-list .e-sec[data-f=deepen]').length === ${i + 1}`, 6000, `심화 ${i + 1}`);
+    assert.equal(srv.anthropic.calls.length, before + 1, '한 번에 한 번만 호출');
+    assert.deepEqual((await deepItems(page)).map(x => x[0]), [1, 2, 3].slice(0, i + 1).map(n => '심화 개념 ' + n));
+    assert.equal(await page.text('[data-t=deepen-count]'), `${i + 1}/3`);
+  }
+  assert.deepEqual((await deepItems(page)).map(x => x[1]), texts, '앞 항목은 그대로 쌓임(덮어쓰기 없음)');
+  assert.equal(await page.eval(`document.querySelector('${deepBtn}').disabled`), true, '3개면 비활성');
+  assert.equal(await page.text(deepBtn), '심화 개념+');
+  assert.equal(await page.text('[data-t=deepen-count]'), '3/3');
+  assert.equal(await page.text('#concept-list [data-t=explanation-source]'), 'AI 설명 · 확인 필요', 'AI 설명 표시 유지');
+  assert.deepEqual(deepOf(srv), texts);
+  assert.equal(await page.hasHorizontalScroll(), false);
+  noErrors(page);
+});
+
+test('[심화 개념+] 실패·한도: 카드 안 한 줄 안내, 아무것도 추가되지 않고, 다시 누를 수 있다', { skip: SKIP, timeout: 60000 }, async t => {
+  const { srv, page } = await open(t, { cap: 3 });
+  await withTopic(page);
+  await search(page, '콜금리'); await waitCount(page, 1);                         // 한도 1
+  srv.anthropic.handler = () => '깨진 응답';
+  await page.click(deepBtn);                                                     // 한도 2 (호출은 됐으나 형식 오류)
+  await page.waitFor("!!document.querySelector('#concept-list [data-t=deepen-msg]')", 6000, '오류 안내');
+  assert.match(await page.text('[data-t=deepen-msg]'), /설명을 가져오지 못했습니다/);
+  assert.equal(srv.anthropic.calls.length, 2); assert.equal(deepOf(srv), undefined);
+  assert.equal(await page.eval(`document.querySelector('${deepBtn}').disabled`), false, '실패하면 다시 누를 수 있음');
+  srv.anthropic.handler = () => JSON.stringify({ deepen: '성공한 심화 항목' });
+  await page.click(deepBtn);                                                     // 한도 3
+  await page.waitFor("document.querySelectorAll('#concept-list .e-sec[data-f=deepen]').length === 1", 6000);
+  assert.equal(await page.count('[data-t=deepen-msg]'), 0, '성공하면 안내가 사라짐');
+  await page.click(deepBtn);                                                     // 한도 초과
+  await page.waitFor("!!document.querySelector('#concept-list [data-t=deepen-msg]')", 6000, '한도 안내');
+  assert.match(await page.text('[data-t=deepen-msg]'), /하루 3건/);
+  assert.equal(deepOf(srv).length, 1);
+  noErrors(page);
+});
+
+test('심화 개념과 [다시 설명]·[수정]: 다시 설명은 정의·예시만 바꾸고 심화는 보존, 수정에서 심화 입력칸(350자·자동 높이)을 비우고 [완료]하면 삭제되고 남은 항목은 번호를 다시 매긴다', { skip: SKIP, timeout: 60000 }, async t => {
+  const { srv, page } = await open(t);
+  await withTopic(page);
+  await search(page, '콜금리'); await waitCount(page, 1);
+  for (const x of ['첫째 심화', '둘째 심화', '셋째 심화']) {
+    srv.anthropic.handler = () => JSON.stringify({ deepen: x });
+    const n = await page.eval("document.querySelectorAll('#concept-list .e-sec[data-f=deepen]').length");
+    await page.click(deepBtn);
+    await page.waitFor(`document.querySelectorAll('#concept-list .e-sec[data-f=deepen]').length === ${n + 1}`, 6000);
+  }
+  srv.anthropic.handler = () => JSON.stringify({ english: 'x', definition: '다시 만든 정의입니다.', example: '다시 만든 예시입니다.' });
+  await page.click('[data-t=concept-again]');
+  await page.waitFor("(document.querySelector('#concept-list .e-sec[data-f=definition] p') || {}).textContent === '다시 만든 정의입니다.'", 6000);
+  assert.deepEqual((await deepItems(page)).map(x => x[1]), ['첫째 심화', '둘째 심화', '셋째 심화'], '다시 설명 후에도 심화 보존');
+  await page.click('[data-t=concept-edit]');
+  await page.waitFor("!!document.getElementById('edit-deepen-3')", 3000);
+  assert.equal(await page.count(deepBtn), 0, '수정 중에는 [심화 개념+]가 보이지 않음');
+  assert.equal(await page.eval("document.getElementById('edit-deepen-1').maxLength"), 350);
+  assert.equal(await page.eval("document.getElementById('edit-deepen-2').value"), '둘째 심화');
+  const st = await page.eval("(() => { const t = document.getElementById('edit-deepen-1'), cs = getComputedStyle(t); return { sh: t.scrollHeight, ch: t.clientHeight, ov: cs.overflowY, resize: cs.resize }; })()");
+  assert.ok(Math.abs(st.sh - st.ch) <= 1 && st.ov === 'hidden' && st.resize === 'none', JSON.stringify(st));
+  await page.type('#edit-deepen-2', '');                                          // 둘째 비움
+  await page.click('#edit-done');
+  await page.waitFor("!document.getElementById('edit-done') && document.querySelectorAll('#concept-list .e-sec[data-f=deepen]').length === 2", 6000, '완료 후 읽기 형태');
+  assert.deepEqual(await deepItems(page), [['심화 개념 1', '첫째 심화'], ['심화 개념 2', '셋째 심화']], '남은 항목 번호를 다시 매김');
+  assert.deepEqual(deepOf(srv), ['첫째 심화', '셋째 심화']);
+  assert.equal(await page.text('[data-t=deepen-count]'), '2/3');
+  assert.equal(await page.eval(`document.querySelector('${deepBtn}').disabled`), false, '3개 미만이면 다시 활성');
+  await page.click('[data-t=concept-edit]');
+  await page.type('#edit-deepen-1', '취소할 수정');
+  await page.click('[data-t=edit-cancel]');
+  assert.deepEqual(deepOf(srv), ['첫째 심화', '셋째 심화'], '수정 취소는 변경 없음');
+  noErrors(page);
+});
+
+test('옛 deeper_text("더 깊게 설명")는 기존 이름으로 표시되고 심화 개수에 포함되지 않는다', { skip: SKIP, timeout: 60000 }, async t => {
+  const { srv, page } = await open(t);
+  const topic = await withTopic(page);
+  const c = (await seed(page, 'POST', `/api/cmap/topics/${topic.id}/concepts`, { term: '네항목', explanation: FOUR, explanation_source: 'ai' })).concept;
+  await page.eval('refresh()'); await waitCount(page, 1);
+  await open1(page, c.id);
+  assert.deepEqual((await secs(page, c.id)).map(x => x[1]), ['정의', '예시', '쉬운 설명', '더 깊게 설명']);
+  srv.anthropic.handler = () => JSON.stringify({ deepen: '심화 항목' });
+  await page.click(deepBtn);
+  await page.waitFor("document.querySelectorAll('#concept-list .e-sec[data-f=deepen]').length === 1", 6000);
+  assert.deepEqual((await secs(page, c.id)).map(x => x[1]), ['정의', '예시', '쉬운 설명', '더 깊게 설명', '심화 개념 1'], '옛 이름은 그대로, 심화는 뒤에');
+  assert.equal(await page.text('[data-t=deepen-count]'), '1/3');
   noErrors(page);
 });

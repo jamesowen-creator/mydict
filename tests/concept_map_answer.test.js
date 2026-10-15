@@ -303,3 +303,14 @@ test('280-2: 비교 기준은 저장된 설명에서 값이 있는 항목 — �
     assert.deepEqual(Object.keys(data['저장된 설명']), keys, '값이 있는 항목만 비교 기준');
   }
 });
+
+test('282-1: 심화 개념(deepen)은 말로 설명하기 평가의 모델 입력에 들어가지 않는다 — 정의·예시(옛 4항목은 값이 있는 항목 전부)만', async t => {
+  const s = await setup(); t.after(() => s.close());
+  const topic = await s.sci();
+  const c = await s.concept(topic, { term: '콜금리', explanation: { definition: '정의입니다', example: '예시입니다', deepen: ['심화는 비교 기준이 아닙니다'] }, explanation_source: 'ai' });
+  const r = await s.text(c.id, { text: '내 말로 설명합니다.' });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const content = s.anthropic.calls[0].messages[0].content;
+  assert.deepEqual(Object.keys(dataOf(content)['저장된 설명']), ['정의', '예시']);
+  assert.ok(!content.includes('심화는 비교 기준'));
+});
