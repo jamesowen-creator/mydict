@@ -289,31 +289,62 @@ async function ownTopic(db, topicId, userId, { lock = false } = {}) {
   return rows[0];
 }
 
-// 작업273-1: 개념 검색 → AI 백과사전 설명(저장하지 않음). 클라이언트는 term 만 보내고, 주제 맥락(최상위 주제명·하위 주제 경로)은 서버가 DB 에서 읽는다.
-// 같은 주제에 같은 이름의 개념이 이미 있으면 AI 를 부르지 않고 기존 개념을 돌려준다. 하루 한도(CMAP_EXPLAIN_DAILY_CAP) 초과는 429.
-// AI 실패·검증 실패는 502 {ok:false, ai_error:true}(화면이 오류 카드 + 다시 시도를 보여 줌, 자동 재시도 없음)
+// 작업273-1: 개념 검색 → AI 백과사전 설명. 280-2: 설명(정의·예시 2항목)을 만들면 바로 저장한다(별도 저장 단계 없음).
+// 클라이언트는 term(과 다시 설명이면 concept_id)만 보내고, 주제 맥락(최상위 주제명·하위 주제 경로)은 서버가 DB 에서 읽는다.
+// 같은 주제에 같은 이름의 개념이 이미 있으면 AI 를 부르지 않고 기존 개념을 돌려준다(200 existing). 하루 한도(CMAP_EXPLAIN_DAILY_CAP) 초과는 429.
+// concept_id 가 있으면 그 개념의 설명을 다시 만들어 덮어쓴다(출처 ai, 이름·메모·지도·표시는 그대로). AI 실패·검증 실패는 502 {ok:false, ai_error:true}이고 아무것도 저장하지 않는다(자동 재시도 없음)
 router.post('/api/cmap/topics/:id/explain', guard, handle(async req => {
   const id = parseId(req.params.id);
   if (id === null) throw notFound('주제를 찾을 수 없습니다.');
-  const term = T.readName(bodyOf(req).term, T.TERM_MAX, '개념 이름');
-  if (term.error) throw bad(term.error);
+  const body = bodyOf(req);
   const topics = await loadTopics(pool, req.user.id);
   const idx = T.buildIndex(topics);
   const topic = idx.byId.get(id);
   if (!topic) throw notFound('주제를 찾을 수 없습니다.');
   const { rows: existing } = await pool.query(`SELECT ${CONCEPT_COLS} FROM cmap_concepts WHERE topic_id = $1 AND user_id = $2 ORDER BY sort_order, id`, [id, req.user.id]);
-  const dup = existing.find(x => T.nameKey(x.term) === T.nameKey(term.value));
-  if (dup) return { body: { existing: true, concept: dup } };
+  let target = null, termValue;
+  if (has(body, 'concept_id') && body.concept_id !== undefined && body.concept_id !== null) {
+    const cid = parseId(String(body.concept_id));
+    target = cid === null ? null : existing.find(x => x.id === cid) || null;
+    if (!target) throw notFound('개념을 찾을 수 없습니다.');
+    termValue = target.term;
+  } else {
+    const term = T.readName(body.term, T.TERM_MAX, '개념 이름');
+    if (term.error) throw bad(term.error);
+    termValue = term.value;
+    const dup = existing.find(x => T.nameKey(x.term) === T.nameKey(termValue));
+    if (dup) return { body: { existing: true, concept: dup } };
+  }
   if (await AI.countToday(req.user.id, AI.EXPLAIN_EVENT) >= AI.explainDailyCap()) {
     throw new HttpError(429, `하루 ${AI.explainDailyCap()}건까지 AI 설명을 받을 수 있습니다.`);
   }
   const path = [];
   for (let cur = topic; cur; cur = cur.parent_id === null || cur.parent_id === undefined ? null : idx.byId.get(cur.parent_id)) path.unshift(cur.title);
-  const input = AI.buildExplainInput({ path, term: term.value, siblings: existing.map(x => x.term) });
+  const input = AI.buildExplainInput({ path, term: termValue, siblings: existing.filter(x => !target || x.id !== target.id).map(x => x.term) });
   const ai = await AI.callExplainAI(req.user.id, input);
   const v = ai.parsed === undefined ? null : AI.validateAiExplanation(ai.parsed);
   if (!v) throw new HttpError(502, ai.aiError || AI.AI_ERROR_TEXT, { ai_error: true });
-  return { body: { existing: false, term: term.value, english: v.english, explanation: v.explanation, explanation_source: 'ai' } };
+  const explJson = JSON.stringify(v.explanation);
+  return withTx(async c => {
+    await ownTopic(c, id, req.user.id, { lock: true });
+    if (target) {
+      const { rows: cur } = await c.query(`SELECT ${CONCEPT_COLS} FROM cmap_concepts WHERE id = $1 AND user_id = $2 FOR UPDATE`, [target.id, req.user.id]);
+      if (!cur.length) throw notFound('개념을 찾을 수 없습니다.');
+      const english = cur[0].english || v.english || null;
+      const { rows } = await c.query(
+        `UPDATE cmap_concepts SET english = $1, explanation = $2, explanation_source = $3, explained_at = $4, updated_at = now() WHERE id = $5 AND user_id = $6 RETURNING ${CONCEPT_COLS}`,
+        [english, explJson, 'ai', new Date(), target.id, req.user.id]);
+      return { body: { existing: false, regenerated: true, concept: rows[0] } };
+    }
+    const { rows: now } = await c.query('SELECT id, term, sort_order FROM cmap_concepts WHERE topic_id = $1 AND user_id = $2', [id, req.user.id]);
+    const dup = now.find(x => T.nameKey(x.term) === T.nameKey(termValue));
+    if (dup) throw conflict(`이 주제에 '${dup.term}' 개념이 이미 있습니다.`);
+    const order = now.reduce((m, x) => Math.max(m, Number(x.sort_order) || 0), 0) + 1;
+    const { rows } = await c.query(
+      `INSERT INTO cmap_concepts (user_id, topic_id, term, english, memo, sort_order, explanation, explanation_source, explained_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ${CONCEPT_COLS}`,
+      [req.user.id, id, termValue, v.english || null, null, order, explJson, 'ai', new Date()]);
+    return { status: 201, body: { existing: false, concept: rows[0] } };
+  });
 }));
 
 router.get('/api/cmap/topics/:id/concepts', guard, handle(async req => {

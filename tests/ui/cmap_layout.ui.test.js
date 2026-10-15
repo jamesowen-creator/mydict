@@ -80,13 +80,13 @@ test('주제 화면: 주제 트리·개념 목록·설명 카드가 내부 스�
   const { srv, page } = await open(t);
   await world(page, srv);
   await page.eval("document.getElementById('explain-term').value = '관성'; document.getElementById('explain-form').requestSubmit(); 0");
-  await page.waitFor("!document.getElementById('explain-card').hidden && !!document.querySelector('#explain-card [data-t=explain-save]')", 6000, '설명 카드');
+  await page.waitFor("document.querySelectorAll('#concept-list [data-t=concept]').length === 31 && !!document.querySelector('#concept-list .c-card')", 6000, '검색 결과 카드(자동 저장)');
   await audit(page, '주제 화면');
   await longPage(page);
   assert.ok(await pageScrolls(page) > 500, '페이지 전체가 스크롤됨');
-  for (const sel of ['.c-tools .btn', '#explain-go', '#add-concept-btn']) assert.ok(await minHeight(page, sel) >= 44, sel);
+  for (const sel of ['.c-toggle', '.c-tools .btn', '#explain-go', '#add-concept-btn']) assert.ok(await minHeight(page, sel) >= 44, sel);
   // 설명 카드 안에서도 스크롤 영역이 없다(카드가 내용만큼 늘어남)
-  const card = await page.eval("(() => { const c = document.getElementById('explain-card'); return { sh: c.scrollHeight, ch: c.clientHeight }; })()");
+  const card = await page.eval("(() => { const c = document.querySelector('#concept-list .c-card'); return { sh: c.scrollHeight, ch: c.clientHeight }; })()");
   assert.equal(card.sh, card.ch);
 });
 
@@ -218,23 +218,25 @@ test('수정 화면 입력칸(이전 형태 항목 포함)과 설명 카드 입�
   const w = await world(page, srv, { n: 2 });
   const old = (await seed(page, 'POST', `/api/cmap/topics/${w.sci.id}/concepts`, { term: '구형', explanation: { definition: LONG, in_context: LONG.slice(0, 200), example: LONG, confusion: LONG.slice(0, 140) }, explanation_source: 'ai' })).concept;
   await page.eval('refresh()');
+  await page.waitFor(`!!document.querySelector('#concept-list [data-id="${old.id}"] .c-toggle')`, 4000);
+  await page.click(`#concept-list [data-id="${old.id}"] .c-toggle`);               // 280-2: 한 줄을 펼친 뒤 카드의 [수정]
   await page.waitFor(`!!document.querySelector('#concept-list [data-id="${old.id}"] [data-t=concept-edit]')`, 4000);
   await page.click(`#concept-list [data-id="${old.id}"] [data-t=concept-edit]`);
-  await page.waitFor("document.getElementById('concept-dlg').open", 3000);
-  for (const id of ['concept-ex-definition', 'concept-ex-in_context', 'concept-ex-example', 'concept-ex-confusion']) {
+  await page.waitFor("!!document.getElementById('edit-f-definition')", 3000);
+  for (const id of ['edit-f-definition', 'edit-f-in_context', 'edit-f-example', 'edit-f-confusion']) {
     const st = await page.eval(TA_STATE(id));
     assert.equal(st.resize, 'none'); assert.ok(st.h > 100 && Math.abs(st.sh - st.ch) <= 1, id + ': ' + JSON.stringify(st));
   }
-  await page.click('#concept-cancel');
-  // 설명 카드(AI 결과)
-  srv.anthropic.handler = () => JSON.stringify({ ...EXPL, definition: LONG.slice(0, 290), example: LONG.slice(0, 190), simple_text: LONG.slice(0, 240), deeper_text: LONG.slice(0, 240) });
+  await page.click('[data-t=edit-cancel]');
+  // 새로 검색한 결과 카드(정의·예시 2항목)의 수정 입력칸
+  srv.anthropic.handler = () => JSON.stringify({ ...EXPL, definition: LONG.slice(0, 290), example: LONG.slice(0, 190) });
   await page.eval("document.getElementById('explain-term').value = '관성'; document.getElementById('explain-form').requestSubmit(); 0");
-  await page.waitFor("!!document.querySelector('#explain-card [data-t=explain-edit]')", 6000, '설명 카드');
-  await page.click('#explain-edit');                                          // 275-3: 입력칸은 [수정]을 눌렀을 때만 나타난다
-  await page.waitFor("!!document.querySelector('#explain-card textarea')", 4000, '수정 입력칸');
-  const cards = await page.eval("[...document.querySelectorAll('#explain-card textarea')].map(t => { const cs = getComputedStyle(t); return { id: t.id, sh: t.scrollHeight, ch: t.clientHeight, resize: cs.resize, ov: cs.overflowY, h: t.getBoundingClientRect().height }; })");
-  assert.equal(cards.length, 4);
-  for (const c of cards) { assert.equal(c.resize, 'none'); assert.equal(c.ov, 'hidden'); assert.ok(Math.abs(c.sh - c.ch) <= 1 && c.h > 80, JSON.stringify(c)); }
+  await page.waitFor("[...document.querySelectorAll('#concept-list .c-term')].some(e => e.textContent === '관성')", 6000, '검색 결과 카드');
+  await page.click('#concept-list [data-t=concept]:last-child [data-t=concept-edit]');
+  await page.waitFor("!!document.querySelector('#concept-list [data-t=edit] textarea')", 4000, '수정 입력칸');
+  const cards = await page.eval("[...document.querySelectorAll('#concept-list [data-t=edit] textarea')].map(t => { const cs = getComputedStyle(t); return { id: t.id, sh: t.scrollHeight, ch: t.clientHeight, resize: cs.resize, ov: cs.overflowY, h: t.getBoundingClientRect().height }; })");
+  assert.deepEqual(cards.map(c => c.id), ['edit-f-definition', 'edit-f-example', 'edit-memo']);
+  for (const c of cards.slice(0, 2)) { assert.equal(c.resize, 'none'); assert.equal(c.ov, 'hidden'); assert.ok(Math.abs(c.sh - c.ch) <= 1 && c.h > 80, JSON.stringify(c)); }
 });
 
 test('모든 textarea(숨겨진 것 포함)는 안쪽 스크롤 없음·크기 조절 손잡이 없음, 입력 포커스는 코랄 테두리 + 링(outline 없음)', { skip: SKIP }, async t => {

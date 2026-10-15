@@ -238,6 +238,9 @@ test('개념 입력: 추가(이름·영문·메모) → 목록 표시·주제 �
   await page.click('#concept-ok');
   await waitClosed(page, 'concept-dlg');
   await page.waitFor("document.querySelectorAll('#concept-list [data-t=concept]').length === 1", 4000);
+  assert.equal(await page.count('#concept-list .c-card'), 0, '280-2: 추가한 개념은 한 줄(접힘)으로 시작');
+  await page.click('#concept-list .c-toggle');
+  await page.waitFor("!!document.querySelector('#concept-list .c-card')", 3000);
   assert.equal(await page.text('#concept-list .c-term'), '힘');
   assert.equal(await page.text('#concept-list .c-en'), 'force');
   assert.equal(await page.text('#concept-list .c-memo'), '질량 × 가속도');
@@ -254,20 +257,19 @@ test('개념 입력: 추가(이름·영문·메모) → 목록 표시·주제 �
   await page.click('#concept-cancel');
   await waitClosed(page, 'concept-dlg');
   // 수정: 값이 채워져 있고 메모를 지우면 목록에서 사라짐
-  await page.click('[data-t=concept-edit]');
-  await waitOpen(page, 'concept-dlg');
-  assert.equal(await page.eval("document.getElementById('concept-term').value"), '힘');
-  assert.equal(await page.eval("document.getElementById('concept-english').value"), 'force');
-  await page.type('#concept-term', '힘(F)');
-  await page.type('#concept-memo', '');
-  await page.click('#concept-ok');
-  await waitClosed(page, 'concept-dlg');
-  await page.waitFor("document.querySelector('#concept-list .c-term').textContent === '힘(F)'", 4000);
+  await page.click('[data-t=concept-edit]');                              // 280-2: 수정은 카드 안에서(입력칸으로 바뀜), [완료]가 서버 저장까지
+  await page.waitFor("!!document.getElementById('edit-term')", 3000);
+  assert.equal(await page.eval("document.getElementById('edit-term').value"), '힘');
+  assert.equal(await page.eval("document.getElementById('edit-english').value"), 'force');
+  await page.type('#edit-term', '힘(F)');
+  await page.type('#edit-memo', '');
+  await page.click('#edit-done');
+  await page.waitFor("!document.getElementById('edit-done') && document.querySelector('#concept-list .c-term').textContent === '힘(F)'", 4000);
   assert.equal(await page.eval("!document.querySelector('#concept-list .c-memo')"), true, '지운 메모는 표시되지 않음');
   // 삭제 확인
   await page.click('[data-t=concept-delete]');
   await waitOpen(page, 'confirm-dlg');
-  assert.match(await page.text('#confirm-text'), /‘힘\(F\)’ 개념을 삭제합니다/);
+  assert.match(await page.text('#confirm-text'), /‘힘\(F\)’을\(를\) 삭제할까요\?/);
   await page.click('#confirm-cancel');
   await waitClosed(page, 'confirm-dlg');
   assert.equal(await page.count('#concept-list [data-t=concept]'), 1, '취소하면 그대로');
