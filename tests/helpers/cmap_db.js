@@ -7,7 +7,7 @@ const { createMockDb } = require('./mock_db');
 function dbError(code, message) { const e = new Error(message); e.code = code; return e; }
 const lower = s => String(s).toLowerCase();
 const len = s => Array.from(String(s)).length;
-const REL = ['사용', '일부', '종류', '일으킴', '구별'];
+const REL = ['사용', '일부', '종류', '일으킴', '선행', '조건', '구별', '유사', '대립', '연관'];   // 286-1: DB CHECK 와 같은 10값
 const TABLES = ['cmap_topics', 'cmap_concepts', 'cmap_maps', 'cmap_map_nodes', 'cmap_edges', 'cmap_narrations', 'cmap_quiz_attempts', 'cmap_concept_marks', 'cmap_answer_attempts'];
 
 function createCmapDb() {
@@ -41,7 +41,9 @@ function createCmapDb() {
     for (const v of [row.x, row.y]) if (v !== null && v !== undefined && !Number.isFinite(v)) throw dbError('22003', 'cmap_map_nodes real');
   }
   function checkEdge(row, self) {
-    if (typeof row.label !== 'string' || len(row.label) < 1 || len(row.label) > 40 || row.label.trim() === '') throw dbError('23514', 'cmap_edges label check');
+    // 286-1: 문구는 NULL 허용(값이 있으면 1~40자·공백만 아님), 유형도 문구도 없으면 거부
+    if (row.label !== null && row.label !== undefined && (typeof row.label !== 'string' || len(row.label) < 1 || len(row.label) > 40 || row.label.trim() === '')) throw dbError('23514', 'cmap_edges label check');
+    if ((row.label === null || row.label === undefined) && (row.relation_type === null || row.relation_type === undefined)) throw dbError('23514', 'cmap_edges has_content check');
     if (row.relation_type !== null && row.relation_type !== undefined && !REL.includes(row.relation_type)) throw dbError('23514', 'cmap_edges relation_type check');
     if (row.from_concept_id === row.to_concept_id) throw dbError('23514', 'cmap_edges from<>to check');
     const others = db.edges.filter(o => o !== self && o.id !== row.id && o.map_id === row.map_id);

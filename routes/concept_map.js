@@ -576,10 +576,10 @@ router.get('/api/cmap/topics/:rootId/map', guard, handle(async req => {
     const inTree = new Set(tree.concepts.map(x => x.id));
     return { body: {
       current_hash: currentHash, save_status: H.saveStatus(map, currentHash),
-      map, nodes: nodes.map(n => ({ concept_id: n.concept_id, x: n.x, y: n.y })), edges,
+      map, nodes: nodes.map(n => ({ concept_id: n.concept_id, x: n.x, y: n.y })), edges: edges.map(M.withDisplay),
       marked_concept_ids: markRows.map(r => r.concept_id).filter(id => inTree.has(id)).sort((a, b) => a - b),
       concepts: tree.concepts.map(x => ({ id: x.id, topic_id: x.topic_id, term: x.term, english: x.english, brief: briefOf(x.explanation) })), topics: tree.topics.map(t => ({ id: t.id, parent_id: t.parent_id, title: t.title, sort_order: t.sort_order })),
-      relation_types: M.RELATION_TYPES,
+      relation_types: M.RELATION_TYPES, symmetric_types: M.SYMMETRIC_TYPES,
     } };
   });
 }));
@@ -645,10 +645,12 @@ router.post('/api/cmap/maps/:id/edges', guard, handle(async req => {
   const b = typeof body.to_concept_id === 'number' ? parseId(String(body.to_concept_id)) : null;
   if (a === null || b === null) throw bad('연결할 두 개념의 id가 올바르지 않습니다.');
   if (a === b) throw bad('같은 개념끼리는 연결할 수 없습니다.');
-  const label = M.readLabel(body.label);
+  const label = M.readOptionalLabel(body.label);    // 286-1: 문구는 선택(생략·빈 문자열은 NULL). 유형도 문구도 없으면 거부
   if (label.error) throw bad(label.error);
   const type = M.readRelationType(body.relation_type);
   if (type.error) throw bad(type.error);
+  const labelValue = label.value === undefined ? null : label.value;
+  if (labelValue === null && (type.value === undefined || type.value === null)) throw bad('연결 유형을 고르거나 문구를 입력해 주세요.');
   return withTx(async c => {
     await ownMap(c, id, req.user.id, { lock: true });
     const { rows: nodes } = await c.query('SELECT map_id, concept_id FROM cmap_map_nodes WHERE map_id = $1', [id]);
@@ -657,18 +659,18 @@ router.post('/api/cmap/maps/:id/edges', guard, handle(async req => {
     if (M.pairExists(edges, a, b, null)) throw conflict('이미 연결돼 있는 두 개념입니다. 기존 연결을 고쳐 주세요.');
     const dir = M.normalizeDirection(a, b, type.value === undefined ? null : type.value);
     const { rows } = await c.query(`INSERT INTO cmap_edges (map_id, from_concept_id, to_concept_id, relation_type, label) VALUES ($1, $2, $3, $4, $5) RETURNING ${EDGE_COLS}`,
-      [id, dir.from, dir.to, type.value === undefined ? null : type.value, label.value]);
-    return { status: 201, body: { edge: rows[0], status: await statusOf(c, id, req.user.id) } };
+      [id, dir.from, dir.to, type.value === undefined ? null : type.value, labelValue]);
+    return { status: 201, body: { edge: M.withDisplay(rows[0]), status: await statusOf(c, id, req.user.id) } };
   });
 }));
 
-// 간선 수정: 문구·종류·방향 바꾸기(reverse: true). '구별'(대칭)은 방향이 없다
+// 간선 수정: 문구·종류·방향 바꾸기(reverse: true). 방향 없음 유형(구별·유사·대립·연관)은 방향이 없다
 router.patch('/api/cmap/edges/:id', guard, handle(async req => {
   const id = parseId(req.params.id);
   if (id === null) throw notFound('연결을 찾을 수 없습니다.');
   const body = bodyOf(req);
   let label;
-  if (has(body, 'label')) { const l = M.readLabel(body.label); if (l.error) throw bad(l.error); label = l.value; }
+  if (has(body, 'label')) { const l = M.readOptionalLabel(body.label); if (l.error) throw bad(l.error); label = l.value; }   // 286-1: null = 문구 지우기
   const type = has(body, 'relation_type') ? M.readRelationType(body.relation_type) : { value: undefined };
   if (type.error) throw bad(type.error);
   const reverse = body.reverse === true;
@@ -682,13 +684,16 @@ router.patch('/api/cmap/edges/:id', guard, handle(async req => {
     const nextType = type.value === undefined ? cur.relation_type : type.value;
     let from = cur.from_concept_id, to = cur.to_concept_id;
     if (reverse) {
-      if (nextType === M.SYMMETRIC_TYPE) throw bad(`'${M.SYMMETRIC_TYPE}'은 방향이 없어 바꿀 수 없습니다.`);
+      if (M.isSymmetric(nextType)) throw bad(`'${nextType}'은 방향이 없어 바꿀 수 없습니다.`);
       [from, to] = [to, from];
     }
+    // 유형이 방향 없음으로 바뀌면 정규화(작은 id 가 from), 방향 있음으로 바뀌면 저장된 방향을 그대로 둔다
     const dir = M.normalizeDirection(from, to, nextType);
+    const nextLabel = label === undefined ? cur.label : label;
+    if ((nextLabel === null || nextLabel === undefined) && (nextType === null || nextType === undefined)) throw bad('연결 유형을 고르거나 문구를 입력해 주세요.');
     const { rows } = await c.query(`UPDATE cmap_edges SET from_concept_id = $1, to_concept_id = $2, relation_type = $3, label = $4 WHERE id = $5 RETURNING ${EDGE_COLS}`,
-      [dir.from, dir.to, nextType === undefined ? null : nextType, label === undefined ? cur.label : label, id]);
-    return { body: { edge: rows[0], status: await statusOf(c, cur.map_id, req.user.id) } };
+      [dir.from, dir.to, nextType === undefined ? null : nextType, nextLabel === undefined ? null : nextLabel, id]);
+    return { body: { edge: M.withDisplay(rows[0]), status: await statusOf(c, cur.map_id, req.user.id) } };
   });
 }));
 

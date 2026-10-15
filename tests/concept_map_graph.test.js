@@ -7,7 +7,7 @@ const { createCmapDb } = require('./helpers/cmap_db');
 const { startApp } = require('./helpers/app');
 const M = require('../lib/cmap_map');
 // 275-1: 개념학습 모듈을 불러오지 않는다. 관계 5종은 개념 지도 기준 고정값(값·순서)
-const PREDICATES = ['사용', '일부', '종류', '일으킴', '구별'];
+const PREDICATES = ['사용', '일부', '종류', '일으킴', '선행', '조건', '구별', '유사', '대립', '연관'];   // 286-1: 10개(기존 5개 포함)
 
 async function setup() {
   const db = createCmapDb();
@@ -31,9 +31,9 @@ async function setup() {
 }
 const fail = (r, status) => { assert.equal(r.status, status, JSON.stringify(r.body)); assert.equal(r.body.ok, false); };
 
-test('관계 종류 5종은 개념 지도 상수와 고정값이 같다(값·순서)', () => {
+test('관계 종류 10개는 개념 지도 상수와 고정값이 같다(값·순서, 기존 5개 포함)', () => {
   assert.deepEqual(M.RELATION_TYPES, PREDICATES);
-  assert.deepEqual(M.RELATION_TYPES, ['사용', '일부', '종류', '일으킴', '구별']);
+  assert.deepEqual(M.RELATION_TYPES, ['사용', '일부', '종류', '일으킴', '선행', '조건', '구별', '유사', '대립', '연관']);
 });
 
 test('권한·소유: 비인증 401, 권한 없음 403, 타인 지도·노드·간선은 404 이고 데이터는 그대로', async t => {
@@ -158,7 +158,7 @@ test('간선 수정·삭제: 문구·종류·방향 바꾸기(reverse), 종류 �
   r = await s.call('PATCH', `/api/cmap/edges/${e.id}`, { relation_type: '종류', reverse: true, label: '종류다' });
   assert.deepEqual([r.body.edge.from_concept_id, r.body.edge.to_concept_id, r.body.edge.relation_type, r.body.edge.label], [w.a.id, w.b.id, '종류', '종류다']);
   const before = s.db.snapshot();
-  for (const b of [{}, { label: '' }, { label: '가'.repeat(41) }, { relation_type: '없는' }, { reverse: 'yes' }, { label: 5 }]) fail(await s.call('PATCH', `/api/cmap/edges/${e.id}`, b), 400);
+  for (const b of [{}, { label: '가'.repeat(41) }, { relation_type: '없는' }, { reverse: 'yes' }, { label: 5 }])   // 286-1: 빈 문자열은 이제 문구 지우기(유형이 있으면 허용) — concept_map_types.test.js fail(await s.call('PATCH', `/api/cmap/edges/${e.id}`, b), 400);
   assert.equal(s.db.snapshot(), before);
   assert.equal((await s.call('PATCH', '/api/cmap/edges/99999', { label: 'x' })).status, 404);
   assert.equal((await s.call('PATCH', '/api/cmap/edges/abc', { label: 'x' })).status, 404);

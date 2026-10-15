@@ -198,7 +198,7 @@ test('두 손가락 핀치: 확대·축소되고, 노드를 끄는 중에 두 �
   noErrors(page);
 });
 
-test('탭-탭 연결: 노드 A 탭(선택 표시) → 노드 B 탭 → 대화상자(A → B), 문구 필수·종류 선택·일으킴 안내, 저장하면 연결이 생긴다', { skip: SKIP, timeout: 60000 }, async t => {
+test('탭-탭 연결: 노드 A 탭(선택 표시) → 노드 B 탭 → 대화상자(A → B), 문구 선택(유형·문구 중 하나는 필요)·종류 선택·일으킴 안내, 저장하면 연결이 생긴다', { skip: SKIP, timeout: 60000 }, async t => {
   const { srv, page } = await open(t);
   const { c } = await world(page);
   await pickAll(page, [c.a.id, c.b.id, c.c.id]);
@@ -216,8 +216,8 @@ test('탭-탭 연결: 노드 A 탭(선택 표시) → 노드 B 탭 → 대화상
   await waitOpen(page, 'edge-dlg');
   assert.equal(await page.text('#edge-pair'), 'a개념 → b개념', '앞 개념 → 뒤 개념(누른 순서)');
   assert.equal(await page.text('#edge-heading'), '연결 만들기');
-  await page.click('#edge-ok');                                                 // 문구 없이 저장
-  assert.match(await page.text('#edge-msg'), /관계 문구를 입력/);
+  await page.click('#edge-ok');                                                 // 유형도 문구도 없이 저장(286-1: 문구는 선택이지만 둘 다 없으면 막힘)
+  assert.match(await page.text('#edge-msg'), /유형을 고르거나 문구를 입력해 주세요/);
   await page.type('#edge-label', '때문에');
   await page.eval("(() => { const s = document.getElementById('edge-type'); s.value = '일으킴'; s.dispatchEvent(new Event('change')); })()");
   assert.match(await page.text('#edge-type-hint'), /작동 방식/);

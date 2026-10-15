@@ -18,7 +18,28 @@
     '종류': '앞 개념이 뒤 개념의 한 종류예요.',
     '일으킴': '앞 개념이 뒤 개념을 일으켜요. 어떻게 일으키는지(작동 방식)를 문구에 적어 주세요. 예: 마찰이 열을 일으킴',
     '구별': '헷갈리기 쉬운 두 개념이에요. 방향이 없어요.',
+    '선행': 'A 다음에 B가 와요 (순서·단계)',
+    '조건': 'A가 B의 전제·조건이에요',
+    '유사': 'A와 B는 비슷해요 (방향 없음)',
+    '대립': 'A와 B는 반대되거나 맞서요 (방향 없음)',
+    '연관': 'A와 B는 관련 있어요 (방향 없음)',
   };
+  // 286-1: 방향 없음 유형은 서버가 내려주는 목록(symmetric_types)을 따른다(열기 전 기본값은 4개)
+  const SYM_DEFAULT = ['구별', '유사', '대립', '연관'];
+  const isSym = t => (M.symTypes || SYM_DEFAULT).includes(t);
+  const TYPE_LABEL = { '사용': '사용(의존)' };
+  // 연결 대화상자·퀴즈 대화상자의 유형 select 를 서버 목록으로 채운다(한 곳에서 관리). 방향 없음 유형에는 "(방향 없음)"을 붙이고 묶음으로 나눈다
+  function fillTypeSelects(types, sym) {
+    for (const id of ['edge-type', 'quiz-type']) {
+      const sel = $(id), keep = sel.value;
+      sel.textContent = '';
+      sel.append(h('option', { value: '', text: '선택 안 함' }));
+      const g1 = h('optgroup', { label: '방향 있음' }), g2 = h('optgroup', { label: '방향 없음' });
+      for (const t of types) (sym.includes(t) ? g2 : g1).append(h('option', { value: t, text: sym.includes(t) ? t + '(방향 없음)' : (TYPE_LABEL[t] || t) }));
+      sel.append(g1, g2);
+      sel.value = keep;
+    }
+  }
 
   const M = {
     rootId: null, map: null, nodes: new Map(), edges: [], concepts: new Map(), topics: [], types: [],
@@ -62,9 +83,9 @@
       const a = M.nodes.get(e.from_concept_id), b = M.nodes.get(e.to_concept_id);
       if (!a || !b) continue;
       const geo = edgeGeom(posOf(e.from_concept_id), posOf(e.to_concept_id));
-      const sym = e.relation_type === '구별';
-      const lbl = clipText(e.label, 12);
-      edgeLayer.append(sv('g', { class: 'm-edge', 'data-edge': e.id, 'data-t': 'edge', role: 'button', tabindex: 0, 'aria-label': `${termOf(e.from_concept_id)}${sym ? '와 ' : ' → '}${termOf(e.to_concept_id)}: ${e.label} (${typeLabel(e.relation_type)}), 눌러서 고치기` },
+      const sym = isSym(e.relation_type);
+      const lbl = clipText(e.display_label || e.label || '', 12);   // 286-1: 문구가 없으면 유형 이름(서버가 채운 display_label)
+      edgeLayer.append(sv('g', { class: 'm-edge' + (e.relation_type === '대립' ? ' m-edge-opp' : ''), 'data-edge': e.id, 'data-t': 'edge', role: 'button', tabindex: 0, 'aria-label': `${termOf(e.from_concept_id)}${sym ? '와 ' : ' → '}${termOf(e.to_concept_id)}: ${e.display_label || e.label} (${typeLabel(e.relation_type)}), 눌러서 고치기` },
         sv('path', { d: geo.d, class: 'm-edge-hit' }),
         sv('path', { d: geo.d, class: 'm-edge-line', 'marker-end': sym ? null : 'url(#m-arrow)' }),
         sv('text', { x: geo.mx, y: geo.my - 4, class: 'm-edge-label', 'text-anchor': 'middle' }, lbl)));
@@ -199,7 +220,8 @@
     const r = await api('GET', '/api/cmap/topics/' + rootId + '/map');
     if (!okStatus(r)) { $('map-load-msg').textContent = errText(r, '지도를 불러오지 못했습니다.'); return false; }
     const b = r.body;
-    M.rootId = rootId; M.map = b.map; M.types = b.relation_types || [];
+    M.rootId = rootId; M.map = b.map; M.types = b.relation_types || []; M.symTypes = b.symmetric_types || SYM_DEFAULT;
+    fillTypeSelects(M.types, M.symTypes);
     M.concepts = new Map(b.concepts.map(c => [c.id, c]));
     M.topics = b.topics;
     M.nodes = new Map(b.nodes.map(n => [n.concept_id, { x: n.x, y: n.y }]));
@@ -336,7 +358,7 @@
   function openEdgeDialog(mode, d) {
     ED = { mode, edge: d.edge || null, from: d.from, to: d.to, flips: 0 };
     $('edge-heading').textContent = mode === 'create' ? '연결 만들기' : '연결 고치기';
-    $('edge-label').value = d.edge ? d.edge.label : '';
+    $('edge-label').value = d.edge && d.edge.label ? d.edge.label : '';
     $('edge-type').value = d.edge && d.edge.relation_type ? d.edge.relation_type : '';
     $('edge-msg').textContent = '';
     $('edge-delete').hidden = mode !== 'edit';
@@ -345,10 +367,12 @@
     $('edge-label').focus();
   }
   function refreshEdgeDialog() {
-    const sym = $('edge-type').value === '구별';
+    const type = $('edge-type').value, sym = isSym(type);
     $('edge-pair').textContent = termOf(ED.from) + (sym ? ' ↔ ' : ' → ') + termOf(ED.to);
-    $('edge-flip').disabled = sym;
-    $('edge-type-hint').textContent = TYPE_HINT[$('edge-type').value] || TYPE_HINT[''];
+    $('edge-flip').disabled = sym;                       // 방향 없음 유형은 방향을 바꿀 수 없다
+    $('edge-type-hint').textContent = TYPE_HINT[type] || TYPE_HINT[''];
+    // 문구는 선택: 비우면 유형 이름이 선 위에 표시된다(유형을 고르면 그 이름으로 안내)
+    $('edge-label-hint').textContent = type ? '비우면 ‘' + type + '’처럼 유형 이름이 표시돼요' : '비우면 유형 이름이 표시돼요. 유형을 고르거나 문구를 입력해 주세요';
   }
   function setupEdgeDialog() {
     $('edge-type').addEventListener('change', refreshEdgeDialog);
@@ -358,7 +382,7 @@
       const e = ED.edge;
       closeDlg($('edge-dlg'));
       openConfirm({
-        heading: '연결 삭제', text: '‘' + termOf(e.from_concept_id) + '’ 와(과) ‘' + termOf(e.to_concept_id) + '’ 사이의 연결(' + e.label + ')을 삭제합니다.', okText: '삭제',
+        heading: '연결 삭제', text: '‘' + termOf(e.from_concept_id) + '’ 와(과) ‘' + termOf(e.to_concept_id) + '’ 사이의 연결(' + (e.display_label || e.label || '') + ')을 삭제합니다.', okText: '삭제',
         action: async () => {
           const r = await api('DELETE', '/api/cmap/edges/' + e.id);
           if (!okStatus(r) && r.status !== 404) return { failed: errText(r) };
@@ -372,12 +396,12 @@
     $('edge-form').addEventListener('submit', async ev => {
       ev.preventDefault();
       const label = $('edge-label').value.trim();
-      if (!label) { $('edge-msg').textContent = '관계 문구를 입력해 주세요.'; return; }
       const type = $('edge-type').value || null;
+      if (!label && !type) { $('edge-msg').textContent = '유형을 고르거나 문구를 입력해 주세요.'; return; }   // 286-1: 문구는 선택이지만 둘 다 없는 연결은 만들 수 없다
       setBusy($('edge-ok'), true);
       let r;
-      if (ED.mode === 'create') r = await api('POST', '/api/cmap/maps/' + M.map.id + '/edges', { from_concept_id: ED.from, to_concept_id: ED.to, label, relation_type: type });
-      else { const body = { label, relation_type: type }; if (ED.flips % 2 === 1) body.reverse = true; r = await api('PATCH', '/api/cmap/edges/' + ED.edge.id, body); }
+      if (ED.mode === 'create') r = await api('POST', '/api/cmap/maps/' + M.map.id + '/edges', { from_concept_id: ED.from, to_concept_id: ED.to, label: label || null, relation_type: type });
+      else { const body = { label: label || null, relation_type: type }; if (ED.flips % 2 === 1) body.reverse = true; r = await api('PATCH', '/api/cmap/edges/' + ED.edge.id, body); }
       setBusy($('edge-ok'), false);
       if (!okStatus(r)) { $('edge-msg').textContent = errText(r); return; }
       setStatus(r.body.status, true);
@@ -489,8 +513,8 @@
     const edgeLayer = sv('g', { class: 'm-edges' }), nodeLayer = sv('g', { class: 'm-nodes' });
     for (const a of q.answers) {
       const geo = edgeGeom(posOf(a.from), posOf(a.to));
-      edgeLayer.append(sv('g', { class: 'm-edge', 'data-answer': a.from + '-' + a.to },
-        sv('path', { d: geo.d, class: 'm-edge-line', 'marker-end': a.type === '구별' ? null : 'url(#m-arrow)' }),
+      edgeLayer.append(sv('g', { class: 'm-edge' + (a.type === '대립' ? ' m-edge-opp' : ''), 'data-answer': a.from + '-' + a.to },
+        sv('path', { d: geo.d, class: 'm-edge-line', 'marker-end': isSym(a.type) ? null : 'url(#m-arrow)' }),
         sv('text', { x: geo.mx, y: geo.my - 4, class: 'm-edge-label', 'text-anchor': 'middle' }, a.type ? a.type : '')));
     }
     for (const n of q.nodes) {
@@ -741,6 +765,7 @@
   window.CmapMap = {
     open, close, setMode, highlight, openSheet, closeSheet, applySelection, save,
     isBusy() { return M.busy; },
+    isSymmetric: t => isSym(t),
     // 283-2: [만들기] 첫 화면용 읽기 전용 정보(저장된 개념·주제 목록, 지도에 올라간 개념, 연결 수, 저장 상태)
     info() { return { concepts: [...M.concepts.values()], topics: M.topics.slice(), nodeIds: [...M.nodes.keys()], edgeCount: M.edges.length, status: M.status ? { ...M.status } : null, rootId: M.rootId, loaded: !!M.svg }; },
     isSheetOpen() { return M.sheet.open; },

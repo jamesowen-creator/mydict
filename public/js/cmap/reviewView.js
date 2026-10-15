@@ -136,7 +136,7 @@
     else q.error = errText(r, '채점하지 못했어요. 잠시 후 다시 시도해 주세요.');
     renderQuiz();
   }
-  const line = (e, withLabel) => quizOrConcept(e.from_term, e.from_concept_id) + (e.relation_type === '구별' ? ' ↔ ' : ' → ') + quizOrConcept(e.to_term, e.to_concept_id) + (e.relation_type ? ' · ' + e.relation_type : '') + (withLabel && e.label ? ' · ' + e.label : '');
+  const line = (e, withLabel) => quizOrConcept(e.from_term, e.from_concept_id) + (window.CmapMap.isSymmetric(e.relation_type) ? ' ↔ ' : ' → ') + quizOrConcept(e.to_term, e.to_concept_id) + (e.relation_type ? ' · ' + e.relation_type : '') + (withLabel && e.label && e.label !== e.relation_type ? ' · ' + e.label : '');
   const quizOrConcept = (term, id) => term || quizTerm(id);
 
   function renderQuiz() {
@@ -149,7 +149,7 @@
     if (q.error) box.append(h('p', { class: 'msg', id: 'quiz-error', role: 'alert', text: q.error }));
     box.append(h('p', { class: 'sec-label narr-sec', text: '내가 이은 연결 ' + q.answers.length + '개' }));
     box.append(h('ul', { class: 'quiz-answers', id: 'quiz-answers' }, q.answers.map((a, i) => h('li', { 'data-i': i },
-      h('span', { text: quizTerm(a.from) + (a.type === '구별' ? ' ↔ ' : ' → ') + quizTerm(a.to) + (a.type ? ' · ' + a.type : ' · 종류 없음') }),
+      h('span', { text: quizTerm(a.from) + (window.CmapMap.isSymmetric(a.type) ? ' ↔ ' : ' → ') + quizTerm(a.to) + (a.type ? ' · ' + a.type : ' · 종류 없음') }),
       h('button', { class: 'btn text', type: 'button', 'data-del': i, onclick: () => removeAnswer(i), text: '삭제' })))));
     box.append(h('div', { class: 'narr-actions' },
       h('button', { class: 'btn text', type: 'button', id: 'quiz-quit', onclick: () => quitQuiz('review'), text: '그만두기' }),
@@ -167,7 +167,7 @@
       h('div', { class: 'quiz-score', id: 'res-pair' }, h('b', { text: pct(r.scores.pair) }), h('span', { text: '연결 찾기' })),
       h('div', { class: 'quiz-score', id: 'res-type' }, h('b', { text: pct(r.scores.type) }), h('span', { text: '관계 종류' })),
       h('div', { class: 'quiz-score', id: 'res-direction' }, h('b', { text: pct(r.scores.direction) }), h('span', { text: '방향' }))));
-    box.append(h('p', { class: 'hint', text: '세 점수는 따로 계산해요. 구별(방향 없음) 연결은 방향 점수에서 빠져요.' }));
+    box.append(h('p', { class: 'hint', text: '세 점수는 따로 계산해요. 방향 없음 유형(구별·유사·대립·연관) 연결은 방향 점수에서 빠져요.' }));
     const why = { type: '관계 종류가 달라요', direction: '방향이 반대예요' };
     for (const part of [
       section('맞힌 연결', 'res-correct', r.correct, e => h('li', { text: line(e, true) }), '아직 없어요.'),
