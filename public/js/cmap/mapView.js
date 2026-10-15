@@ -88,7 +88,8 @@
     const el = $('map-meta');
     if (!el) return;
     const st = M.status ? M.status.save_status : 'unsaved';
-    el.textContent = '개념 ' + M.nodes.size + '개 · 연결 ' + M.edges.length + '개 · ' + (st === 'saved' ? '저장됨' : st === 'changed' ? '저장 후 변경됨' : '저장 안 됨');
+    // 283-2: 지도에 올라간 개념이 있을 때만 한 줄 상태("저장됨 · 개념 N개 · 연결 M개")를 보인다
+    el.textContent = M.nodes.size ? (st === 'saved' ? '저장됨' : st === 'changed' ? '저장 후 변경됨' : '저장 안 됨') + ' · 개념 ' + M.nodes.size + '개 · 연결 ' + M.edges.length + '개' : '';
   }
   function applyView() {
     const r = M.svg.getBoundingClientRect();
@@ -267,6 +268,11 @@
   async function togglePick(cid, cb) {
     const want = cb.checked;
     cb.checked = !want;                       // 서버 결과를 받은 뒤에 화면을 바꾼다(취소·실패하면 그대로)
+    await pickNode(cid, want);
+  }
+  // 283-2: 개념 하나를 지도에 올리거나(want=true) 내린다. 시트 안 [개념 선택]과 [만들기] 첫 화면의 [이 개념으로 지도 만들기]가 같은 이 함수를 쓴다.
+  // 내릴 때 연결이 있으면 확인 창이 뜨고, 창이 닫히면(빼기·취소) 이 함수도 끝난다.
+  async function pickNode(cid, want) {
     mapMsg('');
     if (want) {
       const r = await api('POST', '/api/cmap/maps/' + M.map.id + '/nodes', { concept_id: cid });
@@ -293,9 +299,25 @@
           return {};
         },
       });
+      await new Promise(res => $('confirm-dlg').addEventListener('close', res, { once: true }));
       return;
     }
     mapMsg(errText(probe));
+  }
+  // 283-2: 선택한 개념 집합(ids)에 맞게 지도의 노드를 맞춘다(없는 것은 올리고, 선택에서 빠진 것은 내림). 하나라도 실패하거나 확인 창에서 취소하면 false
+  async function applySelection(ids) {
+    const want = new Set(ids);
+    for (const id of ids) {
+      if (M.nodes.has(id)) continue;
+      await pickNode(id, true);
+      if (!M.nodes.has(id)) return false;
+    }
+    for (const id of [...M.nodes.keys()]) {
+      if (want.has(id)) continue;
+      await pickNode(id, false);
+      if (M.nodes.has(id)) return false;
+    }
+    return true;
   }
   function applyRemoval(cid) {
     M.nodes.delete(cid);
@@ -506,7 +528,8 @@
     d.classList.toggle('quiz-mode', M.mode === 'quiz');
   }
   function openSheet() {
-    if (M.sheet.open || !M.svg) return;
+    if (M.sheet.open) return;
+    if (!M.svg) { pageNote('지도를 아직 읽지 못했어요. 잠시 후 다시 시도해 주세요.'); return; }   // 283-2: 조용히 넘기지 않고 안내한다
     M.sheet.open = true; M.sheet.scrollY = window.scrollY;
     document.documentElement.classList.add('map-open');
     sheetLayout();
@@ -575,7 +598,6 @@
     $('map-fit').addEventListener('click', () => { fit(); });
     $('map-zoom-in').addEventListener('click', () => zoomBy(1.25));
     $('map-zoom-out').addEventListener('click', () => zoomBy(0.8));
-    $('map-open').addEventListener('click', openSheet);
     $('map-sheet-close').addEventListener('click', closeSheet);
     $('map-sheet').addEventListener('cancel', ev => { ev.preventDefault(); closeSheet(); });   // ESC
     window.addEventListener('popstate', () => {
@@ -703,7 +725,9 @@
   }
 
   window.CmapMap = {
-    open, close, setMode, highlight, openSheet, closeSheet,
+    open, close, setMode, highlight, openSheet, closeSheet, applySelection,
+    // 283-2: [만들기] 첫 화면용 읽기 전용 정보(저장된 개념·주제 목록, 지도에 올라간 개념, 연결 수, 저장 상태)
+    info() { return { concepts: [...M.concepts.values()], topics: M.topics.slice(), nodeIds: [...M.nodes.keys()], edgeCount: M.edges.length, status: M.status ? { ...M.status } : null, rootId: M.rootId, loaded: !!M.svg }; },
     isSheetOpen() { return M.sheet.open; },
     // 해설·복습에서 "지도에서 보기": 그 개념들을 강조하고 시트를 연다(이미 열려 있으면 강조만 바꾼다)
     showOnMap(ids) { highlight(ids); openSheet(); },

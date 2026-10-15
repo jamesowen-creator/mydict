@@ -36,7 +36,8 @@ async function world(page, { openMap = true } = {}) {
 }
 const state = page => page.eval('window.CmapMap._state()');
 // 274-4: 지도는 시트(<dialog>) 안에 있다. 지도 조작 전에 [지도 열기]로 시트를 열고, 주제 화면으로 가기 전에 닫는다
-const openSheet = async page => { await page.click('#map-open'); await page.waitFor("document.getElementById('map-sheet').open", 4000, '지도 시트'); };
+// 283-2: [만들기] 첫 화면의 주 버튼(#map-open)은 개념을 2개 이상 고르기 전에는 비활성이므로, 빈 지도에서 시트를 바로 열 때는 CmapMap.openSheet() 를 쓴다
+const openSheet = async page => { await page.eval("(() => { const b = document.getElementById('map-open'); if (b && !b.disabled) b.click(); else window.CmapMap.openSheet(); })()"); await page.waitFor("document.getElementById('map-sheet').open", 4000, '지도 시트'); };
 const closeSheet = async page => { await page.click('#map-sheet-close'); await page.waitFor("!document.getElementById('map-sheet').open", 4000, '지도 시트 닫힘'); };
 // 조건이 참이 될 때까지 기다린다(테스트 프로세스 쪽 값, 예: 가짜 DB). 274-1: 드래그 저장 요청·응답이 끝나기를 기다리는 데 쓴다
 async function until(fn, ms, label) {

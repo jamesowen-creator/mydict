@@ -323,7 +323,7 @@ router.post('/api/cmap/topics/:id/explain', guard, handle(async req => {
   const input = AI.buildExplainInput({ path, term: termValue, siblings: existing.filter(x => !target || x.id !== target.id).map(x => x.term) });
   const ai = await AI.callExplainAI(req.user.id, input);
   const v = ai.parsed === undefined ? null : AI.validateAiExplanation(ai.parsed);
-  if (!v) throw new HttpError(502, ai.aiError || AI.AI_ERROR_TEXT, { ai_error: true });
+  if (!v) { if (ai.parsed !== undefined) { const f = AI.explainFailReason(ai.parsed) || { reason: 'bad_shape' }; AI.logAiFail('explain', f.reason, f.chars, f.field); } throw new HttpError(502, ai.aiError || AI.AI_ERROR_TEXT, { ai_error: true }); }
   const explJson = JSON.stringify(v.explanation);
   return withTx(async c => {
     await ownTopic(c, id, req.user.id, { lock: true });
@@ -466,7 +466,7 @@ router.post('/api/cmap/concepts/:id/deepen', guard, handle(async req => {
     const input = AI.buildDeepenInput({ path, term: row.term, definition: expl.definition, example: expl.example, deepen: have });
     const ai = await AI.callExplainAI(req.user.id, input, AI.deepenSystemPrompt(have.length), 700);
     const v = ai.parsed === undefined ? null : AI.validateDeepen(ai.parsed);
-    if (!v) throw new HttpError(502, ai.aiError || AI.AI_ERROR_TEXT, { ai_error: true });
+    if (!v) { if (ai.parsed !== undefined) { const f = AI.deepenFailReason(ai.parsed) || { reason: 'bad_shape' }; AI.logAiFail('deepen', f.reason, f.chars, f.field); } throw new HttpError(502, ai.aiError || AI.AI_ERROR_TEXT, { ai_error: true }); }
     return await withTx(async c => {
       const { rows: now } = await c.query(`SELECT ${CONCEPT_COLS} FROM cmap_concepts WHERE id = $1 AND user_id = $2 FOR UPDATE`, [id, req.user.id]);
       if (!now.length) throw notFound('개념을 찾을 수 없습니다.');

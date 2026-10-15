@@ -96,7 +96,7 @@ test('지도 탭: 페이지에는 [지도 열기]와 한 줄 상태만 있고 �
   await page.click('#nav-map');
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000, '지도 화면');
   assert.equal(await page.eval("document.getElementById('map-canvas').offsetParent === null"), true, '페이지에는 지도 캔버스가 없음');
-  assert.match(await page.eval("document.getElementById('map-meta').textContent"), /^개념 4개 · 연결 2개 · 저장됨$/);
+  assert.match(await page.eval("document.getElementById('map-meta').textContent"), /^저장됨 · 개념 4개 · 연결 2개$/);
   await audit(page, '지도 탭(페이지)');
   assert.ok(await minHeight(page, '#map-open') >= 44); assert.ok(await minHeight(page, '.map-tab') >= 44);
   await page.click('#map-open');

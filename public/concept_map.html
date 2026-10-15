@@ -275,16 +275,18 @@
 
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
-<script src="/js/map/mapCore.js?v=1"></script>
-<script src="/js/cmap/mapGeometry.js?v=1"></script>
-<script src="/js/cmap/layoutOptimize.js?v=1"></script>
-<script src="/js/cmap/pairPicker.js?v=1"></script>
-<script src="/js/cmap/markState.js?v=1"></script>
-<script src="/js/cmap/mapView.js?v=1"></script>
-<script src="/js/cmap/narrateView.js?v=1"></script>
-<script src="/js/cmap/reviewView.js?v=1"></script>
-<script src="/js/cmap/micRecorder.js?v=1"></script>
-<script src="/js/cmap/answerView.js?v=1"></script>
+<!-- 283-2: ?v= 값은 public/sw.js 의 CACHE_NAME(metis-v36) 숫자와 같게 두고 배포마다 함께 올린다(옛 캐시 JS가 새 HTML과 섞여 내비가 죽는 일을 막는다. tests/concept_map_cache.test.js 가 검사) -->
+<script src="/js/map/mapCore.js?v=36"></script>
+<script src="/js/cmap/mapGeometry.js?v=36"></script>
+<script src="/js/cmap/layoutOptimize.js?v=36"></script>
+<script src="/js/cmap/pairPicker.js?v=36"></script>
+<script src="/js/cmap/markState.js?v=36"></script>
+<script src="/js/cmap/mapView.js?v=36"></script>
+<script src="/js/cmap/mapStart.js?v=36"></script>
+<script src="/js/cmap/narrateView.js?v=36"></script>
+<script src="/js/cmap/reviewView.js?v=36"></script>
+<script src="/js/cmap/micRecorder.js?v=36"></script>
+<script src="/js/cmap/answerView.js?v=36"></script>
 
 <div id="loading" role="status"><p>불러오는 중…</p></div>
 
@@ -344,6 +346,7 @@
   <p id="map-loading" class="hint" role="status" hidden>불러오는 중…</p>
   <div id="map-view" hidden>
     <p id="map-load-msg" class="msg" role="alert"></p>
+    <div id="map-retry-row" class="map-open-row" hidden><button id="map-retry" class="btn" type="button">다시 시도</button></div>
 
     <div id="quiz-view" hidden>
       <div id="review-panel" aria-live="polite"></div>
@@ -354,7 +357,8 @@
       <div class="map-tabs" role="tablist" aria-label="지도 만들기"><button id="tab-map" class="map-tab sel" type="button" role="tab" aria-selected="true">만들기</button><button id="tab-narr" class="map-tab" type="button" role="tab" aria-selected="false">해설</button></div>
       <p id="map-scope" class="hint"></p>
       <div id="map-page" class="map-only">
-        <div class="map-open-row"><button id="map-open" class="btn" type="button">지도 열기</button><span id="map-meta" class="hint"></span></div>
+        <p id="map-meta" class="hint" role="status"></p>
+        <div id="map-start"></div>
         <p id="map-page-note" class="hint" role="status"></p>
       </div>
       <div class="map-open-row narr-only"><button id="narr-open-map" class="btn text" type="button">지도 열기</button></div>
@@ -840,7 +844,7 @@ function explanationSections(expl) {
     const v = expl && typeof expl[k] === 'string' ? expl[k].trim() : '';
     if (v) box.append(h('div', { class: 'e-sec' + (k === 'example' ? ' quote' : ''), 'data-f': k }, h('span', { class: 'sec-label', text: EXPLAIN_VIEW_LABELS[k] }), h('p', { text: v })));
   }
-  deepenList(expl).forEach((v, i) => box.append(h('div', { class: 'e-sec', 'data-f': 'deepen', 'data-i': i + 1 }, h('span', { class: 'sec-label', text: '심화 개념 ' + (i + 1) }), h('p', { text: v }))));   // 282-1: 심화 개념 1~3
+  deepenList(expl).forEach((v, i) => box.append(h('div', { class: 'e-sec', 'data-f': 'deepen', 'data-i': i + 1 }, h('span', { class: 'sec-label', text: '심화 개념 ' + (i + 1) + '.' }), h('p', { text: v }))));   // 282-1: 심화 개념 1~3
   return box;
 }
 // 280-2: 주제 안 화면의 개념 흐름 — 저장된 개념과 방금 검색한 결과가 한 목록이다(오래된 것이 위, 최신이 아래·입력 바 바로 위).
@@ -865,11 +869,11 @@ function renderConcepts() {
   }
   growAll(ul);
 }
-// 282-1: [심화 개념+] — 누를 때마다 정의·예시보다 한 단계 깊은 설명이 하나씩 쌓인다(최대 3개). 생성 중에는 "생성 중…"으로 바뀌고 비활성
+// 282-1: [심화 개념] — 누를 때마다 정의·예시보다 한 단계 깊은 설명이 하나씩 쌓인다(최대 3개). 생성 중에는 "생성 중…"으로 바뀌고 비활성
 function deepenButton(c) {
   const n = deepenList(c.explanation).length, busy = S.deepening.has(c.id), noDef = !(c.explanation && typeof c.explanation.definition === 'string' && c.explanation.definition.trim());
   return [
-    h('button', { class: 'btn text', type: 'button', 'data-t': 'concept-deepen', disabled: busy || n >= DEEPEN_MAX || noDef || (!!S.explain && S.explain.status === 'loading'), 'aria-label': c.term + ' 심화 개념 추가', text: busy ? '생성 중…' : '심화 개념+', onclick: () => requestDeepen(c) }),
+    h('button', { class: 'btn text', type: 'button', 'data-t': 'concept-deepen', disabled: busy || n >= DEEPEN_MAX || noDef || (!!S.explain && S.explain.status === 'loading'), 'aria-label': c.term + ' 심화 개념 추가', text: busy ? '생성 중…' : '심화 개념', onclick: () => requestDeepen(c) }),
     n ? h('span', { class: 'c-deepen-count', 'data-t': 'deepen-count', text: n + '/' + DEEPEN_MAX }) : null,
   ];
 }
@@ -925,7 +929,7 @@ function editForm(c) {
       const el = h('textarea', { id: 'edit-deepen-' + (i + 1), maxlength: DEEPEN_LIMIT, 'data-t': 'edit-deepen', 'data-i': i + 1 });
       el.value = v;
       el.addEventListener('input', () => { E.deepen[i] = el.value; });
-      return h('div', { class: 'field' }, h('label', { for: 'edit-deepen-' + (i + 1), text: '심화 개념 ' + (i + 1) }), el);
+      return h('div', { class: 'field' }, h('label', { for: 'edit-deepen-' + (i + 1), text: '심화 개념 ' + (i + 1) + '.' }), el);
     }),
     inp('edit-memo', '메모 (선택)', 'memo', 2000, 'textarea'), msg,
     h('div', { class: 'btn-row' },
@@ -1120,23 +1124,33 @@ const Nav = (() => {
       if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
     }
   }
+  // 지도 읽기는 한 번에 하나만: 읽는 중에 탭을 또 누르면 같은 읽기가 끝나기를 기다린다(끝나기 전에 모드를 바꾸면 읽기가 끝나며 모드가 되돌아가던 문제 방지)
+  let mapLoading = null;
   async function ensureMap() {
     const root = rootOf(byId(S.selectedId));
-    if (!root || mapRoot === root.id) return;
+    if (!root) return;
+    if (mapRoot === root.id) { if (mapLoading) await mapLoading; return; }
     $('map-load-msg').textContent = '';
+    $('map-retry-row').hidden = true;
     mapRoot = root.id;
     $('map-scope').textContent = '‘' + root.title + '’ 주제 전체의 지도예요.';
-    const ok = await window.CmapMap.open(root.id);
-    if (!ok) { mapRoot = null; $('map-load-msg').textContent = '지도를 불러오지 못했습니다.'; }
+    mapLoading = (async () => {
+      let ok = false;
+      try { ok = await window.CmapMap.open(root.id); } catch (e) { console.error(e); }
+      if (!ok) { mapRoot = null; if (!$('map-load-msg').textContent) $('map-load-msg').textContent = '지도를 불러오지 못했습니다.'; $('map-retry-row').hidden = false; }
+    })();
+    try { await mapLoading; } finally { mapLoading = null; }
   }
+  // 283-2: 한 모듈의 오류가 내비 전체를 막지 않게 모듈 호출을 보호한다(오류는 console.error 로 남김)
+  function safe(fn, fallback) { try { return fn(); } catch (e) { console.error(e); return fallback; } }
   // 화면을 바꾼다(기록은 건드리지 않음). 주제를 고르지 않은 채 퀴즈·지도 만들기·오답노트면 안내 화면
   async function show(v) {
     const my = ++seq;
     const nosel = isMapView(v) && S.selectedId === null;
     const prev = S.view;
     S.view = v;
-    if (prev === 'quiz' && v !== 'quiz' && window.CmapAnswer) window.CmapAnswer.stop();   // 퀴즈 화면을 떠나면 말로 설명하기 진행은 끝난다
-    if ((!isMapView(v) || nosel) && mapRoot !== null) { mapRoot = null; window.CmapMap.close(); }   // 주제 쪽으로 돌아가면 지도를 닫는다(다음에 열 때 새 데이터로)
+    if (prev === 'quiz' && v !== 'quiz') safe(() => window.CmapAnswer.stop());   // 퀴즈 화면을 떠나면 말로 설명하기 진행은 끝난다
+    if ((!isMapView(v) || nosel) && mapRoot !== null) { mapRoot = null; safe(() => window.CmapMap.close()); }   // 주제 쪽으로 돌아가면 지도를 닫는다(다음에 열 때 새 데이터로)
     $('landing-view').hidden = v !== 'landing';
     $('topic-view').hidden = v !== 'topic';
     $('nosel-view').hidden = !nosel;
@@ -1155,13 +1169,13 @@ const Nav = (() => {
     if (my !== seq) return;
     $('map-loading').hidden = true;
     if (mapRoot === null) { $('map-view').hidden = false; $('quiz-view').hidden = $('mapmk-view').hidden = $('wrong-view').hidden = true; return; }   // 불러오기 실패: 오류 문구만
-    window.CmapMap.setMode(v === 'map' ? mkMode : 'review');
-    if (v === 'wrong') window.CmapReview.renderWrong();
+    safe(() => window.CmapMap.setMode(v === 'map' ? mkMode : 'review'));
+    if (v === 'wrong') safe(() => window.CmapReview.renderWrong());
     $('map-view').hidden = false;
   }
   // 이동하면 잃는 것이 있을 때(녹음 중·평가 중·퀴즈 진행 중) 안내 문구, 아니면 null
   function leaveReason() {
-    return window.CmapAnswer.busyText() || (window.CmapReview.quizActive() ? '풀던 퀴즈가 끝나요. 이동할까요?' : null);
+    return safe(() => window.CmapAnswer.busyText(), null) || (safe(() => window.CmapReview.quizActive(), false) ? '풀던 퀴즈가 끝나요. 이동할까요?' : null);
   }
   function guarded(fn) {
     const why = leaveReason();
@@ -1200,13 +1214,14 @@ const Nav = (() => {
   }
   return { show, goTab, toLanding, enterTopic, openTopic, back, onPop, renderPath, record, setMk: m => { mkMode = m; } };
 })();
-window.CmapNav = { openTopic: id => Nav.enterTopic(id) };   // 해설의 [찾아보기] 등 다른 스크립트가 주제 안으로 들어갈 때
+window.CmapNav = { openTopic: id => Nav.enterTopic(id), currentTopicId: () => S.selectedId };   // 해설의 [찾아보기] 등 다른 스크립트가 주제 안으로 들어갈 때
 
 for (const b of document.querySelectorAll('#cmap-nav [data-tab]')) b.addEventListener('click', () => Nav.goTab(b.dataset.tab));
 $('nosel-go').addEventListener('click', () => Nav.goTab('topic'));
 $('tab-map').addEventListener('click', () => Nav.setMk('map'));
 $('tab-narr').addEventListener('click', () => Nav.setMk('narr'));
 $('narr-open-map').addEventListener('click', () => window.CmapMap.showOnMap([]));
+$('map-retry').addEventListener('click', () => Nav.show(S.view));
 $('wrong-open-map').addEventListener('click', () => window.CmapMap.showOnMap([]));
 window.addEventListener('popstate', Nav.onPop);
 

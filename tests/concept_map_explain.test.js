@@ -459,3 +459,74 @@ test('심화 개념: 평가·해설·간략 설명의 입력에는 deepen 이 �
   assert.equal(f.deeper_text, '옛 더 깊게'); assert.equal(f.deepen.length, 3);
   assert.deepEqual(AI.explanationEntries(f).map(e => e[0]), ['definition', 'example', 'simple_text', 'deeper_text']);
 });
+
+// ───── 283-2: 심화 안정화 — 260자 안내, 앞뒤 설명문이 붙은 JSON, 실패 사유 로그(원문 미포함) ─────
+async function withErrLog(fn) {
+  const lines = []; const orig = console.error;
+  console.error = (...a) => { lines.push(a.map(x => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ')); };
+  try { await fn(); } finally { console.error = orig; }
+  return lines;
+}
+
+test('283-2: 심화 프롬프트의 글자 수 안내는 260자 안팎(검증 한도 350자와 간격 약 35%), 한도 350은 그대로', async t => {
+  const s = await setup(); t.after(() => s.t.close());
+  const w = await deepWorld(s);
+  await s.call('POST', `/api/cmap/concepts/${w.c.id}/deepen`, {});
+  const sys = s.anthropic.calls[0].system;
+  assert.ok(sys.includes('deepen 260자 안팎') && !sys.includes('300자 이내'));
+  const AI = require('../lib/cmap_ai');
+  assert.equal(AI.DEEPEN_LIMIT, 350);
+});
+
+test('283-2: 코드 블록이 없어도 앞뒤에 설명 문장이 붙은 JSON 은 첫 JSON 객체만 꺼내 파싱한다(심화·일반 설명 모두), 검증은 그대로 적용된다', async t => {
+  const s = await setup(); t.after(() => s.t.close());
+  const w = await deepWorld(s);
+  const wrap = o => '다음은 요청하신 내용입니다.\n' + JSON.stringify(o) + '\n도움이 되었길 바랍니다. {참고}';
+  s.anthropic.handler = () => wrap({ deepen: '앞뒤 문장이 붙은 응답의 {중괄호} 포함 심화 설명' });
+  const r = await s.call('POST', `/api/cmap/concepts/${w.c.id}/deepen`, {});
+  assert.equal(r.status, 200, JSON.stringify(r.body)); assert.deepEqual(exOf(r.body.concept).deepen, ['앞뒤 문장이 붙은 응답의 {중괄호} 포함 심화 설명']);
+  s.anthropic.handler = () => '```json\n' + JSON.stringify({ deepen: '코드 블록 응답' }) + '\n```';
+  assert.equal((await s.call('POST', `/api/cmap/concepts/${w.c.id}/deepen`, {})).status, 200, '코드 블록은 그대로 지원');
+  const top = await s.topic('과학');
+  s.anthropic.handler = () => wrap(TWO);
+  const e = await s.call('POST', `/api/cmap/topics/${top.id}/explain`, { term: '가속도' });
+  assert.equal(e.status, 201, JSON.stringify(e.body)); assert.equal(exOf(e.body.concept).example, TWO.example);
+  // 검증은 약화되지 않는다: 앞뒤 문장이 있어도 350자 초과·필수 키 없음은 502
+  s.anthropic.handler = () => wrap({ deepen: '가'.repeat(351) });
+  assert.equal((await s.call('POST', `/api/cmap/concepts/${w.c.id}/deepen`, {})).status, 502);
+  s.anthropic.handler = () => wrap({ definition: '정의만' });
+  assert.equal((await s.call('POST', `/api/cmap/topics/${top.id}/explain`, { term: '속도' })).status, 502);
+  s.anthropic.handler = () => '{"deepen": 깨진 json';
+  assert.equal((await s.call('POST', `/api/cmap/concepts/${w.c.id}/deepen`, {})).status, 502);
+  s.anthropic.handler = () => '설명만 있고 JSON 은 없음';
+  assert.equal((await s.call('POST', `/api/cmap/concepts/${w.c.id}/deepen`, {})).status, 502);
+});
+
+test('283-2: 실패 사유 로그 — API 예외 / JSON 파싱 실패 / 검증 실패(too_long·empty·bad_shape)를 사유 코드와 글자 수(숫자)로 구분해 남기고, AI 출력 원문은 로그에 없다(심화·일반 모두, 응답 문구는 그대로)', async t => {
+  const s = await setup(); t.after(() => s.t.close());
+  const w = await deepWorld(s);
+  const top = await s.topic('과학');
+  const SECRET = '비밀원문마커XYZ';
+  const run = async (handler, call) => { s.anthropic.handler = handler; let r; const lines = await withErrLog(async () => { r = await call(); }); return { r, text: lines.join('\n') }; };
+  const deepen = () => s.call('POST', `/api/cmap/concepts/${w.c.id}/deepen`, {});
+  const explain = () => s.call('POST', `/api/cmap/topics/${top.id}/explain`, { term: '가속도' });
+  let x = await run(() => { throw new Error('down'); }, deepen);
+  assert.equal(x.r.status, 502); assert.match(x.r.body.error, /설명을 가져오지 못했습니다\. 잠시 후 다시 시도해주세요\./); assert.match(x.text, /reason=api_error/);
+  x = await run(() => '이것은 JSON 이 아닙니다 ' + SECRET, deepen);
+  assert.match(x.text, /reason=bad_json chars=\d+/); assert.ok(!x.text.includes(SECRET));
+  x = await run(() => JSON.stringify({ deepen: SECRET.repeat(60) }), deepen);              // 412자
+  assert.match(x.text, /cmap deepen ai fail: reason=too_long field=deepen chars=\d+/); assert.ok(!x.text.includes(SECRET));
+  assert.equal(Number(x.text.match(/chars=(\d+)/)[1]), SECRET.length * 60);
+  x = await run(() => JSON.stringify({ deepen: '   ' }), deepen);
+  assert.match(x.text, /reason=empty field=deepen chars=0/);
+  x = await run(() => JSON.stringify({ text: SECRET }), deepen);
+  assert.match(x.text, /reason=bad_shape/); assert.ok(!x.text.includes(SECRET));
+  x = await run(() => JSON.stringify({ definition: SECRET.repeat(40), example: '예' }), explain);   // 일반 설명: 정의 300자 초과
+  assert.equal(x.r.status, 502); assert.match(x.text, /cmap explain ai fail: reason=too_long field=definition chars=\d+/); assert.ok(!x.text.includes(SECRET));
+  x = await run(() => JSON.stringify({ definition: '정의' }), explain);
+  assert.match(x.text, /reason=bad_shape field=example/);
+  x = await run(() => JSON.stringify({ definition: '정의', example: ' ' }), explain);
+  assert.match(x.text, /reason=empty field=example chars=0/);
+  x = await run(() => '[1,2]', explain);
+  assert.match(x.text, /reason=bad_shape/);
+});

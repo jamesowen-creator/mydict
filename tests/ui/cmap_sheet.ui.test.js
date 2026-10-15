@@ -41,7 +41,8 @@ async function world(page, { wide = false } = {}) {
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000, '지도 화면');
   return { sci, ids, map };
 }
-const openSheet = async page => { await page.click('#map-open'); await page.waitFor("document.getElementById('map-sheet').open", 4000, '지도 시트'); };
+// 283-2: [만들기] 첫 화면의 주 버튼(#map-open)은 개념을 2개 이상 고르기 전에는 비활성이므로, 빈 지도에서 시트를 바로 열 때는 CmapMap.openSheet() 를 쓴다
+const openSheet = async page => { await page.eval("(() => { const b = document.getElementById('map-open'); if (b && !b.disabled) b.click(); else window.CmapMap.openSheet(); })()"); await page.waitFor("document.getElementById('map-sheet').open", 4000, '지도 시트'); };
 const isOpen = page => page.eval("document.getElementById('map-sheet').open");
 const closed = page => page.waitFor("!document.getElementById('map-sheet').open", 4000, '지도 시트 닫힘');
 const view = page => page.eval('window.CmapMap._state().view');
@@ -234,7 +235,7 @@ test('시트를 닫을 때: 연결용 선택은 초기화되고, 배치 최적�
 test('열었다 닫은 뒤 페이지 상태: 한 줄 상태(개념·연결·저장 상태)가 갱신되고 시트 밖 조작이 정상이다', { skip: SKIP }, async t => {
   const { page } = await open(t);
   await world(page);
-  assert.equal(await page.eval("document.getElementById('map-meta').textContent"), '개념 4개 · 연결 2개 · 저장됨');
+  assert.equal(await page.eval("document.getElementById('map-meta').textContent"), '저장됨 · 개념 4개 · 연결 2개');
   await openSheet(page);
   await page.click('#map-pick-toggle');
   await page.waitFor("document.querySelectorAll('#map-pick-list .pick-row').length === 4", 4000);
@@ -244,7 +245,7 @@ test('열었다 닫은 뒤 페이지 상태: 한 줄 상태(개념·연결·저�
   await page.waitFor("!document.getElementById('confirm-dlg').open", 4000);
   await page.click('#map-sheet-close'); await closed(page);
   const meta = await page.eval("document.getElementById('map-meta').textContent");
-  assert.match(meta, /^개념 3개 · 연결 [01]개 · 저장 후 변경됨$/);
+  assert.match(meta, /^저장 후 변경됨 · 개념 3개 · 연결 [01]개$/);
   await tabIn(page, 'narr'); await page.waitFor("document.getElementById('map-view').classList.contains('narr-mode')", 4000);
   assert.equal(await page.hasHorizontalScroll(), false);
 });
