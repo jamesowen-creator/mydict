@@ -14,6 +14,7 @@
 <style>
   /* 작업270-1·271-1: 개념 지도(개발 중). 옛 개념학습 화면과 별도 화면.
      색·크기·모서리는 /css/common/tokens.css 의 변수만 쓴다(직접 hex 없음, 글자 크기 11·12·13·14·15·16·18·22, 모서리 10·16·50%). */
+  :root { --navbar-h: 78px; }   /* 280-1: 하단 내비 높이(음성 학습·사전·개념학습과 같은 값) */
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html { -webkit-text-size-adjust: 100%; }
   body {
@@ -26,6 +27,7 @@
     font-size: var(--body-font-size);
     max-width: var(--content-max);
     margin: 0 auto;
+    padding-bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom) + 16px);   /* 280-1: 하단 내비에 가려지지 않게 */
   }
   button, input, textarea, select { font-family: inherit; font-size: inherit; color: inherit; }
   textarea { resize: none; overflow-y: hidden; }   /* 275-2: 칸 안 스크롤·크기 조절 손잡이 없음. 높이는 내용에 맞춰 늘어남(autoGrow) */
@@ -51,17 +53,39 @@
   .msg { min-height: 0; margin-top: 8px; font-size: 14px; color: var(--color-danger-ink); }
   .msg:empty { display: none; }
 
-  /* 주제 트리 */
-  #tree, #tree ul { list-style: none; }
-  .t-row { display: flex; align-items: center; min-height: var(--ctl-min-h); border-bottom: 1px solid var(--color-line); }
-  .t-toggle, .t-spacer { flex: none; width: 36px; height: var(--ctl-min-h); display: inline-flex; align-items: center; justify-content: center; background: none; border: none; color: var(--color-text-sub); }
-  .t-toggle svg { transition: transform 0.15s; }
-  .t-toggle[aria-expanded=true] svg { transform: rotate(90deg); }
-  .t-node { flex: 1; min-width: 0; min-height: var(--ctl-min-h); display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px; background: none; border: none; text-align: left; font-weight: 500; }
+  /* 280-1: 랜딩의 주제 목록(최신순, 한 줄 한 주제) */
+  #topic-list { list-style: none; }
+  .t-item { border-bottom: 1px solid var(--color-line); }
+  .t-node { width: 100%; min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; background: none; border: none; text-align: left; font-weight: 500; }
   .t-node .t-title { min-width: 0; overflow-wrap: anywhere; }
   .t-node .t-count { flex: none; font-size: 13px; color: var(--color-text-sub); font-weight: 400; }
-  .t-node[aria-current=true] { font-weight: 800; color: var(--color-accent-ink); background: var(--color-surface-2); border-radius: var(--radius-ctl); }
+  .t-node[aria-current=true] { font-weight: 800; color: var(--color-accent-ink); }
   #topic-actions { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 0 14px; }
+  #path-line { padding: 12px 0 0; font-size: 14px; font-weight: 700; color: var(--color-accent-ink); overflow-wrap: anywhere; }
+  .land-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--ctl-min-h); }
+  .add-chain { margin-top: 12px; font-size: 14px; color: var(--color-text-sub); overflow-wrap: anywhere; }
+  .nosel { padding: 32px 0; text-align: center; }
+  .nosel p { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+  .qcard { padding: 16px 0; border-bottom: 1px solid var(--color-line); }
+  .qcard:last-child { border-bottom: none; }
+  .qcard .hint { margin-top: 4px; }
+  .qcard .narr-actions { margin-top: 8px; }
+  .wrong-sec { padding: 16px 0 8px; border-bottom: 1px solid var(--color-line); }
+  .wrong-sec:last-child { border-bottom: none; }
+  .wrong-list { margin: 4px 0 0; padding: 0; list-style: none; }
+  .wrong-list li { min-height: var(--ctl-min-h); display: flex; align-items: center; border-bottom: 1px solid var(--color-line); font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+
+  /* 280-1: 하단 내비(4탭). 규격은 사전·개념학습의 하단 내비와 같다(높이 78px, 위 1px 선, 활성 = 위 3px 선 + 강조 글자, 아이콘 없음) */
+  .bottom-nav { position: fixed; left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--content-max); bottom: 0; z-index: 100;
+    min-height: var(--navbar-h); display: flex; align-items: center; padding: 0 16px max(8px, env(safe-area-inset-bottom));
+    background: var(--color-surface); border-top: 1px solid var(--color-line); box-shadow: 0 -2px 8px rgba(226, 88, 59, 0.07); }
+  .bottom-nav-tabs { display: flex; flex: 1; }
+  .bottom-nav-tab { display: flex; align-items: baseline; justify-content: center; flex: 1 1 0; min-width: 0; min-height: var(--ctl-min-h); padding: 10px 0; background: none; border: none; border-top: 3px solid transparent;
+    font-size: 15px; font-weight: 500; line-height: normal; color: var(--color-text-sub); white-space: nowrap; }
+  .bottom-nav-tab.active { color: var(--color-accent-ink); border-top-color: var(--color-accent); }
+  .bottom-nav-tab:focus-visible { outline: 2px solid var(--color-text); outline-offset: -2px; }
+  @media (max-width: 460px) { .bottom-nav-tab { font-size: 13px; } }
+  body.kb-open .bottom-nav { display: none; }   /* 키보드가 열려 있는 동안 숨김 */
 
   /* 개념 목록 */
   #concept-list { list-style: none; }
@@ -137,10 +161,12 @@
   .map-popup .p-text { margin-top: 4px; font-size: 14px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .map-popup .p-note { margin-top: 4px; font-size: 12px; color: var(--color-text-sub); }
   #narr-panel { display: none; padding-top: 12px; padding-bottom: 32px; }
-  #review-panel, #quiz-panel { display: none; }
-  #review-panel { padding-top: 12px; padding-bottom: 32px; }
-  #map-view.narr-mode #narr-panel, #map-view.review-mode #review-panel { display: block; }
+  #quiz-panel { display: none; }
+  #review-panel { padding-top: 4px; padding-bottom: 32px; }
+  #map-view.narr-mode #narr-panel { display: block; }
   #map-view.side-mode .map-only { display: none; }
+  .narr-only { display: none; }
+  #map-view.narr-mode .narr-only { display: flex; }
   .quiz-answers { margin: 8px 0 0; padding: 0; list-style: none; }
   .quiz-answers li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--ctl-min-h); border-bottom: 1px solid var(--color-line); font-size: 14px; overflow-wrap: anywhere; }
   .quiz-scores { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 8px; border-top: 1px solid var(--color-line); border-bottom: 1px solid var(--color-line); }
@@ -254,28 +280,32 @@
 </div>
 
 <div id="app" hidden>
- <div id="main-view">
-  <div class="screen-bar">
-    <button id="back-btn" class="screen-bar-back" type="button" aria-label="홈으로"><svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
-    <h1 class="screen-bar-title">개념 지도</h1>
-  </div>
-  <div class="wrap">
-    <section class="sec" id="topics-sec" aria-label="주제">
-      <div class="sec-head">
-        <h2 class="sec-title">주제</h2>
-        <button id="add-root-btn" class="btn text" type="button">주제 추가</button>
-      </div>
-      <p id="topics-msg" class="msg" role="alert"></p>
-      <ul id="tree" role="tree" aria-label="주제 목록"></ul>
-      <p id="tree-empty" class="hint" hidden>아직 주제가 없습니다. 첫 주제를 만들어 보세요.</p>
-      <div id="topic-actions" hidden>
-        <button id="act-add-child" class="btn text" type="button">하위 주제 추가</button>
-        <button id="act-rename" class="btn text" type="button">이름 변경</button>
-        <button id="act-move" class="btn text" type="button">이동</button>
-        <button id="act-map" class="btn text" type="button">지도 보기</button>
-        <button id="act-delete" class="btn text" type="button">삭제</button>
-      </div>
-    </section>
+ <div class="screen-bar">
+   <button id="back-btn" class="screen-bar-back" type="button" aria-label="뒤로"><svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+   <h1 class="screen-bar-title">개념 지도</h1>
+ </div>
+ <div class="wrap">
+  <p id="path-line" hidden></p>
+
+  <!-- 280-1: 랜딩 — 주제 추가 + 주제 목록(최신순) -->
+  <section id="landing-view" class="sec" aria-label="주제">
+    <div class="land-head">
+      <h2 class="sec-title">주제</h2>
+      <button id="add-root-btn" class="btn" type="button">주제 추가</button>
+    </div>
+    <p id="topics-msg" class="msg" role="alert"></p>
+    <ul id="topic-list" aria-label="주제 목록"></ul>
+    <p id="tree-empty" class="hint" hidden>아직 주제가 없습니다. 첫 주제를 만들어 보세요.</p>
+  </section>
+
+  <!-- 주제 안 화면: 개념 입력·검색·저장 개념 목록 -->
+  <div id="topic-view" hidden>
+    <div id="topic-actions" hidden>
+      <button id="act-add-child" class="btn text" type="button">하위 주제 추가</button>
+      <button id="act-rename" class="btn text" type="button">이름 변경</button>
+      <button id="act-move" class="btn text" type="button">이동</button>
+      <button id="act-delete" class="btn text" type="button">삭제</button>
+    </div>
     <section class="sec" id="concepts-sec" aria-label="개념" hidden>
       <div class="sec-head">
         <h2 class="sec-title" id="concepts-title">개념</h2>
@@ -294,25 +324,57 @@
       <p id="concepts-empty" class="hint" hidden>이 주제에는 아직 개념이 없습니다.</p>
     </section>
   </div>
+
+  <!-- 주제를 고르지 않고 퀴즈·지도 만들기·오답노트를 눌렀을 때 -->
+  <div id="nosel-view" class="nosel" hidden>
+    <p>주제를 먼저 선택해 주세요</p>
+    <button id="nosel-go" class="btn" type="button">주제 목록으로</button>
+  </div>
+
+  <!-- 퀴즈 · 지도 만들기 · 오답노트(최상위 주제 하나의 지도 위에서 동작). 모드 클래스(narr-mode/review-mode/quiz-mode)는 mapView.js 가 붙인다 -->
+  <p id="map-loading" class="hint" role="status" hidden>불러오는 중…</p>
+  <div id="map-view" hidden>
+    <p id="map-load-msg" class="msg" role="alert"></p>
+
+    <div id="quiz-view" hidden>
+      <div id="review-panel" aria-live="polite"></div>
+      <div id="answer-panel" aria-live="polite" hidden></div>
+    </div>
+
+    <div id="mapmk-view" hidden>
+      <div class="map-tabs" role="tablist" aria-label="지도 만들기"><button id="tab-map" class="map-tab sel" type="button" role="tab" aria-selected="true">만들기</button><button id="tab-narr" class="map-tab" type="button" role="tab" aria-selected="false">해설</button></div>
+      <p id="map-scope" class="hint"></p>
+      <div id="map-page" class="map-only">
+        <div class="map-open-row"><button id="map-open" class="btn" type="button">지도 열기</button><span id="map-meta" class="hint"></span></div>
+        <p id="map-page-note" class="hint" role="status"></p>
+      </div>
+      <div class="map-open-row narr-only"><button id="narr-open-map" class="btn text" type="button">지도 열기</button></div>
+      <div id="narr-panel" aria-live="polite"></div>
+    </div>
+
+    <div id="wrong-view" hidden>
+      <section class="wrong-sec" aria-label="모르는 개념 표시">
+        <p class="sec-label" id="wrong-marked-label">모르는 개념 표시</p>
+        <ul id="wrong-marked" class="wrong-list"></ul>
+        <p id="wrong-marked-empty" class="hint" hidden>표시한 개념이 없어요. 해설 탭의 지도에서 모르는 개념을 눌러 표시해 보세요.</p>
+        <div class="map-open-row"><button id="wrong-open-map" class="btn text" type="button">지도에서 보기</button></div>
+      </section>
+      <section class="wrong-sec" aria-label="말로 설명하기 최근 부족">
+        <div id="wrong-recent"></div>
+        <p id="wrong-recent-empty" class="hint" hidden>최근 부족하다고 평가된 개념이 없어요.</p>
+      </section>
+    </div>
+  </div>
  </div>
 
- <!-- 작업273-2: 지도 화면(최상위 주제 하나의 지도) -->
- <div id="map-view" hidden>
-  <div class="screen-bar">
-    <button id="map-back" class="screen-bar-back" type="button" aria-label="주제 화면으로"><svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
-    <h1 id="map-title" class="screen-bar-title"></h1>
-  </div>
-  <div class="wrap">
-    <div class="map-tabs" role="tablist" aria-label="지도 보기"><button id="tab-map" class="map-tab sel" type="button" role="tab" aria-selected="true">지도</button><button id="tab-narr" class="map-tab" type="button" role="tab" aria-selected="false">해설</button><button id="tab-review" class="map-tab" type="button" role="tab" aria-selected="false">복습</button></div>
-    <div id="map-page" class="map-only">
-      <div class="map-open-row"><button id="map-open" class="btn" type="button">지도 열기</button><span id="map-meta" class="hint"></span></div>
-      <p id="map-page-note" class="hint" role="status"></p>
-    </div>
-    <div id="narr-panel" aria-live="polite"></div>
-    <div id="review-panel" aria-live="polite"></div>
-    <div id="answer-panel" aria-live="polite" hidden></div>
-  </div>
- </div>
+ <nav id="cmap-nav" class="bottom-nav" aria-label="개념 지도 메뉴">
+   <div class="bottom-nav-tabs">
+     <button type="button" class="bottom-nav-tab" id="nav-topic" data-tab="topic">주제</button>
+     <button type="button" class="bottom-nav-tab" id="nav-quiz" data-tab="quiz">퀴즈</button>
+     <button type="button" class="bottom-nav-tab" id="nav-map" data-tab="map">지도 만들기</button>
+     <button type="button" class="bottom-nav-tab" id="nav-wrong" data-tab="wrong">오답노트</button>
+   </div>
+ </nav>
 </div>
 
 <dialog id="map-sheet" class="map-sheet" aria-labelledby="map-sheet-title">
@@ -346,6 +408,17 @@
     <div class="field"><label id="name-label" for="name-input"></label><input id="name-input" type="text" maxlength="80" autocomplete="off"></div>
     <p id="name-msg" class="msg" role="alert"></p>
     <div class="btn-row"><button id="name-cancel" class="btn text" type="button">취소</button><button id="name-ok" class="btn" type="submit">저장</button></div>
+  </form>
+</dialog>
+
+<dialog id="add-dlg" aria-labelledby="add-heading">
+  <form id="add-form" novalidate>
+    <h3 id="add-heading">주제 추가</h3>
+    <p id="add-chain" class="add-chain" hidden></p>
+    <div class="field"><label id="add-label" for="add-input">상위 주제</label><input id="add-input" type="text" maxlength="80" autocomplete="off"></div>
+    <p id="add-hint" class="hint">하위 주제는 선택이에요. 나중에도 추가할 수 있어요.</p>
+    <p id="add-msg" class="msg" role="alert"></p>
+    <div class="btn-row"><button id="add-cancel" class="btn text" type="button">취소</button><button id="add-sub" class="btn text" type="button">하위 주제 추가</button><button id="add-done" class="btn" type="submit">완료</button></div>
   </form>
 </dialog>
 
@@ -458,10 +531,9 @@ function h(tag, attrs, ...kids) {
   for (const kid of kids.flat()) if (kid !== null && kid !== undefined) e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
   return e;
 }
-const CHEVRON = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('class', 'ic'); s.setAttribute('viewBox', '0 0 24 24'); const p = document.createElementNS('http://www.w3.org/2000/svg', 'polyline'); p.setAttribute('points', '9 18 15 12 9 6'); s.append(p); return s; };
 
 // ── 상태 ──
-const S = { topics: [], maxDepth: 5, selectedId: null, collapsed: new Set(), concepts: [], explain: null, highlightId: null };
+const S = { topics: [], maxDepth: 5, selectedId: null, concepts: [], explain: null, highlightId: null, view: 'landing' };   // view: landing | topic | quiz | map | wrong
 const byId = id => S.topics.find(t => t.id === id) || null;
 const childrenOf = pid => S.topics.filter(t => (t.parent_id === undefined ? null : t.parent_id) === pid).sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
 function descendantIds(id) { const out = []; const walk = p => { for (const c of childrenOf(p)) { out.push(c.id); walk(c.id); } }; walk(id); return out; }
@@ -505,53 +577,32 @@ async function loadConcepts() {
   S.concepts = r.body.concepts || [];
   renderConcepts();
 }
-function expandAncestors(id) {
-  let cur = byId(id);
-  while (cur && cur.parent_id !== null && cur.parent_id !== undefined) { S.collapsed.delete(cur.parent_id); cur = byId(cur.parent_id); }
-}
 async function refresh(selectId) {
   await loadTopics();
   if (selectId !== undefined) S.selectedId = selectId;
   if (S.selectedId !== null && !byId(S.selectedId)) S.selectedId = null;
-  if (S.selectedId !== null) expandAncestors(S.selectedId);
-  renderTree();
+  renderTopics();
   renderActions();
   await loadConcepts();
+  if (S.view !== 'landing' && S.selectedId === null) await Nav.toLanding();   // 선택한 주제가 사라졌으면(삭제 등) 주제 목록으로
 }
 
-// ── 주제 트리 ──
-function renderTree() {
-  const root = $('tree');
-  root.textContent = '';
-  const build = (pid, depth) => {
-    const items = childrenOf(pid);
-    const ul = h('ul', pid === null ? {} : { role: 'group' });
-    for (const t of items) {
-      const kids = childrenOf(t.id);
-      const open = !S.collapsed.has(t.id);
-      const li = h('li', { role: 'treeitem', 'aria-expanded': kids.length ? String(open) : null, 'aria-selected': String(t.id === S.selectedId), 'data-id': t.id });
-      const row = h('div', { class: 't-row', style: 'padding-left:' + ((depth - 1) * 16) + 'px' },
-        kids.length
-          ? h('button', { class: 't-toggle', type: 'button', 'aria-expanded': String(open), 'aria-label': t.title + (open ? ' 접기' : ' 펼치기'), 'data-t': 'toggle', 'data-id': t.id,
-              onclick: () => { if (S.collapsed.has(t.id)) S.collapsed.delete(t.id); else S.collapsed.add(t.id); renderTree(); } }, CHEVRON())
-          : h('span', { class: 't-spacer' }),
-        h('button', { class: 't-node', type: 'button', 'aria-current': t.id === S.selectedId ? 'true' : null, 'data-t': 'node', 'data-id': t.id, onclick: () => selectTopic(t.id) },
-          h('span', { class: 't-title', text: t.title }),
-          h('span', { class: 't-count', text: '개념 ' + t.concept_count })));
-      li.append(row);
-      if (kids.length && open) li.append(build(t.id, depth + 1));
-      ul.append(li);
-    }
-    return ul;
-  };
-  const top = build(null, 1);
-  while (top.firstChild) root.append(top.firstChild);
+// ── 랜딩: 주제 목록(최신순). 항목마다 경로(상위 › 하위)와 개념 수 ──
+function renderTopics() {
+  const ul = $('topic-list');
+  ul.textContent = '';
+  for (const t of S.topics.slice().sort((a, b) => b.id - a.id)) {
+    ul.append(h('li', { class: 't-item', 'data-id': t.id },
+      h('button', { class: 't-node', type: 'button', 'aria-current': t.id === S.selectedId ? 'true' : null, 'data-t': 'node', 'data-id': t.id, onclick: () => Nav.openTopic(t.id) },
+        h('span', { class: 't-title', text: pathOf(t) }),
+        h('span', { class: 't-count', text: '개념 ' + t.concept_count }))));
+  }
   $('tree-empty').hidden = S.topics.length > 0;
 }
 function selectTopic(id) {
   if (id !== S.selectedId) { explainSeq++; if (explainCtrl) explainCtrl.abort(); explainCtrl = null; S.explain = null; S.highlightId = null; renderExplain(); }
   S.selectedId = id;
-  renderTree();
+  renderTopics();
   renderActions();
   loadConcepts();
 }
@@ -559,6 +610,7 @@ function renderActions() {
   const t = S.selectedId === null ? null : byId(S.selectedId);
   $('topic-actions').hidden = !t;
   $('concepts-sec').hidden = !t;
+  Nav.renderPath();
   if (!t) return;
   $('act-add-child').disabled = t.depth >= S.maxDepth;
   $('act-add-child').title = t.depth >= S.maxDepth ? '주제는 최대 ' + S.maxDepth + '단계까지 만들 수 있습니다.' : '';
@@ -591,10 +643,60 @@ $('name-form').addEventListener('submit', async ev => {
   closeDlg($('name-dlg'));
   await refresh(r.body.topic ? r.body.topic.id : undefined);
 });
-$('add-root-btn').addEventListener('click', () => openNameDialog({
-  heading: '주제 추가', label: '주제 이름', value: '', okText: '추가',
-  submit: v => api('POST', '/api/cmap/topics', { title: v }),
-}));
+// ── 주제 추가 흐름(280-1): 상위 주제 → (선택) 하위 주제를 [하위 주제 추가]로 반복 → [완료]. 하위 주제는 앞 주제의 아래로 이어지고, 완료하면 가장 마지막(최하위) 주제 안으로 들어간다 ──
+const AddFlow = { chain: [], busy: false };
+function addRender() {
+  const last = AddFlow.chain[AddFlow.chain.length - 1];
+  $('add-chain').hidden = !last;
+  $('add-chain').textContent = last ? '만든 주제: ' + AddFlow.chain.map(t => t.title).join(' › ') : '';   // 방금 만든 주제는 아직 S.topics 에 없으므로 만든 순서대로 이어 붙인다
+  $('add-heading').textContent = last ? '하위 주제 추가' : '주제 추가';
+  $('add-label').textContent = last ? '‘' + last.title + '’ 아래에 만들 하위 주제 (선택)' : '상위 주제';
+  $('add-cancel').hidden = !!last;           // 이미 만든 주제가 있으면 [완료]로만 끝낸다
+  const full = !!last && last.depth >= S.maxDepth;
+  $('add-sub').disabled = full;
+  $('add-hint').textContent = full ? '주제는 최대 ' + S.maxDepth + '단계까지 만들 수 있어요.' : '하위 주제는 선택이에요. 나중에도 추가할 수 있어요.';
+  $('add-input').value = '';
+  $('add-msg').textContent = '';
+}
+function addOpen() {
+  AddFlow.chain = [];
+  addRender();
+  openDlg($('add-dlg'));
+  $('add-input').focus();
+}
+// 입력한 이름으로 주제 하나를 만든다(첫 입력은 최상위, 그 뒤는 앞 주제의 하위). 실패하면 대화상자 안에 문구를 보이고 false
+async function addCreate(name) {
+  const last = AddFlow.chain[AddFlow.chain.length - 1];
+  setBusy($('add-sub'), true); setBusy($('add-done'), true);
+  const r = await api('POST', '/api/cmap/topics', last ? { title: name, parent_id: last.id } : { title: name });
+  setBusy($('add-done'), false); setBusy($('add-sub'), !!last && last.depth >= S.maxDepth);
+  if (!okStatus(r)) { $('add-msg').textContent = errText(r); return false; }   // 중복(409) 등은 대화상자 안에 보여 주고 열어 둔다
+  AddFlow.chain.push(r.body.topic);
+  return true;
+}
+async function addFinish() {
+  closeDlg($('add-dlg'));
+  const last = AddFlow.chain[AddFlow.chain.length - 1];
+  AddFlow.chain = [];
+  if (!last) return;
+  await refresh(last.id);
+  await Nav.enterTopic(last.id);
+}
+$('add-root-btn').addEventListener('click', addOpen);
+$('add-cancel').addEventListener('click', () => closeDlg($('add-dlg')));
+$('add-sub').addEventListener('click', async () => {
+  const v = $('add-input').value.trim();
+  if (!v) { $('add-msg').textContent = AddFlow.chain.length ? '하위 주제 이름을 입력해 주세요.' : '주제 이름을 입력해 주세요.'; return; }
+  if (await addCreate(v)) { addRender(); $('add-input').focus(); }
+});
+$('add-form').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const v = $('add-input').value.trim();
+  if (!v && !AddFlow.chain.length) { $('add-msg').textContent = '주제 이름을 입력해 주세요.'; return; }
+  if (v && !(await addCreate(v))) return;       // 입력해 둔 이름이 있으면 그것까지 만든 뒤 끝낸다
+  await addFinish();
+});
+$('add-dlg').addEventListener('cancel', ev => { if (AddFlow.chain.length) { ev.preventDefault(); addFinish(); } });   // ESC: 이미 만든 주제가 있으면 완료로 처리
 $('act-add-child').addEventListener('click', () => {
   const t = byId(S.selectedId);
   if (!t) return;
@@ -926,15 +1028,137 @@ function deleteConcept(c) {
   });
 }
 
-// ── 작업273-2: 지도 보기 ──
-$('act-map').addEventListener('click', () => {
-  let root = byId(S.selectedId);
-  if (!root) return;
-  while (root.parent_id !== null && root.parent_id !== undefined) root = byId(root.parent_id);
-  window.CmapMap.open(root.id);
-});
-$('map-back').addEventListener('click', () => { window.CmapMap.close(); refresh(); });
 $('map-pick-toggle').addEventListener('click', () => window.CmapMap.togglePanel());
+
+// ── 화면 전환(280-1): 랜딩 / 주제 안 / 퀴즈 / 지도 만들기 / 오답노트 ──
+// 기록: 주제 안으로 들어가기는 pushState, 탭 전환은 replaceState. state = { metisCmapView, d(랜딩에서 쌓은 기록 칸 수) }
+const Nav = (() => {
+  const TABS = { landing: 'topic', topic: 'topic', quiz: 'quiz', map: 'map', wrong: 'wrong' };
+  const MAPVIEWS = { quiz: 'quiz-view', map: 'mapmk-view', wrong: 'wrong-view' };
+  let mapRoot = null, seq = 0, mkMode = 'map';
+  const rootOf = t => { let r = t; while (r && r.parent_id !== null && r.parent_id !== undefined) r = byId(r.parent_id); return r; };
+  const isMapView = v => !!MAPVIEWS[v];
+  const depth = () => { const st = history.state; return st && typeof st.d === 'number' ? st.d : 0; };
+  function record(how, v, d) {
+    try {
+      const st = { metisCmapView: v, d };
+      if (how === 'push') history.pushState(st, ''); else history.replaceState(st, '');
+    } catch (e) { /* 무시 */ }
+  }
+
+  function renderPath() {
+    const t = S.selectedId === null ? null : byId(S.selectedId);
+    const el = $('path-line');
+    el.hidden = S.view === 'landing' || !t;
+    el.textContent = t ? pathOf(t) : '';
+  }
+  function renderNav() {
+    const act = TABS[S.view];
+    for (const b of document.querySelectorAll('#cmap-nav [data-tab]')) {
+      const on = b.dataset.tab === act;
+      b.classList.toggle('active', on);
+      if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    }
+  }
+  async function ensureMap() {
+    const root = rootOf(byId(S.selectedId));
+    if (!root || mapRoot === root.id) return;
+    $('map-load-msg').textContent = '';
+    mapRoot = root.id;
+    $('map-scope').textContent = '‘' + root.title + '’ 주제 전체의 지도예요.';
+    const ok = await window.CmapMap.open(root.id);
+    if (!ok) { mapRoot = null; $('map-load-msg').textContent = '지도를 불러오지 못했습니다.'; }
+  }
+  // 화면을 바꾼다(기록은 건드리지 않음). 주제를 고르지 않은 채 퀴즈·지도 만들기·오답노트면 안내 화면
+  async function show(v) {
+    const my = ++seq;
+    const nosel = isMapView(v) && S.selectedId === null;
+    const prev = S.view;
+    S.view = v;
+    if (prev === 'quiz' && v !== 'quiz' && window.CmapAnswer) window.CmapAnswer.stop();   // 퀴즈 화면을 떠나면 말로 설명하기 진행은 끝난다
+    if ((!isMapView(v) || nosel) && mapRoot !== null) { mapRoot = null; window.CmapMap.close(); }   // 주제 쪽으로 돌아가면 지도를 닫는다(다음에 열 때 새 데이터로)
+    $('landing-view').hidden = v !== 'landing';
+    $('topic-view').hidden = v !== 'topic';
+    $('nosel-view').hidden = !nosel;
+    const loading = isMapView(v) && !nosel;
+    $('map-view').hidden = true;                    // 지도 데이터를 읽은 뒤에 보인다(그 사이에는 "불러오는 중…")
+    $('map-loading').hidden = !loading;
+    for (const [k, id] of Object.entries(MAPVIEWS)) $(id).hidden = k !== v;
+    renderPath(); renderNav();
+    if (v === 'landing') renderTopics();
+    if (v === 'topic') { renderActions(); growAll($('topic-view')); }
+    window.scrollTo(0, 0);
+    if (!isMapView(v) || nosel) return;
+    await ensureMap();
+    if (my !== seq) return;
+    $('map-loading').hidden = true;
+    if (mapRoot === null) { $('map-view').hidden = false; $('quiz-view').hidden = $('mapmk-view').hidden = $('wrong-view').hidden = true; return; }   // 불러오기 실패: 오류 문구만
+    window.CmapMap.setMode(v === 'map' ? mkMode : 'review');
+    if (v === 'wrong') window.CmapReview.renderWrong();
+    $('map-view').hidden = false;
+  }
+  // 이동하면 잃는 것이 있을 때(녹음 중·평가 중·퀴즈 진행 중) 안내 문구, 아니면 null
+  function leaveReason() {
+    return window.CmapAnswer.busyText() || (window.CmapReview.quizActive() ? '풀던 퀴즈가 끝나요. 이동할까요?' : null);
+  }
+  function guarded(fn) {
+    const why = leaveReason();
+    if (!why) { fn(); return; }
+    openConfirm({ heading: '이동할까요?', text: why, okText: '이동', action: async () => { fn(); return {}; } });
+  }
+  // 하단 탭(replaceState). 주제 탭은 랜딩에서 쌓은 기록 칸만큼 되돌아가 랜딩으로 돌아간다
+  function goTab(tab) {
+    guarded(() => {
+      if (tab === 'topic') { toLanding(); return; }
+      record('replace', tab, depth());
+      show(tab);
+    });
+  }
+  // 랜딩으로: 랜딩에서 쌓은 기록 칸이 있으면 그만큼 되돌아가고(popstate 가 랜딩을 그린다), 없으면 지금 칸을 랜딩으로 바꾼다
+  async function toLanding() {
+    if (depth() > 0) { history.go(-depth()); return; }
+    record('replace', 'landing', 0);
+    await show('landing');
+  }
+  // 주제 안으로 들어간다(pushState)
+  async function enterTopic(id) {
+    selectTopic(id);
+    record('push', 'topic', depth() + 1);
+    await show('topic');
+  }
+  function openTopic(id) { guarded(() => { enterTopic(id); }); }
+  function back() {
+    if (S.view === 'landing') { location.href = '/'; return; }
+    guarded(() => { if (depth() > 0) history.back(); else toLanding(); });
+  }
+  function onPop() {
+    if (window.CmapMap.isSheetOpen()) return;                   // 지도 시트가 열려 있으면 시트가 알아서 닫힌다
+    const st = history.state, v = st && st.metisCmapView;
+    if (v && v !== S.view) show(v === 'topic' && S.selectedId === null ? 'landing' : v);
+  }
+  return { show, goTab, toLanding, enterTopic, openTopic, back, onPop, renderPath, record, setMk: m => { mkMode = m; } };
+})();
+window.CmapNav = { openTopic: id => Nav.enterTopic(id) };   // 해설의 [찾아보기] 등 다른 스크립트가 주제 안으로 들어갈 때
+
+for (const b of document.querySelectorAll('#cmap-nav [data-tab]')) b.addEventListener('click', () => Nav.goTab(b.dataset.tab));
+$('nosel-go').addEventListener('click', () => Nav.goTab('topic'));
+$('tab-map').addEventListener('click', () => Nav.setMk('map'));
+$('tab-narr').addEventListener('click', () => Nav.setMk('narr'));
+$('narr-open-map').addEventListener('click', () => window.CmapMap.showOnMap([]));
+$('wrong-open-map').addEventListener('click', () => window.CmapMap.showOnMap([]));
+window.addEventListener('popstate', Nav.onPop);
+
+// 키보드가 열려 있는 동안 하단 내비를 숨긴다: 글자 입력칸에 포커스가 있거나, 화면에 보이는 높이(visualViewport)가 눈에 띄게 줄었을 때
+function checkKeyboard() {
+  const ae = document.activeElement;
+  const typing = !!ae && (ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || (ae.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|reset|file)$/.test(ae.type)));
+  const vv = window.visualViewport;
+  const shrunk = !!vv && window.innerHeight - vv.height > 120;
+  document.body.classList.toggle('kb-open', typing || shrunk);
+}
+document.addEventListener('focusin', checkKeyboard);
+document.addEventListener('focusout', () => setTimeout(checkKeyboard, 0));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', checkKeyboard);
 
 // ── 시작 ──
 function applyHeaderHeight() {
@@ -942,7 +1166,7 @@ function applyHeaderHeight() {
   if (hdr) document.documentElement.style.setProperty('--hdr-h', hdr.offsetHeight + 'px');
 }
 window.addEventListener('resize', applyHeaderHeight);
-$('back-btn').addEventListener('click', () => { location.href = '/'; });
+$('back-btn').addEventListener('click', Nav.back);
 
 (async function init() {
   const allowed = await hasPermission();
@@ -950,8 +1174,9 @@ $('back-btn').addEventListener('click', () => { location.href = '/'; });
   if (!allowed) { $('access-denied').hidden = false; return; }
   $('app').hidden = false;
   applyHeaderHeight();
+  Nav.record('replace', 'landing', 0);
   await refresh();
-  if (S.topics.length && S.selectedId === null) selectTopic(childrenOf(null)[0].id);
+  await Nav.show('landing');
 })();
 </script>
 </body>

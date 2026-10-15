@@ -6,6 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startCmapServer } = require('./helpers/cmap_server');
+const { tabIn } = require('./helpers/cmap_nav');
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 let browser;
@@ -40,7 +41,7 @@ async function world(page) {
   await page.eval('refresh()');
   await page.eval(`selectTopic(${sci.id}); 0`);
   await page.waitFor("!document.getElementById('concepts-sec').hidden", 4000);
-  await page.click('#act-map');
+  await page.click('#nav-map');
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000, '지도 화면');
   return { sci, phys, c, map, e1 };
 }
@@ -58,9 +59,9 @@ const good = (w, over = {}) => ({
   ...over,
 });
 const text = (page, sel) => page.eval(`(document.querySelector(${JSON.stringify(sel)}) || {}).textContent || ''`);
-const saveMap = async page => { await page.click('#tab-map'); await openSheet(page); await page.click('#map-save'); await page.waitFor("document.getElementById('map-save-state').textContent.startsWith('저장됨')", 4000, '저장됨'); await closeSheet(page); };
+const saveMap = async page => { await tabIn(page, 'map'); await openSheet(page); await page.click('#map-save'); await page.waitFor("document.getElementById('map-save-state').textContent.startsWith('저장됨')", 4000, '저장됨'); await closeSheet(page); };
 // 274-2: 해설 목록 조회(GET)가 끝난 표시(오늘 N/10건)까지 기다린 뒤 누른다. 조회가 끝나기 전에 누르면 늦게 온 응답과 엇갈린다
-const narrTab = async page => { await page.click('#tab-narr'); await page.waitFor("document.getElementById('map-view').classList.contains('narr-mode') && !!document.getElementById('narr-daily') && (!!document.getElementById('narr-make') || !!document.getElementById('narr-summary'))", 8000, '해설 탭'); };
+const narrTab = async page => { await tabIn(page, 'narr'); await page.waitFor("document.getElementById('map-view').classList.contains('narr-mode') && !!document.getElementById('narr-daily') && (!!document.getElementById('narr-make') || !!document.getElementById('narr-summary'))", 8000, '해설 탭'); };
 
 test('저장 안 된 지도: 해설 탭에서 [해설 만들기]가 비활성이고 저장 안내가 보인다(AI 호출 없음)', { skip: SKIP }, async t => {
   const { srv, page } = await open(t);
@@ -118,7 +119,7 @@ test('단락을 누르면 그 단락의 개념이 지도에서 강조되고, 다
   assert.equal(await page.eval("document.querySelectorAll('.m-node.hl').length"), 1);
   await closeSheet(page);
   // 지도 탭으로 돌아오면 강조가 사라지고 다시 선택할 수 있다
-  await page.click('#tab-map');
+  await tabIn(page, 'map');
   assert.deepEqual(await hl(), []);
   await openSheet(page);
   assert.equal(await page.eval("document.querySelectorAll('.m-node.hl, .m-node.dim').length"), 0);
@@ -145,9 +146,9 @@ test('제안: 자동으로 개념·연결을 추가하지 않는다. [찾아보�
   assert.equal(await page.eval(`document.getElementById('pick-${w.c.vel}').checked`), false);
   await closeSheet(page);
   // 찾아보기 → 주제·개념 화면의 검색칸에 용어만 채워짐
-  await page.click('#tab-narr'); await page.waitFor("!!document.getElementById('narr-sugs')", 4000);
+  await tabIn(page, 'narr'); await page.waitFor("!!document.getElementById('narr-sugs')", 4000);
   await page.click('[data-sug="0"] [data-act]');
-  await page.waitFor("!document.getElementById('main-view').hidden && document.getElementById('explain-term').value === '운동량'", 6000, '검색칸 채움');
+  await page.waitFor("!document.getElementById('topic-view').hidden && document.getElementById('explain-term').value === '운동량'", 6000, '검색칸 채움');
   assert.deepEqual({ nodes: srv.db.nodes.length, edges: srv.db.edges.length, concepts: srv.db.concepts.length, ai: srv.anthropic.calls.length }, before, '개념·노드·연결·AI 호출 모두 그대로');
   assert.equal(await page.eval("document.getElementById('explain-card').hidden"), true, '자동 검색도 하지 않음');
 });
@@ -162,15 +163,15 @@ test('지도가 바뀌면 이전 해설을 보여 주며 "지도가 바뀌었습
   assert.equal(await page.eval("!!document.getElementById('narr-stale')"), false);
   // 지도에서 연결 문구를 바꾼다(서버 직접) → 지도 화면을 다시 열면 해설은 이전 것 + 안내
   await seed(page, 'PATCH', `/api/cmap/edges/${w.e1.id}`, { label: '문구를 고침' });
-  await page.click('#map-back'); await page.waitFor("!document.getElementById('main-view').hidden", 4000);
-  await page.click('#act-map'); await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000);
+  await page.click('#nav-topic'); await page.waitFor("!document.getElementById('landing-view').hidden", 4000);
+  await page.click('#nav-map'); await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000);
   await narrTab(page);
   await page.waitFor("!!document.getElementById('narr-stale')", 4000, '지도가 바뀌었습니다');
   assert.match(await text(page, '#narr-stale'), /지도가 바뀌었습니다/);
   assert.equal(await text(page, '#narr-summary'), '요약 1', '이전 해설을 그대로 보여 줌');
   assert.equal(await page.eval("document.getElementById('narr-make').disabled"), true);
   assert.match(await text(page, '#narr-stale'), /저장하면 해설을 다시 만들 수 있어요/);
-  await page.click('#tab-map'); await saveMap(page); await narrTab(page);
+  await tabIn(page, 'map'); await saveMap(page); await narrTab(page);
   assert.equal(await page.eval("document.getElementById('narr-make').disabled"), false);
   await page.click('#narr-make');
   await page.waitFor("document.getElementById('narr-summary') && document.getElementById('narr-summary').textContent === '요약 2' && !document.getElementById('narr-stale')", 15000, '새 해설');

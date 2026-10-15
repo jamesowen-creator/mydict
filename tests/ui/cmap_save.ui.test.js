@@ -41,7 +41,7 @@ async function world(page) {
   await page.eval('refresh()');
   await page.eval(`selectTopic(${sci.id}); 0`);
   await page.waitFor("!document.getElementById('concepts-sec').hidden", 4000);
-  await page.click('#act-map');
+  await page.click('#nav-map');
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000, '지도 화면');
   await openSheet(page);
   await page.click('#map-fit');                       // 열 때는 글자 크기 하한 때문에 넓은 지도의 오른쪽이 잘릴 수 있어, 테스트는 전체 보기로 맞춘다
@@ -139,8 +139,8 @@ test('되돌리기는 화면을 떠나면 사라지고, 적용 뒤 노드·연�
   const bar = await page.eval("!document.getElementById('map-opt-bar').hidden");
   if (bar) { await page.click('#map-opt-apply'); await page.waitFor("!document.getElementById('map-undo').hidden", 6000); }
   await closeSheet(page);
-  await page.click('#map-back'); await page.waitFor("!document.getElementById('main-view').hidden", 4000);
-  await page.click('#act-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000);
+  await page.click('#nav-topic'); await page.waitFor("!document.getElementById('landing-view').hidden", 4000);
+  await page.click('#nav-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000);
   assert.equal(await page.eval("document.getElementById('map-undo').hidden"), true);
   assert.equal(await page.eval("document.getElementById('map-opt-bar').hidden"), true);
 });

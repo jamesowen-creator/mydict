@@ -6,6 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startCmapServer } = require('./helpers/cmap_server');
+const { tabIn } = require('./helpers/cmap_nav');
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 let browser;
@@ -26,10 +27,10 @@ const seed = (page, method, url, body) => page.eval(`(async () => { const r = aw
 async function gotoMap(page, sciId) {
   await page.eval('refresh()'); await page.eval(`selectTopic(${sciId}); 0`);
   await page.waitFor("document.querySelectorAll('#concept-list > *').length >= 4", 6000, '개념 목록');
-  await page.click('#act-map');
+  await page.click('#nav-map');
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000, '지도 화면');
 }
-const backAndReopen = async (page, sciId) => { await page.click('#map-back'); await page.waitFor("!document.getElementById('main-view').hidden", 4000); await gotoMap(page, sciId); };
+const backAndReopen = async (page, sciId) => { await page.click('#nav-topic'); await page.waitFor("!document.getElementById('landing-view').hidden", 4000); await gotoMap(page, sciId); };
 // 힘(정의 있음) · 질량(설명 없음) · 마찰(옛 4항목 형태) · 에너지(정의 140자 초과)
 async function world(page) {
   const sci = (await seed(page, 'POST', '/api/cmap/topics', { title: '과학' })).topic;
@@ -49,8 +50,8 @@ async function world(page) {
   return { sci, ids, map };
 }
 const roSheet = async page => {                                    // 복습 탭의 [지도 열기] = 읽기 전용 시트
-  await page.click('#tab-review'); await page.waitFor("!!document.getElementById('review-open-map')", 4000, '복습 탭');
-  await page.click('#review-open-map'); await page.waitFor("document.getElementById('map-sheet').open && document.getElementById('map-sheet').classList.contains('ro')", 4000, '읽기 전용 시트');
+  await page.click('#nav-wrong'); await page.waitFor("!document.getElementById('wrong-view').hidden && !!document.getElementById('wrong-open-map')", 4000, '복습 탭');
+  await page.click('#wrong-open-map'); await page.waitFor("document.getElementById('map-sheet').open && document.getElementById('map-sheet').classList.contains('ro')", 4000, '읽기 전용 시트');
 };
 const closeSheet = async page => { await page.click('#map-sheet-close'); await page.waitFor("!document.getElementById('map-sheet').open", 4000); };
 const marks = page => page.eval('window.CmapMap._marks()');
@@ -173,6 +174,7 @@ test('퀴즈 모드에서는 팝업·표시 변경이 없고 표시 색도 보�
   await roSheet(page);
   assert.deepEqual(await isMarkedNode(page, w.ids.mass), { cls: true, badge: true }, '읽기 전용 시트에서는 보임');
   await closeSheet(page);
+  await page.click('#nav-quiz'); await page.waitFor("!document.getElementById('quiz-view').hidden && !!document.getElementById('quiz-start')", 4000, '퀴즈 탭');
   await page.click('#quiz-start'); await page.waitFor("document.getElementById('map-sheet').open && document.getElementById('map-sheet').classList.contains('quiz-mode')", 6000, '퀴즈 시트');
   assert.equal(await page.eval("document.querySelectorAll('.m-node.marked, .m-mark').length"), 0, '퀴즈에서는 표시 색 없음');
   await tap(page, w.ids.force);
@@ -235,7 +237,7 @@ test('시트를 닫기·ESC·뒤로 가기로 닫으면 팝업도 함께 닫히�
   await tap(page, w.ids.force); assert.ok(await popup(page));
   await page.click('#map-sheet-close'); await page.waitFor("!document.getElementById('map-sheet').open", 4000);
   assert.equal(await page.eval("document.getElementById('map-popup').hidden"), true);
-  await page.click('#review-open-map'); await page.waitFor("document.getElementById('map-sheet').open", 4000);
+  await page.click('#wrong-open-map'); await page.waitFor("document.getElementById('map-sheet').open", 4000);
   assert.equal(await popup(page), null, '다시 열면 팝업 없음');
   assert.deepEqual((await marks(page)).marked, [w.ids.force], '표시는 유지');
   await tap(page, w.ids.mass); assert.ok(await popup(page));
@@ -243,16 +245,18 @@ test('시트를 닫기·ESC·뒤로 가기로 닫으면 팝업도 함께 닫히�
   await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
   await page.waitFor("!document.getElementById('map-sheet').open", 4000);
   assert.equal(await page.eval("document.getElementById('map-popup').hidden"), true);
-  await page.click('#review-open-map'); await page.waitFor("document.getElementById('map-sheet').open", 4000);
+  await sleep(200);   // ESC 로 닫힌 직후 기록 되돌리기(history.back)가 끝나기를 기다린다
+  await page.click('#wrong-open-map'); await page.waitFor("document.getElementById('map-sheet').open", 4000);
   await tap(page, w.ids.fric); assert.ok(await popup(page));
   await page.eval('history.back(); 0');
   await page.waitFor("!document.getElementById('map-sheet').open", 4000);
   assert.equal(await page.eval("document.getElementById('map-popup').hidden"), true);
+  await sleep(200);   // 뒤로 가기로 닫힌 직후 기록 처리가 끝나기를 기다린다
   // 탭 바꾸기도 팝업을 닫는다
-  await page.click('#review-open-map'); await page.waitFor("document.getElementById('map-sheet').open", 4000);
+  await page.click('#wrong-open-map'); await page.waitFor("document.getElementById('map-sheet').open", 4000);
   await tap(page, w.ids.long); assert.ok(await popup(page));
   await closeSheet(page);
-  await page.click('#tab-narr'); await page.waitFor("document.getElementById('map-view').classList.contains('narr-mode')", 4000);
+  await tabIn(page, 'narr'); await page.waitFor("document.getElementById('map-view').classList.contains('narr-mode')", 4000);
   assert.equal(await page.eval("document.getElementById('map-popup').hidden"), true);
 });
 
@@ -293,7 +297,7 @@ test('390px: 표시된 개념의 보조 표식(물음표 배지)·테두리가 �
   assert.ok(mk.badge && mk.sw === '3px' && /표시됨/.test(mk.label), JSON.stringify(mk));
   // 해설 강조(.hl)와 비교: 강조는 코랄 굵은 테두리(3.5px)이고 배지·면 색이 없다
   await closeSheet(page);
-  await page.click('#tab-narr');
+  await tabIn(page, 'narr');
   await page.eval(`window.CmapMap.showOnMap([${w.ids.mass}]); 0`);
   await page.waitFor("document.getElementById('map-sheet').open", 4000);
   const hl = await page.eval(`(() => { const g = document.querySelector('[data-node="${w.ids.mass}"]'), cs = getComputedStyle(g.querySelector('rect')); return { stroke: cs.stroke, sw: cs.strokeWidth, badge: !!g.querySelector('.m-mark') }; })()`);

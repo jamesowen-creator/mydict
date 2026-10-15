@@ -50,7 +50,7 @@ const seed = (page, method, url, body) => page.eval(`(async () => { const r = aw
 async function withTopic(page, title = '물리') {
   const t = (await seed(page, 'POST', '/api/cmap/topics', { title })).topic;
   await page.eval('refresh()');
-  await page.eval(`selectTopic(${t.id}); 0`);
+  await page.eval(`Nav.enterTopic(${t.id}).then(() => 0)`);   // 280-1: 랜딩 → 주제 안 화면
   await page.waitFor("!document.getElementById('concepts-sec').hidden", 4000);
   return t;
 }

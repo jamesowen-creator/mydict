@@ -5,6 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startCmapServer } = require('./helpers/cmap_server');
+const { tabIn } = require('./helpers/cmap_nav');
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 let browser;
@@ -58,11 +59,11 @@ async function world(page, { marks = [] } = {}) {
   await page.eval('refresh()'); await page.eval(`selectTopic(${sci.id}); 0`);
   await page.waitFor("document.querySelectorAll('#concept-list > *').length >= 3", 6000, '개념 목록');
   await page.eval(FAKE_MIC);
-  await page.click('#act-map');
+  await page.click('#nav-map');
   await page.waitFor("!document.getElementById('map-view').hidden", 6000, '지도 화면');
   return { sci, ids };
 }
-const reviewTab = async page => { await page.click('#tab-review'); await page.waitFor("!!document.getElementById('answer-start') && document.getElementById('answer-count').textContent.length > 0", 6000, '복습 탭'); };
+const reviewTab = async page => { await page.click('#nav-quiz'); await page.waitFor("!!document.getElementById('answer-start') && document.getElementById('answer-count').textContent.length > 0", 6000, '복습 탭'); };
 const text = (page, sel) => page.eval(`(document.querySelector(${JSON.stringify(sel)}) || {}).textContent || ''`);
 const serverMarks = srv => srv.db.marks.map(m => m.concept_id).sort((a, b) => a - b);
 async function speak(page) {                                           // 마이크 → 녹음 → 끝내기
@@ -84,15 +85,15 @@ test('버튼: 표시 없음 → 대상 0개·비활성·안내, 설명 없는 �
   assert.equal(await page.eval("!!document.getElementById('answer-recent-label')"), false, '최근 부족 목록은 0개이면 숨김');
   assert.equal(await page.eval("!!document.getElementById('quiz-start-marked') && !!document.getElementById('quiz-start')"), true);
   // 설명 없는 개념만 표시
-  await page.click('#map-back'); await page.waitFor("!document.getElementById('main-view').hidden", 4000);
+  await page.click('#nav-topic'); await page.waitFor("!document.getElementById('landing-view').hidden", 4000);
   await seed(page, 'PUT', `/api/cmap/concepts/${w.ids.mass}/mark`, { marked: true });
-  await page.click('#act-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000);
+  await page.click('#nav-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000);
   await reviewTab(page);
   assert.equal(await text(page, '#answer-count'), '대상 0개');
   assert.match(await text(page, '#answer-hint'), /설명이 있는 표시 개념이 없어요/);
   await seed(page, 'PUT', `/api/cmap/concepts/${w.ids.force}/mark`, { marked: true });
-  await page.click('#map-back'); await page.waitFor("!document.getElementById('main-view').hidden", 4000);
-  await page.click('#act-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000);
+  await page.click('#nav-topic'); await page.waitFor("!document.getElementById('landing-view').hidden", 4000);
+  await page.click('#nav-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000);
   await reviewTab(page);
   await page.waitFor("document.getElementById('answer-count').textContent === '대상 1개'", 4000);
   assert.equal(await page.eval("document.getElementById('answer-start').disabled"), false);
@@ -146,7 +147,9 @@ test('다음 개념 → 마지막은 마치기 → 복습으로 돌아오고, �
   await speak(page); await resultShown(page);
   assert.equal(await text(page, '#answer-next'), '마치기');
   await page.click('#answer-next');
-  await page.waitFor("document.getElementById('answer-panel').hidden && !document.getElementById('review-panel').hidden && !!document.getElementById('answer-recent')", 6000, '복습 화면 + 최근 부족 목록');
+  await page.waitFor("document.getElementById('answer-panel').hidden && !document.getElementById('review-panel').hidden && !!document.getElementById('answer-recent')", 6000, '퀴즈 화면으로 복귀 + 최근 부족 목록');
+  assert.equal(await page.eval("!!document.querySelector('#review-panel #answer-recent')"), false, '280-1: 최근 부족 목록은 퀴즈 탭이 아니라 오답노트 탭에 있다');
+  await page.click('#nav-wrong'); await page.waitFor("!document.getElementById('wrong-view').hidden", 4000, '오답노트 탭');
   assert.equal(await text(page, '#answer-recent-label'), '최근 부족하다고 평가된 개념 2개');
   assert.deepEqual(await page.eval("[...document.querySelectorAll('#answer-recent > li')].map(li => [li.querySelector('.ar-term').textContent, li.querySelector('.ar-verdict').textContent, li.querySelector('.ar-gaps li').textContent, li.querySelector('.ar-sup').textContent])"),
     [['가속도', '부분적', EV.gaps[0], EV.supplement], ['힘', '부분적', EV.gaps[0], EV.supplement]], '최근 순');
@@ -263,11 +266,16 @@ test('다른 탭으로 가면 녹음을 버리고(업로드 없음) 진행 화�
   await page.click('#answer-start'); await page.waitFor("!!document.getElementById('answer-mic')", 4000);
   await page.click('#answer-mic');
   await page.waitFor("document.getElementById('answer-mic').getAttribute('aria-pressed') === 'true'", 3000);
-  await page.click('#tab-narr');
+  await page.click('#nav-map');                                         // 280-1: 녹음 중 탭 전환은 이탈 확인을 먼저 띄운다
+  await page.waitFor("document.getElementById('confirm-dlg').open", 3000, '이탈 확인');
+  assert.match(await page.text('#confirm-text'), /녹음 중/);
+  assert.equal(await page.eval("document.getElementById('answer-panel').hidden"), false, '확인 전에는 그대로');
+  await page.click('#confirm-ok');
+  await page.waitFor("!document.getElementById('mapmk-view').hidden", 6000, '지도 만들기 화면');
   await sleep(300);
   assert.equal(await page.eval("document.getElementById('answer-panel').hidden"), true);
   assert.equal(openai.calls.length, 0, '버린 녹음은 서버로 가지 않음'); assert.equal(srv.db.answers.length, 0);
-  await page.click('#tab-review'); await page.waitFor("!!document.getElementById('answer-start')", 4000);
+  await page.click('#nav-quiz'); await page.waitFor("!!document.getElementById('answer-start')", 4000);
   assert.equal(await page.eval("document.getElementById('review-panel').hidden"), false);
 });
 

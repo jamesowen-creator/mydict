@@ -5,6 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startCmapServer } = require('./helpers/cmap_server');
+const { tabIn } = require('./helpers/cmap_nav');
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 let browser;
@@ -37,7 +38,7 @@ async function world(page, srv, { n = 30 } = {}) {
   srv.anthropic.handler = p => /개념 지도를 읽고/.test(p.system || '')
     ? JSON.stringify({ summary: '요약입니다.', story: [{ text: '개념0 과 개념1 과 개념2 이야기입니다. 개념3 은 따로입니다.', concept_ids: ids.slice(0, 4) }], mnemonic: ['기억'], suggestions: [{ term: '운동량', reason: '이유', near_concept_id: ids[0] }] })
     : JSON.stringify(EXPL);
-  await page.eval('refresh()'); await page.eval(`selectTopic(${sci.id}); 0`);
+  await page.eval('refresh()'); await page.eval(`Nav.enterTopic(${sci.id}).then(() => 0)`);   // 280-1: 주제 안 화면
   await page.waitFor(`document.querySelectorAll('#concept-list > *').length >= ${n}`, 8000, '개념 목록');
   return { sci, ids, map };
 }
@@ -83,7 +84,7 @@ test('주제 화면: 주제 트리·개념 목록·설명 카드가 내부 스�
   await audit(page, '주제 화면');
   await longPage(page);
   assert.ok(await pageScrolls(page) > 500, '페이지 전체가 스크롤됨');
-  for (const sel of ['.t-row', '.c-tools .btn', '#explain-go', '#add-concept-btn']) assert.ok(await minHeight(page, sel) >= 44, sel);
+  for (const sel of ['.c-tools .btn', '#explain-go', '#add-concept-btn']) assert.ok(await minHeight(page, sel) >= 44, sel);
   // 설명 카드 안에서도 스크롤 영역이 없다(카드가 내용만큼 늘어남)
   const card = await page.eval("(() => { const c = document.getElementById('explain-card'); return { sh: c.scrollHeight, ch: c.clientHeight }; })()");
   assert.equal(card.sh, card.ch);
@@ -92,7 +93,7 @@ test('주제 화면: 주제 트리·개념 목록·설명 카드가 내부 스�
 test('지도 탭: 페이지에는 [지도 열기]와 한 줄 상태만 있고 캔버스는 시트 안에 있다. 개념 선택 목록은 시트 안(대화상자 예외)에서만 스크롤된다', { skip: SKIP }, async t => {
   const { srv, page } = await open(t);
   const w = await world(page, srv);
-  await page.click('#act-map');
+  await page.click('#nav-map');
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000, '지도 화면');
   assert.equal(await page.eval("document.getElementById('map-canvas').offsetParent === null"), true, '페이지에는 지도 캔버스가 없음');
   assert.match(await page.eval("document.getElementById('map-meta').textContent"), /^개념 4개 · 연결 2개 · 저장됨$/);
@@ -113,7 +114,7 @@ test('지도 탭: 페이지에는 [지도 열기]와 한 줄 상태만 있고 �
 test('캔버스 제스처와 페이지 스크롤: 시트가 열려 있는 동안 배경 페이지는 스크롤되지 않고, 캔버스 위 휠은 확대만 한다(캔버스에서 시작한 스크롤이 페이지를 막던 한계는 시트로 해결)', { skip: SKIP }, async t => {
   const { srv, page } = await open(t);
   await world(page, srv);
-  await page.click('#act-map');
+  await page.click('#nav-map');
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000);
   await page.eval("document.body.style.minHeight = '3000px'; window.scrollTo(0, 300); 0");
   const y0 = await page.eval('window.scrollY');
@@ -140,10 +141,10 @@ test('캔버스 제스처와 페이지 스크롤: 시트가 열려 있는 동안
 test('해설·복습·퀴즈 결과 화면: 내부 스크롤·박스 없음, 줄 높이 44px 이상, 페이지 전체 스크롤', { skip: SKIP }, async t => {
   const { srv, page } = await open(t);
   await world(page, srv, { n: 6 });
-  await page.click('#act-map');
+  await page.click('#nav-map');
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000);
   // 해설
-  await page.click('#tab-narr'); await page.waitFor("!!document.getElementById('narr-make')", 4000);
+  await tabIn(page, 'narr'); await page.waitFor("!!document.getElementById('narr-make')", 4000);
   await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-summary')", 6000);
   await audit(page, '해설 탭');
   assert.ok(await minHeight(page, '.narr-para') >= 44); assert.ok(await minHeight(page, '.narr-sug [data-act]') >= 44);
@@ -153,10 +154,9 @@ test('해설·복습·퀴즈 결과 화면: 내부 스크롤·박스 없음, 줄
   await audit(page, '해설 탭(단락 선택)');
   assert.equal(await page.eval("getComputedStyle(document.querySelector('.narr-para.sel')).borderLeftWidth"), '3px', '선택은 왼쪽 막대로 표시');
   // 복습
-  await page.click('#tab-review'); await page.waitFor("!!document.getElementById('quiz-start')", 4000);
-  await page.waitFor("!!document.getElementById('review-summary')", 4000);
-  await audit(page, '복습 탭');
-  assert.ok(await minHeight(page, '#review-panel .narr-para') >= 44);
+  await page.click('#nav-quiz'); await page.waitFor("!!document.getElementById('quiz-start')", 4000);
+  await audit(page, '퀴즈 탭');
+  assert.ok(await minHeight(page, '#review-panel .qcard .btn') >= 44);
   // 퀴즈: 답 목록 + 결과
   await page.click('#quiz-start'); await page.waitFor("document.getElementById('map-view').classList.contains('quiz-mode')", 6000);
   const nodes = await page.eval("[...document.querySelectorAll('[data-node]')].map(e => Number(e.dataset.node))");

@@ -42,7 +42,7 @@ test('개념 지도 화면: 권한 있으면 제목과 본문 표시, 390px에�
   assert.equal(await page.text('.screen-bar-title'), '개념 지도');
   assert.equal(await page.hasHorizontalScroll(), false);
   // 작업271-2: 2a 단계에서 "개발 중" 안내 문구는 주제·개념 화면으로 바뀜(이 파일의 모의 서버에는 /api/cmap 이 없어 목록 조회는 실패하고, 화면은 오류 문구만 보여 줌)
-  const r = await page.eval(`(() => { const hdr = document.querySelector('.metis-app-header').getBoundingClientRect(), bar = document.querySelector('.screen-bar').getBoundingClientRect(), sec = document.getElementById('topics-sec').getBoundingClientRect();
+  const r = await page.eval(`(() => { const hdr = document.querySelector('.metis-app-header').getBoundingClientRect(), bar = document.querySelector('.screen-bar').getBoundingClientRect(), sec = document.getElementById('landing-view').getBoundingClientRect();
     return { hdrBottom: hdr.bottom, barTop: bar.top, barBottom: bar.bottom, secTop: sec.top, secRight: sec.right, vw: innerWidth }; })()`);
   assert.ok(r.barTop >= r.hdrBottom - 1, '제목 줄이 공용 헤더 아래');
   assert.ok(r.secTop >= r.barBottom, '본문이 제목 줄에 가려지지 않음');

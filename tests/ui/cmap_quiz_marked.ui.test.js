@@ -39,10 +39,10 @@ async function world(page, { marks = [] } = {}) {
 async function gotoMap(page, sciId) {
   await page.eval('refresh()'); await page.eval(`selectTopic(${sciId}); 0`);
   await page.waitFor("document.querySelectorAll('#concept-list > *').length >= 6", 6000, '개념 목록');
-  await page.click('#act-map');
+  await page.click('#nav-map');
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 6", 6000, '지도 화면');
 }
-const reviewTab = async page => { await page.click('#tab-review'); await page.waitFor("!!document.getElementById('quiz-start-marked') && !!document.getElementById('quiz-marked-count') && document.getElementById('quiz-marked-count').textContent.length > 0", 6000, '복습 탭'); };
+const reviewTab = async page => { await page.click('#nav-quiz'); await page.waitFor("!!document.getElementById('quiz-start-marked') && !!document.getElementById('quiz-marked-count') && document.getElementById('quiz-marked-count').textContent.length > 0", 6000, '복습 탭'); };
 const text = (page, sel) => page.eval(`(document.querySelector(${JSON.stringify(sel)}) || {}).textContent || ''`);
 const serverMarks = srv => srv.db.marks.map(m => m.concept_id).sort((a, b) => a - b);
 async function pairTap(page, a, b, type) {
@@ -66,7 +66,7 @@ test('버튼: 표시가 없으면 0개 표시·비활성 + 안내, 표시가 있
   assert.equal(await text(page, '#quiz-start'), '연결 퀴즈 시작');
   assert.ok(await page.eval("document.getElementById('quiz-start-marked').getBoundingClientRect().height") >= 44);
   // 표시가 있는 지도: 새로 열어서 확인(b: 출제 가능, f: 연결 없음)
-  await page.click('#map-back'); await page.waitFor("!document.getElementById('main-view').hidden", 4000);
+  await page.click('#nav-topic'); await page.waitFor("!document.getElementById('landing-view').hidden", 4000);
   const sci = w.sci.id;
   await seed(page, 'PUT', `/api/cmap/concepts/${w.ids.b}/mark`, { marked: true });
   await seed(page, 'PUT', `/api/cmap/concepts/${w.ids.f}/mark`, { marked: true });

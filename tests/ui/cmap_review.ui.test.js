@@ -1,10 +1,12 @@
-// 작업273-5: 개념 지도 화면의 "복습" 탭(저장된 지도 + 최신 해설 읽기 전용: 새 구조 summary/story/mnemonic/suggestions)과 연결 퀴즈(정답 간선 비노출, 탭-탭 입력, 점수 3종·틀린/놓친/지도에 없는 연결 표시, 지도가 바뀌면 채점 거부), 390px 레이아웃.
+// 작업273-5: 개념 지도 화면의 연결 퀴즈(정답 간선 비노출, 탭-탭 입력, 점수 3종·틀린/놓친/지도에 없는 연결 표시, 지도가 바뀌면 채점 거부), 390px 레이아웃.
+// 280-1: 예전 "복습" 탭은 하단 내비의 [퀴즈] 탭(시작 카드 3개)이 됨. 복습 탭에서 읽던 해설은 [지도 만들기] 탭의 [해설]에서 읽는다(cmap_narrate).
 // 서버는 실제 routes/concept_map.js + 가짜 DB 이며 AI 는 모의(해설 만들기용만, 퀴즈는 AI 없음). 서버·페이지는 t.after 로 종료한다.
 // 실행: node --test "tests/ui/cmap_review.ui.test.js"   (Chrome이 없으면 건너뜀)
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startCmapServer } = require('./helpers/cmap_server');
+const { tabIn } = require('./helpers/cmap_nav');
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 let browser;
@@ -36,7 +38,7 @@ async function world(page) {
   await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: c.mass, to_concept_id: c.force, label: '질량이 클수록 힘이 필요', relation_type: '사용' });
   await page.eval('refresh()'); await page.eval(`selectTopic(${sci.id}); 0`);
   await page.waitFor("!document.getElementById('concepts-sec').hidden", 4000);
-  await page.click('#act-map');
+  await page.click('#nav-map');
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000, '지도 화면');
   return { sci, c, map, e1 };
 }
@@ -47,11 +49,11 @@ const good = w => ({
   suggestions: [{ term: '운동량', reason: '힘과 이어지는 양입니다', near_concept_id: w.c.mass }],
 });
 const text = (page, sel) => page.eval(`(document.querySelector(${JSON.stringify(sel)}) || {}).textContent || ''`);
-const saveMap = async page => { await page.click('#tab-map'); await openSheet(page); await page.click('#map-save'); await page.waitFor("document.getElementById('map-save-state').textContent.startsWith('저장됨')", 4000, '저장됨'); await closeSheet(page); };
-const reviewTab = async page => { await page.click('#tab-review'); await page.waitFor("document.getElementById('map-view').classList.contains('review-mode') && !!document.getElementById('quiz-start')", 4000, '복습 탭'); };
+const saveMap = async page => { await tabIn(page, 'map'); await openSheet(page); await page.click('#map-save'); await page.waitFor("document.getElementById('map-save-state').textContent.startsWith('저장됨')", 4000, '저장됨'); await closeSheet(page); };
+const reviewTab = async page => { await page.click('#nav-quiz'); await page.waitFor("!document.getElementById('quiz-view').hidden && document.getElementById('map-view').classList.contains('review-mode') && !!document.getElementById('quiz-start')", 4000, '퀴즈 탭'); };
 async function makeNarration(page, srv, w) {
   srv.anthropic.handler = () => JSON.stringify(good(w));
-  await page.click('#tab-narr'); await page.waitFor("!!document.getElementById('narr-make')", 4000);
+  await tabIn(page, 'narr'); await page.waitFor("!!document.getElementById('narr-make')", 4000);
   await page.click('#narr-make'); await page.waitFor("!!document.getElementById('narr-summary')", 6000);
 }
 async function pairTap(page, a, b, type) {
@@ -62,38 +64,34 @@ async function pairTap(page, a, b, type) {
   await page.waitFor("!document.getElementById('quiz-dlg').open", 3000);
 }
 
-test('복습: 저장 안 된 지도는 퀴즈 시작 비활성 + 안내, 해설이 없으면 안내', { skip: SKIP }, async t => {
+test('퀴즈 탭: 저장 안 된 지도는 연결 퀴즈 시작 비활성 + 안내, 카드 3개(연결 퀴즈·표시 개념 퀴즈·말로 설명하기)', { skip: SKIP }, async t => {
   const { page } = await open(t);
   await world(page);
   await reviewTab(page);
   assert.equal(await page.eval("document.getElementById('quiz-start').disabled"), true);
   assert.match(await text(page, '#quiz-start-note'), /저장된 지도에서만/);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#review-panel .qcard > .sec-label')].map(e => e.textContent)"), ['연결 퀴즈', '표시 개념 퀴즈', '말로 설명하기']);
   await saveMap(page); await reviewTab(page);
   assert.equal(await page.eval("document.getElementById('quiz-start').disabled"), false);
-  assert.match(await text(page, '#review-no-narr'), /아직 만든 해설이 없어요/);
+  assert.equal(await page.eval("!!document.getElementById('review-no-narr') || !!document.getElementById('review-summary')"), false, '해설 본문은 퀴즈 탭에 없음(지도 만들기 탭의 해설에 있음)');
 });
 
-test('복습: 최신 해설을 새 구조(요약·이야기 단락·기억용·제안)로 읽기 전용 표시, 만들기·찾아보기 버튼 없음, 단락 → 지도 강조', { skip: SKIP }, async t => {
+test('해설을 만든 뒤에도 퀴즈 탭에는 시작 카드만 있고, 해설 읽기·단락의 [지도에서 보기](읽기 전용 시트, 강조)는 해설 탭에서 된다', { skip: SKIP }, async t => {
   const { srv, page } = await open(t);
   const w = await world(page);
   await saveMap(page); await makeNarration(page, srv, w);
   await reviewTab(page);
-  await page.waitFor("!!document.getElementById('review-summary')", 4000, '해설 표시');
-  assert.equal(await text(page, '#review-summary'), good(w).summary);
-  assert.equal(await page.eval("document.querySelectorAll('#review-panel .narr-para').length"), 2);
-  assert.match(await text(page, '#review-panel .narr-cap'), /힘 · 가속도 · 질량/);
-  assert.match(await text(page, '#review-mnemonic'), /브레이크/);
-  assert.match(await text(page, '#review-sugs'), /운동량[\s\S]*힘과 이어지는 양/);
-  assert.match(await text(page, '#review-panel .sec-label'), /연결|AI 설명/);
-  assert.equal(await page.eval("[...document.querySelectorAll('#review-panel .sec-label')].some(e => e.textContent === 'AI 설명 · 확인 필요')"), true);
-  assert.equal(await page.eval("!!document.getElementById('narr-make') && document.getElementById('review-panel').contains(document.getElementById('narr-make'))"), false, '해설 만들기 버튼 없음');
-  assert.equal(await page.eval("document.querySelectorAll('#review-panel [data-act]:not([data-act=show-map])').length"), 0, '제안에 동작 버튼 없음(단락의 지도에서 보기만 있음)');
+  assert.equal(await page.eval("document.querySelectorAll('#review-panel .narr-para').length"), 0, '퀴즈 탭에는 해설 단락이 없음');
+  assert.equal(await page.eval("document.querySelectorAll('#review-panel .qcard').length"), 3);
   const before = srv.anthropic.calls.length;
-  await page.click('#review-panel [data-para="1"] [data-act=show-map]');
+  await tabIn(page, 'narr');
+  await page.waitFor("!!document.getElementById('narr-summary')", 6000, '해설 표시');
+  assert.equal(await text(page, '#narr-summary'), good(w).summary);
+  await page.click('#narr-panel [data-para="1"] [data-act=show-map]');
   await page.waitFor("document.getElementById('map-sheet').open", 4000, '읽기 전용 시트');
   assert.deepEqual(await page.eval('window.CmapMap._highlight()'), [w.c.iso]);
   assert.equal(await page.eval("document.getElementById('map-sheet').classList.contains('ro')"), true);
-  assert.equal(srv.anthropic.calls.length, before, '복습은 AI 를 부르지 않음');
+  assert.equal(srv.anthropic.calls.length, before, '읽기만으로는 AI 를 부르지 않음');
   assert.equal((await page.eval('window.CmapMap._state()')).selected, null);
 });
 
@@ -172,10 +170,10 @@ test('퀴즈 중 시트를 닫으면(닫기) 퀴즈가 끝나고 복습으로 �
   assert.equal((await page.eval('window.CmapReview._state()')).quiz, null);
 });
 
-test('390px: 복습·퀴즈 버튼 44px 이상, 가로 스크롤 없음, 결과 점수 3칸이 한 줄에 들어간다', { skip: SKIP }, async t => {
+test('390px: 하단 내비·퀴즈 버튼 44px 이상, 가로 스크롤 없음, 결과 점수 3칸이 한 줄에 들어간다', { skip: SKIP }, async t => {
   const { page } = await open(t);
   const w = await world(page);
-  assert.ok(await page.eval("document.getElementById('tab-review').getBoundingClientRect().height") >= 44);
+  assert.ok(await page.eval("document.getElementById('nav-quiz').getBoundingClientRect().height") >= 44);
   await saveMap(page); await reviewTab(page);
   assert.ok(await page.eval("document.getElementById('quiz-start').getBoundingClientRect().height") >= 44);
   await page.click('#quiz-start'); await page.waitFor("document.getElementById('map-view').classList.contains('quiz-mode')", 6000);

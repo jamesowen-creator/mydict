@@ -1,7 +1,8 @@
 // 작업273-2: 개념 지도 화면의 "지도" 보기 — 지도에 쓸 개념 선택, 노드 드래그 배치, 노드 A 탭 → B 탭 연결, 연결 수정·삭제.
 // 클래식 스크립트(window.CmapMap). concept_map.html 의 인라인 스크립트가 먼저 정의한 전역($, h, api, okStatus, errText, openDlg, closeDlg, openConfirm, S, byId, ...)과
 // 공용 /js/map/mapCore.js 의 읽기 전용 도구(sv, clipText, edgeGeom), /js/cmap/mapGeometry.js·pairPicker.js 를 호출 시점에 사용한다(공용 코드는 수정하지 않음).
-// 274-4: 지도는 페이지 안의 작은 캔버스가 아니라 <dialog id="map-sheet"> 안에 크게 그린다(모바일 = 전체 화면 시트, 768px 이상 = 큰 팝업). 열고 닫기·맞춤·확대/축소는 개념학습의 지도 팝업 방식을 따랐다.
+// 280-1: 화면 전환(주제 목록 / 주제 안 / 퀴즈 / 지도 만들기 / 오답노트)은 concept_map.html 의 Nav 가 맡는다. open·close 는 데이터와 모드만 다룬다.
+  // 274-4: 지도는 페이지 안의 작은 캔버스가 아니라 <dialog id="map-sheet"> 안에 크게 그린다(모바일 = 전체 화면 시트, 768px 이상 = 큰 팝업). 열고 닫기·맞춤·확대/축소는 개념학습의 지도 팝업 방식을 따랐다.
 // 모든 연결은 사용자가 직접 만든다(AI 제안 없음). 제스처: 노드 위 드래그 = 노드 이동(끝나면 위치 저장), 빈 곳 드래그 = 화면 이동, 두 손가락 = 확대·축소, 노드 탭 = 연결용 선택.
 (function () {
   'use strict';
@@ -195,7 +196,7 @@
   // ── 열기·닫기 ──
   async function open(rootId) {
     const r = await api('GET', '/api/cmap/topics/' + rootId + '/map');
-    if (!okStatus(r)) { $('topics-msg').textContent = errText(r, '지도를 불러오지 못했습니다.'); return; }
+    if (!okStatus(r)) { $('map-load-msg').textContent = errText(r, '지도를 불러오지 못했습니다.'); return false; }
     const b = r.body;
     M.rootId = rootId; M.map = b.map; M.types = b.relation_types || [];
     M.concepts = new Map(b.concepts.map(c => [c.id, c]));
@@ -213,9 +214,6 @@
     } else M.picker.reset();
     M.marks = new Set(b.marked_concept_ids || []); M.serverMarks = new Set(M.marks); hidePopup();
     M.svg = $('map-svg');
-    $('main-view').hidden = true;
-    $('map-view').hidden = false;
-    $('map-title').textContent = '지도 · ' + b.map.title;
     $('map-sheet-title').textContent = '지도 · ' + b.map.title;
     pageNote('');
     $('map-pick-panel').hidden = true;
@@ -229,6 +227,7 @@
     renderSave(); renderOptUi();
     setMode('map', true);
     emit('open');
+    return true;
   }
   function close() {
     if (M.sheet.open) closeSheetUi(false);
@@ -236,8 +235,6 @@
     emit('close');       // 화면을 떠나면 되돌리기는 사라진다
     if (M.picker) M.picker.reset();
     M.gest = null; M.pinch = null; M.ptrs.clear();
-    $('map-view').hidden = true;
-    $('main-view').hidden = false;
   }
 
   // ── 개념 선택 패널 ──
@@ -488,7 +485,7 @@
     cl.toggle('side-mode', mode !== 'map');
     for (const m of ['narr', 'review', 'quiz']) cl.toggle(m + '-mode', mode === m);
     sheetLayout();
-    for (const [id, m] of [['tab-map', 'map'], ['tab-narr', 'narr'], ['tab-review', 'review']]) { $(id).setAttribute('aria-selected', String(mode === m)); $(id).classList.toggle('sel', mode === m); }
+    for (const [id, m] of [['tab-map', 'map'], ['tab-narr', 'narr']]) { $(id).setAttribute('aria-selected', String(mode === m)); $(id).classList.toggle('sel', mode === m); }
     if (!silent) { if (M.svg) { render(); requestAnimationFrame(() => { fit(); render(); }); } emit('mode', mode); }
   }
   // 강조할 개념 목록. 시트가 열려 있으면 그 개념들이 보이도록 맞추고, 닫혀 있으면 다음에 열 때 맞춘다
@@ -732,6 +729,8 @@
       M.marks.delete(id); M.serverMarks.delete(id);
       return true;
     },
+    // 오답노트: 모르는 개념으로 표시한 개념(이 지도의 주제 트리 안)
+    markedConcepts() { return [...M.marks].map(id => M.concepts.get(id)).filter(Boolean).map(c => ({ id: c.id, term: c.term })).sort((a, b) => a.term.localeCompare(b.term, 'ko')); },
     _marks() { return { marked: [...M.marks].sort((a, b) => a - b), server: [...M.serverMarks].sort((a, b) => a - b), popup: M.popup }; },
     _highlight() { return [...M.hl].sort((a, b) => a - b); },
     _state() { return { mode: M.mode, nodes: [...M.nodes].map(([id, n]) => ({ id, x: n.x, y: n.y })), edges: M.edges.map(e => ({ ...e })), view: { ...M.view }, selected: M.selected, mapId: M.map && M.map.id }; },

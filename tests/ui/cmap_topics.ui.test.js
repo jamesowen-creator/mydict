@@ -1,4 +1,4 @@
-// 작업271-2: 개념 지도 화면(주제 트리·개념). 실제 routes/concept_map.js + 가짜 DB(tests/helpers/cmap_db.js)에 연결한 헤드리스 Chrome 테스트.
+// 작업271-2: 개념 지도 화면(주제 목록·개념). 280-1: 랜딩(주제 목록, 최신순) → 주제 안 화면 구조에 맞춰 고침. 실제 routes/concept_map.js + 가짜 DB(tests/helpers/cmap_db.js)에 연결한 헤드리스 Chrome 테스트.
 // 서버는 단언이 실패해도 닫히도록 t.after 로 등록한다. 실행: node --test "tests/ui/cmap_topics.ui.test.js"   (Chrome이 없으면 건너뜀)
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -23,48 +23,57 @@ async function open(t, width = 390, height = 844) {
 // 화면의 api() 로 데이터를 미리 만든다(화면 코드의 전역 함수를 그대로 부름)
 const seed = (page, method, url, body) => page.eval(`(async () => { const r = await api(${JSON.stringify(method)}, ${JSON.stringify(url)}, ${JSON.stringify(body)}); return r.body; })()`);
 const reload = page => page.eval('refresh()');
-const titles = page => page.eval("[...document.querySelectorAll('#tree [data-t=node] .t-title')].map(e => e.textContent)");
+const titles = page => page.eval("[...document.querySelectorAll('#topic-list [data-t=node] .t-title')].map(e => e.textContent)");   // 랜딩 목록(최신순, 항목은 경로 표시)
 const dlgOpen = (page, id) => page.eval(`document.getElementById('${id}').open`);
 const waitOpen = (page, id) => page.waitFor(`document.getElementById('${id}').open`, 4000, id + ' 열림');
 const waitClosed = (page, id) => page.waitFor(`!document.getElementById('${id}').open`, 4000, id + ' 닫힘');
-const pickNode = (page, title) => page.eval(`(() => { const b = [...document.querySelectorAll('#tree [data-t=node]')].find(e => e.querySelector('.t-title').textContent === ${JSON.stringify(title)}); if (!b) return false; b.scrollIntoView({ block: 'center' }); b.click(); return true; })()`);
-const selected = page => page.eval("(() => { const b = document.querySelector('#tree [data-t=node][aria-current=true] .t-title'); return b ? b.textContent : null; })()");
+// 랜딩에서 주제(끝 이름이 title 인 것)를 눌러 주제 안 화면으로 들어간다(주제 안 화면에 있으면 먼저 [주제] 탭으로 랜딩에 간다)
+const pickNode = async (page, title) => {
+  if (await page.eval("document.getElementById('landing-view').hidden")) { await page.click('#nav-topic'); await page.waitFor("!document.getElementById('landing-view').hidden", 4000, '랜딩'); }
+  const ok = await page.eval(`(() => { const b = [...document.querySelectorAll('#topic-list [data-t=node]')].find(e => e.querySelector('.t-title').textContent.split(' › ').pop() === ${JSON.stringify(title)}); if (!b) return false; b.scrollIntoView({ block: 'center' }); b.click(); return true; })()`);
+  if (ok) await page.waitFor("!document.getElementById('topic-view').hidden", 4000, '주제 안 화면');
+  return ok;
+};
+const selected = page => page.eval("(() => { const b = document.querySelector('#topic-list [data-t=node][aria-current=true] .t-title'); return b ? b.textContent : null; })()");
 const noErrors = page => assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
 
-test('주제 추가: 빈 상태 안내 → 대화상자로 추가 → 트리에 표시·선택, 빈 이름·중복 이름은 대화상자 안에 오류, 390px 가로 스크롤 없음', { skip: SKIP, timeout: 60000 }, async t => {
+test('주제 추가: 빈 상태 안내 → 대화상자로 추가 → 완료하면 그 주제 안으로 들어감, 빈 이름·중복 이름은 대화상자 안에 오류, 390px 가로 스크롤 없음', { skip: SKIP, timeout: 60000 }, async t => {
   const { page } = await open(t);
   assert.equal(await page.eval("!document.getElementById('tree-empty').hidden"), true, '빈 상태 안내');
   assert.match(await page.text('#tree-empty'), /아직 주제가 없습니다/);
-  assert.equal(await page.eval("document.getElementById('topic-actions').hidden"), true);
+  assert.equal(await page.eval("document.getElementById('topic-view').hidden"), true, '랜딩에서는 주제 안 화면이 보이지 않음');
   await page.click('#add-root-btn');
-  await waitOpen(page, 'name-dlg');
-  await page.click('#name-ok');                                           // 빈 이름
-  assert.match(await page.text('#name-msg'), /입력해 주세요/);
-  await page.type('#name-input', '과학');
-  await page.click('#name-ok');
-  await waitClosed(page, 'name-dlg');
-  await page.waitFor("document.querySelectorAll('#tree [data-t=node]').length === 1", 4000);
+  await waitOpen(page, 'add-dlg');
+  await page.click('#add-done');                                          // 빈 이름
+  assert.match(await page.text('#add-msg'), /입력해 주세요/);
+  await page.type('#add-input', '과학');
+  await page.click('#add-done');
+  await waitClosed(page, 'add-dlg');
+  await page.waitFor("!document.getElementById('topic-view').hidden", 4000, '완료하면 주제 안으로');
   assert.deepEqual(await titles(page), ['과학']);
   assert.equal(await selected(page), '과학', '새 주제가 선택됨');
+  assert.equal(await page.text('#path-line'), '과학', '주제 경로 한 줄');
   assert.equal(await page.eval("document.getElementById('topic-actions').hidden"), false);
   assert.equal(await page.eval("document.getElementById('concepts-sec').hidden"), false);
   assert.equal(await page.eval("document.getElementById('tree-empty').hidden"), true);
-  // 같은 이름(대소문자 무시) → 서버 409 문구가 대화상자 안에 나오고 닫히지 않음
+  // 랜딩으로 돌아가 같은 이름(대소문자 무시) 추가 → 서버 409 문구가 대화상자 안에 나오고 닫히지 않음
+  await page.click('#nav-topic');
+  await page.waitFor("!document.getElementById('landing-view').hidden", 4000);
   await page.click('#add-root-btn');
-  await waitOpen(page, 'name-dlg');
-  await page.type('#name-input', '과학');
-  await page.click('#name-ok');
-  await page.waitFor("document.getElementById('name-msg').textContent.length > 0", 4000);
-  assert.match(await page.text('#name-msg'), /이미 있습니다/);
-  assert.equal(await dlgOpen(page, 'name-dlg'), true, '오류 시 대화상자 유지');
-  await page.click('#name-cancel');
-  await waitClosed(page, 'name-dlg');
+  await waitOpen(page, 'add-dlg');
+  await page.type('#add-input', '과학');
+  await page.click('#add-done');
+  await page.waitFor("document.getElementById('add-msg').textContent.length > 0", 4000);
+  assert.match(await page.text('#add-msg'), /이미 있습니다/);
+  assert.equal(await dlgOpen(page, 'add-dlg'), true, '오류 시 대화상자 유지');
+  await page.click('#add-cancel');
+  await waitClosed(page, 'add-dlg');
   assert.deepEqual(await titles(page), ['과학']);
   assert.equal(await page.hasHorizontalScroll(), false);
   noErrors(page);
 });
 
-test('하위 주제 추가·접기/펼치기, 5단계에서는 하위 추가 버튼이 꺼짐', { skip: SKIP, timeout: 60000 }, async t => {
+test('하위 주제 추가(주제 안 화면), 5단계에서는 하위 추가 버튼이 꺼짐', { skip: SKIP, timeout: 60000 }, async t => {
   const { page } = await open(t);
   const a = (await seed(page, 'POST', '/api/cmap/topics', { title: 'A' })).topic;
   await reload(page);
@@ -75,18 +84,10 @@ test('하위 주제 추가·접기/펼치기, 5단계에서는 하위 추가 버
   await page.type('#name-input', 'A1');
   await page.click('#name-ok');
   await waitClosed(page, 'name-dlg');
-  await page.waitFor("document.querySelectorAll('#tree [data-t=node]').length === 2", 4000);
-  assert.deepEqual(await titles(page), ['A', 'A1']);
-  assert.equal(await selected(page), 'A1');
-  // 접기/펼치기
-  const toggle = `#tree [data-t=toggle][data-id="${a.id}"]`;
-  assert.equal(await page.eval(`document.querySelector('${toggle}').getAttribute('aria-expanded')`), 'true');
-  await page.click(toggle);
-  await page.waitFor("document.querySelectorAll('#tree [data-t=node]').length === 1", 3000);
-  assert.deepEqual(await titles(page), ['A']);
-  assert.equal(await page.eval(`document.querySelector('${toggle}').getAttribute('aria-expanded')`), 'false');
-  await page.click(toggle);
-  await page.waitFor("document.querySelectorAll('#tree [data-t=node]').length === 2", 3000);
+  await page.waitFor("document.querySelectorAll('#topic-list [data-t=node]').length === 2", 4000);
+  assert.deepEqual(await titles(page), ['A › A1', 'A'], '최신순(나중에 만든 주제가 위), 항목은 경로로 표시');
+  assert.equal(await selected(page), 'A › A1');
+  assert.equal(await page.text('#path-line'), 'A › A1');
   // 5단계까지 만든 뒤: 가장 깊은 주제를 고르면 하위 추가 버튼이 꺼진다
   let parent = (await seed(page, 'POST', '/api/cmap/topics', { title: 'A1-1', parent_id: (await page.eval("byId(S.selectedId).id")) })).topic;
   for (const name of ['A1-2', 'A1-3']) parent = (await seed(page, 'POST', '/api/cmap/topics', { title: name, parent_id: parent.id })).topic;
@@ -116,7 +117,7 @@ test('이름 변경: 현재 이름이 채워져 있고 저장하면 트리에 �
   await page.type('#name-input', '화학 일반');
   await page.click('#name-ok');
   await waitClosed(page, 'name-dlg');
-  await page.waitFor("[...document.querySelectorAll('#tree [data-t=node] .t-title')].some(e => e.textContent === '화학 일반')", 4000);
+  await page.waitFor("[...document.querySelectorAll('#topic-list [data-t=node] .t-title')].some(e => e.textContent === '화학 일반')", 4000);
   assert.deepEqual((await titles(page)).sort(), ['물리', '화학 일반']);
   assert.equal(await selected(page), '화학 일반');
   noErrors(page);
@@ -144,7 +145,7 @@ test('이동: 자기 자신·하위는 목록에 없고, 다른 주제 아래/�
   await page.click('#move-ok');
   await waitClosed(page, 'move-dlg');
   await page.waitFor("(() => { const x = byId(S.selectedId); return x && byId(x.parent_id) && byId(x.parent_id).title === 'B'; })()", 4000, 'A1 이 B 아래로');
-  assert.deepEqual(await titles(page), ['A', 'B', 'A1']);
+  assert.deepEqual(await titles(page), ['B', 'B › A1', 'A']);
   // 최상위로
   await page.click('#act-move');
   await waitOpen(page, 'move-dlg');
@@ -178,7 +179,7 @@ test('삭제 확인창: 최상위는 서버가 알려 준 하위 주제·개념 
   await waitOpen(page, 'confirm-dlg');
   await page.click('#confirm-ok');
   await waitClosed(page, 'confirm-dlg');
-  await page.waitFor("[...document.querySelectorAll('#tree [data-t=node] .t-title')].every(e => e.textContent !== 'A')", 4000);
+  await page.waitFor("[...document.querySelectorAll('#topic-list [data-t=node] .t-title')].every(e => e.textContent !== 'A') && !document.getElementById('landing-view').hidden", 4000, '삭제 뒤 랜딩');
   assert.deepEqual(await titles(page), ['다른']);
   assert.equal(srv.db.topics.length, 1); assert.equal(srv.db.concepts.length, 0);
   noErrors(page);
@@ -215,7 +216,7 @@ test('삭제 확인창: 하위 주제는 부모로 옮겨지는 범위를 안내
   await waitOpen(page, 'confirm-dlg');
   await page.click('#confirm-ok');
   await waitClosed(page, 'confirm-dlg');
-  await page.waitFor("[...document.querySelectorAll('#tree [data-t=node] .t-title')].every(e => e.textContent !== 'B')", 4000);
+  await page.waitFor("[...document.querySelectorAll('#topic-list [data-t=node] .t-title')].every(e => e.textContent.split(' › ').pop() !== 'B')", 4000);
   assert.equal(await selected(page), 'A', '삭제 뒤 부모가 선택됨');
   assert.equal(await page.eval("byId(S.selectedId).concept_count"), 2, '개념 2개가 부모로 옮겨짐');
   noErrors(page);
@@ -241,7 +242,7 @@ test('개념 입력: 추가(이름·영문·메모) → 목록 표시·주제 �
   assert.equal(await page.text('#concept-list .c-en'), 'force');
   assert.equal(await page.text('#concept-list .c-memo'), '질량 × 가속도');
   assert.equal(await page.eval("document.getElementById('concepts-empty').hidden"), true);
-  assert.match(await page.text('#tree [data-t=node] .t-count'), /개념 1/, '주제 옆 개수가 갱신됨');
+  assert.match(await page.text('#topic-list [data-t=node] .t-count'), /개념 1/, '주제 옆 개수가 갱신됨');
   // 중복(대소문자 무시)
   await page.click('#add-concept-btn');
   await waitOpen(page, 'concept-dlg');

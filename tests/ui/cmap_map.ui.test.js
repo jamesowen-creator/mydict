@@ -31,7 +31,7 @@ async function world(page, { openMap = true } = {}) {
   await page.eval('refresh()');
   await page.eval(`selectTopic(${sci.id}); 0`);
   await page.waitFor("!document.getElementById('concepts-sec').hidden", 4000);
-  if (openMap) { await page.waitFor("document.querySelectorAll('#concept-list > *').length >= 3", 6000, '개념 목록 표시(레이아웃 안정)'); await hittable(page, '#act-map'); await page.click('#act-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000, '지도 화면'); await openSheet(page); }
+  if (openMap) { await page.waitFor("document.querySelectorAll('#concept-list > *').length >= 3", 6000, '개념 목록 표시(레이아웃 안정)'); await hittable(page, '#nav-map'); await page.click('#nav-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000, '지도 화면'); await openSheet(page); }
   return { sci, phys, c };
 }
 const state = page => page.eval('window.CmapMap._state()');
@@ -80,8 +80,9 @@ const edgesDb = srv => srv.db.edges.map(e => ({ from: e.from_concept_id, to: e.t
 test('지도 열기·개념 선택: 최상위 주제의 지도가 열리고, 트리 안 개념을 체크하면 노드가 생기고(미배치는 점선 임시 위치) 체크를 풀면 바로 빠진다', { skip: SKIP, timeout: 60000 }, async t => {
   const { srv, page } = await open(t);
   const { c } = await world(page);
-  assert.equal(await page.text('#map-title'), '지도 · 과학');
-  assert.equal(await page.eval("document.getElementById('main-view').hidden"), true);
+  assert.equal(await page.text('#map-sheet-title'), '지도 · 과학', '시트 제목에 지도 이름');
+  assert.match(await page.text('#map-scope'), /‘과학’ 주제 전체의 지도/);
+  assert.equal(await page.eval("document.getElementById('landing-view').hidden && document.getElementById('topic-view').hidden"), true, '주제 쪽 화면은 숨김');
   assert.match(await page.text('#map-hint'), /개념 선택/);
   assert.equal(srv.db.maps.length, 1);
   await page.click('#map-pick-toggle');
@@ -122,8 +123,8 @@ test('노드 드래그: 끝나면 위치가 저장되고(임시 → 배치), 다
   assert.ok(scale > 0);
   // 다시 열어도 같은 자리
   await closeSheet(page);
-  await page.click('#map-back'); await page.waitFor("!document.getElementById('main-view').hidden", 4000);
-  await page.click('#act-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000);
+  await page.click('#nav-topic'); await page.waitFor("!document.getElementById('landing-view').hidden", 4000);
+  await page.click('#nav-map'); await page.waitFor("!document.getElementById('map-view').hidden", 6000);
   await openSheet(page);
   await page.waitFor(`document.querySelector('[data-node="${c.a.id}"]') !== null`, 4000);
   const st2 = (await state(page)).nodes.find(n => n.id === c.a.id);
@@ -329,9 +330,9 @@ test('주제·개념 화면과의 연결: 지도에 쓰이는 가지의 이동 �
   const other = (await seed(page, 'POST', '/api/cmap/topics', { title: '수학' })).topic;
   await pickAll(page, [c.d.id]);
   await closeSheet(page);
-  await page.click('#map-back'); await page.waitFor("!document.getElementById('main-view').hidden", 4000);
+  await page.click('#nav-topic'); await page.waitFor("!document.getElementById('landing-view').hidden", 4000);
   await page.eval('refresh()');
-  await page.eval(`selectTopic(${phys.id}); 0`);
+  await page.eval(`Nav.enterTopic(${phys.id}).then(() => 0)`);
   await page.click('#act-move'); await waitOpen(page, 'move-dlg');
   await page.eval(`(() => { const s = document.getElementById('move-select'); s.value = '${other.id}'; })()`);
   await page.click('#move-ok');

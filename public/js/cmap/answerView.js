@@ -1,4 +1,4 @@
-// 작업278-1: 개념 지도 복습 탭의 "말로 설명하기" — 표시한 개념 중 저장된 설명이 있는 개념의 이름만 보여 주고, 사용자가 음성(또는 직접 입력)으로 설명하면 서버가 전사 → AI(Haiku) 평가를 한다.
+// 작업278-1: 개념 지도 퀴즈 탭의 "말로 설명하기"(280-1: 최근 부족 목록은 오답노트 탭) — 표시한 개념 중 저장된 설명이 있는 개념의 이름만 보여 주고, 사용자가 음성(또는 직접 입력)으로 설명하면 서버가 전사 → AI(Haiku) 평가를 한다.
 // 클래식 스크립트(window.CmapAnswer). concept_map.html 의 인라인 전역($, h, api, okStatus, errText, getToken, autoGrow/growAll)과 window.CmapMap(mapView.js)·window.CmapMic(micRecorder.js)을 호출 시점에 사용한다.
 // - 질문 문장 없음: 개념 이름만 제시. 전사 확인 단계 없음: 녹음을 끝내면 바로 서버로 보내 평가한다.
 // - 녹음 원문(전사)·입력 원문은 화면에 보여 주지 않고 저장하지 않는다. 서버가 돌려주는 값은 AI 가 정리한 요약(summary)·판정·피드백뿐이다. 오디오는 서버 전송 직후 버린다.
@@ -27,26 +27,34 @@
     if (seq !== A.seq) return;
     A.targets = okStatus(t) ? t.body : null;
     A.recent = okStatus(r) ? r.body.items : [];
+    renderRecent();
     if (!A.run) renderEntry();
   }
 
-  // ── 복습 탭 안의 진입 영역 + 최근 부족 목록(reviewView 가 #answer-entry 를 만들어 두고 호출) ──
+  // ── 퀴즈 탭 안의 진입 영역(reviewView 가 #answer-entry 를 만들어 두고 호출) ──
   function renderEntry() {
     const box = $('answer-entry');
     if (!box) return;
     box.textContent = '';
     const t = A.targets, n = t ? t.targets.length : 0;
     box.append(h('div', { class: 'narr-actions', style: 'justify-content:flex-start;margin-top:0;align-items:center' },
-      h('button', { class: 'btn text', type: 'button', id: 'answer-start', disabled: !t || n === 0, onclick: startRun, text: '말로 설명하기' }),
+      h('button', { class: 'btn', type: 'button', id: 'answer-start', disabled: !t || n === 0, onclick: startRun, text: '말로 설명하기' }),
       h('span', { class: 'hint', id: 'answer-count', style: 'margin-top:0', text: t ? '대상 ' + n + '개' : '' })));
     if (t && n === 0) box.append(h('p', { class: 'hint', id: 'answer-hint', text: t.marked_count === 0 ? '지도에서 모르는 개념을 눌러 표시해 보세요' : '설명이 있는 표시 개념이 없어요. 개념에 설명을 저장해 주세요.' }));
-    if (A.recent && A.recent.length) {
-      box.append(h('p', { class: 'sec-label narr-sec', id: 'answer-recent-label', text: '최근 부족하다고 평가된 개념 ' + A.recent.length + '개' }));
-      box.append(h('ul', { class: 'answer-recent', id: 'answer-recent' }, A.recent.map(it => h('li', { 'data-id': it.concept_id },
-        h('p', { class: 'ar-head' }, h('span', { class: 'ar-term', text: it.term }), h('span', { class: 'ar-verdict ' + VERDICT_CLASS[it.verdict], text: it.verdict })),
-        it.gaps && it.gaps.length ? h('ul', { class: 'ar-gaps' }, it.gaps.map(g => h('li', { text: g }))) : null,
-        it.supplement ? h('p', { class: 'ar-sup', text: it.supplement }) : null))));
-    }
+  }
+  // ── 오답노트 탭 안의 최근 부족 목록(280-1: 퀴즈 탭 진입 영역에서 옮김. 읽기 형태로 보여 주기만 한다) ──
+  function renderRecent() {
+    const box = $('wrong-recent');
+    if (!box) return;
+    box.textContent = '';
+    const has = !!(A.recent && A.recent.length);
+    if ($('wrong-recent-empty')) $('wrong-recent-empty').hidden = has || A.recent === null;
+    if (!has) return;
+    box.append(h('p', { class: 'sec-label', id: 'answer-recent-label', text: '최근 부족하다고 평가된 개념 ' + A.recent.length + '개' }));
+    box.append(h('ul', { class: 'answer-recent', id: 'answer-recent' }, A.recent.map(it => h('li', { 'data-id': it.concept_id },
+      h('p', { class: 'ar-head' }, h('span', { class: 'ar-term', text: it.term }), h('span', { class: 'ar-verdict ' + VERDICT_CLASS[it.verdict], text: it.verdict })),
+      it.gaps && it.gaps.length ? h('ul', { class: 'ar-gaps' }, it.gaps.map(g => h('li', { text: g }))) : null,
+      it.supplement ? h('p', { class: 'ar-sup', text: it.supplement }) : null))));
   }
   // 대상은 개념 단위(표시·설명)라 지도 저장 여부와 무관하다
 
@@ -80,6 +88,14 @@
     showPanel(false);
     refresh();                                              // 결과가 쌓였으므로 최근 부족 목록·대상 개수를 갱신
   }
+  // 280-1: 탭을 옮길 때 잃는 것이 있으면 안내 문구(녹음 중·평가 중), 없으면 null / 퀴즈 화면을 떠나면 진행을 끝낸다
+  function busyText() {
+    if (!A.run) return null;
+    if (A.run.recording) return '녹음 중입니다. 이동하면 녹음이 취소됩니다.';
+    if (A.run.view === 'working') return '평가 중입니다. 이동하면 결과를 받지 못할 수 있어요.';
+    return null;
+  }
+  function stop() { if (A.run) endRun(); }
   const cur = () => A.run.list[A.run.i];
   function setView(v) { A.run.view = v; A.run.msg = null; A.run.result = v === 'result' ? A.run.result : null; renderRun(); }
 
@@ -195,12 +211,12 @@
   function init() {
     const M = window.CmapMap;
     M.on('mode', mode => { if (mode === 'review') refresh(); else if (A.run) endRun(); });   // 다른 탭으로 가면 녹음을 버리고 진행을 끝낸다
-    M.on('open', () => { A.targets = null; A.recent = null; A.run = null; if ($('answer-panel')) { $('answer-panel').hidden = true; } });
+    M.on('open', () => { A.targets = null; A.recent = null; A.run = null; renderRecent(); if ($('answer-panel')) { $('answer-panel').hidden = true; } });
     M.on('close', () => { if (A.mic) A.mic.cancel(); A.run = null; });
     M.on('sheetclose', () => { if (M._state().mode === 'review' && !A.run) refresh(); });
     window.addEventListener('hashchange', () => { if (A.mic) A.mic.cancel(); });
     window.addEventListener('pagehide', () => { if (A.mic) A.mic.cancel(); });
   }
-  window.CmapAnswer = { init, renderEntry, refresh, _state: () => ({ run: A.run ? { i: A.run.i, view: A.run.view, n: A.run.list.length } : null, targets: A.targets && A.targets.targets.length, recent: A.recent && A.recent.length }) };
+  window.CmapAnswer = { init, renderEntry, renderRecent, refresh, busyText, stop, _state: () => ({ run: A.run ? { i: A.run.i, view: A.run.view, n: A.run.list.length } : null, targets: A.targets && A.targets.targets.length, recent: A.recent && A.recent.length }) };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

@@ -6,6 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startCmapServer } = require('./helpers/cmap_server');
+const { tabIn } = require('./helpers/cmap_nav');
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 let browser;
@@ -36,7 +37,7 @@ async function world(page, { wide = false } = {}) {
   await seed(page, 'POST', `/api/cmap/maps/${map.id}/save`);
   await page.eval('refresh()'); await page.eval(`selectTopic(${sci.id}); 0`);
   await page.waitFor("document.querySelectorAll('#concept-list > *').length >= 4", 6000, '개념 목록');
-  await page.click('#act-map');
+  await page.click('#nav-map');
   await page.waitFor("!document.getElementById('map-view').hidden && document.querySelectorAll('[data-node]').length === 4", 6000, '지도 화면');
   return { sci, ids, map };
 }
@@ -174,8 +175,8 @@ test('툴바: 한 줄·각 44px 이상·SVG 아이콘·이모지 없음, 해설�
   assert.equal(await page.hasHorizontalScroll(), false);
   await page.click('#map-sheet-close'); await closed(page);
   // 복습 탭의 [지도 열기] = 읽기 전용
-  await page.click('#tab-review'); await page.waitFor("!!document.getElementById('review-open-map')", 4000);
-  await page.click('#review-open-map'); await page.waitFor("document.getElementById('map-sheet').open", 4000);
+  await page.click('#nav-wrong'); await page.waitFor("!document.getElementById('wrong-view').hidden && !!document.getElementById('wrong-open-map')", 4000);
+  await page.click('#wrong-open-map'); await page.waitFor("document.getElementById('map-sheet').open", 4000);
   assert.equal(await page.eval("document.getElementById('map-sheet').classList.contains('ro')"), true);
   const vis = await page.eval("[...document.querySelectorAll('.sheet-tools .tool')].filter(b => b.offsetParent !== null).map(b => b.id)");
   assert.deepEqual(vis, ['map-fit', 'map-zoom-in', 'map-zoom-out']);
@@ -244,6 +245,6 @@ test('열었다 닫은 뒤 페이지 상태: 한 줄 상태(개념·연결·저�
   await page.click('#map-sheet-close'); await closed(page);
   const meta = await page.eval("document.getElementById('map-meta').textContent");
   assert.match(meta, /^개념 3개 · 연결 [01]개 · 저장 후 변경됨$/);
-  await page.click('#tab-narr'); await page.waitFor("document.getElementById('map-view').classList.contains('narr-mode')", 4000);
+  await tabIn(page, 'narr'); await page.waitFor("document.getElementById('map-view').classList.contains('narr-mode')", 4000);
   assert.equal(await page.hasHorizontalScroll(), false);
 });

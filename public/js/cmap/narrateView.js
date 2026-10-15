@@ -62,9 +62,8 @@
   // 제안: [찾아보기] → 개념 검색 입력칸에 용어만 채우고 이동(자동 검색·저장 없음)
   async function searchSuggestion(s) {
     const topicId = (s.topic_id !== undefined ? s.topic_id : null) || window.CmapMap.topicOfConcept(s.near_concept_id) || window.CmapMap.rootId();
-    window.CmapMap.close();
     await refresh();
-    selectTopic(topicId);
+    await window.CmapNav.openTopic(topicId);        // 280-1: 지도를 닫고 그 주제 안 화면으로(뒤로 가면 해설로 돌아옴)
     const input = $('explain-term');
     input.value = s.term;
     $('concepts-msg').textContent = '';

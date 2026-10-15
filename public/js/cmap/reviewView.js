@@ -1,29 +1,20 @@
-// 작업273-5: 개념 지도 화면의 "복습" 탭(저장된 지도 + 최신 AI 해설을 읽기 전용으로 다시 보기)과 "연결 퀴즈"(AI 없음).
+// 작업273-5: 개념 지도 화면의 "연결 퀴즈"(AI 없음). 280-1: 퀴즈 탭(시작 카드 3개)과 오답노트(모르는 개념 표시 목록)의 화면 그리기도 맡는다.
 // 클래식 스크립트(window.CmapReview). concept_map.html 의 인라인 전역($, h, api, okStatus, errText, openDlg, closeDlg)과 window.CmapMap(mapView.js)의 공개 함수를 호출 시점에 사용한다.
-// - 복습: 해설은 273-4 의 구조(summary / story / mnemonic / suggestions)를 그대로 보여 주기만 한다(만들기·찾아보기 버튼 없음). 단락을 누르면 지도에서 개념이 강조된다.
 // - 퀴즈: 시작하면 서버가 노드 목록만 준다(정답 간선 없음). 화면이 노드를 흩어 놓고, 사용자는 두 노드를 차례로 눌러(CmapPairPicker) 이은 뒤 종류를 고른다. 제출하면 서버가 저장된 지도로 채점한다.
 //   점수 3종(연결 찾기·관계 종류·방향)은 따로 보여 주고, 지도에 없는 연결은 "지도에 없는 연결"로 따로 표시하며 감점하지 않는다.
 (function () {
   'use strict';
-  const Rv = { data: null, loaded: false, seq: 0, msg: '', quiz: null, minfo: null, fallback: false };   // minfo = 표시한 개념 퀴즈 안내 정보(서버 계산)
+  const Rv = { loaded: false, msg: '', quiz: null, minfo: null, fallback: false };   // minfo = 표시한 개념 퀴즈 안내 정보(서버 계산)
 
   const status = () => window.CmapMap.status();
   const isSaved = () => { const s = status(); return !!s && s.save_status === 'saved'; };
-  const nar = () => (Rv.data && Rv.data.narration) || null;
-  const isStale = () => !!(nar() && status() && nar().source_hash !== status().current_hash);
-  const termOf = id => { const c = Rv.data && Rv.data.concepts && Rv.data.concepts.find(x => x.id === id); return c ? c.term : '?'; };
   const quizTerm = id => { const n = Rv.quiz && Rv.quiz.nodes.find(x => x.id === id); return n ? n.term : '?'; };
   const pct = s => (s.total === 0 ? '해당 없음' : s.hit + '/' + s.total + ' (' + Math.round(s.ratio * 100) + '%)');
 
-  function reset() { Rv.seq++; Rv.data = null; Rv.loaded = false; Rv.msg = ''; Rv.quiz = null; Rv.minfo = null; Rv.fallback = false; window.CmapMap.quizEnd(); window.CmapMap.highlight([]); }
+  function reset() { Rv.loaded = false; Rv.msg = ''; Rv.quiz = null; Rv.minfo = null; Rv.fallback = false; window.CmapMap.quizEnd(); window.CmapMap.highlight([]); }
 
-  async function load() {
-    const id = window.CmapMap.mapId();
-    if (!id) return;
-    const seq = ++Rv.seq;
-    const r = await api('GET', '/api/cmap/maps/' + id + '/narration');
-    if (seq !== Rv.seq) return;
-    if (okStatus(r)) Rv.data = r.body; else Rv.msg = errText(r, '해설을 불러오지 못했습니다.');
+  // 280-1: 퀴즈 탭은 시작 카드 3개(연결 퀴즈 · 표시 개념 퀴즈 · 말로 설명하기)만 보여 준다. 해설 읽기는 지도 만들기 탭의 [해설]에 있다.
+  function load() {
     Rv.loaded = true;
     renderReview();
     loadInfo();
@@ -35,61 +26,49 @@
     const r = await api('GET', '/api/cmap/maps/' + id + '/quiz/marked-info');
     if (id !== window.CmapMap.mapId()) return;
     Rv.minfo = okStatus(r) ? r.body : null;
-    if (Rv.loaded && window.CmapMap._state().mode === 'review') renderReview();
+    if (Rv.loaded) renderReview();
   }
 
-  // ── 복습 ──
-  let para = null;
-  function showPara(i) {                                  // 274-4: [지도에서 보기] → 읽기 전용 시트가 열리고 그 단락의 개념이 강조된다
-    const p = nar() && nar().content.story[i];
-    if (!p) return;
-    para = i;
-    window.CmapMap.showOnMap(p.concept_ids);
-    renderReview();
-  }
+  // ── 퀴즈 탭 ──
   function renderReview() {
+    renderWrong();
     const box = $('review-panel');
     box.textContent = '';
     if (!Rv.loaded) { box.append(h('p', { class: 'hint', text: '불러오는 중…' })); return; }
     const saved = isSaved(), edges = window.CmapMap.edgeCount();
-    // 퀴즈 시작
+    // 1) 연결 퀴즈
     const canQuiz = saved && edges > 0;
-    box.append(h('div', { class: 'narr-actions', style: 'justify-content:flex-start;margin-top:0' },
-      h('button', { class: 'btn text', type: 'button', id: 'review-open-map', onclick: () => window.CmapMap.showOnMap([]), text: '지도 열기' }),
-      h('button', { class: 'btn', type: 'button', id: 'quiz-start', disabled: !canQuiz, onclick: startQuiz, text: '연결 퀴즈 시작' })));
+    box.append(h('section', { class: 'qcard', id: 'qcard-all' },
+      h('p', { class: 'sec-label', text: '연결 퀴즈' }),
+      h('p', { class: 'hint', id: 'quiz-start-note', text: !saved ? '저장된 지도에서만 퀴즈를 풀 수 있어요. 지도 만들기 탭에서 [저장]을 눌러 주세요.' : edges === 0 ? '연결이 있는 지도에서만 퀴즈를 풀 수 있어요.' : '지도의 노드만 보여 줍니다. 두 노드를 차례로 눌러 연결을 떠올려 보세요.' }),
+      h('div', { class: 'narr-actions', style: 'justify-content:flex-start' }, h('button', { class: 'btn', type: 'button', id: 'quiz-start', disabled: !canQuiz, onclick: startQuiz, text: '연결 퀴즈 시작' }))));
+    // 2) 표시 개념 퀴즈
     const mi = Rv.minfo, nMarked = mi ? mi.marked.length : 0;
-    box.append(h('div', { class: 'narr-actions', style: 'justify-content:flex-start;margin-top:0;align-items:center' },
-      h('button', { class: 'btn text', type: 'button', id: 'quiz-start-marked', disabled: !saved || !mi || nMarked === 0, onclick: () => startQuiz('marked'), text: '표시한 개념 퀴즈' }),
-      h('span', { class: 'hint', id: 'quiz-marked-count', style: 'margin-top:0', text: mi ? '표시한 개념 ' + nMarked + '개' : '' })));
-    if (mi && nMarked === 0) box.append(h('p', { class: 'hint', id: 'quiz-marked-hint', text: '지도에서 모르는 개념을 눌러 표시해 보세요' }));
-    if (mi && mi.isolated.length) box.append(h('p', { class: 'hint', id: 'quiz-marked-isolated', text: '연결이 없어 출제할 수 없음: ' + mi.isolated.map(x => x.term).join(', ') }));
-    box.append(h('div', { id: 'answer-entry' }));                    // 278-1: 말로 설명하기 진입 영역 + 최근 부족 목록(answerView.js 가 채움)
+    const mcard = h('section', { class: 'qcard', id: 'qcard-marked' },
+      h('p', { class: 'sec-label', text: '표시 개념 퀴즈' }),
+      h('div', { class: 'narr-actions', style: 'justify-content:flex-start;margin-top:4px;align-items:center' },
+        h('button', { class: 'btn', type: 'button', id: 'quiz-start-marked', disabled: !saved || !mi || nMarked === 0, onclick: () => startQuiz('marked'), text: '표시한 개념 퀴즈' }),
+        h('span', { class: 'hint', id: 'quiz-marked-count', style: 'margin-top:0', text: mi ? '표시한 개념 ' + nMarked + '개' : '' })));
+    if (mi && nMarked === 0) mcard.append(h('p', { class: 'hint', id: 'quiz-marked-hint', text: '지도에서 모르는 개념을 눌러 표시해 보세요' }));
+    if (mi && mi.isolated.length) mcard.append(h('p', { class: 'hint', id: 'quiz-marked-isolated', text: '연결이 없어 출제할 수 없음: ' + mi.isolated.map(x => x.term).join(', ') }));
+    if (Rv.msg) mcard.append(h('p', { class: 'msg', id: 'review-msg', role: 'alert', text: Rv.msg }));
+    if (Rv.fallback) mcard.append(h('div', { class: 'narr-actions', style: 'justify-content:flex-start;margin-top:0' }, h('button', { class: 'btn text', type: 'button', id: 'quiz-start-all-fallback', onclick: () => startQuiz('all'), text: '전체 퀴즈로 풀기' })));
+    box.append(mcard);
+    // 3) 말로 설명하기 (answerView.js 가 #answer-entry 를 채운다)
+    box.append(h('section', { class: 'qcard', id: 'qcard-answer' }, h('p', { class: 'sec-label', text: '말로 설명하기' }), h('div', { id: 'answer-entry' })));
     if (window.CmapAnswer) window.CmapAnswer.renderEntry();
-    box.append(h('p', { class: 'hint', id: 'quiz-start-note', text: !saved ? '저장된 지도에서만 퀴즈를 풀 수 있어요. 지도 탭에서 [저장]을 눌러 주세요.' : edges === 0 ? '연결이 있는 지도에서만 퀴즈를 풀 수 있어요.' : '지도의 노드만 보여 줍니다. 두 노드를 차례로 눌러 연결을 떠올려 보세요.' }));
-    if (Rv.msg) box.append(h('p', { class: 'msg', id: 'review-msg', role: 'alert', text: Rv.msg }));
-    if (Rv.fallback) box.append(h('div', { class: 'narr-actions', style: 'justify-content:flex-start;margin-top:0' }, h('button', { class: 'btn text', type: 'button', id: 'quiz-start-all-fallback', onclick: () => startQuiz('all'), text: '전체 퀴즈로 풀기' })));
-    if (saved === false && status() && status().save_status === 'changed') box.append(h('p', { class: 'hint', text: '지도가 저장한 뒤에 바뀌었어요. 위 지도는 지금 상태입니다.' }));
-    // 최신 해설(읽기 전용)
-    if (!nar()) { box.append(h('p', { class: 'hint', id: 'review-no-narr', text: '아직 만든 해설이 없어요. 해설 탭에서 만들 수 있어요.' })); return; }
-    const c = nar().content;
-    if (isStale()) box.append(h('div', { class: 'narr-stale', id: 'review-stale', role: 'status' }, h('p', { text: '지도가 바뀌었습니다. 아래 해설은 이전 지도를 기준으로 만든 것입니다.' })));
-    box.append(h('p', { class: 'sec-label', text: 'AI 설명 · 확인 필요' }));
-    box.append(h('p', { class: 'narr-summary', id: 'review-summary', text: c.summary }));
-    c.story.forEach((p, i) => {
-      box.append(h('div', { class: 'narr-para' + (para === i ? ' sel' : ''), 'data-para': i },
-        h('span', { class: 'narr-text', text: p.text }),
-        h('span', { class: 'narr-cap', text: '다루는 개념: ' + p.concept_ids.map(termOf).join(' · ') }),
-        h('div', { class: 'narr-para-row' }, h('button', { class: 'btn text', type: 'button', 'data-act': 'show-map', onclick: () => showPara(i), text: '지도에서 보기' }))));
-    });
-    if (c.mnemonic && c.mnemonic.length) {
-      box.append(h('p', { class: 'sec-label narr-sec', text: '기억용' }));
-      box.append(h('ul', { class: 'narr-mnemonic', id: 'review-mnemonic' }, c.mnemonic.map(m => h('li', { text: m }))));
-    }
-    box.append(h('p', { class: 'sec-label narr-sec', text: 'AI가 제안하는 개념' }));
-    if (!c.suggestions || !c.suggestions.length) box.append(h('p', { class: 'hint', text: '제안할 개념이 없어요.' }));
-    else box.append(h('ul', { class: 'narr-sugs', id: 'review-sugs' }, c.suggestions.map(s => h('li', { class: 'narr-sug' },
-      h('p', { class: 'narr-sug-term', text: s.term }), h('p', { class: 'narr-sug-reason', text: s.reason }),
-      h('p', { class: 'narr-cap', text: '가까운 개념: ' + termOf(s.near_concept_id) + (s.saved ? ' · 이미 저장된 개념' : '') })))));
+    if (!saved && status() && status().save_status === 'changed') box.append(h('p', { class: 'hint', text: '지도가 저장한 뒤에 바뀌었어요. 위 지도는 지금 상태입니다.' }));
+  }
+
+  // ── 오답노트 탭: 모르는 개념으로 표시한 개념 목록(말로 설명하기 최근 부족 목록은 answerView.js 가 #wrong-recent 에 그린다) ──
+  function renderWrong() {
+    const ul = $('wrong-marked');
+    if (!ul) return;
+    const list = window.CmapMap.mapId() ? window.CmapMap.markedConcepts() : [];
+    ul.textContent = '';
+    for (const c of list) ul.append(h('li', { 'data-id': c.id, text: c.term }));
+    $('wrong-marked-label').textContent = '모르는 개념 표시 ' + list.length + '개';
+    $('wrong-marked-empty').hidden = list.length > 0;
   }
 
   // ── 퀴즈 ──
@@ -108,7 +87,6 @@
       renderReview(); loadInfo(); return;
     }
     Rv.quiz = { mode, scope_key: r.body.scope_key || null, source_hash: r.body.source_hash, nodes: r.body.nodes, answers: [], result: null, error: '', submitting: false, stale: false };
-    para = null;
     window.CmapMap.highlight([]);
     window.CmapMap.quizBegin(r.body.nodes);
     window.CmapMap.quizSetAnswers([]);
@@ -215,7 +193,6 @@
 
   function init() {
     const M = window.CmapMap;
-    $('tab-review').addEventListener('click', () => M.setMode('review'));
     $('quiz-cancel').addEventListener('click', () => { pending = null; closeDlg($('quiz-dlg')); });
     $('quiz-form').addEventListener('submit', ev => {
       ev.preventDefault();
@@ -226,17 +203,19 @@
       syncAnswers(); renderQuiz();
     });
     M.on('mode', mode => {
-      if (mode === 'review') { renderReview(); load(); }
-      else if (mode !== 'quiz') { if (Rv.quiz) { Rv.quiz = null; M.quizEnd(); } para = null; }
+      if (mode === 'review') load();
+      else if (mode !== 'quiz') { if (Rv.quiz) { Rv.quiz = null; M.quizEnd(); } }
     });
     M.on('quizpair', onQuizPair);
     M.on('sheetclose', () => {                                    // 시트를 닫으면(닫기·ESC·뒤로 가기) 진행 중이던 퀴즈는 끝난다
       if (Rv.quiz) { Rv.quiz = null; pending = null; M.quizEnd(); M.setMode('review'); }
-      if (M._state().mode === 'review') loadInfo();                  // 시트에서 표시를 바꿨을 수 있으므로 표시한 개념 수를 다시 가져온다
+      if (M._state().mode === 'review') loadInfo();                  // 시트에서 표시를 바꿨을 수 있으므로 표시한 개념 수·오답노트 목록을 다시 가져온다
     });
     M.on('open', reset); M.on('close', reset);
-    M.on('status', () => { if (Rv.loaded && $('map-view') && !$('map-view').hidden && M._state().mode === 'review') renderReview(); });
+    M.on('status', () => { if (Rv.loaded && M._state().mode === 'review') renderReview(); });
   }
-  window.CmapReview = { init, _state: () => ({ quiz: Rv.quiz ? { answers: Rv.quiz.answers.length, result: !!Rv.quiz.result } : null }) };
+  // 280-1: 풀던 퀴즈가 있으면(한 개라도 이었고 결과 전) 탭을 옮길 때 확인한다
+  const quizActive = () => !!Rv.quiz && !Rv.quiz.result && Rv.quiz.answers.length > 0;
+  window.CmapReview = { init, renderWrong, quizActive, _state: () => ({ quiz: Rv.quiz ? { answers: Rv.quiz.answers.length, result: !!Rv.quiz.result } : null }) };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
