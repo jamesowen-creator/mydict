@@ -5,6 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startCmapServer } = require('./helpers/cmap_server');
+const { clickMore } = require('./helpers/cmap_nav');
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 let browser;
@@ -83,7 +84,7 @@ test('배치 최적화: 미리보기(서버는 그대로) → 취소 → 다시 
   await page.click('#map-save'); await page.waitFor("document.getElementById('map-save-state').textContent.startsWith('저장됨')", 4000);
   const g0 = await serverMap(page, w.sci);
   // 미리보기
-  await page.click('#map-opt');
+  await clickMore(page, '#map-opt');
   await page.waitFor("!document.getElementById('map-opt-bar').hidden", 4000, '미리보기 막대');
   const pv = await page.eval('window.CmapMap._preview()');
   assert.ok(pv && pv.metrics.crossingsBefore === 1 && pv.metrics.crossingsAfter === 0, JSON.stringify(pv && pv.metrics));
@@ -99,7 +100,7 @@ test('배치 최적화: 미리보기(서버는 그대로) → 취소 → 다시 
   assert.equal(await page.eval('window.CmapMap._preview()'), null);
   assert.equal(posKey((await serverMap(page, w.sci)).nodes), posKey(g0.nodes));
   // 적용
-  await page.click('#map-opt');
+  await clickMore(page, '#map-opt');
   await page.waitFor("!document.getElementById('map-opt-bar').hidden", 4000);
   await page.click('#map-opt-apply');
   await page.waitFor("document.getElementById('map-opt-bar').hidden && !document.getElementById('map-undo').hidden", 6000, '적용 후 되돌리기 표시');
@@ -113,7 +114,7 @@ test('배치 최적화: 미리보기(서버는 그대로) → 취소 → 다시 
   const st = await page.eval('window.CmapMap._state()');
   assert.equal(posKey(st.nodes.map(n => ({ concept_id: n.id, x: n.x, y: n.y }))), posKey(g1.nodes));
   // 되돌리기
-  await page.click('#map-undo');
+  await clickMore(page, '#map-undo');
   await page.waitFor("document.getElementById('map-undo').hidden", 6000, '되돌리기 사라짐');
   const g2 = await serverMap(page, w.sci);
   assert.equal(posKey(g2.nodes), posKey(g0.nodes), '원래 위치로 복원');
@@ -125,7 +126,7 @@ test('배치 최적화: 미리보기(서버는 그대로) → 취소 → 다시 
 test('되돌리기는 화면을 떠나면 사라지고, 적용 뒤 노드·연결이 바뀌면 사라진다', { skip: SKIP }, async t => {
   const { page } = await open(t);
   const w = await world(page);
-  await page.click('#map-opt'); await page.waitFor("!document.getElementById('map-opt-bar').hidden", 4000);
+  await clickMore(page, '#map-opt'); await page.waitFor("!document.getElementById('map-opt-bar').hidden", 4000);
   await page.click('#map-opt-apply'); await page.waitFor("!document.getElementById('map-undo').hidden", 6000);
   // 연결을 하나 더 만들면 되돌리기 사라짐
   await seed(page, 'GET', `/api/cmap/topics/${w.sci.id}/map`);
@@ -136,7 +137,7 @@ test('되돌리기는 화면을 떠나면 사라지고, 적용 뒤 노드·연�
   await page.click('#edge-ok');
   await page.waitFor("document.getElementById('map-undo').hidden", 4000, '연결 변경 후 되돌리기 사라짐');
   // 다시 적용 후 화면을 나갔다 오면 사라짐
-  await page.click('#map-opt');
+  await clickMore(page, '#map-opt');
   const bar = await page.eval("!document.getElementById('map-opt-bar').hidden");
   if (bar) { await page.click('#map-opt-apply'); await page.waitFor("!document.getElementById('map-undo').hidden", 6000); }
   await closeSheet(page);
@@ -149,9 +150,9 @@ test('되돌리기는 화면을 떠나면 사라지고, 적용 뒤 노드·연�
 test('이미 정리된 배치는 바뀌는 것이 없다는 안내만 보이고 미리보기는 열리지 않는다', { skip: SKIP }, async t => {
   const { page } = await open(t);
   await world(page);
-  await page.click('#map-opt'); await page.waitFor("!document.getElementById('map-opt-bar').hidden", 4000);
+  await clickMore(page, '#map-opt'); await page.waitFor("!document.getElementById('map-opt-bar').hidden", 4000);
   await page.click('#map-opt-apply'); await page.waitFor("!document.getElementById('map-undo').hidden", 6000);
-  await page.click('#map-opt');
+  await clickMore(page, '#map-opt');
   await sleep(200);
   if (await page.eval("!document.getElementById('map-opt-bar').hidden")) {
     // 두 번째 최적화가 더 좋은 배치를 찾은 경우: 취소하고 넘어간다(미리보기가 열린 것 자체는 정상)
@@ -164,8 +165,10 @@ test('이미 정리된 배치는 바뀌는 것이 없다는 안내만 보이고 
 test('390px: 저장·최적화 버튼 높이 44 이상, 가로 스크롤 없음, 미리보기 막대가 캔버스 안에 있음', { skip: SKIP }, async t => {
   const { page } = await open(t);
   await world(page);
-  for (const id of ['map-save', 'map-opt']) assert.ok(await page.eval(`document.getElementById('${id}').getBoundingClientRect().height`) >= 44, id);
-  await page.click('#map-opt'); await page.waitFor("!document.getElementById('map-opt-bar').hidden", 4000);
+  assert.ok(await page.eval(`document.getElementById('map-save').getBoundingClientRect().height`) >= 44, 'map-save');
+  await page.click('#map-more-toggle'); await page.waitFor("!document.getElementById('map-more').hidden", 3000);
+  assert.ok(await page.eval(`document.getElementById('map-opt').getBoundingClientRect().height`) >= 44, 'map-opt');
+  await clickMore(page, '#map-opt'); await page.waitFor("!document.getElementById('map-opt-bar').hidden", 4000);
   for (const id of ['map-opt-apply', 'map-opt-cancel']) assert.ok(await page.eval(`document.getElementById('${id}').getBoundingClientRect().height`) >= 44, id);
   assert.equal(await page.eval("(() => { const b = document.getElementById('map-opt-bar').getBoundingClientRect(), c = document.querySelector('.map-canvas').getBoundingClientRect(); return b.left >= c.left && b.right <= c.right && b.top >= c.top; })()"), true);
   assert.equal(await page.hasHorizontalScroll(), false);

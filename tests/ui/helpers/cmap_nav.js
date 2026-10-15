@@ -34,4 +34,11 @@ async function tabIn(page, which) {
   await page.click('#tab-' + which);
 }
 
-module.exports = { enterTopic, gotoTab, openMapTab, backToTopic, tabIn };
+// 285-1: 시트 툴바 [더보기] 목록 안의 항목(배치 최적화·되돌리기·확대·축소)을 누른다 — 목록이 닫혀 있으면 [더보기]를 먼저 누른다
+async function clickMore(page, sel) {
+  if (await page.eval("document.getElementById('map-more').hidden")) await page.click('#map-more-toggle');
+  await page.waitFor("!document.getElementById('map-more').hidden", 3000, '더보기 목록');
+  await page.click(sel);
+}
+
+module.exports = { enterTopic, gotoTab, openMapTab, backToTopic, tabIn, clickMore };

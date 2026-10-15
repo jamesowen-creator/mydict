@@ -8,7 +8,7 @@
   'use strict';
   const NARR_TIMEOUT_MS = 40000;
   const timeoutMs = () => (Number.isFinite(window.__CMAP_AI_TIMEOUT_MS) && window.__CMAP_AI_TIMEOUT_MS > 0 ? window.__CMAP_AI_TIMEOUT_MS : NARR_TIMEOUT_MS);
-  const N = { mapId: null, data: null, loading: false, error: null, para: null, loaded: false, seq: 0, ctrl: null };
+  const N = { saving: false, mapId: null, data: null, loading: false, error: null, para: null, loaded: false, seq: 0, ctrl: null };
 
   const status = () => window.CmapMap.status();
   const isSaved = () => { const s = status(); return !!s && s.save_status === 'saved'; };
@@ -16,7 +16,7 @@
   const termOf = id => { const c = N.data && N.data.concepts && N.data.concepts.find(x => x.id === id); return c ? c.term : '?'; };
 
   function reset() {
-    N.seq++; if (N.ctrl) N.ctrl.abort();
+    N.saving = false; N.seq++; if (N.ctrl) N.ctrl.abort();
     N.ctrl = null; N.data = null; N.loading = false; N.error = null; N.para = null; N.loaded = false; N.mapId = null;
     window.CmapMap.highlight([]);
   }
@@ -48,6 +48,18 @@
     else if (okStatus(r)) { N.data = r.body; N.para = null; window.CmapMap.highlight([]); }
     else N.error = { message: errText(r, '해설을 만들지 못했습니다. 잠시 후 다시 시도해주세요.'), retry: r.status !== 429 && r.status !== 409 };
     render();
+  }
+
+  // 285-1: 저장되지 않은 지도에서는 [지도 저장하고 해설 만들기] — 화면에서 저장(CmapMap.save, 서버 새 라우트 없음) → 성공하면 이어서 해설 만들기.
+  // 저장이 실패하면 해설을 부르지 않고 안내하며, 저장 뒤 해설이 실패하면 "저장됨"은 그대로 두고 해설 오류만 안내한다.
+  async function saveThenGenerate() {
+    if (N.loading || N.saving || !window.CmapMap.mapId()) return;
+    N.mapId = window.CmapMap.mapId();
+    N.saving = true; N.error = null; render();
+    const r = await window.CmapMap.save();
+    N.saving = false;
+    if (!r.ok) { N.error = { message: '지도를 저장하지 못했어요. ' + (r.error || ''), retry: false }; render(); return; }
+    await generate();
   }
 
   // 274-4: 단락의 [지도에서 보기] → 지도 시트(읽기 전용)가 열리고 그 단락의 개념이 강조된다
@@ -84,6 +96,7 @@
     box.textContent = '';
     const nar = N.data && N.data.narration;
     const saved = isSaved();
+    const nodes = window.CmapMap.info().nodeIds.length;
     const actions = [];
 
     if (!N.loaded) { box.append(h('p', { class: 'hint', text: '해설을 불러오는 중…' })); return; }
@@ -99,15 +112,23 @@
 
     if (!nar) {
       if (!N.loading) {
-        box.append(h('p', { class: 'hint', id: 'narr-empty', text: saved ? '지도 속 개념과 연결을 이야기처럼 이어 주는 해설을 만들 수 있어요.' : '해설은 저장된 지도에서만 만들 수 있어요. 지도 탭에서 [저장]을 눌러 주세요.' }));
-        actions.push(h('button', { class: 'btn', type: 'button', id: 'narr-make', disabled: !saved || N.loading, onclick: generate, text: '해설 만들기' }));
+        if (nodes === 0) {
+          box.append(h('p', { class: 'hint', id: 'narr-empty', text: '먼저 지도를 만들어 주세요. 지도에 개념을 올리면 해설을 만들 수 있어요.' }));
+          actions.push(h('button', { class: 'btn', type: 'button', id: 'narr-go-make', onclick: () => window.CmapNav.goMake(), text: '지도 만들기로 가기' }));
+        } else if (!saved) {
+          box.append(h('p', { class: 'hint', id: 'narr-empty', text: '지도가 아직 저장되지 않았어요. 저장하고 이어서 해설을 만들 수 있어요.' }));
+          actions.push(h('button', { class: 'btn', type: 'button', id: 'narr-make', disabled: N.saving || N.loading, onclick: saveThenGenerate, text: N.saving ? '저장하는 중…' : '지도 저장하고 해설 만들기' }));
+        } else {
+          box.append(h('p', { class: 'hint', id: 'narr-empty', text: '지도 속 개념과 연결을 이야기처럼 이어 주는 해설을 만들 수 있어요.' }));
+          actions.push(h('button', { class: 'btn', type: 'button', id: 'narr-make', disabled: N.loading, onclick: generate, text: '해설 만들기' }));
+        }
       }
     } else {
       const c = nar.content;
       if (isStale()) {
         box.append(h('div', { class: 'narr-stale', id: 'narr-stale', role: 'status' },
           h('p', { text: '지도가 바뀌었습니다. 아래 해설은 이전 지도를 기준으로 만든 것입니다.' }),
-          h('p', { class: 'hint', text: saved ? '' : '지도를 저장하면 해설을 다시 만들 수 있어요.' })));
+          h('p', { class: 'hint', text: saved ? '' : '지도를 저장하고 이어서 해설을 다시 만들 수 있어요.' })));
       }
       box.append(h('p', { class: 'sec-label', text: 'AI 설명 · 확인 필요' }));
       box.append(h('p', { class: 'narr-summary', id: 'narr-summary', text: c.summary }));
@@ -132,7 +153,7 @@
             ? h('div', { class: 'narr-sug-row' }, h('span', { class: 'narr-cap', text: '이미 저장된 개념이에요.' }), h('button', { class: 'btn text', type: 'button', 'data-act': 'guide', onclick: () => guideAdd(s), text: '지도에 추가하러 가기' }))
             : h('div', { class: 'narr-sug-row' }, h('button', { class: 'btn text', type: 'button', 'data-act': 'search', onclick: () => searchSuggestion(s), text: '찾아보기' }))))));
       }
-      if (!N.loading) actions.push(h('button', { class: isStale() ? 'btn' : 'btn text', type: 'button', id: 'narr-make', disabled: !saved, onclick: generate, text: '다시 만들기' }));
+      if (!N.loading) actions.push(h('button', { class: isStale() ? 'btn' : 'btn text', type: 'button', id: 'narr-make', disabled: N.saving, onclick: saved ? generate : saveThenGenerate, text: N.saving ? '저장하는 중…' : saved ? '다시 만들기' : '지도 저장하고 다시 만들기' }));
     }
     if (actions.length) box.append(h('div', { class: 'narr-actions' }, actions));
     if (N.data && N.data.daily) box.append(h('p', { class: 'hint narr-daily', id: 'narr-daily', text: '오늘 해설 ' + N.data.daily.used + '/' + N.data.daily.cap + '건 사용' }));

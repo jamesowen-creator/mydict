@@ -410,13 +410,23 @@
     $('map-opt').disabled = !!M.preview;
     if (M.preview) $('map-opt-info').textContent = '연결선 교차 ' + M.preview.metrics.crossingsBefore + '개 → ' + M.preview.metrics.crossingsAfter + '개';
   }
+  // 285-1: 저장은 이 함수 하나만 쓴다(시트 [저장], 만들기 화면 [지도 저장], 해설·퀴즈의 "저장하고 …"). 결과 { ok, error }. 저장 중 중복 호출은 거부한다
   async function save() {
-    if (M.busy) return;
+    if (M.busy) return { ok: false, error: '저장하는 중이에요.' };
+    if (!M.map) return { ok: false, error: '지도를 아직 읽지 못했어요.' };
     M.busy = true; mapMsg('');
     const r = await api('POST', '/api/cmap/maps/' + M.map.id + '/save');
     M.busy = false;
-    if (!okStatus(r)) { mapMsg(errText(r, '저장하지 못했어요.')); return; }
+    if (!okStatus(r)) { const error = errText(r, '저장하지 못했어요.'); mapMsg(error); return { ok: false, error }; }
     M.map = r.body.map; setStatus(r.body.status, false);
+    return { ok: true };
+  }
+  // 285-1: 시트 툴바의 [더보기] 목록(배치 최적화·되돌리기·확대·축소)
+  function moreOpen() { return !$('map-more').hidden; }
+  function setMore(on) {
+    $('map-more').hidden = !on;
+    $('map-more-toggle').setAttribute('aria-expanded', String(on));
+    if (on) { const first = $('map-more').querySelector('button:not([hidden])'); if (first && getComputedStyle(first).display !== 'none') { try { first.focus({ preventScroll: true }); } catch (e) { /* 무시 */ } } }
   }
   function optimize() {
     if (M.busy || M.preview) return;
@@ -550,6 +560,7 @@
     M.selected = null; M.gest = null; M.pinch = null; M.ptrs.clear();
     $('map-pick-panel').hidden = true; $('map-pick-toggle').setAttribute('aria-expanded', 'false');
     for (const id of ['edge-dlg', 'quiz-dlg']) { const dl = $(id); if (dl && dl.open) closeDlg(dl); }
+    setMore(false);
     const note = M.preview ? '배치 최적화 미리보기를 취소했어요. 노드와 연결은 그대로예요.' : '';
     if (M.preview) cancelPreview();
     const d = $('map-sheet');
@@ -599,7 +610,10 @@
     $('map-zoom-in').addEventListener('click', () => zoomBy(1.25));
     $('map-zoom-out').addEventListener('click', () => zoomBy(0.8));
     $('map-sheet-close').addEventListener('click', closeSheet);
-    $('map-sheet').addEventListener('cancel', ev => { ev.preventDefault(); closeSheet(); });   // ESC
+    $('map-sheet').addEventListener('cancel', ev => { ev.preventDefault(); if (moreOpen()) { setMore(false); $('map-more-toggle').focus(); return; } closeSheet(); });   // ESC: 열린 [더보기]가 있으면 그것만 닫는다
+    $('map-more-toggle').addEventListener('click', () => setMore(!moreOpen()));
+    $('map-more').addEventListener('click', ev => { if (ev.target.closest('button')) setMore(false); });          // 항목을 누르면 목록이 닫힌다
+    $('map-sheet').addEventListener('pointerdown', ev => { if (moreOpen() && !$('map-more').contains(ev.target) && !$('map-more-toggle').contains(ev.target)) setMore(false); });   // 바깥을 누르면 닫힌다
     window.addEventListener('popstate', () => {
       if (M.sheet.ignorePop) { M.sheet.ignorePop = false; return; }
       if (M.sheet.open) closeSheetUi(true);
@@ -725,7 +739,8 @@
   }
 
   window.CmapMap = {
-    open, close, setMode, highlight, openSheet, closeSheet, applySelection,
+    open, close, setMode, highlight, openSheet, closeSheet, applySelection, save,
+    isBusy() { return M.busy; },
     // 283-2: [만들기] 첫 화면용 읽기 전용 정보(저장된 개념·주제 목록, 지도에 올라간 개념, 연결 수, 저장 상태)
     info() { return { concepts: [...M.concepts.values()], topics: M.topics.slice(), nodeIds: [...M.nodes.keys()], edgeCount: M.edges.length, status: M.status ? { ...M.status } : null, rootId: M.rootId, loaded: !!M.svg }; },
     isSheetOpen() { return M.sheet.open; },

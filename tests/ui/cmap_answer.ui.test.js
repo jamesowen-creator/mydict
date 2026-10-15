@@ -83,7 +83,7 @@ test('버튼: 표시 없음 → 대상 0개·비활성·안내, 설명 없는 �
   assert.equal(await page.eval("document.getElementById('answer-start').disabled"), true);
   assert.equal(await text(page, '#answer-hint'), '지도에서 모르는 개념을 눌러 표시해 보세요');
   assert.equal(await page.eval("!!document.getElementById('answer-recent-label')"), false, '최근 부족 목록은 0개이면 숨김');
-  assert.equal(await page.eval("!!document.getElementById('quiz-start-marked') && !!document.getElementById('quiz-start')"), true);
+  assert.equal(await page.eval("!!document.getElementById('quiz-start-marked') && !!(document.getElementById('quiz-start') || document.getElementById('quiz-go-make'))"), true);
   // 설명 없는 개념만 표시
   await page.click('#nav-topic'); await page.waitFor("!document.getElementById('landing-view').hidden", 4000);
   await seed(page, 'PUT', `/api/cmap/concepts/${w.ids.mass}/mark`, { marked: true });

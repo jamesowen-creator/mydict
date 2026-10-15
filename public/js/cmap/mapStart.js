@@ -4,15 +4,34 @@
 // (연결이 있는 노드를 내릴 때의 확인 창, 저장 상태 표시 변경, 배치 처리 모두 시트 안 [개념 선택]과 같다).
 (function () {
   'use strict';
-  const St = { sel: new Set(), busy: false, note: '' };
+  const St = { sel: new Set(), busy: false, note: '', saving: false };
   const M = () => window.CmapMap;
 
   const sameSet = (a, b) => a.size === b.size && [...a].every(x => b.has(x));
   function syncFromMap() { St.sel = new Set(M().info().nodeIds); }
 
+  // 285-1: 지도에 개념이 있을 때 상태 줄(#map-meta, mapView 가 갱신) 옆에 [지도 저장] — 저장 안 됨·저장 후 변경됨일 때만 활성. 저장은 mapView 의 save() 하나를 쓴다
+  function syncSave() {
+    const b = $('map-save-out');
+    if (!b) return;
+    const info = M().info(), st = info.status && info.status.save_status;
+    b.hidden = !info.nodeIds.length;
+    b.disabled = St.saving || !(st === 'unsaved' || st === 'changed');
+    b.textContent = St.saving ? '저장하는 중…' : '지도 저장';
+  }
+  async function saveOut() {
+    if (St.saving) return;
+    St.saving = true; $('map-page-note').textContent = ''; syncSave();
+    const r = await M().save();
+    St.saving = false;
+    $('map-page-note').textContent = r.ok ? '' : '지도를 저장하지 못했어요. ' + (r.error || '');
+    syncSave();
+  }
+
   function render() {
     const box = $('map-start');
     if (!box) return;
+    syncSave();
     box.textContent = '';
     const info = M().info();
     if (!info.loaded) return;
@@ -68,6 +87,7 @@
 
   function init() {
     const m = M();
+    if ($('map-save-out')) $('map-save-out').addEventListener('click', saveOut);
     m.on('open', () => { St.busy = false; St.note = ''; syncFromMap(); render(); });
     m.on('status', () => { if (!St.busy) render(); });
     m.on('sheetclose', () => {

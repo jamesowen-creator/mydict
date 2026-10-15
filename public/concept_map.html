@@ -223,7 +223,16 @@
   }
   .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 8px 16px; border-bottom: 1px solid var(--color-line); }
   .sheet-head h2 { margin: 0; font-size: 18px; font-weight: 800; min-width: 0; overflow-wrap: anywhere; }
-  .sheet-tools { display: flex; justify-content: space-around; align-items: stretch; gap: 2px; padding: 2px 4px; border-bottom: 1px solid var(--color-line); }
+  .sheet-tools { position: relative; border-bottom: 1px solid var(--color-line); padding: 0 4px; }
+  .tool-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px 0 12px; border-bottom: 1px solid var(--color-line); }
+  .tool-top .map-save-state { font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+  .tool-row { display: flex; justify-content: space-around; align-items: stretch; gap: 2px; padding: 2px 0; }
+  .tool .dot { fill: currentColor; stroke: none; }
+  .tool-more { position: absolute; right: 8px; top: 100%; z-index: 4; display: flex; flex-direction: column; min-width: 160px; padding: 4px 0; background: var(--color-surface); border: 1px solid var(--color-line-strong); border-radius: var(--input-radius); }
+  .tool-item { min-height: var(--ctl-min-h); padding: 0 16px; background: transparent; border: none; text-align: left; font-size: 15px; font-weight: 500; color: var(--color-text); }
+  .tool-item:focus-visible { outline: 2px solid var(--color-text); outline-offset: -2px; }
+  .ro-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 8px; padding: 4px 12px 4px 16px; border-bottom: 1px solid var(--color-line); font-size: 13px; color: var(--color-text-sub); }
+  .map-sheet:not(.ro) .ro-only { display: none; }
   .tool { flex: 1 1 0; min-width: 44px; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0 2px; background: transparent; border: none; color: var(--color-accent-ink); font-size: 11px; font-weight: 700; white-space: nowrap; }
   .tool svg.ic { width: 20px; height: 20px; }
   .map-sheet.ro .edit-only, .map-sheet.quiz-mode .edit-only { display: none; }
@@ -275,18 +284,18 @@
 
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
-<!-- 283-2: ?v= 값은 public/sw.js 의 CACHE_NAME(metis-v36) 숫자와 같게 두고 배포마다 함께 올린다(옛 캐시 JS가 새 HTML과 섞여 내비가 죽는 일을 막는다. tests/concept_map_cache.test.js 가 검사) -->
-<script src="/js/map/mapCore.js?v=36"></script>
-<script src="/js/cmap/mapGeometry.js?v=36"></script>
-<script src="/js/cmap/layoutOptimize.js?v=36"></script>
-<script src="/js/cmap/pairPicker.js?v=36"></script>
-<script src="/js/cmap/markState.js?v=36"></script>
-<script src="/js/cmap/mapView.js?v=36"></script>
-<script src="/js/cmap/mapStart.js?v=36"></script>
-<script src="/js/cmap/narrateView.js?v=36"></script>
-<script src="/js/cmap/reviewView.js?v=36"></script>
-<script src="/js/cmap/micRecorder.js?v=36"></script>
-<script src="/js/cmap/answerView.js?v=36"></script>
+<!-- 283-2: ?v= 값은 public/sw.js 의 CACHE_NAME(metis-v37) 숫자와 같게 두고 배포마다 함께 올린다(옛 캐시 JS가 새 HTML과 섞여 내비가 죽는 일을 막는다. tests/concept_map_cache.test.js 가 검사) -->
+<script src="/js/map/mapCore.js?v=37"></script>
+<script src="/js/cmap/mapGeometry.js?v=37"></script>
+<script src="/js/cmap/layoutOptimize.js?v=37"></script>
+<script src="/js/cmap/pairPicker.js?v=37"></script>
+<script src="/js/cmap/markState.js?v=37"></script>
+<script src="/js/cmap/mapView.js?v=37"></script>
+<script src="/js/cmap/mapStart.js?v=37"></script>
+<script src="/js/cmap/narrateView.js?v=37"></script>
+<script src="/js/cmap/reviewView.js?v=37"></script>
+<script src="/js/cmap/micRecorder.js?v=37"></script>
+<script src="/js/cmap/answerView.js?v=37"></script>
 
 <div id="loading" role="status"><p>불러오는 중…</p></div>
 
@@ -357,7 +366,7 @@
       <div class="map-tabs" role="tablist" aria-label="지도 만들기"><button id="tab-map" class="map-tab sel" type="button" role="tab" aria-selected="true">만들기</button><button id="tab-narr" class="map-tab" type="button" role="tab" aria-selected="false">해설</button></div>
       <p id="map-scope" class="hint"></p>
       <div id="map-page" class="map-only">
-        <p id="map-meta" class="hint" role="status"></p>
+        <div class="map-open-row" id="map-status-row"><span id="map-meta" class="hint" role="status"></span><button id="map-save-out" class="btn text" type="button" hidden>지도 저장</button></div>
         <div id="map-start"></div>
         <p id="map-page-note" class="hint" role="status"></p>
       </div>
@@ -401,20 +410,27 @@
     <h2 id="map-sheet-title">지도</h2>
     <button id="map-sheet-close" class="btn text" type="button" aria-label="지도 닫기">닫기</button>
   </div>
+  <p id="map-ro-note" class="ro-only ro-note"><span>읽기 전용이에요. 수정은 지도 만들기에서 할 수 있어요.</span><button id="map-ro-go" class="btn text" type="button">지도 만들기로 가기</button></p>
+  <!-- 285-1: 툴바 정리 — 윗줄 저장 상태 + [저장], 아랫줄 [개념 선택][전체 보기][더보기]. 배치 최적화·되돌리기(최적화 직후만)·확대·축소는 [더보기] 목록 안에 있다 -->
   <div class="sheet-tools" role="toolbar" aria-label="지도 도구">
-    <button id="map-pick-toggle" class="tool edit-only" type="button" aria-expanded="false" aria-controls="map-pick-panel"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg><span>개념 선택</span></button>
-    <button id="map-save" class="tool edit-only" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><path d="M8 20v-6h8v6"/></svg><span>저장</span></button>
-    <button id="map-opt" class="tool edit-only" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 6h8M7 8l4 8M17 8l-4 8"/></svg><span>배치 최적화</span></button>
-    <button id="map-undo" class="tool edit-only" type="button" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg><span>되돌리기</span></button>
-    <button id="map-fit" class="tool" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>전체 보기</span></button>
-    <button id="map-zoom-in" class="tool" type="button" aria-label="확대"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5M11 8v6M8 11h6"/></svg><span>확대</span></button>
-    <button id="map-zoom-out" class="tool" type="button" aria-label="축소"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5M8 11h6"/></svg><span>축소</span></button>
+    <div class="tool-top edit-only"><span id="map-save-state" class="map-save-state" role="status"></span><button id="map-save" class="btn text" type="button">저장</button></div>
+    <div class="tool-row">
+      <button id="map-pick-toggle" class="tool edit-only" type="button" aria-expanded="false" aria-controls="map-pick-panel"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg><span>개념 선택</span></button>
+      <button id="map-fit" class="tool" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>전체 보기</span></button>
+      <button id="map-more-toggle" class="tool" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="map-more"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle class="dot" cx="5" cy="12" r="1.8"/><circle class="dot" cx="12" cy="12" r="1.8"/><circle class="dot" cx="19" cy="12" r="1.8"/></svg><span>더보기</span></button>
+    </div>
+    <div id="map-more" class="tool-more" role="group" aria-label="더보기" hidden>
+      <button id="map-opt" class="tool-item edit-only" type="button">배치 최적화</button>
+      <button id="map-undo" class="tool-item edit-only" type="button" hidden>되돌리기</button>
+      <button id="map-zoom-in" class="tool-item" type="button" aria-label="확대">확대</button>
+      <button id="map-zoom-out" class="tool-item" type="button" aria-label="축소">축소</button>
+    </div>
   </div>
   <div id="map-canvas" class="map-canvas">
     <div id="map-opt-bar" class="map-opt-bar" hidden><span id="map-opt-info"></span><button id="map-opt-apply" class="btn" type="button">적용</button><button id="map-opt-cancel" class="btn text" type="button">취소</button></div>
     <svg id="map-svg" role="group" aria-label="개념 지도"></svg>
     <div id="map-popup" class="map-popup" role="status" hidden></div>
-    <div class="map-overlay-top"><span id="map-save-state" class="map-save-state" role="status"></span><span id="map-count" class="hint"></span></div>
+    <div class="map-overlay-top"><span id="map-count" class="hint"></span></div>
     <div class="map-overlay-bottom"><p id="map-hint"></p><p id="map-msg" class="msg" role="alert"></p></div>
   </div>
   <div id="map-pick-panel" class="map-pick edit-only" hidden><div id="map-pick-list"></div></div>
@@ -1133,7 +1149,7 @@ const Nav = (() => {
     $('map-load-msg').textContent = '';
     $('map-retry-row').hidden = true;
     mapRoot = root.id;
-    $('map-scope').textContent = '‘' + root.title + '’ 주제 전체의 지도예요.';
+    $('map-scope').textContent = '‘' + root.title + '’ 주제 전체의 지도예요. 다른 최상위 주제의 개념은 이 지도에 나오지 않아요.';
     mapLoading = (async () => {
       let ok = false;
       try { ok = await window.CmapMap.open(root.id); } catch (e) { console.error(e); }
@@ -1214,7 +1230,17 @@ const Nav = (() => {
   }
   return { show, goTab, toLanding, enterTopic, openTopic, back, onPop, renderPath, record, setMk: m => { mkMode = m; } };
 })();
-window.CmapNav = { openTopic: id => Nav.enterTopic(id), currentTopicId: () => S.selectedId };   // 해설의 [찾아보기] 등 다른 스크립트가 주제 안으로 들어갈 때
+// 285-1: [지도 만들기로 가기] — 지도 만들기 탭의 [만들기] 구분으로 이동(이탈 확인·히스토리 규칙은 goTab 그대로). 지도 시트가 열려 있으면 기록이 정리된 뒤 이동한다
+function goMake() { Nav.setMk('map'); Nav.goTab('map'); }
+function closeSheetThen(fn) {
+  if (!window.CmapMap.isSheetOpen()) { fn(); return; }
+  let done = false;
+  const go = () => { if (done) return; done = true; window.removeEventListener('popstate', go); fn(); };
+  window.addEventListener('popstate', go);
+  setTimeout(go, 400);                      // 기록 되돌리기가 오지 않아도 이동은 한다
+  window.CmapMap.closeSheet();
+}
+window.CmapNav = { openTopic: id => Nav.enterTopic(id), currentTopicId: () => S.selectedId, goMake, closeSheetThen };   // 해설의 [찾아보기] 등 다른 스크립트가 주제 안으로 들어갈 때
 
 for (const b of document.querySelectorAll('#cmap-nav [data-tab]')) b.addEventListener('click', () => Nav.goTab(b.dataset.tab));
 $('nosel-go').addEventListener('click', () => Nav.goTab('topic'));
@@ -1222,6 +1248,7 @@ $('tab-map').addEventListener('click', () => Nav.setMk('map'));
 $('tab-narr').addEventListener('click', () => Nav.setMk('narr'));
 $('narr-open-map').addEventListener('click', () => window.CmapMap.showOnMap([]));
 $('map-retry').addEventListener('click', () => Nav.show(S.view));
+$('map-ro-go').addEventListener('click', () => closeSheetThen(goMake));
 $('wrong-open-map').addEventListener('click', () => window.CmapMap.showOnMap([]));
 window.addEventListener('popstate', Nav.onPop);
 

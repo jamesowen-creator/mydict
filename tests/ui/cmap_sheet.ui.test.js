@@ -6,7 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 const { startCmapServer } = require('./helpers/cmap_server');
-const { tabIn } = require('./helpers/cmap_nav');
+const { tabIn, clickMore } = require('./helpers/cmap_nav');
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 let browser;
@@ -133,16 +133,16 @@ test('확대·축소 버튼: ×1.25 / ×0.8(캔버스 가운데 기준), 한도 
   const s0 = (await view(page)).scale;
   const centerOf = async () => { const v = await view(page), c = await canvasRect(page); return { x: v.tx + c.w / v.scale / 2, y: v.ty + c.h / v.scale / 2 }; };
   const c0 = await centerOf();
-  await page.click('#map-zoom-in');
+  await clickMore(page, '#map-zoom-in');
   const s1 = (await view(page)).scale;
   assert.ok(Math.abs(s1 - Math.min(3, s0 * 1.25)) < 0.001, `확대 ${s0} → ${s1}`);
   const c1 = await centerOf();
   assert.ok(Math.abs(c1.x - c0.x) < 0.5 && Math.abs(c1.y - c0.y) < 0.5, '가운데가 제자리');
-  await page.click('#map-zoom-out');
+  await clickMore(page, '#map-zoom-out');
   assert.ok(Math.abs((await view(page)).scale - s1 * 0.8) < 0.001);
-  for (let i = 0; i < 20; i++) await page.click('#map-zoom-in');
+  for (let i = 0; i < 20; i++) await clickMore(page, '#map-zoom-in');
   assert.ok(Math.abs((await view(page)).scale - 3) < 0.001, '확대 한도 3');
-  for (let i = 0; i < 40; i++) await page.click('#map-zoom-out');
+  for (let i = 0; i < 40; i++) await clickMore(page, '#map-zoom-out');
   assert.ok(Math.abs((await view(page)).scale - 0.05) < 0.001, '축소 한도 0.05');
   await page.click('#map-fit');
   assert.ok((await view(page)).scale > 0.05);
@@ -154,7 +154,7 @@ test('연결선 클릭 영역은 화면 28px 고정(non-scaling-stroke)이고 �
   await openSheet(page);
   const hit = await page.eval("(() => { const cs = getComputedStyle(document.querySelector('.m-edge-hit')); return { w: cs.strokeWidth, v: cs.vectorEffect, p: cs.pointerEvents }; })()");
   assert.deepEqual(hit, { w: '28px', v: 'non-scaling-stroke', p: 'stroke' });
-  await page.click('#map-zoom-out');                                                   // 축소해도 클릭 영역이 화면 크기로 유지됨
+  await clickMore(page, '#map-zoom-out');                                                   // 축소해도 클릭 영역이 화면 크기로 유지됨
   const p = await page.eval(`(() => { const svg = document.getElementById('map-svg'), path = document.querySelector('.m-edge .m-edge-hit'); const pt = path.getPointAtLength(path.getTotalLength() / 2); const sp = svg.createSVGPoint(); sp.x = pt.x; sp.y = pt.y; const m = sp.matrixTransform(path.getScreenCTM()); return { x: m.x, y: m.y }; })()`);
   await page.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: p.x, y: p.y + 10, button: 'left', clickCount: 1 });   // 선에서 10px 떨어진 곳도 눌림
   await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p.x, y: p.y + 10, button: 'left', clickCount: 1 });
@@ -169,7 +169,7 @@ test('툴바: 한 줄·각 44px 이상·SVG 아이콘·이모지 없음, 해설�
   await world(page);
   await openSheet(page);
   const tb = await page.eval("[...document.querySelectorAll('.sheet-tools .tool')].filter(b => b.offsetParent !== null).map(b => { const r = b.getBoundingClientRect(); return { id: b.id, t: Math.round(r.top), w: r.width, h: r.height, svg: !!b.querySelector('svg'), txt: b.textContent.trim() }; })");
-  assert.deepEqual(tb.map(b => b.id), ['map-pick-toggle', 'map-save', 'map-opt', 'map-fit', 'map-zoom-in', 'map-zoom-out'].filter(id => id !== 'map-save' || true));
+  assert.deepEqual(tb.map(b => b.id), ['map-pick-toggle', 'map-fit', 'map-more-toggle'], '285-1: 아랫줄 [개념 선택][전체 보기][더보기]');
   assert.equal(new Set(tb.map(b => b.t)).size, 1, '한 줄: ' + JSON.stringify(tb.map(b => b.t)));
   assert.ok(tb.every(b => b.w >= 44 && b.h >= 44 && b.svg), JSON.stringify(tb));
   assert.ok(!/\p{Extended_Pictographic}/u.test(tb.map(b => b.txt).join('')), '이모지 없음');
@@ -180,7 +180,7 @@ test('툴바: 한 줄·각 44px 이상·SVG 아이콘·이모지 없음, 해설�
   await page.click('#wrong-open-map'); await page.waitFor("document.getElementById('map-sheet').open", 4000);
   assert.equal(await page.eval("document.getElementById('map-sheet').classList.contains('ro')"), true);
   const vis = await page.eval("[...document.querySelectorAll('.sheet-tools .tool')].filter(b => b.offsetParent !== null).map(b => b.id)");
-  assert.deepEqual(vis, ['map-fit', 'map-zoom-in', 'map-zoom-out']);
+  assert.deepEqual(vis, ['map-fit', 'map-more-toggle']);
   await page.click('#map-sheet-close'); await closed(page);
 });
 
@@ -217,7 +217,7 @@ test('시트를 닫을 때: 연결용 선택은 초기화되고, 배치 최적�
   // 미리보기 → 닫기 → 취소 + 안내
   await openSheet(page);
   const posBefore = JSON.stringify(srv.db.nodes.map(n => [n.concept_id, n.x, n.y]));
-  await page.click('#map-opt');
+  await clickMore(page, '#map-opt');
   await page.waitFor("!document.getElementById('map-opt-bar').hidden", 4000, '미리보기');
   assert.ok(await page.eval('window.CmapMap._preview()'));
   await page.click('#map-sheet-close'); await closed(page);

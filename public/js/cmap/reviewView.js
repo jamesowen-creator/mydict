@@ -4,14 +4,14 @@
 //   점수 3종(연결 찾기·관계 종류·방향)은 따로 보여 주고, 지도에 없는 연결은 "지도에 없는 연결"로 따로 표시하며 감점하지 않는다.
 (function () {
   'use strict';
-  const Rv = { loaded: false, msg: '', quiz: null, minfo: null, fallback: false };   // minfo = 표시한 개념 퀴즈 안내 정보(서버 계산)
+  const Rv = { saving: false, loaded: false, msg: '', quiz: null, minfo: null, fallback: false };   // minfo = 표시한 개념 퀴즈 안내 정보(서버 계산)
 
   const status = () => window.CmapMap.status();
   const isSaved = () => { const s = status(); return !!s && s.save_status === 'saved'; };
   const quizTerm = id => { const n = Rv.quiz && Rv.quiz.nodes.find(x => x.id === id); return n ? n.term : '?'; };
   const pct = s => (s.total === 0 ? '해당 없음' : s.hit + '/' + s.total + ' (' + Math.round(s.ratio * 100) + '%)');
 
-  function reset() { Rv.loaded = false; Rv.msg = ''; Rv.quiz = null; Rv.minfo = null; Rv.fallback = false; window.CmapMap.quizEnd(); window.CmapMap.highlight([]); }
+  function reset() { Rv.saving = false; Rv.loaded = false; Rv.msg = ''; Rv.quiz = null; Rv.minfo = null; Rv.fallback = false; window.CmapMap.quizEnd(); window.CmapMap.highlight([]); }
 
   // 280-1: 퀴즈 탭은 시작 카드 3개(연결 퀴즈 · 표시 개념 퀴즈 · 말로 설명하기)만 보여 준다. 해설 읽기는 지도 만들기 탭의 [해설]에 있다.
   function load() {
@@ -35,19 +35,21 @@
     const box = $('review-panel');
     box.textContent = '';
     if (!Rv.loaded) { box.append(h('p', { class: 'hint', text: '불러오는 중…' })); return; }
-    const saved = isSaved(), edges = window.CmapMap.edgeCount();
-    // 1) 연결 퀴즈
-    const canQuiz = saved && edges > 0;
+    const saved = isSaved(), edges = window.CmapMap.edgeCount(), nodes = window.CmapMap.info().nodeIds.length;
+    // 1) 연결 퀴즈 — 285-1: 저장되지 않았으면 [지도 저장하고 퀴즈 시작](저장 → 성공하면 시작), 지도가 비었거나 연결이 없으면 [지도 만들기로 가기]
+    const needMake = nodes === 0 || edges === 0;
     box.append(h('section', { class: 'qcard', id: 'qcard-all' },
       h('p', { class: 'sec-label', text: '연결 퀴즈' }),
-      h('p', { class: 'hint', id: 'quiz-start-note', text: !saved ? '저장된 지도에서만 퀴즈를 풀 수 있어요. 지도 만들기 탭에서 [저장]을 눌러 주세요.' : edges === 0 ? '연결이 있는 지도에서만 퀴즈를 풀 수 있어요.' : '지도의 노드만 보여 줍니다. 두 노드를 차례로 눌러 연결을 떠올려 보세요.' }),
-      h('div', { class: 'narr-actions', style: 'justify-content:flex-start' }, h('button', { class: 'btn', type: 'button', id: 'quiz-start', disabled: !canQuiz, onclick: startQuiz, text: '연결 퀴즈 시작' }))));
+      h('p', { class: 'hint', id: 'quiz-start-note', text: nodes === 0 ? '먼저 지도를 만들어 주세요. 지도에 개념을 올리고 연결을 이으면 퀴즈를 풀 수 있어요.' : edges === 0 ? '연결이 있는 지도에서만 퀴즈를 풀 수 있어요. 지도 만들기에서 연결을 이어 보세요.' : !saved ? '지도가 아직 저장되지 않았어요. 저장하고 이어서 퀴즈를 시작할 수 있어요.' : '지도의 노드만 보여 줍니다. 두 노드를 차례로 눌러 연결을 떠올려 보세요.' }),
+      h('div', { class: 'narr-actions', style: 'justify-content:flex-start' }, needMake
+        ? h('button', { class: 'btn', type: 'button', id: 'quiz-go-make', onclick: () => window.CmapNav.goMake(), text: '지도 만들기로 가기' })
+        : h('button', { class: 'btn', type: 'button', id: 'quiz-start', disabled: Rv.saving, onclick: startQuiz, text: Rv.saving ? '저장하는 중…' : saved ? '연결 퀴즈 시작' : '지도 저장하고 퀴즈 시작' }))));
     // 2) 표시 개념 퀴즈
     const mi = Rv.minfo, nMarked = mi ? mi.marked.length : 0;
     const mcard = h('section', { class: 'qcard', id: 'qcard-marked' },
       h('p', { class: 'sec-label', text: '표시 개념 퀴즈' }),
       h('div', { class: 'narr-actions', style: 'justify-content:flex-start;margin-top:4px;align-items:center' },
-        h('button', { class: 'btn', type: 'button', id: 'quiz-start-marked', disabled: !saved || !mi || nMarked === 0, onclick: () => startQuiz('marked'), text: '표시한 개념 퀴즈' }),
+        h('button', { class: 'btn', type: 'button', id: 'quiz-start-marked', disabled: !mi || nMarked === 0 || Rv.saving, onclick: () => startQuiz('marked'), text: Rv.saving ? '저장하는 중…' : saved ? '표시한 개념 퀴즈' : '지도 저장하고 표시 개념 퀴즈 시작' }),
         h('span', { class: 'hint', id: 'quiz-marked-count', style: 'margin-top:0', text: mi ? '표시한 개념 ' + nMarked + '개' : '' })));
     if (mi && nMarked === 0) mcard.append(h('p', { class: 'hint', id: 'quiz-marked-hint', text: '지도에서 모르는 개념을 눌러 표시해 보세요' }));
     if (mi && mi.isolated.length) mcard.append(h('p', { class: 'hint', id: 'quiz-marked-isolated', text: '연결이 없어 출제할 수 없음: ' + mi.isolated.map(x => x.term).join(', ') }));
@@ -77,6 +79,14 @@
     if (!id) return;
     mode = mode === 'marked' ? 'marked' : 'all';
     Rv.msg = ''; Rv.fallback = false;
+    if (!isSaved()) {                                               // 285-1: 저장하고 이어서 시작. 저장이 실패하면 퀴즈를 부르지 않는다
+      if (Rv.saving) return;
+      Rv.saving = true; renderReview();
+      const sv = await window.CmapMap.save();
+      Rv.saving = false;
+      if (!sv.ok) { Rv.msg = '지도를 저장하지 못했어요. ' + (sv.error || ''); renderReview(); return; }
+      renderReview();
+    }
     const r = await api('POST', '/api/cmap/maps/' + id + '/quiz/start', mode === 'marked' ? { mode: 'marked' } : undefined);   // 전체 퀴즈는 기존 요청 그대로(본문 없음)
     if (!okStatus(r)) {
       Rv.msg = errText(r, '퀴즈를 시작하지 못했어요.');

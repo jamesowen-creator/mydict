@@ -65,15 +65,17 @@ async function pairTap(page, a, b, type) {
   await page.waitFor("!document.getElementById('quiz-dlg').open", 3000);
 }
 
-test('퀴즈 탭: 저장 안 된 지도는 연결 퀴즈 시작 비활성 + 안내, 카드 3개(연결 퀴즈·표시 개념 퀴즈·말로 설명하기)', { skip: SKIP }, async t => {
+test('퀴즈 탭: 저장 안 된 지도는 [지도 저장하고 퀴즈 시작] + 안내, 카드 3개(연결 퀴즈·표시 개념 퀴즈·말로 설명하기)', { skip: SKIP }, async t => {
   const { page } = await open(t);
   await world(page);
   await reviewTab(page);
-  assert.equal(await page.eval("document.getElementById('quiz-start').disabled"), true);
-  assert.match(await text(page, '#quiz-start-note'), /저장된 지도에서만/);
+  assert.equal(await page.eval("document.getElementById('quiz-start').disabled"), false);
+  assert.equal(await text(page, '#quiz-start'), '지도 저장하고 퀴즈 시작');
+  assert.match(await text(page, '#quiz-start-note'), /저장하고 이어서 퀴즈를 시작할 수 있어요/);
   assert.deepEqual(await page.eval("[...document.querySelectorAll('#review-panel .qcard > .sec-label')].map(e => e.textContent)"), ['연결 퀴즈', '표시 개념 퀴즈', '말로 설명하기']);
   await saveMap(page); await reviewTab(page);
   assert.equal(await page.eval("document.getElementById('quiz-start').disabled"), false);
+  assert.equal(await text(page, '#quiz-start'), '연결 퀴즈 시작');
   assert.equal(await page.eval("!!document.getElementById('review-no-narr') || !!document.getElementById('review-summary')"), false, '해설 본문은 퀴즈 탭에 없음(지도 만들기 탭의 해설에 있음)');
 });
 

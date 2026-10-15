@@ -64,12 +64,14 @@ const saveMap = async page => { await tabIn(page, 'map'); await openSheet(page);
 // 274-2: 해설 목록 조회(GET)가 끝난 표시(오늘 N/10건)까지 기다린 뒤 누른다. 조회가 끝나기 전에 누르면 늦게 온 응답과 엇갈린다
 const narrTab = async page => { await tabIn(page, 'narr'); await page.waitFor("document.getElementById('map-view').classList.contains('narr-mode') && !!document.getElementById('narr-daily') && (!!document.getElementById('narr-make') || !!document.getElementById('narr-summary'))", 8000, '해설 탭'); };
 
-test('저장 안 된 지도: 해설 탭에서 [해설 만들기]가 비활성이고 저장 안내가 보인다(AI 호출 없음)', { skip: SKIP }, async t => {
+test('저장 안 된 지도(285-1): 해설 탭에 [지도 저장하고 해설 만들기]가 보이고 안내 문구가 동작에 맞다(누르기 전에는 AI 호출 없음)', { skip: SKIP }, async t => {
   const { srv, page } = await open(t);
   await world(page);
   await narrTab(page);
-  assert.equal(await page.eval("document.getElementById('narr-make').disabled"), true);
-  assert.match(await text(page, '#narr-empty'), /저장된 지도에서만/);
+  assert.equal(await page.eval("document.getElementById('narr-make').disabled"), false);
+  assert.equal(await text(page, '#narr-make'), '지도 저장하고 해설 만들기');
+  assert.match(await text(page, '#narr-empty'), /저장하고 이어서 해설을 만들 수 있어요/);
+  assert.ok(!/지도 탭/.test(await text(page, '#narr-panel')), '옛 "지도 탭" 문구 없음');
   assert.equal(srv.anthropic.calls.length, 0);
 });
 
@@ -109,7 +111,8 @@ test('단락을 누르면 그 단락의 개념이 지도에서 강조되고, 다
   assert.equal(await page.eval("document.querySelectorAll('.m-node.hl').length"), 3);
   assert.equal(await page.eval("document.querySelectorAll('.m-node.dim').length"), 1);
   assert.equal(await page.eval("document.getElementById('map-sheet').classList.contains('ro')"), true, '해설에서 여는 시트는 읽기 전용');
-  assert.equal(await page.eval("['map-pick-toggle', 'map-save', 'map-opt'].every(id => getComputedStyle(document.getElementById(id)).display === 'none')"), true, '편집 도구는 숨겨짐');
+  assert.equal(await page.eval("['map-pick-toggle', 'map-save', 'map-opt'].every(id => document.getElementById(id).getBoundingClientRect().width === 0)"), true, '편집 도구는 숨겨짐');
+  await sleep(300);   // 285-1: 읽기 전용 안내 줄이 생겨 시트 레이아웃이 자리 잡을 시간
   await page.click(`[data-node="${w.c.force}"] rect`);
   assert.equal((await page.eval('window.CmapMap._state()')).selected, null, '해설 탭에서는 연결용 선택이 되지 않음');
   await closeSheet(page);
@@ -170,8 +173,9 @@ test('지도가 바뀌면 이전 해설을 보여 주며 "지도가 바뀌었습
   await page.waitFor("!!document.getElementById('narr-stale')", 4000, '지도가 바뀌었습니다');
   assert.match(await text(page, '#narr-stale'), /지도가 바뀌었습니다/);
   assert.equal(await text(page, '#narr-summary'), '요약 1', '이전 해설을 그대로 보여 줌');
-  assert.equal(await page.eval("document.getElementById('narr-make').disabled"), true);
-  assert.match(await text(page, '#narr-stale'), /저장하면 해설을 다시 만들 수 있어요/);
+  assert.equal(await page.eval("document.getElementById('narr-make').disabled"), false, '285-1: 저장하고 이어서 다시 만들 수 있음');
+  assert.equal(await text(page, '#narr-make'), '지도 저장하고 다시 만들기');
+  assert.match(await text(page, '#narr-stale'), /저장하고 이어서 해설을 다시 만들 수 있어요/);
   await tabIn(page, 'map'); await saveMap(page); await narrTab(page);
   assert.equal(await page.eval("document.getElementById('narr-make').disabled"), false);
   await page.click('#narr-make');

@@ -128,7 +128,7 @@ test('하단 내비 4탭: 주제/퀴즈/지도 만들기/오답노트가 랜딩�
   assert.deepEqual(await page.eval("[...document.querySelectorAll('.map-tab')].map(b => b.textContent)"), ['만들기', '해설']);
   assert.equal(await hidden(page, 'map-page'), false); assert.equal(await page.visible('#narr-panel'), false);
   await page.click('#tab-narr');
-  await page.waitFor("document.getElementById('map-view').classList.contains('narr-mode') && !!document.getElementById('narr-make')", 4000);
+  await page.waitFor("document.getElementById('map-view').classList.contains('narr-mode') && !!document.getElementById('narr-empty')", 4000);
   assert.equal(await page.visible('#narr-open-map'), true, '해설에서 읽기 전용 지도를 연다');
   // 오답노트: 모르는 개념 표시 목록 + 말로 설명하기 최근 부족 목록(틀)
   await page.click('#nav-wrong');
