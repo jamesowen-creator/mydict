@@ -636,6 +636,25 @@ router.patch('/api/cmap/maps/:id/nodes/:conceptId', guard, handle(async req => {
   });
 }));
 
+// 287-1: 간선 만들기 입력(유형·문구)의 읽기·검증과 한 줄 저장은 단건과 일괄이 같은 함수를 쓴다(규칙을 복제하지 않는다).
+// 문구는 선택(생략·빈 문자열·공백만은 NULL), 유형도 문구도 없으면 400. 저장은 방향 없음 유형을 정규화(작은 id 가 from)하고 방향 있음은 from → to 그대로.
+function readEdgeInput(body) {
+  const label = M.readOptionalLabel(body.label);
+  if (label.error) throw bad(label.error);
+  const type = M.readRelationType(body.relation_type);
+  if (type.error) throw bad(type.error);
+  const labelValue = label.value === undefined ? null : label.value;
+  const typeValue = type.value === undefined ? null : type.value;
+  if (labelValue === null && typeValue === null) throw bad('연결 유형을 고르거나 문구를 입력해 주세요.');
+  return { labelValue, typeValue };
+}
+async function insertEdge(c, mapId, a, b, typeValue, labelValue) {
+  const dir = M.normalizeDirection(a, b, typeValue);
+  const { rows } = await c.query(`INSERT INTO cmap_edges (map_id, from_concept_id, to_concept_id, relation_type, label) VALUES ($1, $2, $3, $4, $5) RETURNING ${EDGE_COLS}`,
+    [mapId, dir.from, dir.to, typeValue, labelValue]);
+  return rows[0];
+}
+
 // 간선 만들기(사용자가 두 노드를 이어 줌)
 router.post('/api/cmap/maps/:id/edges', guard, handle(async req => {
   const id = parseId(req.params.id);
@@ -645,22 +664,53 @@ router.post('/api/cmap/maps/:id/edges', guard, handle(async req => {
   const b = typeof body.to_concept_id === 'number' ? parseId(String(body.to_concept_id)) : null;
   if (a === null || b === null) throw bad('연결할 두 개념의 id가 올바르지 않습니다.');
   if (a === b) throw bad('같은 개념끼리는 연결할 수 없습니다.');
-  const label = M.readOptionalLabel(body.label);    // 286-1: 문구는 선택(생략·빈 문자열은 NULL). 유형도 문구도 없으면 거부
-  if (label.error) throw bad(label.error);
-  const type = M.readRelationType(body.relation_type);
-  if (type.error) throw bad(type.error);
-  const labelValue = label.value === undefined ? null : label.value;
-  if (labelValue === null && (type.value === undefined || type.value === null)) throw bad('연결 유형을 고르거나 문구를 입력해 주세요.');
+  const { labelValue, typeValue } = readEdgeInput(body);
   return withTx(async c => {
     await ownMap(c, id, req.user.id, { lock: true });
     const { rows: nodes } = await c.query('SELECT map_id, concept_id FROM cmap_map_nodes WHERE map_id = $1', [id]);
     if (!nodes.some(n => n.concept_id === a) || !nodes.some(n => n.concept_id === b)) throw bad('연결하는 두 개념이 모두 지도에 있어야 합니다.');
     const { rows: edges } = await c.query('SELECT id, from_concept_id, to_concept_id FROM cmap_edges WHERE map_id = $1', [id]);
     if (M.pairExists(edges, a, b, null)) throw conflict('이미 연결돼 있는 두 개념입니다. 기존 연결을 고쳐 주세요.');
-    const dir = M.normalizeDirection(a, b, type.value === undefined ? null : type.value);
-    const { rows } = await c.query(`INSERT INTO cmap_edges (map_id, from_concept_id, to_concept_id, relation_type, label) VALUES ($1, $2, $3, $4, $5) RETURNING ${EDGE_COLS}`,
-      [id, dir.from, dir.to, type.value === undefined ? null : type.value, labelValue]);
-    return { status: 201, body: { edge: M.withDisplay(rows[0]), status: await statusOf(c, id, req.user.id) } };
+    const edge = await insertEdge(c, id, a, b, typeValue, labelValue);
+    return { status: 201, body: { edge: M.withDisplay(edge), status: await statusOf(c, id, req.user.id) } };
+  });
+}));
+
+// 287-1: 1:n 한 번에 연결 — 시작 개념 하나(from)에서 대상 여러 개(to_ids)로 같은 유형·문구의 연결을 한꺼번에 만든다(저장 모델은 선 n개 그대로, 그룹 없음).
+// 한 트랜잭션. 검증 오류(없는 노드·자기 자신·잘못된 유형·대상 0개·50개 초과·유형도 문구도 없음)는 400 으로 전체 거부하고 아무것도 만들지 않는다.
+// 이미 연결된 쌍(방향 무시)은 전체 실패가 아니라 건너뛰고 skipped 로 알린다.
+const BULK_MAX = 50;
+router.post('/api/cmap/maps/:id/edges/bulk', guard, handle(async req => {
+  const id = parseId(req.params.id);
+  if (id === null) throw notFound('지도를 찾을 수 없습니다.');
+  const body = bodyOf(req);
+  const from = typeof body.from === 'number' ? parseId(String(body.from)) : null;
+  if (from === null) throw bad('시작 개념의 id가 올바르지 않습니다.');
+  if (!Array.isArray(body.to_ids)) throw bad('연결할 대상 개념 목록(to_ids)이 필요합니다.');
+  const targets = [];
+  for (const v of body.to_ids) {
+    const t = typeof v === 'number' ? parseId(String(v)) : null;
+    if (t === null) throw bad('대상 개념의 id가 올바르지 않습니다.');
+    if (t === from) throw bad('같은 개념끼리는 연결할 수 없습니다.');
+    if (!targets.includes(t)) targets.push(t);          // 중복 제거
+  }
+  if (!targets.length) throw bad('연결할 대상 개념을 1개 이상 골라 주세요.');
+  if (targets.length > BULK_MAX) throw bad(`한 번에 ${BULK_MAX}개까지만 연결할 수 있습니다.`);
+  const { labelValue, typeValue } = readEdgeInput(body);
+  return withTx(async c => {
+    await ownMap(c, id, req.user.id, { lock: true });
+    const { rows: nodes } = await c.query('SELECT map_id, concept_id FROM cmap_map_nodes WHERE map_id = $1', [id]);
+    const have = new Set(nodes.map(n => n.concept_id));
+    if (!have.has(from) || targets.some(t => !have.has(t))) throw bad('연결하는 개념이 모두 지도에 있어야 합니다.');
+    const { rows: existing } = await c.query('SELECT id, from_concept_id, to_concept_id FROM cmap_edges WHERE map_id = $1', [id]);
+    const created = [], skipped = [];
+    for (const t of targets) {
+      if (M.pairExists(existing, from, t, null)) { skipped.push({ concept_id: t, reason: 'already_connected' }); continue; }
+      const edge = await insertEdge(c, id, from, t, typeValue, labelValue);
+      existing.push(edge);
+      created.push(M.withDisplay(edge));
+    }
+    return { status: created.length ? 201 : 200, body: { edges: created, skipped, status: await statusOf(c, id, req.user.id) } };
   });
 }));
 

@@ -30,7 +30,7 @@
   const TYPE_LABEL = { '사용': '사용(의존)' };
   // 연결 대화상자·퀴즈 대화상자의 유형 select 를 서버 목록으로 채운다(한 곳에서 관리). 방향 없음 유형에는 "(방향 없음)"을 붙이고 묶음으로 나눈다
   function fillTypeSelects(types, sym) {
-    for (const id of ['edge-type', 'quiz-type']) {
+    for (const id of ['edge-type', 'quiz-type', 'bulk-type']) {
       const sel = $(id), keep = sel.value;
       sel.textContent = '';
       sel.append(h('option', { value: '', text: '선택 안 함' }));
@@ -205,14 +205,19 @@
   }
   function renderHint() {
     const el = $('map-hint');
+    if (M.preview || M.mode !== 'map') $('map-bulk-row').hidden = true;
     if (M.preview) { el.textContent = '미리보기예요. 마음에 들면 [적용], 아니면 [취소]를 눌러 주세요. 노드와 연결은 그대로이고 자리만 바뀌어요.'; return; }
+    // 287-1: 편집 시트에서 노드 하나를 골라 두 번째를 기다리는 동안 [여러 개에 한 번에 연결]을 보인다(읽기 전용·퀴즈·미리보기에서는 보이지 않음)
+    $('map-bulk-row').hidden = !(M.mode === 'map' && !M.preview && M.selected !== null && M.nodes.size >= 2);
+    if (M.selected !== null) $('map-note').textContent = '';
     if (M.mode !== 'map') { el.textContent = ''; return; }
     if (!M.nodes.size) { el.textContent = '[개념 선택]에서 지도에 쓸 개념을 골라 보세요.'; return; }
     el.textContent = M.selected !== null
       ? '‘' + termOf(M.selected) + '’을(를) 골랐어요. 이어 줄 개념을 눌러 주세요. 같은 개념을 다시 누르면 취소돼요.'
       : '노드를 끌어 옮기고, 두 노드를 차례로 눌러 연결해요. 연결선을 누르면 고칠 수 있어요.';
   }
-  const mapMsg = t => { $('map-msg').textContent = t || ''; };
+  const mapMsg = t => { $('map-msg').textContent = t || ''; if (!t) $('map-note').textContent = ''; };
+  const mapNote = t => { $('map-note').textContent = t || ''; };
   const pageNote = t => { const el = $('map-page-note'); if (el) el.textContent = t || ''; };
 
   // ── 열기·닫기 ──
@@ -411,6 +416,74 @@
     });
   }
 
+  // ── 1:n 한 번에 연결(작업287-1): 시작 개념 하나 + 대상 여러 개 + 유형·문구 한 번 → 서버 일괄 API 가 선 n개를 만든다 ──
+  let BK = null;   // { from, linked: Set, sel: Set, busy }
+  function openBulk() {
+    if (M.selected === null || M.mode !== 'map' || M.preview || BK) return;
+    const from = M.selected;
+    const linked = new Set(M.edges.filter(e => e.from_concept_id === from || e.to_concept_id === from).map(e => (e.from_concept_id === from ? e.to_concept_id : e.from_concept_id)));
+    BK = { from, linked, sel: new Set(), busy: false };
+    $('bulk-from').textContent = termOf(from);
+    const list = $('bulk-list');
+    list.textContent = '';
+    for (const id of [...M.nodes.keys()].filter(x => x !== from).sort((a, b) => termOf(a).localeCompare(termOf(b), 'ko'))) {
+      const off = linked.has(id);
+      const cb = h('input', { type: 'checkbox', id: 'bulk-pick-' + id, 'data-t': 'bulk-pick', 'data-id': id });
+      cb.disabled = off;
+      cb.addEventListener('change', () => { if (cb.checked) BK.sel.add(id); else BK.sel.delete(id); refreshBulk(); });
+      list.append(h('label', { class: 'pick-row' + (off ? ' off' : ''), for: 'bulk-pick-' + id }, cb, h('span', { class: 'pick-term', text: termOf(id) }), off ? h('span', { class: 'pick-en', 'data-t': 'bulk-linked', text: '이미 연결됨' }) : null));
+    }
+    $('bulk-type').value = ''; $('bulk-label').value = ''; $('bulk-msg').textContent = '';
+    refreshBulk();
+    openDlg($('bulk-dlg'));
+    $('bulk-type').focus();
+  }
+  function refreshBulk() {
+    if (!BK) return;
+    const n = BK.sel.size, type = $('bulk-type').value, label = $('bulk-label').value.trim();
+    $('bulk-count').textContent = n + '개 선택';
+    $('bulk-all').disabled = BK.busy;
+    $('bulk-type-hint').textContent = TYPE_HINT[type] || TYPE_HINT[''];
+    $('bulk-label-hint').textContent = type ? '비우면 ‘' + type + '’처럼 유형 이름이 표시돼요' : '비우면 유형 이름이 표시돼요. 유형을 고르거나 문구를 입력해 주세요';
+    $('bulk-dir').textContent = isSym(type) ? '방향 없이 연결돼요' : '‘' + termOf(BK.from) + '’ → 선택한 개념들 방향으로 만들어져요';
+    const needMore = n === 0 ? '연결할 개념을 하나 이상 골라 주세요' : (!type && !label) ? '유형을 고르거나 문구를 입력해 주세요' : '';
+    $('bulk-hint').textContent = needMore;
+    $('bulk-ok').disabled = BK.busy || !!needMore;
+    $('bulk-ok').textContent = BK.busy ? '만드는 중…' : n ? '연결 ' + n + '개 만들기' : '연결 만들기';
+    for (const cb of $('bulk-list').querySelectorAll('input')) if (!BK.linked.has(Number(cb.dataset.id))) cb.disabled = BK.busy;
+  }
+  function setupBulkDialog() {
+    $('map-bulk-btn').addEventListener('click', openBulk);
+    $('bulk-type').addEventListener('change', refreshBulk);
+    $('bulk-label').addEventListener('input', refreshBulk);
+    $('bulk-all').addEventListener('click', () => {
+      if (!BK) return;
+      for (const cb of $('bulk-list').querySelectorAll('input:not(:disabled)')) { cb.checked = true; BK.sel.add(Number(cb.dataset.id)); }
+      refreshBulk();
+    });
+    $('bulk-cancel').addEventListener('click', () => closeDlg($('bulk-dlg')));
+    $('bulk-dlg').addEventListener('close', () => { if (!BK || !BK.busy) BK = null; });
+    $('bulk-form').addEventListener('submit', async ev => {
+      ev.preventDefault();
+      if (!BK || BK.busy || $('bulk-ok').disabled) return;
+      const type = $('bulk-type').value || null, label = $('bulk-label').value.trim();
+      BK.busy = true; $('bulk-msg').textContent = ''; refreshBulk();
+      const r = await api('POST', '/api/cmap/maps/' + M.map.id + '/edges/bulk', { from: BK.from, to_ids: [...BK.sel], relation_type: type, label: label || null });
+      if (!BK) return;
+      BK.busy = false;
+      if (!okStatus(r)) { $('bulk-msg').textContent = errText(r, '연결을 만들지 못했어요.'); refreshBulk(); return; }   // 실패하면 입력 내용을 그대로 둔다
+      for (const e of r.body.edges) M.edges.push(e);
+      setStatus(r.body.status, true);
+      const made = r.body.edges.length, skipped = r.body.skipped.length;
+      BK = null;
+      closeDlg($('bulk-dlg'));
+      if (M.picker) M.picker.reset();
+      M.selected = null;
+      render();
+      mapNote((made ? '연결 ' + made + '개를 만들었어요' : '새로 만든 연결이 없어요') + (skipped ? (made ? '. ' : ' · ') + skipped + '개는 이미 연결돼 있어 건너뛰었어요' : ''));
+    });
+  }
+
   // ── 저장 상태 · 배치 최적화(작업273-3) ──
   // 저장 상태는 서버가 계산한 값(save_status)만 표시한다. 클라이언트는 해시를 계산하지 않는다.
   function setStatus(st, semantic) {
@@ -583,7 +656,7 @@
     if (M.picker) M.picker.reset();
     M.selected = null; M.gest = null; M.pinch = null; M.ptrs.clear();
     $('map-pick-panel').hidden = true; $('map-pick-toggle').setAttribute('aria-expanded', 'false');
-    for (const id of ['edge-dlg', 'quiz-dlg']) { const dl = $(id); if (dl && dl.open) closeDlg(dl); }
+    for (const id of ['edge-dlg', 'quiz-dlg', 'bulk-dlg']) { const dl = $(id); if (dl && dl.open) closeDlg(dl); }
     setMore(false);
     const note = M.preview ? '배치 최적화 미리보기를 취소했어요. 노드와 연결은 그대로예요.' : '';
     if (M.preview) cancelPreview();
@@ -658,6 +731,7 @@
     $('map-opt-cancel').addEventListener('click', cancelPreview);
     $('map-undo').addEventListener('click', undoOptimize);
     setupEdgeDialog();
+    setupBulkDialog();
   }
   const worldPerPx = () => 1 / M.view.scale;
 

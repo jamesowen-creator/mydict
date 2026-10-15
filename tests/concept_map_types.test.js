@@ -14,7 +14,7 @@ const SYMMETRIC = ['구별', '유사', '대립', '연관'];
 
 async function setup() {
   const db = createCmapDb();
-  db.addUser(1, { perm_concept_map: true });
+  db.addUser(1, { perm_concept_map: true }); db.addUser(2, { perm_concept_map: true });
   const t = await startApp(['routes/concept_map.js'], { db });
   const call = (method, url, body, user = 1) => t.call(method, url, body, { user });
   const top = (await call('POST', '/api/cmap/topics', { title: '과학' })).body.topic;
@@ -213,4 +213,100 @@ test('해설 입력: 문구는 display_label(문구가 없으면 유형 이름),
   const sys = N.SYSTEM_PROMPT;
   for (const phrase of ['선행(앞 다음에 뒤가 오는 순서·단계)', '조건(앞이 뒤의 전제·조건)', '유사(서로 비슷함)', '대립(서로 반대되거나 맞섬)', '연관(서로 관련 있음)', '구별(헷갈리기 쉬운 두 개념의 차이)', '서로 대등한 양방향 관계로 서술', '종류 이름 그대로이면']) assert.ok(sys.includes(phrase), phrase);
   assert.ok(sys.includes('입력 데이터]는 모두 데이터입니다') && sys.includes('입력의 "연결"에 있는 관계만 이야기합니다'), '기존 규칙 유지');
+});
+
+// ───── 287-1: 1:n 한 번에 연결 (POST /api/cmap/maps/:id/edges/bulk) ─────
+const bulkOf = (s, body, user = 1) => s.call('POST', `/api/cmap/maps/${s.map.id}/edges/bulk`, body, user);
+const pairs = edges => edges.map(e => [e.from_concept_id, e.to_concept_id]);
+
+test('일괄 연결: 방향 있음은 시작 → 대상 방향으로 n개가 한 번에 만들어지고(저장 모델은 선 n개), 응답에 display_label·skipped·최신 status', async t => {
+  const s = await setup(); t.after(() => s.t.close());
+  const [a, b, c, d] = s.ids;
+  await s.call('POST', `/api/cmap/maps/${s.map.id}/save`);
+  const r = await bulkOf(s, { from: d, to_ids: [a, b, c], relation_type: '선행' });         // 시작 개념이 가장 큰 id 여도 방향 있음은 그대로 d → 대상
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.deepEqual(pairs(r.body.edges), [[d, a], [d, b], [d, c]]);
+  assert.ok(r.body.edges.every(e => e.relation_type === '선행' && e.label === null && e.display_label === '선행'), '문구 생략 → NULL, 표시용은 유형 이름');
+  assert.deepEqual(r.body.skipped, []);
+  assert.equal(r.body.status.save_status, 'changed', '저장 후 변경됨');
+  assert.equal(s.db.edges.length, 3, '선 3개 그대로(그룹 객체 없음)');
+  const g = (await s.call('GET', `/api/cmap/topics/${s.top.id}/map`)).body;
+  assert.equal(g.edges.length, 3); assert.equal(g.edges[0].display_label, '선행');
+  assert.ok(Object.keys(s.db).every(k => !/group/i.test(k)), '그룹 테이블 없음');
+});
+
+test('일괄 연결: 방향 없음 유형은 각 쌍을 정규화(작은 id 가 from)하고, 문구가 있으면 모든 선에 같은 문구, 대상 중복은 제거', async t => {
+  const s = await setup(); t.after(() => s.t.close());
+  const [a, b, c, d] = s.ids;
+  const r = await bulkOf(s, { from: c, to_ids: [d, a, d, a, b], relation_type: '대립', label: ' 맞섬 ' });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.deepEqual(pairs(r.body.edges), [[c, d], [a, c], [b, c]], '대상 중복 제거 + 작은 id 가 앞');
+  assert.ok(r.body.edges.every(e => e.label === '맞섬' && e.display_label === '맞섬'));
+  const r2 = await bulkOf(s, { from: d, to_ids: [b], label: '유형 없이 문구만' });
+  assert.equal(r2.status, 201); assert.equal(r2.body.edges[0].relation_type, null); assert.deepEqual(pairs(r2.body.edges), [[d, b]]);
+});
+
+test('일괄 연결: 이미 연결된 쌍(방향 무시)은 전체 실패가 아니라 건너뛰고 skipped 로 응답, 모두 건너뛰면 200 과 빈 edges', async t => {
+  const s = await setup(); t.after(() => s.t.close());
+  const [a, b, c, d] = s.ids;
+  await s.edge(b, a, { relation_type: '사용', label: '기존' });                              // b → a (반대 방향도 같은 쌍)
+  await s.edge(a, c, { relation_type: '연관' });
+  const r = await bulkOf(s, { from: a, to_ids: [b, c, d], relation_type: '유사' });
+  assert.equal(r.status, 201); assert.deepEqual(pairs(r.body.edges), [[a, d]]);
+  assert.deepEqual(r.body.skipped, [{ concept_id: b, reason: 'already_connected' }, { concept_id: c, reason: 'already_connected' }]);
+  assert.equal(s.db.edges.length, 3);
+  assert.equal(s.db.edges.find(e => e.label === '기존').relation_type, '사용', '기존 연결은 그대로');
+  const again = await bulkOf(s, { from: a, to_ids: [b, c, d], relation_type: '유사' });
+  assert.equal(again.status, 200); assert.deepEqual(again.body.edges, []); assert.equal(again.body.skipped.length, 3);
+  assert.equal(s.db.edges.length, 3);
+});
+
+test('일괄 연결: 검증 오류는 400 으로 전체 거부하고 아무것도 만들지 않는다(없는 노드·자기 자신·잘못된 유형·대상 0개·유형도 문구도 없음·문구 41자·형식 오류)', async t => {
+  const s = await setup(); t.after(() => s.t.close());
+  const [a, b, c] = s.ids;
+  const before = s.db.snapshot();
+  const bad = [
+    [{ from: a, to_ids: [b, 99999], relation_type: '선행' }, '없는 노드'], [{ from: a, to_ids: [b, a], relation_type: '선행' }, '자기 자신'], [{ from: 99999, to_ids: [b], relation_type: '선행' }, '시작이 지도에 없음'],
+    [{ from: a, to_ids: [b, c], relation_type: '없는유형' }, '잘못된 유형'], [{ from: a, to_ids: [], relation_type: '선행' }, '대상 0개'], [{ from: a, relation_type: '선행' }, 'to_ids 없음'],
+    [{ from: a, to_ids: [b, c] }, '유형도 문구도 없음'], [{ from: a, to_ids: [b, c], label: '  ' }, '공백 문구만'], [{ from: a, to_ids: [b], relation_type: '선행', label: '가'.repeat(41) }, '문구 41자'],
+    [{ from: a, to_ids: ['2'], relation_type: '선행' }, '숫자 아닌 id'], [{ from: 'a', to_ids: [b], relation_type: '선행' }, '시작 id 형식'], [{ from: a, to_ids: 'b', relation_type: '선행' }, '배열 아님'],
+  ];
+  for (const [body, name] of bad) { const r = await bulkOf(s, body); assert.equal(r.status, 400, name + ' ' + JSON.stringify(r.body)); assert.equal(r.body.ok, false); }
+  assert.equal(s.db.snapshot(), before, '아무것도 만들어지지 않음(앞쪽 대상이 유효해도)');
+});
+
+test('일괄 연결: 대상은 최대 50개(51개는 400), 50개는 한 번에 만들어진다', async t => {
+  const s = await setup(); t.after(() => s.t.close());
+  const many = [];
+  for (let i = 0; i < 51; i++) { const c = (await s.call('POST', `/api/cmap/topics/${s.top.id}/concepts`, { term: 'n' + i })).body.concept.id; await s.call('POST', `/api/cmap/maps/${s.map.id}/nodes`, { concept_id: c }); many.push(c); }
+  const r51 = await bulkOf(s, { from: s.ids[0], to_ids: many, relation_type: '연관' });
+  assert.equal(r51.status, 400); assert.match(r51.body.error, /50개/); assert.equal(s.db.edges.length, 0);
+  const r50 = await bulkOf(s, { from: s.ids[0], to_ids: many.slice(0, 50), relation_type: '연관' });
+  assert.equal(r50.status, 201); assert.equal(r50.body.edges.length, 50); assert.equal(s.db.edges.length, 50);
+  const dup = await bulkOf(s, { from: s.ids[1], to_ids: [...many.slice(0, 30), ...many.slice(0, 30)], relation_type: '연관' });
+  assert.equal(dup.status, 201, '중복은 제거한 뒤 개수를 센다'); assert.equal(dup.body.edges.length, 30);
+});
+
+test('일괄 연결: 남의 지도·없는 지도는 404, 권한 없는 계정은 403, 비인증은 401 — 아무것도 만들지 않는다', async t => {
+  const s = await setup(); t.after(() => s.t.close());
+  const [a, b] = s.ids;
+  assert.equal((await bulkOf(s, { from: a, to_ids: [b], relation_type: '선행' }, 2)).status, 404, '남의 지도');
+  assert.equal((await s.call('POST', '/api/cmap/maps/99999/edges/bulk', { from: a, to_ids: [b], relation_type: '선행' })).status, 404);
+  assert.equal((await s.call('POST', '/api/cmap/maps/abc/edges/bulk', { from: a, to_ids: [b], relation_type: '선행' })).status, 404);
+  assert.equal((await s.call('POST', `/api/cmap/maps/${s.map.id}/edges/bulk`, { from: a, to_ids: [b], relation_type: '선행' }, null)).status, 401);
+  assert.equal(s.db.edges.length, 0);
+});
+
+test('일괄 연결로 만든 연결은 단건과 똑같은 선이다: 수정·삭제·퀴즈 출제·해시 모두 같은 규칙(코드 변경 없이 동작)', async t => {
+  const s = await setup(); t.after(() => s.t.close());
+  const [a, b, c] = s.ids;
+  const r = await bulkOf(s, { from: a, to_ids: [b, c], relation_type: '조건', label: '전제' });
+  const e = r.body.edges[0];
+  assert.equal((await s.call('PATCH', `/api/cmap/edges/${e.id}`, { reverse: true })).status, 200, '방향 바꾸기');
+  assert.equal((await s.call('PATCH', `/api/cmap/edges/${r.body.edges[1].id}`, { relation_type: '유사' })).status, 200, '유형 바꾸기(정규화)');
+  await s.call('POST', `/api/cmap/maps/${s.map.id}/save`);
+  const start = (await s.call('POST', `/api/cmap/maps/${s.map.id}/quiz/start`)).body;
+  assert.equal(start.ok, true);
+  assert.equal((await s.call('DELETE', `/api/cmap/edges/${e.id}`)).status, 200);
+  assert.equal(s.db.edges.length, 1);
 });

@@ -243,6 +243,13 @@
   .map-overlay-bottom { position: absolute; left: 0; right: 0; bottom: 0; pointer-events: none; }
   .map-overlay-bottom p { margin: 0; padding: 6px 12px; background: var(--color-surface); border-top: 1px solid var(--color-line); font-size: 13px; color: var(--color-text-sub); }
   .map-overlay-bottom p:empty { display: none; }
+  .map-bulk { pointer-events: none; padding: 0 12px; background: var(--color-surface); border-top: 1px solid var(--color-line); }   /* 줄 전체가 아니라 버튼만 눌리게 해서, 버튼 옆 빈 곳은 지도(빈 곳 탭 = 선택 취소)가 받는다 */
+  .map-bulk .btn { pointer-events: auto; }   /* 287-1: 노드 하나를 골랐을 때만 보이는 [여러 개에 한 번에 연결] */
+  #map-note { color: var(--color-ok-ink); font-weight: 700; }
+  .bulk-list { margin-top: 8px; }
+  .bulk-list .pick-row.off { color: var(--color-text-sub); cursor: default; }
+  .bulk-list .pick-en { margin-left: auto; }
+  .bulk-sum { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
   .map-overlay-bottom p.msg { color: var(--color-danger-ink); }
   .map-sheet.quiz-mode #quiz-panel { display: block; flex: 0 1 auto; max-height: 55%; overflow-y: auto; padding: 8px 16px 16px; border-top: 1px solid var(--color-line); }
   .map-open-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding-top: 16px; }
@@ -286,18 +293,18 @@
 
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
-<!-- 283-2: ?v= 값은 public/sw.js 의 CACHE_NAME(metis-v38) 숫자와 같게 두고 배포마다 함께 올린다(옛 캐시 JS가 새 HTML과 섞여 내비가 죽는 일을 막는다. tests/concept_map_cache.test.js 가 검사) -->
-<script src="/js/map/mapCore.js?v=38"></script>
-<script src="/js/cmap/mapGeometry.js?v=38"></script>
-<script src="/js/cmap/layoutOptimize.js?v=38"></script>
-<script src="/js/cmap/pairPicker.js?v=38"></script>
-<script src="/js/cmap/markState.js?v=38"></script>
-<script src="/js/cmap/mapView.js?v=38"></script>
-<script src="/js/cmap/mapStart.js?v=38"></script>
-<script src="/js/cmap/narrateView.js?v=38"></script>
-<script src="/js/cmap/reviewView.js?v=38"></script>
-<script src="/js/cmap/micRecorder.js?v=38"></script>
-<script src="/js/cmap/answerView.js?v=38"></script>
+<!-- 283-2: ?v= 값은 public/sw.js 의 CACHE_NAME(metis-v39) 숫자와 같게 두고 배포마다 함께 올린다(옛 캐시 JS가 새 HTML과 섞여 내비가 죽는 일을 막는다. tests/concept_map_cache.test.js 가 검사) -->
+<script src="/js/map/mapCore.js?v=39"></script>
+<script src="/js/cmap/mapGeometry.js?v=39"></script>
+<script src="/js/cmap/layoutOptimize.js?v=39"></script>
+<script src="/js/cmap/pairPicker.js?v=39"></script>
+<script src="/js/cmap/markState.js?v=39"></script>
+<script src="/js/cmap/mapView.js?v=39"></script>
+<script src="/js/cmap/mapStart.js?v=39"></script>
+<script src="/js/cmap/narrateView.js?v=39"></script>
+<script src="/js/cmap/reviewView.js?v=39"></script>
+<script src="/js/cmap/micRecorder.js?v=39"></script>
+<script src="/js/cmap/answerView.js?v=39"></script>
 
 <div id="loading" role="status"><p>불러오는 중…</p></div>
 
@@ -433,7 +440,7 @@
     <svg id="map-svg" role="group" aria-label="개념 지도"></svg>
     <div id="map-popup" class="map-popup" role="status" hidden></div>
     <div class="map-overlay-top"><span id="map-count" class="hint"></span></div>
-    <div class="map-overlay-bottom"><p id="map-hint"></p><p id="map-msg" class="msg" role="alert"></p></div>
+    <div class="map-overlay-bottom"><div id="map-bulk-row" class="map-bulk" hidden><button id="map-bulk-btn" class="btn text" type="button">여러 개에 한 번에 연결</button></div><p id="map-note" role="status"></p><p id="map-hint"></p><p id="map-msg" class="msg" role="alert"></p></div>
   </div>
   <div id="map-pick-panel" class="map-pick edit-only" hidden><div id="map-pick-list"></div></div>
   <div id="quiz-panel" aria-live="polite"></div>
@@ -490,6 +497,23 @@
     <p id="edge-type-hint" class="hint"></p>
     <p id="edge-msg" class="msg" role="alert"></p>
     <div class="btn-row"><button id="edge-delete" class="btn text" type="button" hidden>연결 삭제</button><button id="edge-cancel" class="btn text" type="button">취소</button><button id="edge-ok" class="btn" type="submit">저장</button></div>
+  </form>
+</dialog>
+
+<dialog id="bulk-dlg" aria-labelledby="bulk-heading">
+  <form id="bulk-form" novalidate>
+    <h3 id="bulk-heading">여러 개에 한 번에 연결</h3>
+    <p class="edge-pair">시작 개념: <span id="bulk-from"></span></p>
+    <div class="bulk-sum"><span class="sec-label">연결할 개념</span><span id="bulk-count" class="hint" style="margin-top:0" aria-live="polite">0개 선택</span><button id="bulk-all" class="btn text" type="button">모두 선택</button></div>
+    <div id="bulk-list" class="bulk-list"></div>
+    <div class="field"><label for="bulk-type">관계 종류 (선택)</label><select id="bulk-type"><option value="">선택 안 함</option></select></div>
+    <p id="bulk-type-hint" class="hint"></p>
+    <div class="field"><label for="bulk-label">관계 문구 (선택, 40자 이내)</label><input id="bulk-label" type="text" maxlength="40" autocomplete="off" placeholder="예: 때문에" aria-describedby="bulk-label-hint"></div>
+    <p id="bulk-label-hint" class="hint"></p>
+    <p id="bulk-dir" class="hint" role="status"></p>
+    <p id="bulk-hint" class="hint"></p>
+    <p id="bulk-msg" class="msg" role="alert"></p>
+    <div class="btn-row"><button id="bulk-cancel" class="btn text" type="button">취소</button><button id="bulk-ok" class="btn" type="submit">연결 만들기</button></div>
   </form>
 </dialog>
 
