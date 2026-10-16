@@ -1,12 +1,12 @@
 // 작업273-2: 개념 지도 화면의 "지도" 보기 — 지도에 쓸 개념 선택, 노드 드래그 배치, 노드 A 탭 → B 탭 연결, 연결 수정·삭제.
 // 클래식 스크립트(window.CmapMap). concept_map.html 의 인라인 스크립트가 먼저 정의한 전역($, h, api, okStatus, errText, openDlg, closeDlg, openConfirm, S, byId, ...)과
-// 공용 /js/map/mapCore.js 의 읽기 전용 도구(sv, clipText, edgeGeom), /js/cmap/mapGeometry.js·pairPicker.js 를 호출 시점에 사용한다(공용 코드는 수정하지 않음).
+// 공용 /js/map/mapCore.js 의 읽기 전용 도구(sv, clipText; 선 경로는 290-1부터 /js/cmap/edgeRoute.js), /js/cmap/mapGeometry.js·pairPicker.js 를 호출 시점에 사용한다(공용 코드는 수정하지 않음).
 // 280-1: 화면 전환(주제 목록 / 주제 안 / 퀴즈 / 지도 만들기 / 오답노트)은 concept_map.html 의 Nav 가 맡는다. open·close 는 데이터와 모드만 다룬다.
   // 274-4: 지도는 페이지 안의 작은 캔버스가 아니라 <dialog id="map-sheet"> 안에 크게 그린다(모바일 = 전체 화면 시트, 768px 이상 = 큰 팝업). 열고 닫기·맞춤·확대/축소는 개념학습의 지도 팝업 방식을 따랐다.
 // 모든 연결은 사용자가 직접 만든다(AI 제안 없음). 제스처: 노드 위 드래그 = 노드 이동(끝나면 위치 저장), 빈 곳 드래그 = 화면 이동, 두 손가락 = 확대·축소, 노드 탭 = 연결용 선택.
 (function () {
   'use strict';
-  const G = window.CmapGeometry, PP = window.CmapPairPicker, MS = window.CmapMarkState;
+  const G = window.CmapGeometry, PP = window.CmapPairPicker, MS = window.CmapMarkState, ER = window.CmapEdgeRoute;
   const TAP_PX = 6;   // 이 거리(px) 안에서 손을 떼면 탭, 넘으면 드래그
   const READ_FLOOR = 12 / 13;          // 열 때 노드 글자가 화면에서 12px 이상이 되는 배율(개념학습의 MAP_READ_PX / MAP_FONT_UNITS 와 같음)
   const ZMIN = 0.05, ZMAX = 3;         // 확대·축소 한도(개념학습의 MAP_MIN_SCALE / MAP_MAX_SCALE 와 같음)
@@ -79,12 +79,15 @@
     svg.textContent = '';
     const defs = sv('defs', {}, sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '8', markerHeight: '8', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-path' })));
     const edgeLayer = sv('g', { class: 'm-edges' }), nodeLayer = sv('g', { class: 'm-nodes' });
+    // 290-1: 선 경로는 개념 지도 전용 edgeRoute.js 가 한꺼번에 계산한다(접속면 선택·접속점 나누기·가로지름 회피·라벨 위치). 공용 mapCore.js 의 edgeGeom 은 쓰지 않는다
+    const lblOf = e => clipText(e.display_label || e.label || '', 12);   // 286-1: 문구가 없으면 유형 이름(서버가 채운 display_label)
+    const routes = ER.routeAll([...M.nodes.keys()].map(id => ({ id, x: posOf(id).x, y: posOf(id).y })), M.edges.map(e => ({ key: e.id, from: e.from_concept_id, to: e.to_concept_id, label: lblOf(e) })));
     for (const e of M.edges) {
       const a = M.nodes.get(e.from_concept_id), b = M.nodes.get(e.to_concept_id);
       if (!a || !b) continue;
-      const geo = edgeGeom(posOf(e.from_concept_id), posOf(e.to_concept_id));
+      const geo = routes.get(e.id);
       const sym = isSym(e.relation_type);
-      const lbl = clipText(e.display_label || e.label || '', 12);   // 286-1: 문구가 없으면 유형 이름(서버가 채운 display_label)
+      const lbl = lblOf(e);
       edgeLayer.append(sv('g', { class: 'm-edge' + (e.relation_type === '대립' ? ' m-edge-opp' : ''), 'data-edge': e.id, 'data-t': 'edge', role: 'button', tabindex: 0, 'aria-label': `${termOf(e.from_concept_id)}${sym ? '와 ' : ' → '}${termOf(e.to_concept_id)}: ${e.display_label || e.label} (${typeLabel(e.relation_type)}), 눌러서 고치기` },
         sv('path', { d: geo.d, class: 'm-edge-hit' }),
         sv('path', { d: geo.d, class: 'm-edge-line', 'marker-end': sym ? null : 'url(#m-arrow)' }),
@@ -584,8 +587,9 @@
     svg.textContent = '';
     const defs = sv('defs', {}, sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '8', markerHeight: '8', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-path' })));
     const edgeLayer = sv('g', { class: 'm-edges' }), nodeLayer = sv('g', { class: 'm-nodes' });
+    const qRoutes = ER.routeAll(q.nodes.map(n => ({ id: n.id, x: posOf(n.id).x, y: posOf(n.id).y })), q.answers.map(a => ({ key: a.from + '-' + a.to, from: a.from, to: a.to, label: a.type ? a.type : '' })));
     for (const a of q.answers) {
-      const geo = edgeGeom(posOf(a.from), posOf(a.to));
+      const geo = qRoutes.get(a.from + '-' + a.to);
       edgeLayer.append(sv('g', { class: 'm-edge' + (a.type === '대립' ? ' m-edge-opp' : ''), 'data-answer': a.from + '-' + a.to },
         sv('path', { d: geo.d, class: 'm-edge-line', 'marker-end': isSym(a.type) ? null : 'url(#m-arrow)' }),
         sv('text', { x: geo.mx, y: geo.my - 4, class: 'm-edge-label', 'text-anchor': 'middle' }, a.type ? a.type : '')));
