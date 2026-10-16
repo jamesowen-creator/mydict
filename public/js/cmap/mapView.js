@@ -77,7 +77,7 @@
     if (M.mode === 'quiz' && M.quiz) return renderQuiz();
     const svg = M.svg;
     svg.textContent = '';
-    const defs = sv('defs', {}, sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '8', markerHeight: '8', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-path' })));
+    const defs = sv('defs', {}, sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-path' })));
     const edgeLayer = sv('g', { class: 'm-edges' }), nodeLayer = sv('g', { class: 'm-nodes' });
     // 290-1: 선 경로는 개념 지도 전용 edgeRoute.js 가 한꺼번에 계산한다(접속면 선택·접속점 나누기·가로지름 회피·라벨 위치). 공용 mapCore.js 의 edgeGeom 은 쓰지 않는다
     const lblOf = e => clipText(e.display_label || e.label || '', 12);   // 286-1: 문구가 없으면 유형 이름(서버가 채운 display_label)
@@ -631,7 +631,7 @@
   function renderQuiz() {
     const svg = M.svg, q = M.quiz;
     svg.textContent = '';
-    const defs = sv('defs', {}, sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '8', markerHeight: '8', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-path' })));
+    const defs = sv('defs', {}, sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-path' })));
     const edgeLayer = sv('g', { class: 'm-edges' }), nodeLayer = sv('g', { class: 'm-nodes' });
     const qRoutes = ER.routeAll(q.nodes.map(n => ({ id: n.id, x: posOf(n.id).x, y: posOf(n.id).y })), q.answers.map(a => ({ key: a.from + '-' + a.to, from: a.from, to: a.to, label: a.type ? a.type : '' })));
     for (const a of q.answers) {
