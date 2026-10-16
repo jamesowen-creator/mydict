@@ -18,9 +18,39 @@
   }
   const pad2 = n => String(n).padStart(2, '0');
   const dateText = (d, sep) => d.getFullYear() + sep + pad2(d.getMonth() + 1) + sep + pad2(d.getDate());
-  function safeFileName(title, d) {
-    const t = String(title || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().replace(/^\.+|\.+$/g, '').slice(0, NAME_MAX).trim();
+  // 293-1: 제목은 주제 경로(names = 최상위 → 현재 주제), 하위 주제일 때만 "지도 범위" 줄이 붙는다(지도는 최상위 주제 전체의 것)
+  const TITLE_SEP = ' > ';
+  const titleOf = names => names.join(TITLE_SEP);
+  const scopeOf = names => (names.length > 1 ? '지도 범위: ‘' + names[0] + '’ 전체' : '');
+  // 파일 이름: 경로 이름을 '-'로 잇고 공백·금지 문자를 지운다. 길면 뒤쪽을 잘라 앞부분(최상위 주제)을 지킨다
+  function safeFileName(names, d) {
+    const list = (Array.isArray(names) ? names : [names]).map(x => String(x || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/\s+/g, '')).filter(Boolean);
+    const t = list.join('-').replace(/^[.-]+/, '').slice(0, NAME_MAX).replace(/[.-]+$/, '');
     return '지도-' + (t ? t + '-' : '') + dateText(d, '') + '.pdf';
+  }
+  // 제목 배치(순수): 기본 글자 크기에서 시작해 두 줄에 들어갈 때까지 크기를 줄이고(최소 MIN_TITLE_RATIO), 그래도 넘으면 둘째 줄을 말줄임한다. 공백이 있으면 거기서 줄을 바꾼다
+  const TITLE_LINES = 2, MIN_TITLE_RATIO = 0.7;
+  function wrapLines(measure, text, size, maxW) {
+    const lines = [];
+    let cur = '';
+    for (const ch of text) {
+      if (!cur || measure(cur + ch, size) <= maxW) { cur += ch; continue; }
+      const sp = cur.lastIndexOf(' ');
+      if (sp > 0 && ch !== ' ') { lines.push(cur.slice(0, sp)); cur = cur.slice(sp + 1) + ch; } else { lines.push(cur); cur = ch === ' ' ? '' : ch; }
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  }
+  function layoutTitle(measure, text, baseSize, maxW) {
+    for (let r = 1; r >= MIN_TITLE_RATIO - 1e-9; r -= 0.1) {
+      const size = Math.round(baseSize * r), lines = wrapLines(measure, text, size, maxW);
+      if (lines.length <= TITLE_LINES) return { size, lines, cut: false };
+    }
+    const size = Math.round(baseSize * MIN_TITLE_RATIO), lines = wrapLines(measure, text, size, maxW).slice(0, TITLE_LINES);
+    let last = lines[TITLE_LINES - 1];
+    while (last.length > 1 && measure(last + '…', size) > maxW) last = last.slice(0, -1);
+    lines[TITLE_LINES - 1] = last + '…';
+    return { size, lines, cut: true };
   }
 
   // 최소 PDF: 카탈로그 · 페이지 목록 · 페이지 · 내용(이미지 그리기) · 이미지(DCTDecode) · xref · trailer. 문자열은 모두 ASCII 라 글자 수 = 바이트 수
@@ -54,7 +84,7 @@
     return out;
   }
 
-  const api = { A4, MARGIN, pickOrientation, pageSize, fitImage, safeFileName, dateText, buildPdf, MIN_W, MIN_H };
+  const api = { A4, MARGIN, pickOrientation, pageSize, fitImage, safeFileName, dateText, buildPdf, MIN_W, MIN_H, titleOf, scopeOf, layoutTitle, TITLE_LINES };
   if (typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
 
   // ── 브라우저 전용 ──
@@ -99,8 +129,20 @@
     const view = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
     const scale = Math.min(MAX_SCALE, MAX_SIDE / Math.max(view.w, view.h));
     const mw = Math.round(view.w * scale), mh = Math.round(view.h * scale);
-    const titleSize = Math.max(22, Math.round(mw * 0.032)), headH = Math.round(titleSize * 2.2);
+    const names = o.names && o.names.length ? o.names : ['지도'], scope = scopeOf(names);
+    const baseSize = Math.max(22, Math.round(mw * 0.032)), edge = baseSize;
+    // 제목 영역(제목 최대 2줄 + 범위 줄)의 높이만 달라진다: 지도 영역 크기·용지 맞춤 계산은 그대로
+    const fam = o.fontFamily || 'sans-serif';
+    const probe = document.createElement('canvas').getContext('2d');
+    const dateSize = Math.round(baseSize * 0.6), scopeSize = Math.max(14, Math.round(baseSize * 0.55));
+    probe.font = `400 ${dateSize}px ${fam}`;
+    const dateW = probe.measureText(o.date).width;
+    const maxW = mw - edge * 3 - dateW;
+    const lay = layoutTitle((t, sz) => { probe.font = `700 ${sz}px ${fam}`; return probe.measureText(t).width; }, titleOf(names), baseSize, maxW);
+    const lineH = Math.round(lay.size * 1.35);
+    const headH = Math.round(edge * 0.6 + lineH * lay.lines.length + (scope ? scopeSize * 1.5 : 0) + edge * 0.6);
     const W = mw, H = mh + headH;
+    api.lastMeta = { title: titleOf(names), scope, lines: lay.lines.slice() };   // 테스트·점검용: 마지막으로 만든 PDF 의 제목 데이터
     const clone = cloneForExport(o.svg, view);
     const xml = new XMLSerializer().serializeToString(clone);
     const img = await loadImage('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml));
@@ -112,21 +154,18 @@
     ctx.drawImage(img, 0, headH, mw, mh);
     ctx.fillStyle = o.ink || 'black';
     ctx.textBaseline = 'middle';
-    const fam = o.fontFamily || 'sans-serif';
-    ctx.font = `400 ${Math.round(titleSize * 0.6)}px ${fam}`;
-    const dateW = ctx.measureText(o.date).width;
-    ctx.textAlign = 'right'; ctx.fillText(o.date, W - titleSize, headH / 2);
-    ctx.font = `700 ${titleSize}px ${fam}`;
-    const maxW = W - titleSize * 3 - dateW;
-    let t = o.title || '';
-    while (t.length > 1 && ctx.measureText(t).width > maxW) t = t.slice(0, -1);
-    if (t !== (o.title || '')) t += '…';
-    ctx.textAlign = 'left'; ctx.fillText(t, titleSize, headH / 2);
+    const y0t = edge * 0.6;
+    ctx.font = `400 ${dateSize}px ${fam}`;
+    ctx.textAlign = 'right'; ctx.fillText(o.date, W - edge, y0t + lineH / 2);
+    ctx.font = `700 ${lay.size}px ${fam}`;
+    ctx.textAlign = 'left';
+    lay.lines.forEach((ln, i) => ctx.fillText(ln, edge, y0t + lineH * (i + 0.5)));
+    if (scope) { ctx.font = `400 ${scopeSize}px ${fam}`; ctx.fillText(scope, edge, y0t + lineH * lay.lines.length + scopeSize * 0.6); }
     const blob = await toJpeg(cv, 0.92);
     const jpeg = new Uint8Array(await blob.arrayBuffer());
     const page = pageSize(pickOrientation(W, H));
     const bytes = buildPdf({ jpeg, imgW: W, imgH: H, pageW: page.w, pageH: page.h, place: fitImage(W, H, page.w, page.h) });
-    return { blob: new Blob([bytes], { type: 'application/pdf' }), fileName: safeFileName(o.title, o.dateObj) };
+    return { blob: new Blob([bytes], { type: 'application/pdf' }), fileName: safeFileName(names, o.dateObj) };
   }
 
   // 파일 공유가 되는 환경이면 공유 시트, 아니면 다운로드. 공유 시트를 닫아 취소한 경우(AbortError)는 오류가 아니다. 테스트에서는 api.deliverImpl 을 바꿔 끼운다

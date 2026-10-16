@@ -70,7 +70,7 @@ for (const [w, h] of [[390, 844], [320, 640]]) {
     assert.ok(calls[0].size > 2000, 'PDF 크기 ' + calls[0].size);
     assert.equal(calls[0].head, '%PDF-');
     assert.match(calls[0].tail, /%%EOF/);
-    assert.match(calls[0].name, /^지도-과학물리 1-\d{8}\.pdf$/);
+    assert.match(calls[0].name, /^지도-과학물리1-\d{8}\.pdf$/);
     assert.equal(await page.text('#map-pdf-label'), 'PDF 저장');
     assert.equal(await page.eval('JSON.stringify([document.getElementById("map-save-state").textContent, document.getElementById("map-meta") && document.getElementById("map-meta").textContent])'), saveBefore, '지도 저장 상태 불변');
     assert.equal(await page.text('#map-msg'), '', '오류 없음');
@@ -105,3 +105,38 @@ test('다운로드 경로: 공유를 쓸 수 없으면 <a download> 로 내려�
   assert.deepEqual(r, { st: 'downloaded', got: ['지도-테스트-20261016.pdf'] });
   noErrors(page);
 });
+
+// 293-1: 하위 주제에서 저장하면 제목에 경로·범위 줄, 최상위 주제에서는 범위 줄 없음
+async function nested(page, enterChild) {
+  const root = (await seed(page, 'POST', '/api/cmap/topics', { title: '자본시장' })).topic;
+  const mid = (await seed(page, 'POST', '/api/cmap/topics', { title: '증권 시장', parent_id: root.id })).topic;
+  const leaf = (await seed(page, 'POST', '/api/cmap/topics', { title: '주식', parent_id: mid.id })).topic;
+  const ids = [];
+  for (const term of ['a개념', 'b개념']) ids.push((await seed(page, 'POST', `/api/cmap/topics/${leaf.id}/concepts`, { term })).concept.id);
+  const map = (await seed(page, 'GET', `/api/cmap/topics/${root.id}/map`)).map;
+  for (const [i, id] of ids.entries()) { await seed(page, 'POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: id }); await seed(page, 'PATCH', `/api/cmap/maps/${map.id}/nodes/${id}`, { x: 20 + i * 200, y: 40 }); }
+  await seed(page, 'POST', `/api/cmap/maps/${map.id}/save`);
+  await page.eval('refresh()');
+  const cur = { root, mid, leaf }[enterChild];
+  await page.eval(`Nav.enterTopic(${cur.id}).then(() => 0)`);
+  await page.click('#nav-map'); await page.waitFor("!!document.getElementById('start-list')", 6000);
+  await page.click('#map-open'); await page.waitFor("document.getElementById('map-sheet').open && document.querySelectorAll('[data-node]').length === 2", 6000); await sleep(250);
+}
+for (const [w, h] of [[390, 844], [320, 640]]) {
+  for (const [lvl, title, scope, file] of [['leaf', '자본시장 > 증권 시장 > 주식', '지도 범위: ‘자본시장’ 전체', /^지도-자본시장-증권시장-주식-\d{8}\.pdf$/], ['mid', '자본시장 > 증권 시장', '지도 범위: ‘자본시장’ 전체', /^지도-자본시장-증권시장-\d{8}\.pdf$/], ['root', '자본시장', '', /^지도-자본시장-\d{8}\.pdf$/]]) {
+    test(`PDF 제목 경로(${w}px, ${lvl}): 제목 데이터와 범위 줄, 파일 이름`, { skip: SKIP, timeout: 90000 }, async t => {
+      const { page } = await open(t, w, h);
+      await nested(page, lvl);
+      await stub(page, 0);
+      await page.eval("document.getElementById('map-pdf').click()");
+      await page.waitFor('window.__calls.length === 1', 15000, 'PDF 생성');
+      const meta = await page.eval('window.CmapPdf.lastMeta');
+      assert.equal(meta.title, title);
+      assert.equal(meta.scope, scope);
+      assert.ok(meta.lines.length >= 1 && meta.lines.length <= 2);
+      assert.match((await page.eval('window.__calls'))[0].name, file);
+      assert.equal(await page.text('#map-msg'), '');
+      noErrors(page);
+    });
+  }
+}

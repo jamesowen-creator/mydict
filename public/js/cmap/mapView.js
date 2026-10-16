@@ -243,13 +243,22 @@
     $('map-pdf-label').textContent = pdfBusy ? '만드는 중…' : 'PDF 저장';
     b.title = M.nodes.size ? '' : '지도에 개념을 올리면 저장할 수 있어요';
   }
+  // 293-1: PDF 제목용 주제 경로(최상위 → 지금 보고 있는 주제). 지도 응답의 주제 목록(parent_id)으로 거슬러 올라가며, 최상위가 이 지도의 주제와 맞지 않으면 최상위 이름만 쓴다
+  function topicNames() {
+    const byTopic = new Map((M.topics || []).map(t => [t.id, t]));
+    const root = byTopic.get(M.rootId), rootName = (root && root.title) || (M.map && M.map.title) || '지도';
+    const cur = window.CmapNav && window.CmapNav.currentTopicId ? window.CmapNav.currentTopicId() : null;
+    const chain = [];
+    for (let t = byTopic.get(cur), n = 0; t && n < 20; t = t.parent_id === null || t.parent_id === undefined ? null : byTopic.get(t.parent_id), n++) chain.unshift(t);
+    return chain.length && chain[0].id === M.rootId ? chain.map(t => t.title) : [rootName];
+  }
   async function pdfSave() {
     if (pdfBusy || M.mode !== 'map' || !M.nodes.size || !window.CmapPdf) return;
     pdfBusy = true; renderPdfBtn(); mapMsg('');
     try {
-      const topic = (M.topics || []).find(t => t.id === M.rootId);
+      const names = topicNames();
       const now = new Date(), cvs = getComputedStyle($('map-canvas')), body = getComputedStyle(document.body);
-      const r = await window.CmapPdf.make({ svg: M.svg, pts: [...M.nodes.keys()].map(posOf), nodeW: G.NODE_W, nodeH: G.NODE_H, title: (topic && topic.title) || (M.map && M.map.title) || '지도', date: window.CmapPdf.dateText(now, '-'), dateObj: now, background: cvs.backgroundColor, ink: body.color, fontFamily: body.fontFamily });
+      const r = await window.CmapPdf.make({ svg: M.svg, pts: [...M.nodes.keys()].map(posOf), nodeW: G.NODE_W, nodeH: G.NODE_H, names, date: window.CmapPdf.dateText(now, '-'), dateObj: now, background: cvs.backgroundColor, ink: body.color, fontFamily: body.fontFamily });
       await window.CmapPdf.deliver(r.blob, r.fileName);
     } catch (e) { mapMsg('PDF를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.'); }
     pdfBusy = false; renderPdfBtn();
