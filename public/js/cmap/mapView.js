@@ -104,6 +104,7 @@
     svg.append(defs, edgeLayer, nodeLayer);
     applyView();
     renderHint();
+    renderPdfBtn();
     $('map-count').textContent = '지도에 ' + M.nodes.size + '개 · 연결 ' + M.edges.length + '개';
     updateMeta();
   }
@@ -232,6 +233,26 @@
     el.textContent = M.selected !== null
       ? '‘' + termOf(M.selected) + '’을(를) 골랐어요. 이어 줄 개념을 눌러 주세요. 같은 개념을 다시 누르면 취소돼요.'
       : '노드를 끌어 옮기고, 두 노드를 차례로 눌러 연결해요. 연결선을 누르면 고칠 수 있어요.';
+  }
+  // ── PDF 저장(작업292-1): 화면의 지도 그림만 A4 한 쪽 PDF 로. 지도 데이터·저장 상태는 바꾸지 않는다 ──
+  let pdfBusy = false;
+  function renderPdfBtn() {
+    const b = $('map-pdf');
+    if (!b) return;
+    b.disabled = pdfBusy || !M.nodes.size;
+    $('map-pdf-label').textContent = pdfBusy ? '만드는 중…' : 'PDF 저장';
+    b.title = M.nodes.size ? '' : '지도에 개념을 올리면 저장할 수 있어요';
+  }
+  async function pdfSave() {
+    if (pdfBusy || M.mode !== 'map' || !M.nodes.size || !window.CmapPdf) return;
+    pdfBusy = true; renderPdfBtn(); mapMsg('');
+    try {
+      const topic = (M.topics || []).find(t => t.id === M.rootId);
+      const now = new Date(), cvs = getComputedStyle($('map-canvas')), body = getComputedStyle(document.body);
+      const r = await window.CmapPdf.make({ svg: M.svg, pts: [...M.nodes.keys()].map(posOf), nodeW: G.NODE_W, nodeH: G.NODE_H, title: (topic && topic.title) || (M.map && M.map.title) || '지도', date: window.CmapPdf.dateText(now, '-'), dateObj: now, background: cvs.backgroundColor, ink: body.color, fontFamily: body.fontFamily });
+      await window.CmapPdf.deliver(r.blob, r.fileName);
+    } catch (e) { mapMsg('PDF를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.'); }
+    pdfBusy = false; renderPdfBtn();
   }
   const mapMsg = t => { $('map-msg').textContent = t || ''; if (!t) $('map-note').textContent = ''; };
   const mapNote = t => { $('map-note').textContent = t || ''; };
@@ -724,6 +745,7 @@
     });
     $('map-sheet').addEventListener('pointerdown', ev => { if (M.popup !== null && !$('map-popup').contains(ev.target) && !M.svg.contains(ev.target)) closePopupOnly(); });   // 팝업·지도 밖(툴바 등)을 누르면 팝업만 닫는다
     $('map-fit').addEventListener('click', () => { fit(); });
+    $('map-pdf').addEventListener('click', pdfSave);
     $('map-zoom-in').addEventListener('click', () => zoomBy(1.25));
     $('map-zoom-out').addEventListener('click', () => zoomBy(0.8));
     $('map-sheet-close').addEventListener('click', closeSheet);

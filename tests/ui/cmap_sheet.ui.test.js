@@ -169,7 +169,7 @@ test('툴바: 한 줄·각 44px 이상·SVG 아이콘·이모지 없음, 해설�
   await world(page);
   await openSheet(page);
   const tb = await page.eval("[...document.querySelectorAll('.sheet-tools .tool')].filter(b => b.offsetParent !== null).map(b => { const r = b.getBoundingClientRect(); return { id: b.id, t: Math.round(r.top), w: r.width, h: r.height, svg: !!b.querySelector('svg'), txt: b.textContent.trim() }; })");
-  assert.deepEqual(tb.map(b => b.id), ['map-pick-toggle', 'map-fit', 'map-more-toggle'], '285-1: 아랫줄 [개념 선택][전체 보기][더보기]');
+  assert.deepEqual(tb.map(b => b.id), ['map-pick-toggle', 'map-fit', 'map-pdf', 'map-more-toggle'], '292-1: 아랫줄 [개념 선택][전체 보기][PDF 저장][더보기]');
   assert.equal(new Set(tb.map(b => b.t)).size, 1, '한 줄: ' + JSON.stringify(tb.map(b => b.t)));
   assert.ok(tb.every(b => b.w >= 44 && b.h >= 44 && b.svg), JSON.stringify(tb));
   assert.ok(!/\p{Extended_Pictographic}/u.test(tb.map(b => b.txt).join('')), '이모지 없음');

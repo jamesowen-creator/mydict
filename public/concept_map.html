@@ -297,19 +297,20 @@
 
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
-<!-- 283-2: ?v= 값은 public/sw.js 의 CACHE_NAME(metis-v41) 숫자와 같게 두고 배포마다 함께 올린다(옛 캐시 JS가 새 HTML과 섞여 내비가 죽는 일을 막는다. tests/concept_map_cache.test.js 가 검사) -->
-<script src="/js/map/mapCore.js?v=41"></script>
-<script src="/js/cmap/mapGeometry.js?v=41"></script>
-<script src="/js/cmap/layoutOptimize.js?v=41"></script>
-<script src="/js/cmap/edgeRoute.js?v=41"></script>
-<script src="/js/cmap/pairPicker.js?v=41"></script>
-<script src="/js/cmap/markState.js?v=41"></script>
-<script src="/js/cmap/mapView.js?v=41"></script>
-<script src="/js/cmap/mapStart.js?v=41"></script>
-<script src="/js/cmap/narrateView.js?v=41"></script>
-<script src="/js/cmap/reviewView.js?v=41"></script>
-<script src="/js/cmap/micRecorder.js?v=41"></script>
-<script src="/js/cmap/answerView.js?v=41"></script>
+<!-- 283-2: ?v= 값은 public/sw.js 의 CACHE_NAME(metis-v42) 숫자와 같게 두고 배포마다 함께 올린다(옛 캐시 JS가 새 HTML과 섞여 내비가 죽는 일을 막는다. tests/concept_map_cache.test.js 가 검사) -->
+<script src="/js/map/mapCore.js?v=42"></script>
+<script src="/js/cmap/mapGeometry.js?v=42"></script>
+<script src="/js/cmap/layoutOptimize.js?v=42"></script>
+<script src="/js/cmap/edgeRoute.js?v=42"></script>
+<script src="/js/cmap/pairPicker.js?v=42"></script>
+<script src="/js/cmap/markState.js?v=42"></script>
+<script src="/js/cmap/mapPdf.js?v=42"></script>
+<script src="/js/cmap/mapView.js?v=42"></script>
+<script src="/js/cmap/mapStart.js?v=42"></script>
+<script src="/js/cmap/narrateView.js?v=42"></script>
+<script src="/js/cmap/reviewView.js?v=42"></script>
+<script src="/js/cmap/micRecorder.js?v=42"></script>
+<script src="/js/cmap/answerView.js?v=42"></script>
 
 <div id="loading" role="status"><p>불러오는 중…</p></div>
 
@@ -431,6 +432,7 @@
     <div class="tool-row">
       <button id="map-pick-toggle" class="tool edit-only" type="button" aria-expanded="false" aria-controls="map-pick-panel"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg><span>개념 선택</span></button>
       <button id="map-fit" class="tool" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>전체 보기</span></button>
+      <button id="map-pdf" class="tool edit-only" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M12 10v6M9.5 13.5L12 16l2.5-2.5"/></svg><span id="map-pdf-label">PDF 저장</span></button>
       <button id="map-more-toggle" class="tool" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="map-more"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle class="dot" cx="5" cy="12" r="1.8"/><circle class="dot" cx="12" cy="12" r="1.8"/><circle class="dot" cx="19" cy="12" r="1.8"/></svg><span>더보기</span></button>
     </div>
     <div id="map-more" class="tool-more" role="group" aria-label="더보기" hidden>
