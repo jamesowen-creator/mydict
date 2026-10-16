@@ -245,6 +245,10 @@
   .map-overlay-bottom p:empty { display: none; }
   .map-bulk { pointer-events: none; padding: 0 12px; background: var(--color-surface); border-top: 1px solid var(--color-line); }   /* 줄 전체가 아니라 버튼만 눌리게 해서, 버튼 옆 빈 곳은 지도(빈 곳 탭 = 선택 취소)가 받는다 */
   .map-bulk .btn { pointer-events: auto; }   /* 287-1: 노드 하나를 골랐을 때만 보이는 [여러 개에 한 번에 연결] */
+  .map-overlay-bottom p.map-brief { display: flex; flex-direction: column; gap: 2px; color: var(--color-text); }   /* 291-1: 편집 시트 첫 선택 설명. 탭을 가로채지 않음(overlay 의 pointer-events: none 상속) */
+  .map-brief[hidden] { display: none; }
+  .map-brief .b-term { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+  .map-brief .b-text { font-size: 13px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: var(--brief-lines, 2); -webkit-box-orient: vertical; overflow: hidden; }
   #map-note { color: var(--color-ok-ink); font-weight: 700; }
   .bulk-list { margin-top: 8px; }
   .bulk-list .pick-row.off { color: var(--color-text-sub); cursor: default; }
@@ -293,19 +297,19 @@
 
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
-<!-- 283-2: ?v= 값은 public/sw.js 의 CACHE_NAME(metis-v40) 숫자와 같게 두고 배포마다 함께 올린다(옛 캐시 JS가 새 HTML과 섞여 내비가 죽는 일을 막는다. tests/concept_map_cache.test.js 가 검사) -->
-<script src="/js/map/mapCore.js?v=40"></script>
-<script src="/js/cmap/mapGeometry.js?v=40"></script>
-<script src="/js/cmap/layoutOptimize.js?v=40"></script>
-<script src="/js/cmap/edgeRoute.js?v=40"></script>
-<script src="/js/cmap/pairPicker.js?v=40"></script>
-<script src="/js/cmap/markState.js?v=40"></script>
-<script src="/js/cmap/mapView.js?v=40"></script>
-<script src="/js/cmap/mapStart.js?v=40"></script>
-<script src="/js/cmap/narrateView.js?v=40"></script>
-<script src="/js/cmap/reviewView.js?v=40"></script>
-<script src="/js/cmap/micRecorder.js?v=40"></script>
-<script src="/js/cmap/answerView.js?v=40"></script>
+<!-- 283-2: ?v= 값은 public/sw.js 의 CACHE_NAME(metis-v41) 숫자와 같게 두고 배포마다 함께 올린다(옛 캐시 JS가 새 HTML과 섞여 내비가 죽는 일을 막는다. tests/concept_map_cache.test.js 가 검사) -->
+<script src="/js/map/mapCore.js?v=41"></script>
+<script src="/js/cmap/mapGeometry.js?v=41"></script>
+<script src="/js/cmap/layoutOptimize.js?v=41"></script>
+<script src="/js/cmap/edgeRoute.js?v=41"></script>
+<script src="/js/cmap/pairPicker.js?v=41"></script>
+<script src="/js/cmap/markState.js?v=41"></script>
+<script src="/js/cmap/mapView.js?v=41"></script>
+<script src="/js/cmap/mapStart.js?v=41"></script>
+<script src="/js/cmap/narrateView.js?v=41"></script>
+<script src="/js/cmap/reviewView.js?v=41"></script>
+<script src="/js/cmap/micRecorder.js?v=41"></script>
+<script src="/js/cmap/answerView.js?v=41"></script>
 
 <div id="loading" role="status"><p>불러오는 중…</p></div>
 
@@ -441,7 +445,7 @@
     <svg id="map-svg" role="group" aria-label="개념 지도"></svg>
     <div id="map-popup" class="map-popup" role="status" hidden></div>
     <div class="map-overlay-top"><span id="map-count" class="hint"></span></div>
-    <div class="map-overlay-bottom"><div id="map-bulk-row" class="map-bulk" hidden><button id="map-bulk-btn" class="btn text" type="button">여러 개에 한 번에 연결</button></div><p id="map-note" role="status"></p><p id="map-hint"></p><p id="map-msg" class="msg" role="alert"></p></div>
+    <div class="map-overlay-bottom"><p id="map-brief" class="map-brief" role="status" hidden></p><div id="map-bulk-row" class="map-bulk" hidden><button id="map-bulk-btn" class="btn text" type="button">여러 개에 한 번에 연결</button></div><p id="map-note" role="status"></p><p id="map-hint"></p><p id="map-msg" class="msg" role="alert"></p></div>
   </div>
   <div id="map-pick-panel" class="map-pick edit-only" hidden><div id="map-pick-list"></div></div>
   <div id="quiz-panel" aria-live="polite"></div>

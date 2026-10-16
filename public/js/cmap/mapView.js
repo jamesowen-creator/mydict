@@ -206,7 +206,21 @@
     const x0 = M.view.tx, y0 = M.view.ty, x1 = x0 + r.width / M.view.scale, y1 = y0 + r.height / M.view.scale;
     if (p.x < x0 || p.y < y0 || p.x + G.NODE_W > x1 || p.y + G.NODE_H > y1) fit();
   }
+  // 291-1: 편집 시트에서 첫 노드를 고르면 개념 이름 + 정의 한 줄(brief)을 안내 줄 위에 보인다. 이미 불러온 지도 응답의 brief 만 쓰고 표시(marks)는 건드리지 않는다
+  const BRIEF_LINES = 2;
+  function hideBrief() { M.briefId = null; const b = $('map-brief'); if (b) { b.hidden = true; b.textContent = ''; } }
+  function renderBrief() {
+    const el = $('map-brief');
+    if (!el) return;
+    if (!(M.sheet.open && M.mode === 'map' && !M.preview && M.selected !== null && M.briefId === M.selected)) { hideBrief(); return; }
+    const c = M.concepts.get(M.selected);
+    el.textContent = '';
+    el.append(h('span', { class: 'b-term', text: termOf(M.selected) }), h('span', { class: 'b-text', text: c && c.brief ? c.brief : '설명이 아직 없습니다' }));
+    el.style.setProperty('--brief-lines', BRIEF_LINES);
+    el.hidden = false;
+  }
   function renderHint() {
+    renderBrief();
     const el = $('map-hint');
     if (M.preview || M.mode !== 'map') $('map-bulk-row').hidden = true;
     if (M.preview) { el.textContent = '미리보기예요. 마음에 들면 [적용], 아니면 [취소]를 눌러 주세요. 노드와 연결은 그대로이고 자리만 바뀌어요.'; return; }
@@ -234,11 +248,11 @@
     M.topics = b.topics;
     M.nodes = new Map(b.nodes.map(n => [n.concept_id, { x: n.x, y: n.y }]));
     M.edges = b.edges;
-    M.selected = null; M.gest = null; M.pinch = null; M.ptrs.clear();
+    M.selected = null; M.briefId = null; M.gest = null; M.pinch = null; M.ptrs.clear();
     M.status = { current_hash: b.current_hash, save_status: b.save_status }; M.preview = null; M.undo = null; M.hl = new Set(); M.quiz = null;
     if (!M.picker) {
       M.picker = PP.create({
-        onFirst: id => { M.selected = id; render(); },
+        onFirst: id => { M.selected = id; M.briefId = id; render(); },
         onCancel: () => { M.selected = null; render(); },
         onPair: (a, bb) => { M.selected = null; render(); if (M.mode === 'quiz') emit('quizpair', { a, b: bb }); else onPair(a, bb); },
       });
@@ -364,6 +378,7 @@
     openEdgeDialog('create', { from: a, to: b });
   }
   function openEdgeDialog(mode, d) {
+    hideBrief();
     ED = { mode, edge: d.edge || null, from: d.from, to: d.to, flips: 0 };
     $('edge-heading').textContent = mode === 'create' ? '연결 만들기' : '연결 고치기';
     $('edge-label').value = d.edge && d.edge.label ? d.edge.label : '';
@@ -423,6 +438,7 @@
   let BK = null;   // { from, linked: Set, sel: Set, busy }
   function openBulk() {
     if (M.selected === null || M.mode !== 'map' || M.preview || BK) return;
+    hideBrief();
     const from = M.selected;
     const linked = new Set(M.edges.filter(e => e.from_concept_id === from || e.to_concept_id === from).map(e => (e.from_concept_id === from ? e.to_concept_id : e.from_concept_id)));
     BK = { from, linked, sel: new Set(), busy: false };
@@ -656,7 +672,7 @@
   function closeSheetUi(restore) {
     if (!M.sheet.open) return;
     M.sheet.open = false;
-    hidePopup();
+    hidePopup(); hideBrief();
     if (M.picker) M.picker.reset();
     M.selected = null; M.gest = null; M.pinch = null; M.ptrs.clear();
     $('map-pick-panel').hidden = true; $('map-pick-toggle').setAttribute('aria-expanded', 'false');
