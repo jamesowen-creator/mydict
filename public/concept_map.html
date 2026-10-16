@@ -297,20 +297,20 @@
 
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
-<!-- 283-2: ?v= 값은 public/sw.js 의 CACHE_NAME(metis-v45) 숫자와 같게 두고 배포마다 함께 올린다(옛 캐시 JS가 새 HTML과 섞여 내비가 죽는 일을 막는다. tests/concept_map_cache.test.js 가 검사) -->
-<script src="/js/map/mapCore.js?v=45"></script>
-<script src="/js/cmap/mapGeometry.js?v=45"></script>
-<script src="/js/cmap/layoutOptimize.js?v=45"></script>
-<script src="/js/cmap/edgeRoute.js?v=45"></script>
-<script src="/js/cmap/pairPicker.js?v=45"></script>
-<script src="/js/cmap/markState.js?v=45"></script>
-<script src="/js/cmap/mapPdf.js?v=45"></script>
-<script src="/js/cmap/mapView.js?v=45"></script>
-<script src="/js/cmap/mapStart.js?v=45"></script>
-<script src="/js/cmap/narrateView.js?v=45"></script>
-<script src="/js/cmap/reviewView.js?v=45"></script>
-<script src="/js/cmap/micRecorder.js?v=45"></script>
-<script src="/js/cmap/answerView.js?v=45"></script>
+<!-- 283-2: ?v= 값은 public/sw.js 의 CACHE_NAME(metis-v46) 숫자와 같게 두고 배포마다 함께 올린다(옛 캐시 JS가 새 HTML과 섞여 내비가 죽는 일을 막는다. tests/concept_map_cache.test.js 가 검사) -->
+<script src="/js/map/mapCore.js?v=46"></script>
+<script src="/js/cmap/mapGeometry.js?v=46"></script>
+<script src="/js/cmap/layoutOptimize.js?v=46"></script>
+<script src="/js/cmap/edgeRoute.js?v=46"></script>
+<script src="/js/cmap/pairPicker.js?v=46"></script>
+<script src="/js/cmap/markState.js?v=46"></script>
+<script src="/js/cmap/mapPdf.js?v=46"></script>
+<script src="/js/cmap/mapView.js?v=46"></script>
+<script src="/js/cmap/mapStart.js?v=46"></script>
+<script src="/js/cmap/narrateView.js?v=46"></script>
+<script src="/js/cmap/reviewView.js?v=46"></script>
+<script src="/js/cmap/micRecorder.js?v=46"></script>
+<script src="/js/cmap/answerView.js?v=46"></script>
 
 <div id="loading" role="status"><p>불러오는 중…</p></div>
 
@@ -886,7 +886,7 @@ const EXPLAIN_LABELS = { definition: '정의', example: '예시', simple_text: '
 const EXPLAIN_LEGACY_LABELS = { in_context: '이 주제에서의 의미', confusion: '헷갈리기 쉬운 점' };
 const EXPLAIN_VIEW_LABELS = Object.assign({}, EXPLAIN_LABELS, EXPLAIN_LEGACY_LABELS);
 const EXPLAIN_MAXLEN = { definition: 2000, example: 1000, simple_text: 1000, deeper_text: 1000 };
-const DEEPEN_MAX = 3, DEEPEN_LIMIT = 350;
+const DEEPEN_MAX = 6, DEEPEN_LIMIT = 350;      // 297-1: 검색 때 3개 + [심화 개념+] 최대 3번
 function deepenList(expl) { return expl && Array.isArray(expl.deepen) ? expl.deepen.filter(x => typeof x === 'string' && x.trim()) : []; }
 function explanationSections(expl) {
   const box = h('div', { class: 'e-secs' });
@@ -919,11 +919,11 @@ function renderConcepts() {
   }
   growAll(ul);
 }
-// 282-1: [심화 개념] — 누를 때마다 정의·예시보다 한 단계 깊은 설명이 하나씩 쌓인다(최대 3개). 생성 중에는 "생성 중…"으로 바뀌고 비활성
+// 282-1: [심화 개념] — 누를 때마다 정의·예시보다 한 단계 깊은 설명이 하나씩 쌓인다(297-1: 검색 때 3개 포함 최대 6개, 한 번에 1개 추가). 생성 중에는 "생성 중…"으로 바뀌고 비활성
 function deepenButton(c) {
   const n = deepenList(c.explanation).length, busy = S.deepening.has(c.id), noDef = !(c.explanation && typeof c.explanation.definition === 'string' && c.explanation.definition.trim());
   return [
-    h('button', { class: 'btn text', type: 'button', 'data-t': 'concept-deepen', disabled: busy || n >= DEEPEN_MAX || noDef || (!!S.explain && S.explain.status === 'loading'), 'aria-label': c.term + ' 심화 개념 추가', text: busy ? '생성 중…' : '심화 개념', onclick: () => requestDeepen(c) }),
+    h('button', { class: 'btn text', type: 'button', 'data-t': 'concept-deepen', disabled: busy || n >= DEEPEN_MAX || noDef || (!!S.explain && S.explain.status === 'loading'), 'aria-label': c.term + ' 심화 개념 추가', text: busy ? '생성 중…' : '심화 개념+', onclick: () => requestDeepen(c) }),
     n ? h('span', { class: 'c-deepen-count', 'data-t': 'deepen-count', text: n + '/' + DEEPEN_MAX }) : null,
   ];
 }

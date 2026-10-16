@@ -291,7 +291,7 @@ test('비용 집계: calcCost 가 cmap_stt(초 × 분당 단가)와 cmap_answer(
 test('280-2: 비교 기준은 저장된 설명에서 값이 있는 항목 — 정의·예시 2항목 개념(검색으로 저장)과 4항목 개념 모두 평가되고, 모델 입력에는 값이 있는 항목만 들어간다', async t => {
   const s = await setup(); t.after(() => s.close());
   const topic = await s.sci();
-  s.anthropic.handler = p => (/개념 하나에 대해 쉬운 설명/.test(p.system || '') ? JSON.stringify({ english: 'speed', definition: '속도는 위치가 변하는 빠르기이며 이동을 비교할 때 씁니다.', example: '자전거로 한 시간에 15km를 갑니다.' }) : JSON.stringify(GOOD));
+  s.anthropic.handler = p => (/개념 하나에 대해 쉬운 설명/.test(p.system || '') ? JSON.stringify({ english: 'speed', definition: '속도는 위치가 변하는 빠르기이며 이동을 비교할 때 씁니다.', example: '자전거로 한 시간에 15km를 갑니다.', deepen: ['심화 하나입니다.', '심화 둘입니다.', '심화 셋입니다.'] }) : JSON.stringify(GOOD));
   const two = (await s.call('POST', `/api/cmap/topics/${topic.id}/explain`, { term: '속도' })).body.concept;          // 검색 즉시 저장된 2항목
   const four = await s.concept(topic, { term: '네항목', explanation: { definition: '정의', example: '예', simple_text: '쉬움', deeper_text: '깊음' }, explanation_source: 'ai' });
   s.anthropic.calls.length = 0;

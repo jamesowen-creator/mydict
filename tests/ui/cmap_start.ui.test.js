@@ -15,7 +15,7 @@ async function open(t, width = 390, height = 844) {
   const srv = await startCmapServer();
   t.after(() => srv.close());
   let n = 0;
-  srv.anthropic.handler = () => { n++; return JSON.stringify({ english: 'e' + n, definition: '정의 ' + n + '입니다.', example: '예시 ' + n + '입니다.' }); };
+  srv.anthropic.handler = () => { n++; return JSON.stringify({ english: 'e' + n, definition: '정의 ' + n + '입니다.', example: '예시 ' + n + '입니다.', deepen: ['심화 하나입니다.', '심화 둘입니다.', '심화 셋입니다.'] }); };
   const page = await browser.newPage({ width, height, token: srv.token() });
   t.after(() => page.close());
   await page.goto(srv.url + '/concept_map.html');

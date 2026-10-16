@@ -23,7 +23,7 @@ async function open(t) {
   return { srv, page };
 }
 const seed = (page, method, url, body) => page.eval(`(async () => { const r = await api(${JSON.stringify(method)}, ${JSON.stringify(url)}, ${JSON.stringify(body)}); return r.body; })()`);
-const EXPL = { english: 'inertia', definition: '물체가 원래 운동 상태를 유지하려는 성질입니다.', example: '버스가 갑자기 서면 몸이 앞으로 쏠립니다.', simple_text: '가만히 있던 것은 계속 가만히 있으려 합니다.', deeper_text: '관성의 크기는 질량으로 나타냅니다.' };
+const EXPL = { english: 'inertia', definition: '물체가 원래 운동 상태를 유지하려는 성질입니다.', example: '버스가 갑자기 서면 몸이 앞으로 쏠립니다.', simple_text: '가만히 있던 것은 계속 가만히 있으려 합니다.', deeper_text: '관성의 크기는 질량으로 나타냅니다.', deepen: ['심화 하나입니다.', '심화 둘입니다.', '심화 셋입니다.'] };   // 297-1: 검색 응답에는 심화 3개가 필요
 // 과학(물리): 개념 N개(길게 만들어 목록이 화면보다 길어지게), 앞 4개를 지도에 넣고 연결 2개, 저장
 async function world(page, srv, { n = 30 } = {}) {
   const sci = (await seed(page, 'POST', '/api/cmap/topics', { title: '과학' })).topic;
@@ -235,7 +235,7 @@ test('수정 화면 입력칸(이전 형태 항목 포함)과 설명 카드 입�
   await page.click('#concept-list [data-t=concept]:last-child [data-t=concept-edit]');
   await page.waitFor("!!document.querySelector('#concept-list [data-t=edit] textarea')", 4000, '수정 입력칸');
   const cards = await page.eval("[...document.querySelectorAll('#concept-list [data-t=edit] textarea')].map(t => { const cs = getComputedStyle(t); return { id: t.id, sh: t.scrollHeight, ch: t.clientHeight, resize: cs.resize, ov: cs.overflowY, h: t.getBoundingClientRect().height }; })");
-  assert.deepEqual(cards.map(c => c.id), ['edit-f-definition', 'edit-f-example', 'edit-memo']);
+  assert.deepEqual(cards.map(c => c.id), ['edit-f-definition', 'edit-f-example', 'edit-deepen-1', 'edit-deepen-2', 'edit-deepen-3', 'edit-memo']);   // 297-1: 검색 결과에는 심화 입력칸 3개가 함께 있다
   for (const c of cards.slice(0, 2)) { assert.equal(c.resize, 'none'); assert.equal(c.ov, 'hidden'); assert.ok(Math.abs(c.sh - c.ch) <= 1 && c.h > 80, JSON.stringify(c)); }
 });
 

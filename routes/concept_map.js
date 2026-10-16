@@ -321,9 +321,10 @@ router.post('/api/cmap/topics/:id/explain', guard, handle(async req => {
   const path = [];
   for (let cur = topic; cur; cur = cur.parent_id === null || cur.parent_id === undefined ? null : idx.byId.get(cur.parent_id)) path.unshift(cur.title);
   const input = AI.buildExplainInput({ path, term: termValue, siblings: existing.filter(x => !target || x.id !== target.id).map(x => x.term) });
-  const ai = await AI.callExplainAI(req.user.id, input);
-  const v = ai.parsed === undefined ? null : AI.validateAiExplanation(ai.parsed);
-  if (!v) { if (ai.parsed !== undefined) { const f = AI.explainFailReason(ai.parsed) || { reason: 'bad_shape' }; AI.logAiFail('explain', f.reason, f.chars, f.field); } throw new HttpError(502, ai.aiError || AI.AI_ERROR_TEXT, { ai_error: true }); }
+  const withDeepen = !target;                           // 297-1: 새 개념은 정의·예시·심화 3개를 한 번의 호출로, [다시 설명]은 정의·예시만(심화는 보존)
+  const ai = await AI.callExplainAI(req.user.id, input, AI.explainSystemPrompt(withDeepen), withDeepen ? AI.EXPLAIN_WITH_DEEPEN_MAX_TOKENS : undefined);
+  const v = ai.parsed === undefined ? null : AI.validateAiExplanation(ai.parsed, withDeepen);
+  if (!v) { if (ai.parsed !== undefined) { const f = AI.explainFailReason(ai.parsed, withDeepen) || { reason: 'bad_shape' }; AI.logAiFail('explain', f.reason, f.chars, f.field); } throw new HttpError(502, ai.aiError || AI.AI_ERROR_TEXT, { ai_error: true }); }
   const explJson = JSON.stringify(v.explanation);
   return withTx(async c => {
     await ownTopic(c, id, req.user.id, { lock: true });
