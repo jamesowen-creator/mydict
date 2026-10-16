@@ -554,7 +554,7 @@
     $('map-opt-bar').hidden = !M.preview;
     $('map-undo').hidden = !M.undo || !!M.preview;
     $('map-opt').disabled = !!M.preview;
-    if (M.preview) $('map-opt-info').textContent = '연결선 교차 ' + M.preview.metrics.crossingsBefore + '개 → ' + M.preview.metrics.crossingsAfter + '개';
+    if (M.preview) $('map-opt-info').textContent = (M.preview.metrics.layout === 'hierarchy' ? '위→아래 계층 · ' : '') + '연결선 교차 ' + M.preview.metrics.crossingsBefore + '개 → ' + M.preview.metrics.crossingsAfter + '개';
   }
   // 285-1: 저장은 이 함수 하나만 쓴다(시트 [저장], 만들기 화면 [지도 저장], 해설·퀴즈의 "저장하고 …"). 결과 { ok, error }. 저장 중 중복 호출은 거부한다
   async function save() {
@@ -581,7 +581,7 @@
     const L = window.CmapLayout, rect = M.svg.getBoundingClientRect();
     const ids = [...M.nodes.keys()].sort((a, b) => a - b);
     const nodes = ids.map(id => ({ id, x: posOf(id).x, y: posOf(id).y }));
-    const res = L.optimizeLayout(nodes, M.edges.map(e => ({ from: e.from_concept_id, to: e.to_concept_id })), { bounds: L.suggestBounds(ids.length, rect.width / (rect.height || 1)) });
+    const res = L.optimizeLayout(nodes, M.edges.map(e => ({ from: e.from_concept_id, to: e.to_concept_id, type: e.relation_type || null, sym: isSym(e.relation_type) })), { bounds: L.suggestBounds(ids.length, rect.width / (rect.height || 1)) });
     if (!res.metrics.changed) { mapMsg('지금 배치가 이미 정리돼 있어요. 바꿀 것이 없어요.'); return; }
     if (M.picker) M.picker.reset();
     M.selected = null;

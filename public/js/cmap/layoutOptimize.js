@@ -1,8 +1,11 @@
 // 작업273-3: 개념 지도 배치 최적화(계산만, AI 호출 없음, DOM 없음). 노드 위치만 계산하고 노드 집합·간선은 읽기만 하며 바꾸지 않는다(의미 불변).
 //   const r = CmapLayout.optimizeLayout(nodes, edges, { bounds })
-//     nodes: [{ id, x, y }] (x, y = 지금 화면에 보이는 위치, 노드 사각형의 왼쪽 위), edges: [{ from, to }] (노드 id 쌍, 방향·문구는 배치에 쓰지 않음)
+//     nodes: [{ id, x, y }] (x, y = 지금 화면에 보이는 위치, 노드 사각형의 왼쪽 위), edges: [{ from, to, type?, sym? }] (노드 id 쌍, 문구는 배치에 쓰지 않음)
+//       294-1: 연결에 sym(boolean: true = 방향 없음)을 주면 방향 정보를 쓴다. sym 이 false 인 연결 = 방향 있음(위→아래: 기본은 from 이 위, type 이 '일부'·'종류'면 to 가 위).
+//       sym 을 주지 않으면(예전 호출) 방향 정보가 없는 것이라 계층 후보를 만들지 않고 아래 일반 후보 선택만 쓴다.
 //     bounds: { w, h } 노드를 놓을 영역(노드 왼쪽 위 좌표의 범위는 [0, w - NODE_W] × [0, h - NODE_H]). 생략하면 노드 수에 맞는 영역(suggestBounds)
-//     반환: { positions: Map(id → {x, y}), metrics: { crossingsBefore, crossingsAfter, lengthBefore, lengthAfter, changed, expanded }, bounds }
+//     반환: { positions: Map(id → {x, y}), metrics: { crossingsBefore, crossingsAfter, lengthBefore, lengthAfter, changed, expanded, layout, reason }, bounds }
+//       layout: 'hierarchy'(방향 있는 연결이 있어 계층 배치를 고름) | 'general'(기존 후보 선택). 계층 배치가 세로로 모자라면 bounds.h 를 늘리고 expanded 를 true 로 한다.
 // 목표: 노드 겹침 없음, 간선 교차 수 감소, 연결된 노드 가까이, 영역 안. 같은 입력이면 항상 같은 결과(난수 없음).
 // 방법: 서로 다른 후보 배치(원래 배치를 보정한 것·층 배치·힘 기반·BFS 순서의 격자·BFS 순서의 원)를 모두 만들어 겹침을 없애고 영역 안으로 넣은 뒤,
 //   교차 수 → 연결선 길이 순으로 가장 좋은 것을 고른다. 원래 배치가 이미 유효(겹침 없음·영역 안)하면, 고른 후보가 원래보다 좋지 않을 때 원래 배치를 그대로 돌려준다
@@ -13,6 +16,7 @@
   const NODE_W = 132, NODE_H = 44;           // mapCore.js 의 MAPD 와 같은 값
   const GAP = 12;                            // 겹침을 없앨 때 두는 노드 사이 여백
   const CELL_W = NODE_W + 72, CELL_H = NODE_H + 52;   // 격자 한 칸(연결 문구가 들어갈 여유)
+  const REASON_HIER = '방향 있는 연결이 있어 위→아래 계층으로 배치', REASON_GENERAL = '교차가 가장 적은 배치를 선택';
   const r1 = v => Math.round(v * 10) / 10;
 
   function suggestBounds(n, aspect) {
@@ -145,6 +149,134 @@
     for (const p of pos.values()) { p.x *= sx; p.y *= sy; }
     return pos;
   }
+  // ── 계층 배치(294-1): 방향 있는 연결은 위→아래 층, 방향 없는 연결은 같은 층에서 이웃, 연결 없는 개념은 맨 아래 층 ──
+  const TOP_IS_TO = ['일부', '종류'];          // 이 유형은 화살표 끝(전체·상위 개념)이 위, 나머지 방향 있는 유형은 화살표 시작이 위
+  const LEVEL_GAP = 24;                        // 층과 층 사이에 더 두는 간격(한 층이 여러 줄로 감길 때 같은 층임이 보이게)
+  const byKeyId = key => (p, q) => key.get(p) - key.get(q) || p - q;
+
+  function directionInfo(idSet, edgesIn) {      // 쌍마다 하나로 정리: 방향 있는 [위, 아래] 또는 방향 없는 쌍(입력 순서와 무관하게 같은 결과)
+    const recs = new Map();
+    for (const e of edgesIn || []) {
+      if (!idSet.has(e.from) || !idSet.has(e.to) || e.from === e.to) continue;
+      const key = Math.min(e.from, e.to) + ':' + Math.max(e.from, e.to);
+      if (!recs.has(key)) recs.set(key, { a: Math.min(e.from, e.to), b: Math.max(e.from, e.to), dirs: [] });
+      if (typeof e.sym === 'boolean' && !e.sym) recs.get(key).dirs.push(TOP_IS_TO.includes(e.type) ? [e.to, e.from] : [e.from, e.to]);
+    }
+    const directed = [], undirected = [];
+    for (const r of recs.values()) {
+      if (r.dirs.length) directed.push(r.dirs.sort((p, q) => p[0] - q[0] || p[1] - q[1])[0]);
+      else undirected.push([r.a, r.b]);
+    }
+    directed.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+    undirected.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+    return { directed, undirected };
+  }
+
+  function hierarchical(ids, info, b) {
+    const { directed, undirected } = info;
+    const outs = new Map(ids.map(id => [id, []])), ins = new Map(ids.map(id => [id, []]));
+    for (const [t, u] of directed) { outs.get(t).push(u); ins.get(u).push(t); }
+    for (const l of outs.values()) l.sort((x, y) => x - y);
+    // 순환 끊기: 위쪽 연결이 없는 노드부터 id 순으로 깊이 우선 탐색하고, 탐색 중인 노드로 되돌아가는 연결을 뺀다(같은 입력이면 항상 같은 결과)
+    const state = new Map(), cut = new Set();
+    const dfs = u => {
+      state.set(u, 1);
+      for (const v of outs.get(u)) {
+        if (state.get(v) === 1) cut.add(u + '>' + v);
+        else if (!state.get(v)) dfs(v);
+      }
+      state.set(u, 2);
+    };
+    const roots = ids.filter(id => ins.get(id).length === 0).concat(ids.filter(id => ins.get(id).length > 0));
+    for (const id of roots) if (!state.get(id)) dfs(id);
+    const dag = directed.filter(([t, u]) => !cut.has(t + '>' + u));
+    const par = new Map(ids.map(id => [id, []])), chi = new Map(ids.map(id => [id, []]));
+    for (const [t, u] of dag) { chi.get(t).push(u); par.get(u).push(t); }
+    // 층 = 위쪽 연결을 따라가는 가장 긴 경로(위상 순서로 계산)
+    const level = new Map(), indeg = new Map(ids.map(id => [id, par.get(id).length]));
+    const hasDir = new Set(directed.flat());
+    const queue = ids.filter(id => hasDir.has(id) && indeg.get(id) === 0);
+    queue.forEach(id => level.set(id, 0));
+    for (let qi = 0; qi < queue.length; qi++) {
+      const u = queue[qi];
+      for (const v of chi.get(u).slice().sort((x, y) => x - y)) {
+        level.set(v, Math.max(level.get(v) || 0, level.get(u) + 1));
+        indeg.set(v, indeg.get(v) - 1);
+        if (indeg.get(v) === 0) queue.push(v);
+      }
+    }
+    // 방향 없는 연결: 방향 있는 순서를 해치지 않는 범위에서 두 개념을 같은 층으로(위 개념을 내리거나 아래 개념을 올림)
+    for (let pass = 0; pass < 3; pass++) {
+      for (const [u, v] of undirected) {
+        if (!hasDir.has(u) || !hasDir.has(v) || level.get(u) === level.get(v)) continue;
+        const lo = level.get(u) < level.get(v) ? u : v, hi = lo === u ? v : u, ll = level.get(lo), hl = level.get(hi);
+        if (chi.get(lo).every(c => level.get(c) > hl)) level.set(lo, hl);
+        else if (par.get(hi).every(p => level.get(p) < ll)) level.set(hi, ll);
+      }
+    }
+    // 방향 있는 연결이 없는 개념: 방향 없는 이웃과 같은 층, 이웃이 모두 그런 개념이면 맨 위 층
+    const und = new Map(ids.map(id => [id, []]));
+    for (const [u, v] of undirected) { und.get(u).push(v); und.get(v).push(u); }
+    for (const l of und.values()) l.sort((x, y) => x - y);
+    const linked = ids.filter(id => und.get(id).length || hasDir.has(id));
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const id of linked) {
+        if (level.has(id)) continue;
+        const nb = und.get(id).find(m => level.has(m));
+        if (nb !== undefined) { level.set(id, level.get(nb)); grew = true; }
+      }
+    }
+    for (const id of linked) if (!level.has(id)) level.set(id, 0);
+    const levels = [...new Set(linked.map(id => level.get(id)))].sort((x, y) => x - y);   // 빈 층은 건너뛴다
+    const rows = levels.map(lv => linked.filter(id => level.get(id) === lv));
+    const linkedSet = new Set(linked), isolated = ids.filter(id => !linkedSet.has(id));
+    // 층 안 순서: 위·아래 이웃 평균 위치(barycenter)로 정렬하되 같은 층의 방향 없는 이웃은 붙여 놓는다
+    const lvIdx = new Map(); rows.forEach((l, i) => l.forEach(id => lvIdx.set(id, i)));
+    const nbAll = new Map(ids.map(id => [id, []]));
+    for (const [t, u] of directed) { nbAll.get(t).push(u); nbAll.get(u).push(t); }
+    for (const [u, v] of undirected) { nbAll.get(u).push(v); nbAll.get(v).push(u); }
+    const frac = new Map();
+    rows.forEach(l => l.forEach((id, i) => frac.set(id, (i + 0.5) / l.length)));
+    const orderRow = (li, down) => {
+      const arr = rows[li], key = new Map(arr.map(id => {
+        const nb = nbAll.get(id).filter(m => (down ? lvIdx.get(m) < li : lvIdx.get(m) > li));
+        return [id, nb.length ? nb.reduce((s, m) => s + frac.get(m), 0) / nb.length : frac.get(id)];
+      }));
+      const near = new Map(arr.map(id => [id, nbAll.get(id).filter(m => lvIdx.get(m) === li).sort(byKeyId(key))]));
+      const seen = new Set(), clusters = [];
+      for (const s0 of arr.slice().sort(byKeyId(key))) {
+        if (seen.has(s0)) continue;
+        const comp = [], stack = [s0]; seen.add(s0);
+        while (stack.length) { const u = stack.pop(); comp.push(u); for (const m of near.get(u)) if (!seen.has(m)) { seen.add(m); stack.push(m); } }
+        const start = comp.slice().sort((p, q) => near.get(p).length - near.get(q).length || key.get(p) - key.get(q) || p - q)[0];
+        const ord = [], vis = new Set(), walk = u => { vis.add(u); ord.push(u); for (const m of near.get(u)) if (!vis.has(m)) walk(m); };
+        walk(start);
+        clusters.push({ ord, k: comp.reduce((a, m) => a + key.get(m), 0) / comp.length, id: Math.min(...comp) });
+      }
+      clusters.sort((p, q) => p.k - q.k || p.id - q.id);
+      rows[li] = clusters.flatMap(c => c.ord);
+      rows[li].forEach((id, i) => frac.set(id, (i + 0.5) / rows[li].length));
+    };
+    for (let pass = 0; pass < 8; pass++) {
+      const down = pass % 2 === 0, seq = rows.map((_, i) => i);
+      for (const li of down ? seq : seq.reverse()) orderRow(li, down);
+    }
+    if (isolated.length) rows.push(isolated);
+    // 좌표: 층마다 가운데 맞춤, 폭을 넘는 층은 고르게 여러 줄로 감는다(층 사이에만 간격을 더 둠)
+    const { cols } = gridCells(b), pos = new Map();
+    let y = 0;
+    rows.forEach(l => {
+      const lines = Math.ceil(l.length / cols), per = Math.ceil(l.length / lines);
+      for (let k = 0; k < lines; k++) {
+        const part = l.slice(k * per, (k + 1) * per), off = ((cols - part.length) * CELL_W) / 2;
+        part.forEach((id, i) => pos.set(id, { x: off + i * CELL_W, y }));
+        y += CELL_H;
+      }
+      y += LEVEL_GAP;
+    });
+    return { pos, height: y - LEVEL_GAP - CELL_H + NODE_H };
+  }
   function circle(order, b) {
     const pos = new Map(), n = order.length, rx = Math.max(0, (b.w - NODE_W) / 2), ry = Math.max(0, (b.h - NODE_H) / 2);
     order.forEach((id, i) => { const t = (2 * Math.PI * i) / Math.max(1, n); pos.set(id, { x: rx + rx * Math.cos(t), y: ry + ry * Math.sin(t) }); });
@@ -193,11 +325,23 @@
     let bounds = (opts && opts.bounds && opts.bounds.w > 0 && opts.bounds.h > 0) ? { w: opts.bounds.w, h: opts.bounds.h } : suggestBounds(ids.length);
     let expanded = false;
     if (capacity(bounds) < ids.length) { const s = suggestBounds(ids.length); bounds = { w: Math.max(bounds.w, s.w), h: Math.max(bounds.h, s.h) }; expanded = true; }
+    const info = directionInfo(idSet, edgesIn), useHier = info.directed.length > 0;   // 294-1: 방향 있는 연결이 하나라도 있으면 계층 후보를 우선한다
+    const hier = useHier && ids.length ? hierarchical(ids, info, bounds) : null;
+    if (hier && hier.height > bounds.h) { bounds = { w: bounds.w, h: hier.height }; expanded = true; }   // 층이 많아 세로가 모자라면 영역 높이를 늘린다
     const orig = new Map(nodes.map(n => [n.id, { x: Number.isFinite(n.x) ? n.x : 0, y: Number.isFinite(n.y) ? n.y : 0 }]));
     const origCross = crossings(orig, edges), origLen = totalLength(orig, edges);
     const origValid = !hasOverlap(orig, ids, 0) && isInside(orig, ids, bounds);
     if (ids.length === 0) return { positions: new Map(), metrics: { crossingsBefore: 0, crossingsAfter: 0, lengthBefore: 0, lengthAfter: 0, changed: false, expanded }, bounds };
 
+    if (hier) {                                                      // 계층 후보가 유효(겹침 없음·영역 안)하면 그것을 고른다
+      const pos = hier.pos;
+      for (const q of pos.values()) { q.x = r1(q.x); q.y = r1(q.y); }
+      if (!hasOverlap(pos, ids, 0) && isInside(pos, ids, bounds)) {
+        const c = crossings(pos, edges), l = totalLength(pos, edges);
+        const changed = ids.some(id => Math.abs(pos.get(id).x - orig.get(id).x) > 0.05 || Math.abs(pos.get(id).y - orig.get(id).y) > 0.05);
+        return { positions: changed ? pos : clone(orig), metrics: { crossingsBefore: origCross, crossingsAfter: changed ? c : origCross, lengthBefore: origLen, lengthAfter: changed ? r1(l) : origLen, changed, expanded, layout: 'hierarchy', reason: REASON_HIER }, bounds };
+      }
+    }
     const adj = adjacency(ids, edges), comps = components(ids, adj), order = bfsOrder(comps);
     const raw = [
       resolve(orig, ids, bounds),
@@ -216,9 +360,9 @@
     });
     // 원래 배치가 유효하면 더 좋아질 때만 바꾼다(교차 수 비증가 보장)
     if (origValid && (best.c > origCross || (best.c === origCross && best.l >= origLen - 1e-6))) {
-      return { positions: clone(orig), metrics: { crossingsBefore: origCross, crossingsAfter: origCross, lengthBefore: origLen, lengthAfter: origLen, changed: false, expanded }, bounds };
+      return { positions: clone(orig), metrics: { crossingsBefore: origCross, crossingsAfter: origCross, lengthBefore: origLen, lengthAfter: origLen, changed: false, expanded, layout: 'general', reason: REASON_GENERAL }, bounds };
     }
-    return { positions: best.pos, metrics: { crossingsBefore: origCross, crossingsAfter: best.c, lengthBefore: origLen, lengthAfter: best.l, changed: true, expanded }, bounds };
+    return { positions: best.pos, metrics: { crossingsBefore: origCross, crossingsAfter: best.c, lengthBefore: origLen, lengthAfter: best.l, changed: true, expanded, layout: 'general', reason: REASON_GENERAL }, bounds };
   }
 
   const api = { NODE_W, NODE_H, GAP, CELL_W, CELL_H, suggestBounds, optimizeLayout, crossings, totalLength, hasOverlap, isInside };
