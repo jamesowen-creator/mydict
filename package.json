@@ -7,7 +7,8 @@
     "start": "node server.js",
     "build:home": "npm --prefix home-wheel install && npm --prefix home-wheel run build",
     "validate:digest": "node scripts/validate_digest.js",
-    "validate:science": "node scripts/validate_science.js"
+    "validate:science": "node scripts/validate_science.js",
+    "validate:artist_notes": "node scripts/validate_artist_notes.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",

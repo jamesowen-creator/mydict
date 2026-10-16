@@ -12,6 +12,7 @@ const OPTIONS = [
   { id: 'science', name: '과학', description: '오해를 바로잡는 과학 상식', url: '/science_reading.html' },
   { id: 'voice', name: '음성 학습', description: '소리 내어 읽은 공부를 글과 요약으로', url: '/voice_study.html' },
   { id: 'concept', name: '개념학습', description: '개념 하나에서 시작해 한 걸음씩 넓히기', url: '/concept_study.html' },
+  { id: 'artist_notes', name: '작가 노트', description: '음악·미술 작가의 삶과 대표작을 가볍게 읽기', url: '/artist_notes.html' },
 ];
 
 // 작업270-1: 개발 중인 새 메뉴. 로그인한 사용자의 perm_concept_map 이 true 일 때만 휠에 더한다(fetchMe 가 받는 /api/me 응답에 이미 들어 있음).

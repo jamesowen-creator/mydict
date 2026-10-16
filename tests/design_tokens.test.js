@@ -52,7 +52,7 @@ test('tokens.css: 위 56개 말고 다른 변수는 정의하지 않는다(의�
 });
 
 test('새 변수 이름을 다른 CSS·html 에서 다시 정의하지 않는다(사용만 허용)', () => {
-  const files = ['admin.html', 'concept_study.html', 'digest_reading.html', 'english_dictionary.html', 'literature_compass.html', 'science_reading.html', 'voice_study.html',
+  const files = ['admin.html', 'artist_notes.html', 'concept_study.html', 'digest_reading.html', 'english_dictionary.html', 'literature_compass.html', 'science_reading.html', 'voice_study.html',
     'css/common/appHeader.css', 'css/common/screenBar.css'];
   const redefinitions = [];
   for (const f of files) {

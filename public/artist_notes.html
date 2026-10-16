@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>작가 노트</title>
+<link rel="icon" type="image/png" href="/icons/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/common/appHeader.css">
+<link rel="stylesheet" href="/css/common/tokens.css">
+<link rel="stylesheet" href="/css/common/screenBar.css">
+<style>
+  /* 작업131: digest_reading.html(한입 독서)의 캐러셀·범례·목록·상세 구조를 복제한 독립 파일.
+     한입 독서·과학과 코드·데이터·localStorage를 공유하지 않는다(키 접두사 'artist_notes_').
+     색·글자·간격·모서리는 docs/design/design-principles.md 의 단계 안에서만 쓴다
+     (색은 tokens.css 의 --color-* 변수만 사용, #hex 직접 지정 없음). */
+  :root {
+    --primary: var(--color-accent);
+    --primary-dark: var(--color-accent-ink);
+    --bg: var(--color-bg);
+    --card: var(--color-surface);
+    --text1: var(--color-text);
+    --text2: var(--color-text-sub);
+    --border: var(--color-line);
+    --genre-music: var(--color-accent-ink);
+    --genre-art: var(--color-ok-ink);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-size: var(--body-font-size);
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text1);
+    min-height: 100dvh;
+    max-width: var(--content-max);
+    margin: 0 auto;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* ── Loading ── */
+  #loading {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: var(--bg); z-index: 999; gap: 16px;
+  }
+  .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid var(--color-surface-2);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { color: var(--text2); font-size: 14px; }
+
+  /* ── Views ── */
+  .view { display: none; min-height: 100dvh; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); }
+  .view.active { display: block; }
+
+  .screen-bar-title.one-line { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── View 1: List (3D 캐러셀) ──
+     한입 독서와 같은 메커니즘: 중심 기준 offset 을 가로(rotateY)로 옮겼고, 겹침 순서는 z-index 가 아니라 translateZ 로만 정한다.
+     overflow:hidden 은 바깥 래퍼(.carousel-clip)에만 건다. --hdr-h 는 공통 헤더 실제 높이(JS 측정). */
+  #view-list.active {
+    display: flex; flex-direction: column;
+    min-height: calc(100dvh - var(--hdr-h, 0px));
+  }
+  #view-list .content {
+    flex: 1; display: flex; flex-direction: column;
+    padding: 16px;
+  }
+  #list-carousel {
+    flex: 1; display: flex; flex-direction: column; justify-content: center;
+    padding: 8px 0;
+  }
+  .carousel-clip {
+    overflow: hidden;
+    margin: 0 -16px;
+  }
+  .carousel-viewport {
+    position: relative;
+    outline: none;
+    user-select: none; -webkit-user-select: none;
+    touch-action: pan-y;
+    perspective-origin: 50% 50%;
+  }
+  .carousel-viewport:focus-visible { box-shadow: inset 0 0 0 2px var(--primary); }
+  .carousel-track {
+    position: absolute; inset: 0;
+    transform-style: preserve-3d; -webkit-transform-style: preserve-3d;
+  }
+  /* 카드: 테두리·둥근 모서리·그림자·그라데이션 없는 평면 흰 배경. 분야는 글자색(--genre-ink)과 인용선으로 표시 */
+  .carousel-card {
+    position: absolute; top: 50%; left: 50%;
+    display: flex; flex-direction: column;
+    padding: 20px 16px 16px;
+    border-radius: 0;
+    color: var(--text1);
+    background: var(--card);
+    box-shadow: none;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .carousel-track.moving .carousel-card { will-change: transform, opacity; }
+  /* [분야 줄] / [이름·생몰연도·one_line]. 제목 margin-top:auto + one_line margin-bottom:auto 로 남는 높이를 위아래 반씩 나눈다 */
+  .carousel-card-meta {
+    margin-bottom: 12px;
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 12px; letter-spacing: 0.04em; color: var(--text2);
+  }
+  .carousel-card-meta .g { color: var(--genre-ink); font-weight: 700; }
+  .carousel-card-title {
+    margin-top: auto;
+    font-size: var(--title-size, 22px); font-weight: 500; line-height: 1.3;
+    word-break: keep-all;
+  }
+  .carousel-card.is-center .carousel-card-title { font-weight: 700; }
+  .carousel-card-years { margin-top: 8px; font-size: 13px; color: var(--text2); font-family: var(--font-num); }
+  .carousel-card-line {
+    flex-shrink: 0;
+    margin-top: 12px; margin-bottom: auto; padding-left: 10px;
+    border-left: 2px solid var(--genre-ink);
+    font-size: 13px; line-height: 1.6; color: var(--text1);
+    display: -webkit-box; -webkit-line-clamp: var(--line-clamp, 4); -webkit-box-orient: vertical;
+    overflow: hidden; word-break: keep-all;
+  }
+  .carousel-nav {
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    margin-top: 8px;
+    font-size: 12px; color: var(--text2);
+  }
+  .carousel-nav-count { font-family: var(--font-num); min-width: 56px; text-align: center; }
+  /* 이전·다음 화살표: 테두리·배경 없이 글자(‹ ›), 터치 영역 44×44px */
+  .carousel-nav-btn {
+    position: relative;
+    width: 44px; height: 44px; padding: 0 0 4px;
+    border: none; border-radius: 0; background: transparent;
+    color: var(--text1); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-sans); font-size: 32px; line-height: 1; font-weight: 400;
+  }
+  .carousel-nav-btn:hover:not(:disabled) { color: var(--primary-dark); }
+  .carousel-nav-btn:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
+  /* 범례(분야 필터): 터치 영역 최소 44px, 선택은 굵기+글자색, 나머지는 투명도 0.4 */
+  .carousel-legend {
+    display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 8px;
+    margin-top: 12px; font-size: 13px; color: var(--text2);
+  }
+  .carousel-legend-item {
+    display: inline-flex; align-items: center; min-height: var(--ctl-min-h); min-width: var(--ctl-min-h);
+    padding: 0 12px; border-radius: 10px; cursor: pointer;
+    user-select: none; -webkit-user-select: none;
+    transition: opacity 0.15s, color 0.15s, background 0.15s;
+  }
+  .carousel-legend-item:hover { background: var(--color-surface-2); }
+  .carousel-legend-item:focus-visible { outline: 2px solid var(--genre-ink); outline-offset: 1px; }
+  .carousel-legend-item.dim { opacity: 0.4; }
+  .carousel-legend-item.active { color: var(--text1); font-weight: 700; }
+  .carousel-legend-item::before {
+    content: ''; display: inline-block; width: 8px; height: 8px;
+    margin-right: 8px; background: var(--genre-ink); vertical-align: 0;
+    flex-shrink: 0;
+  }
+
+  /* 높이 600 미만(1세대 SE 320×568 등): 세로 여백 압축 */
+  @media (max-height: 599px) {
+    #view-list .content { padding-top: 10px; padding-bottom: 10px; }
+    #list-carousel { padding: 0; }
+    .carousel-nav { margin-top: 0; }
+  }
+
+  /* ── View 2: 작가 상세 (스크롤 화면, 섹션 = 카드 한 장) ── */
+  #view-artist .content { padding: 20px 16px 24px; }
+
+  .artist-header {
+    background: var(--card);
+    padding: 20px 16px; margin: 0 -16px 12px;
+  }
+  .artist-name { font-size: 22px; font-weight: 700; color: var(--text1); line-height: 1.3; }
+  .artist-name-original { margin-top: 4px; font-size: 14px; color: var(--text2); font-family: var(--font-num); }
+  .artist-meta { margin-top: 8px; font-size: 14px; color: var(--text2); }
+  .artist-meta .g { color: var(--genre-ink); font-weight: 700; }
+
+  .artist-section {
+    background: var(--card);
+    padding: 20px 16px; margin: 0 -16px 12px;
+  }
+  /* 섹션 제목 규격: 12px / 700 / 짙은 코랄 / 아래 2px 코랄 선 */
+  .artist-section-label {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+    color: var(--primary-dark); padding-bottom: 4px; border-bottom: 2px solid var(--primary); margin-bottom: 10px;
+  }
+  .artist-body { font-size: 15px; line-height: 1.7; color: var(--text1); word-break: keep-all; }
+  .artist-body + .artist-body { margin-top: 12px; }
+  .artist-sub { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--text2); }
+  .artist-body + .artist-sub { margin-top: 16px; }
+  .work-year { font-size: 13px; color: var(--text2); font-family: var(--font-num); margin-bottom: 8px; }
+  .work-interp { margin-top: 12px; padding-left: 12px; border-left: 2px solid var(--genre-ink); }
+  /* 인용 강조 규칙: 배경 박스 없이 왼쪽 2px 세로선만 */
+  .artist-summary {
+    border-left: 2px solid var(--genre-ink);
+    padding: 4px 0 4px 12px;
+    font-size: 15px; font-weight: 600; line-height: 1.6; color: var(--text1); word-break: keep-all;
+  }
+  .artist-see-also { margin-top: 16px; font-size: 13px; color: var(--text2); }
+
+  /* ── Misc ── */
+  .error-msg { text-align: center; padding: 40px 24px; color: var(--color-danger); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<script src="/js/common/appHeader.js"></script>
+<script>MetisAppHeader.inject();</script>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p>작가 데이터 로딩 중…</p>
+</div>
+
+<!-- View 1: List -->
+<div id="view-list" class="view">
+  <div class="content">
+    <div id="list-carousel"></div>
+  </div>
+</div>
+
+<!-- View 2: Artist -->
+<div id="view-artist" class="view">
+  <div class="screen-bar">
+    <button class="screen-bar-back" onclick="goList()" aria-label="목록으로">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <h1 class="screen-bar-title one-line" id="artist-bar-title"></h1>
+  </div>
+  <div class="content" id="artist-content"></div>
+</div>
+
+<script>
+// ── State ──
+let DB = null;
+let currentArtistId = null;
+
+// 범례 필터 (전체=null / 음악 / 미술). 다른 메뉴의 키와 겹치지 않는 'artist_notes_' 접두사
+const FILTER_STORAGE_KEY = 'artist_notes_field_filter';
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+const FIELD_ORDER = ['음악', '미술'];
+let fieldFilter = FIELD_ORDER.includes(lsGet(FILTER_STORAGE_KEY)) ? lsGet(FILTER_STORAGE_KEY) : null;
+
+// 분야 → 글자·선 색 (원칙 팔레트의 짙은 코랄 / 짙은 초록, 흰 바탕 글자 대비 4.5:1 이상)
+const FIELD_INK = { '음악': 'var(--genre-music)', '미술': 'var(--genre-art)' };
+const FIELD_FALLBACK_INK = 'var(--text2)';
+const fieldInk = f => FIELD_INK[f] || FIELD_FALLBACK_INK;
+
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+const years = a => `${a.birth_year} – ${a.death_year}`;
+
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── History ── 목록을 바닥 상태로 깔고 상세는 그 위에 한 칸만 쌓는다(이미 한 칸 위면 replace)
+let _navFromPop = false;
+function navState(state) {
+  if (_navFromPop) return;
+  const cur = history.state && history.state.view;
+  if (!cur || cur === 'list') history.pushState(state, '');
+  else history.replaceState(state, '');
+}
+function syncListHistoryState() {
+  if (_navFromPop) return;
+  if (!history.state || history.state.view === 'list') history.replaceState({ view: 'list', filter: fieldFilter }, '');
+}
+function showListView() {
+  renderList();
+  showView('view-list');
+  window.scrollTo(0, 0);
+}
+window.addEventListener('popstate', e => {
+  if (!DB) return;
+  const st = e.state || { view: 'list' };
+  _navFromPop = true;
+  try {
+    if (st.view === 'artist' && DB.artists.some(a => a.id === st.id)) {
+      showArtist(st.id);
+    } else {
+      if ('filter' in st) fieldFilter = st.filter;
+      showListView();
+    }
+  } finally {
+    _navFromPop = false;
+  }
+});
+
+// ── Data Load ──
+async function loadDB() {
+  try {
+    const res = await fetch('artist_notes_db.json');
+    if (!res.ok) throw new Error('네트워크 오류');
+    DB = await res.json();
+    document.getElementById('loading').style.display = 'none';
+    renderList();
+    showView('view-list');
+    const st = history.state;
+    if (st && st.view === 'artist' && DB.artists.some(a => a.id === st.id)) {
+      _navFromPop = true;
+      try { showArtist(st.id); } finally { _navFromPop = false; }
+    } else {
+      syncListHistoryState();
+    }
+  } catch (e) {
+    document.getElementById('loading').innerHTML =
+      `<div class="error-msg">데이터를 불러오지 못했습니다.<br>${escHtml(e.message)}</div>`;
+  }
+}
+
+// ── View 1: List ──
+function buildLegendItems() {
+  const counts = {};
+  DB.artists.forEach(a => { counts[a.field] = (counts[a.field] || 0) + 1; });
+  const order = FIELD_ORDER.filter(f => counts[f]).concat(Object.keys(counts).filter(f => !FIELD_ORDER.includes(f)));
+  return order.map(f => ({ field: f, count: counts[f] }));
+}
+// 이름 가나다순 + 필터 적용
+function getFilteredArtists() {
+  const sorted = [...DB.artists].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  return fieldFilter ? sorted.filter(a => a.field === fieldFilter) : sorted;
+}
+// 같은 항목을 다시 누르면 전체로 복귀
+function setFieldFilter(field) {
+  fieldFilter = (fieldFilter === field) ? null : field;
+  lsSet(FILTER_STORAGE_KEY, fieldFilter);
+  renderList();
+}
+
+// 한입 독서 Carousel 과 같은 동작(스프링/스냅, 휠 1회=최대 1칸, 드래그 6px 초과 시 탭 아님, 관성,
+// prefers-reduced-motion). 이 파일 안에서 완결되며 바깥 전역 함수에 기대지 않고, 카드 열기는 mount 의 onOpen 콜백으로 받는다.
+const Carousel = (() => {
+  const mod = (n, m) => ((n % m) + m) % m;
+  const relativePos = (index, offset, n) => mod(index - offset + n / 2, n) - n / 2;
+  const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+  const RENDER_RANGE = 4.5; // 중앙 기준 ±4.5장만 렌더, 나머지 display:none
+
+  const reducedMq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  // blur 는 마우스 쓰는 데스크톱에서만 - 모바일 GPU 에선 3D 요소 filter 가 가장 무겁다
+  const finePointerMq = window.matchMedia ? window.matchMedia('(hover: hover) and (pointer: fine)') : null;
+
+  let artists = [], n = 0, cards = [];
+  let viewport, track, countEl, legendEl;
+  let offset = 0, target = 0, vel = 0, raf = null;
+  let dragging = false, wheelAcc = 0;
+  let pointer = { lastX: 0, moved: 0 };
+  let reduced = false, metrics = null;
+  let lastCenter = -1, centerId = null;
+  let onOpen = () => {};
+
+  function computeMetrics() {
+    const w = Math.min(window.innerWidth, 480);
+    // 짧은 화면에서도 범례·이동 버튼이 화면 안에 들어오도록 카드 높이를 남은 높이에 맞춘다(하단 내비 없음)
+    const maxH = Math.max(200, window.innerHeight - 240);
+    let cardW = clamp(Math.round(w * 0.62), 190, 270);
+    let cardH = Math.round(cardW * 1.4);
+    if (cardH > maxH) { cardH = maxH; cardW = Math.min(cardW, Math.round(cardH * 0.9)); }
+    // 카드 중심 간 간격을 카드 폭보다 살짝 넓게 - 원통 접평면끼리 겹치면 이웃 카드 모서리가 중앙 카드 앞으로 뚫고 나온다
+    const spacing = cardW * 1.04;
+    const baseStep = 24;
+    const vpad = window.innerHeight < 600 ? 40 : 64;
+    return { cardW, cardH, spacing, baseStep, viewportH: cardH + vpad, drag: cardW * 0.45 };
+  }
+
+  function render() {
+    const depth = reduced ? 0.35 : 1;
+    const stepDeg = metrics.baseStep * depth;
+    // reduced 모드에선 각도만 줄이고 카드 간격(현 길이)은 유지하도록 반지름을 역산(더 평평한 원통)
+    const radius = metrics.spacing / (2 * Math.sin((stepDeg * Math.PI) / 360));
+    const blurOn = !reduced && finePointerMq && finePointerMq.matches;
+    track.style.transform = `translateZ(${-radius}px)`; // 중앙 카드가 z=0(원래 크기)에 오도록
+
+    for (let i = 0; i < n; i++) {
+      const el = cards[i];
+      const rel = relativePos(i, offset, n);
+      const abs = Math.abs(rel);
+      if (abs > RENDER_RANGE) {
+        if (el.style.display !== 'none') el.style.display = 'none';
+        continue;
+      }
+      if (el.style.display === 'none') el.style.display = '';
+      const scale = 1 - clamp(abs, 0, 3) * 0.06;
+      el.style.transform = `rotateY(${rel * stepDeg}deg) translateZ(${radius}px) scale(${scale})`;
+      el.style.opacity = clamp(1 - abs * 0.3, 0.06, 1);
+      el.style.filter = blurOn ? `blur(${clamp(abs * 1.25 - 0.15, 0, 4.5)}px)` : '';
+    }
+
+    if (n === 0) return;
+    const center = mod(Math.round(offset), n);
+    if (center !== lastCenter) {
+      if (lastCenter >= 0 && cards[lastCenter]) {
+        cards[lastCenter].classList.remove('is-center');
+        cards[lastCenter].setAttribute('aria-selected', 'false');
+      }
+      cards[center].classList.add('is-center');
+      cards[center].setAttribute('aria-selected', 'true');
+      lastCenter = center;
+      centerId = artists[center].id;
+      countEl.textContent = `${center + 1} / ${n}`;
+    }
+  }
+
+  function setMoving(on) { track.classList.toggle('moving', on); }
+
+  /* ---------- 애니메이션 루프 (스프링 + 스냅) ---------- */
+  function tick() {
+    raf = null;
+    if (dragging) return;
+    const stiffness = reduced ? 0.32 : 0.14;
+    const damping = reduced ? 0.6 : 0.78;
+    const d = target - offset;
+    vel = (vel + d * stiffness) * damping;
+    offset += vel;
+    if (Math.abs(d) < 0.0008 && Math.abs(vel) < 0.0008) {
+      offset = target;
+      vel = 0;
+      render();
+      setMoving(false);
+      return;
+    }
+    render();
+    raf = requestAnimationFrame(tick);
+  }
+  function kick() {
+    setMoving(true);
+    if (raf == null) raf = requestAnimationFrame(tick);
+  }
+  function goBy(delta) {
+    if (n === 0) return;
+    target = Math.round(target) + delta;
+    kick();
+  }
+
+  /* ---------- 입력 ---------- */
+  function onWheel(e) {
+    // 가로 휠(트랙패드)과 세로 휠 중 큰 쪽을 사용
+    const dv = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    e.preventDefault();
+    wheelAcc += dv;
+    if (Math.abs(wheelAcc) >= 45) {
+      goBy(Math.sign(wheelAcc)); // 1회 이벤트 = 최대 1칸
+      wheelAcc = 0;
+    }
+  }
+
+  // setPointerCapture 를 쓰지 않는다: 캡처하면 Chromium 이 click 대상을 뷰포트로 바꿔 카드 탭이 죽는다
+  function onPointerDown(e) {
+    if (e.button != null && e.button > 0) return;
+    dragging = true;
+    vel = 0;
+    pointer = { lastX: e.clientX, moved: 0 };
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    setMoving(true);
+  }
+  function onPointerMove(e) {
+    if (!dragging) return;
+    const dx = e.clientX - pointer.lastX;
+    pointer.lastX = e.clientX;
+    pointer.moved += Math.abs(dx);
+    const delta = -dx / metrics.drag; // 오른쪽으로 끌면 이전 카드
+    offset += delta;
+    vel = vel * 0.6 + delta * 0.4;
+    render();
+  }
+  // touch-action: pan-y 라서 세로 스크롤로 판정되면 브라우저가 pointercancel 을 보낸다 → 가장 가까운 카드로 스냅
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    const fling = reduced ? 0 : clamp(vel * 9, -4, 4);
+    target = Math.round(offset + fling);
+    kick();
+  }
+
+  function onCardClick(e) {
+    const el = e.target.closest('.carousel-card');
+    if (!el) return;
+    if (pointer.moved > 6) return; // 드래그와 클릭 구분
+    const rel = relativePos(Number(el.dataset.idx), offset, n);
+    if (Math.abs(rel) < 0.5) { onOpen(artists[Number(el.dataset.idx)].id); return; } // 중앙 카드 탭 = 바로 읽기
+    goBy(Math.round(rel));
+    viewport.focus({ preventScroll: true });
+  }
+
+  function onKeyDown(e) {
+    if (e.key === 'ArrowRight') { e.preventDefault(); goBy(1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); goBy(-1); }
+    else if (e.key === 'Home') {
+      e.preventDefault();
+      if (n === 0) return;
+      target = Math.round(target) + relativePos(0, target, n);
+      kick();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (n > 0) onOpen(artists[mod(Math.round(target), n)].id);
+    }
+  }
+
+  function applyMetrics() {
+    const hdr = document.querySelector('.metis-app-header');
+    document.documentElement.style.setProperty('--hdr-h', (hdr ? hdr.offsetHeight : 0) + 'px');
+    metrics = computeMetrics();
+    viewport.style.height = metrics.viewportH + 'px';
+    viewport.style.perspective = (reduced ? 2400 : 1100) + 'px';
+    // 짧은 카드에선 one_line 줄 수와 이름 글자를 줄인다 - 안 그러면 카드 아래로 반쯤 잘린 줄이 보인다
+    viewport.style.setProperty('--line-clamp', metrics.cardH < 230 ? 2 : metrics.cardH < 280 ? 3 : 4);
+    viewport.style.setProperty('--title-size', metrics.cardH < 230 ? '16px' : metrics.cardH < 300 ? '18px' : '22px');
+    cards.forEach(el => {
+      el.style.width = metrics.cardW + 'px';
+      el.style.height = metrics.cardH + 'px';
+      el.style.marginLeft = -metrics.cardW / 2 + 'px';
+      el.style.marginTop = -metrics.cardH / 2 + 'px';
+    });
+    fitCards();
+    render();
+  }
+
+  // 이름이 길어 여러 줄로 접히는 카드는 기본 줄 수로도 넘칠 수 있어서, 카드별로 넘치지 않을 때까지 one_line 줄 수를 1까지 줄인다.
+  // 숨겨진 카드도 재야 하므로 잠깐 display 를 풀고, 바로 뒤 render() 가 되돌린다
+  function fitCards() {
+    const base = Number(viewport.style.getPropertyValue('--line-clamp')) || 4;
+    cards.forEach(el => {
+      el.style.display = '';
+      el.style.removeProperty('--line-clamp');
+      for (let c = base; c > 1 && el.scrollHeight > el.clientHeight; ) {
+        el.style.setProperty('--line-clamp', --c);
+      }
+    });
+  }
+
+  function buildCard(a, i) {
+    const el = document.createElement('div');
+    el.className = 'carousel-card';
+    el.dataset.idx = i;
+    el.setAttribute('role', 'option');
+    el.setAttribute('aria-selected', 'false');
+    el.style.setProperty('--genre-ink', fieldInk(a.field));
+    el.innerHTML = `
+      <div class="carousel-card-meta"><span class="g"></span></div>
+      <div class="carousel-card-title"></div>
+      <div class="carousel-card-years"></div>
+      <div class="carousel-card-line"></div>`;
+    el.querySelector('.g').textContent = a.field || '';
+    el.querySelector('.carousel-card-title').textContent = a.name;
+    el.querySelector('.carousel-card-years').textContent = years(a);
+    el.querySelector('.carousel-card-line').textContent = a.one_line;
+    return el;
+  }
+
+  // 목록으로 돌아올 때 id 카드를 애니메이션 없이 중앙에 둔다(필터로 목록에 없으면 첫 카드)
+  function jumpTo(id) {
+    if (n === 0) return;
+    let idx = artists.findIndex(a => a.id === id);
+    if (idx < 0) idx = 0;
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    dragging = false;
+    target = offset = Math.round(offset) + relativePos(idx, Math.round(offset), n);
+    vel = 0;
+    setMoving(false);
+    render();
+  }
+
+  // 카드 DOM 만 다시 만든다(리스너는 손대지 않음). setList()와 최초 mount() 가 같이 쓴다
+  function buildCardsDOM(list) {
+    artists = list;
+    n = list.length;
+    track.innerHTML = '';
+    cards = list.map((a, i) => buildCard(a, i));
+    cards.forEach(el => track.appendChild(el));
+    lastCenter = -1; // 새 카드 배열이라 이전 중앙 인덱스가 의미 없음
+    if (n === 0) countEl.textContent = '';
+    applyMetrics();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { fitCards(); render(); });
+  }
+
+  // 필터 전환 시 목록 교체. 진행 중이던 애니메이션/드래그 상태만 초기화하고 카드를 다시 그린다
+  function setList(list) {
+    if (!viewport) return;
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    dragging = false;
+    vel = 0;
+    offset = 0;
+    target = 0;
+    buildCardsDOM(list);
+  }
+
+  // 범례: 전체 데이터 기준으로 항상 모든 분야를 보이되, 선택된 분야만 강조하고 나머지는 흐리게
+  function renderLegend(items, activeField, onItemClick) {
+    if (!legendEl) return;
+    legendEl.innerHTML = '';
+    items.forEach(it => {
+      const s = document.createElement('span');
+      s.className = 'carousel-legend-item';
+      s.tabIndex = 0;
+      s.setAttribute('role', 'button');
+      s.setAttribute('aria-pressed', String(it.field === activeField));
+      if (activeField && it.field !== activeField) s.classList.add('dim');
+      if (it.field === activeField) s.classList.add('active');
+      s.style.setProperty('--genre-ink', fieldInk(it.field));
+      s.textContent = `${it.field} ${it.count}`;
+      s.addEventListener('click', () => onItemClick(it.field));
+      s.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onItemClick(it.field); }
+      });
+      legendEl.appendChild(s);
+    });
+  }
+
+  // 뼈대 생성 + 리스너 최초 1회 바인딩
+  function mount(root, list, openFn) {
+    if (viewport) return;
+    onOpen = openFn;
+    root.innerHTML = `
+      <div class="carousel-clip">
+        <div class="carousel-viewport" role="listbox" tabindex="0" aria-label="작가 선택 - 좌우로 넘기고 Enter 또는 가운데 카드를 눌러 읽기">
+          <div class="carousel-track"></div>
+        </div>
+      </div>
+      <div class="carousel-nav">
+        <button class="carousel-nav-btn" data-dir="-1" aria-label="이전 작가">‹</button>
+        <span class="carousel-nav-count"></span>
+        <button class="carousel-nav-btn" data-dir="1" aria-label="다음 작가">›</button>
+      </div>
+      <div class="carousel-legend"></div>`;
+
+    viewport = root.querySelector('.carousel-viewport');
+    track = root.querySelector('.carousel-track');
+    countEl = root.querySelector('.carousel-nav-count');
+    legendEl = root.querySelector('.carousel-legend');
+
+    viewport.addEventListener('wheel', onWheel, { passive: false });
+    viewport.addEventListener('pointerdown', onPointerDown);
+    viewport.addEventListener('pointermove', onPointerMove);
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+    window.addEventListener('pointerup', endDrag); // 뷰포트 밖에서 마우스를 놓은 경우
+    viewport.addEventListener('keydown', onKeyDown);
+    track.addEventListener('click', onCardClick);
+    root.querySelectorAll('.carousel-nav-btn').forEach(b =>
+      b.addEventListener('click', () => goBy(Number(b.dataset.dir))));
+
+    reduced = !!(reducedMq && reducedMq.matches);
+    const onReducedChange = () => { reduced = reducedMq.matches; applyMetrics(); };
+    if (reducedMq) {
+      if (reducedMq.addEventListener) reducedMq.addEventListener('change', onReducedChange);
+      else if (reducedMq.addListener) reducedMq.addListener(onReducedChange); // iOS 13 이하 Safari
+    }
+    window.addEventListener('resize', applyMetrics);
+
+    buildCardsDOM(list);
+  }
+
+  return { mount, setList, renderLegend, jumpTo, getCenterId: () => centerId, isMounted: () => !!viewport };
+})();
+
+function renderList() {
+  // setList 가 중앙 카드를 첫 카드로 되돌리므로, 호출 전에 원래 가려던 id 를 먼저 떼어 둔다
+  const wantId = Carousel.getCenterId() || currentArtistId;
+  const filtered = getFilteredArtists();
+  if (!Carousel.isMounted()) {
+    Carousel.mount(document.getElementById('list-carousel'), filtered, showArtist);
+  } else {
+    Carousel.setList(filtered);
+  }
+  Carousel.renderLegend(buildLegendItems(), fieldFilter, setFieldFilter);
+  Carousel.jumpTo(wantId);
+  syncListHistoryState();
+}
+
+function goList() {
+  // 상세 위에 쌓아 둔 한 칸이 있으면 history.back() 으로 되돌려 popstate 가 목록을 그리게 한다
+  if (history.state && history.state.view && history.state.view !== 'list') {
+    history.back();
+    return;
+  }
+  showListView();
+}
+
+// ── View 2: 작가 상세 (카드 = 섹션 한 장: 누구인가 → 삶과 시대 → 예술 사조 → 대표작(작품마다 1장) → 평판 → 한 줄 정리) ──
+function section(label, inner) {
+  return `<div class="artist-section"><div class="artist-section-label">${escHtml(label)}</div>${inner}</div>`;
+}
+function showArtist(artistId) {
+  const a = DB.artists.find(x => x.id === artistId);
+  if (!a) return;
+  currentArtistId = artistId;
+  document.getElementById('artist-bar-title').textContent = a.name;
+  const content = document.getElementById('artist-content');
+  content.style.setProperty('--genre-ink', fieldInk(a.field));
+
+  const header = `
+    <div class="artist-header">
+      <div class="artist-name">${escHtml(a.name)}</div>
+      ${a.name_original ? `<div class="artist-name-original">${escHtml(a.name_original)}</div>` : ''}
+      <div class="artist-meta"><span class="g">${escHtml(a.field)}</span> · ${escHtml(years(a))} · ${escHtml(a.nationality)}</div>
+    </div>`;
+  const works = a.works.map(w => section(`대표작 · ${w.title}`, `
+      <div class="work-year">${escHtml(w.year)}</div>
+      <div class="artist-body">${escHtml(w.description)}</div>
+      <div class="artist-body work-interp">${escHtml(w.interpretation)}</div>`)).join('');
+  const seeAlso = a.see_also && a.see_also.length
+    ? `<div class="artist-see-also">함께 보면 좋은 이름 · ${a.see_also.map(escHtml).join(', ')}</div>` : '';
+
+  content.innerHTML = header
+    + section('누구인가', `<div class="artist-body">${escHtml(a.who)}</div>`)
+    + section('삶과 시대', `<div class="artist-body">${escHtml(a.life)}</div>`)
+    + section('예술 사조', `<div class="artist-sub">${escHtml(a.movement.name)}</div><div class="artist-body">${escHtml(a.movement.text)}</div>`)
+    + works
+    + section('평판', `<div class="artist-sub">당대의 평가</div><div class="artist-body">${escHtml(a.reputation.contemporary)}</div>
+        <div class="artist-sub">후대의 평가</div><div class="artist-body">${escHtml(a.reputation.posthumous)}</div>`)
+    + section('한 줄 정리', `<div class="artist-summary">${escHtml(a.summary)}</div>${seeAlso}`);
+
+  showView('view-artist');
+  window.scrollTo(0, 0);
+  navState({ view: 'artist', id: artistId });
+}
+
+// ── Boot ──
+loadDB();
+</script>
+</body>
+</html>
