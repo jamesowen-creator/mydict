@@ -1,7 +1,7 @@
 // 작업273-3: 개념 지도 배치 최적화(계산만, AI 호출 없음, DOM 없음). 노드 위치만 계산하고 노드 집합·간선은 읽기만 하며 바꾸지 않는다(의미 불변).
 //   const r = CmapLayout.optimizeLayout(nodes, edges, { bounds })
 //     nodes: [{ id, x, y }] (x, y = 지금 화면에 보이는 위치, 노드 사각형의 왼쪽 위), edges: [{ from, to, type?, sym? }] (노드 id 쌍, 문구는 배치에 쓰지 않음)
-//       294-1: 연결에 sym(boolean: true = 방향 없음)을 주면 방향 정보를 쓴다. sym 이 false 인 연결 = 방향 있음(위→아래: 기본은 from 이 위, type 이 '일부'·'종류'면 to 가 위).
+//       294-1: 연결에 sym(boolean: true = 방향 없음)을 주면 방향 정보를 쓴다. sym 이 false 인 연결 = 방향 있음(위→아래: 유형과 관계없이 from(화살표 시작)이 위, 295-1).
 //       sym 을 주지 않으면(예전 호출) 방향 정보가 없는 것이라 계층 후보를 만들지 않고 아래 일반 후보 선택만 쓴다.
 //     bounds: { w, h } 노드를 놓을 영역(노드 왼쪽 위 좌표의 범위는 [0, w - NODE_W] × [0, h - NODE_H]). 생략하면 노드 수에 맞는 영역(suggestBounds)
 //     반환: { positions: Map(id → {x, y}), metrics: { crossingsBefore, crossingsAfter, lengthBefore, lengthAfter, changed, expanded, layout, reason }, bounds }
@@ -150,7 +150,7 @@
     return pos;
   }
   // ── 계층 배치(294-1): 방향 있는 연결은 위→아래 층, 방향 없는 연결은 같은 층에서 이웃, 연결 없는 개념은 맨 아래 층 ──
-  const TOP_IS_TO = ['일부', '종류'];          // 이 유형은 화살표 끝(전체·상위 개념)이 위, 나머지 방향 있는 유형은 화살표 시작이 위
+  const WRAP_COLS = 8;                         // 295-1: 한 층이 이 개수를 넘으면 여러 줄로 감는다(그 안에서는 영역 폭을 넓혀 한 줄에 놓는다)
   const LEVEL_GAP = 24;                        // 층과 층 사이에 더 두는 간격(한 층이 여러 줄로 감길 때 같은 층임이 보이게)
   const byKeyId = key => (p, q) => key.get(p) - key.get(q) || p - q;
 
@@ -160,7 +160,7 @@
       if (!idSet.has(e.from) || !idSet.has(e.to) || e.from === e.to) continue;
       const key = Math.min(e.from, e.to) + ':' + Math.max(e.from, e.to);
       if (!recs.has(key)) recs.set(key, { a: Math.min(e.from, e.to), b: Math.max(e.from, e.to), dirs: [] });
-      if (typeof e.sym === 'boolean' && !e.sym) recs.get(key).dirs.push(TOP_IS_TO.includes(e.type) ? [e.to, e.from] : [e.from, e.to]);
+      if (typeof e.sym === 'boolean' && !e.sym) recs.get(key).dirs.push([e.from, e.to]);   // 295-1: 방향 있는 모든 유형(유형 없음 포함)은 화살표 시작이 위
     }
     const directed = [], undirected = [];
     for (const r of recs.values()) {
@@ -172,7 +172,7 @@
     return { directed, undirected };
   }
 
-  function hierarchical(ids, info, b) {
+  function hierarchical(ids, info) {
     const { directed, undirected } = info;
     const outs = new Map(ids.map(id => [id, []])), ins = new Map(ids.map(id => [id, []]));
     for (const [t, u] of directed) { outs.get(t).push(u); ins.get(u).push(t); }
@@ -231,18 +231,20 @@
     const levels = [...new Set(linked.map(id => level.get(id)))].sort((x, y) => x - y);   // 빈 층은 건너뛴다
     const rows = levels.map(lv => linked.filter(id => level.get(id) === lv));
     const linkedSet = new Set(linked), isolated = ids.filter(id => !linkedSet.has(id));
-    // 층 안 순서: 위·아래 이웃 평균 위치(barycenter)로 정렬하되 같은 층의 방향 없는 이웃은 붙여 놓는다
+    // 층 안 순서: 처음에는 위쪽 연결을 따라 깊이 우선으로 훑은 순서(가지가 이어 붙어 트리는 꼬이지 않음),
+    // 그 뒤 위·아래 이웃 평균(barycenter)으로 정렬을 반복하고 선 교차가 가장 적었던 순서를 채택한다. 같은 층의 방향 없는 이웃은 붙여 놓는다
     const lvIdx = new Map(); rows.forEach((l, i) => l.forEach(id => lvIdx.set(id, i)));
     const nbAll = new Map(ids.map(id => [id, []]));
     for (const [t, u] of directed) { nbAll.get(t).push(u); nbAll.get(u).push(t); }
     for (const [u, v] of undirected) { nbAll.get(u).push(v); nbAll.get(v).push(u); }
     const frac = new Map();
     rows.forEach(l => l.forEach((id, i) => frac.set(id, (i + 0.5) / l.length)));
-    const orderRow = (li, down) => {
-      const arr = rows[li], key = new Map(arr.map(id => {
-        const nb = nbAll.get(id).filter(m => (down ? lvIdx.get(m) < li : lvIdx.get(m) > li));
-        return [id, nb.length ? nb.reduce((s, m) => s + frac.get(m), 0) / nb.length : frac.get(id)];
-      }));
+    const rank = new Map();
+    const visit = u => { rank.set(u, rank.size); for (const v of chi.get(u).slice().sort((x, y) => x - y)) if (!rank.has(v)) visit(v); };
+    for (const id of linked) if (par.get(id).length === 0 && !rank.has(id)) visit(id);
+    for (const id of linked) if (!rank.has(id)) visit(id);
+    const orderRow = (li, keyOf) => {
+      const arr = rows[li], key = keyOf(arr, li);
       const near = new Map(arr.map(id => [id, nbAll.get(id).filter(m => lvIdx.get(m) === li).sort(byKeyId(key))]));
       const seen = new Set(), clusters = [];
       for (const s0 of arr.slice().sort(byKeyId(key))) {
@@ -258,24 +260,67 @@
       rows[li] = clusters.flatMap(c => c.ord);
       rows[li].forEach((id, i) => frac.set(id, (i + 0.5) / rows[li].length));
     };
-    for (let pass = 0; pass < 8; pass++) {
+    const baryKey = down => (arr, li) => new Map(arr.map(id => {
+      const nb = nbAll.get(id).filter(m => (down ? lvIdx.get(m) < li : lvIdx.get(m) > li));
+      return [id, nb.length ? nb.reduce((s0, m) => s0 + frac.get(m), 0) / nb.length : frac.get(id)];
+    }));
+    const edgePairs = directed.concat(undirected);
+    const crossNow = () => {
+      const p = new Map(); rows.forEach((l, li) => l.forEach((id, i) => p.set(id, { x: i * CELL_W, y: li * CELL_H })));
+      return crossings(p, edgePairs);
+    };
+    rows.forEach((_, li) => orderRow(li, arr => new Map(arr.map(id => [id, rank.get(id)]))));
+    let bestRows = rows.map(l => l.slice()), bestC = crossNow();
+    for (let pass = 0; pass < 12 && bestC > 0; pass++) {
       const down = pass % 2 === 0, seq = rows.map((_, i) => i);
-      for (const li of down ? seq : seq.reverse()) orderRow(li, down);
+      for (const li of down ? seq : seq.reverse()) orderRow(li, baryKey(down));
+      const c = crossNow();
+      if (c < bestC) { bestC = c; bestRows = rows.map(l => l.slice()); }
     }
-    if (isolated.length) rows.push(isolated);
-    // 좌표: 층마다 가운데 맞춤, 폭을 넘는 층은 고르게 여러 줄로 감는다(층 사이에만 간격을 더 둠)
-    const { cols } = gridCells(b), pos = new Map();
-    let y = 0;
-    rows.forEach(l => {
-      const lines = Math.ceil(l.length / cols), per = Math.ceil(l.length / lines);
+    bestRows.forEach((l, i) => { rows[i] = l; });
+    // 가로 위치: 부모는 자식들의 가운데 위, 같은 줄은 균등한 간격(순서를 지키며 목표에 가장 가깝게 = 등위 회귀)
+    const pav = t => {
+      const bl = [];
+      t.forEach((v, i) => {
+        bl.push({ sum: v - i, n: 1 });
+        while (bl.length > 1 && bl[bl.length - 2].sum / bl[bl.length - 2].n > bl[bl.length - 1].sum / bl[bl.length - 1].n) { const q = bl.pop(); bl[bl.length - 1].sum += q.sum; bl[bl.length - 1].n += q.n; }
+      });
+      const out = []; for (const q of bl) for (let k = 0; k < q.n; k++) out.push(q.sum / q.n + out.length);
+      return out;
+    };
+    const wrapMode = rows.some(l => l.length > WRAP_COLS);
+    const cx0 = new Map();            // 칸 단위 가로 위치(칸 폭 = CELL_W)
+    rows.forEach(l => l.forEach((id, i) => cx0.set(id, i - (l.length - 1) / 2)));
+    if (!wrapMode) {
+      const settle = (li, from) => {
+        const t = rows[li].map(id => { const nb = from(id); return nb.length ? nb.reduce((s0, m) => s0 + cx0.get(m), 0) / nb.length : cx0.get(id); });
+        pav(t).forEach((v, i) => cx0.set(rows[li][i], v));
+      };
+      const up = () => { for (let li = rows.length - 2; li >= 0; li--) settle(li, id => chi.get(id)); };
+      const dn = () => { for (let li = 1; li < rows.length; li++) settle(li, id => par.get(id)); };
+      for (let it = 0; it < 6; it++) { up(); dn(); }
+      up();
+    }
+    // 좌표: 층마다 같은 간격의 줄. 폭을 넘는 층은 고르게 여러 줄로 감고(층 사이에만 간격을 더 둠) 연결 없는 개념은 마지막 줄
+    const cells = new Map(), allRows = rows.concat(isolated.length ? [isolated] : []);
+    let y = 0, maxY = 0;
+    allRows.forEach((l, li) => {
+      const isIso = isolated.length && li === allRows.length - 1;
+      const lines = Math.ceil(l.length / WRAP_COLS), per = Math.ceil(l.length / lines);
       for (let k = 0; k < lines; k++) {
-        const part = l.slice(k * per, (k + 1) * per), off = ((cols - part.length) * CELL_W) / 2;
-        part.forEach((id, i) => pos.set(id, { x: off + i * CELL_W, y }));
-        y += CELL_H;
+        const part = l.slice(k * per, (k + 1) * per);
+        part.forEach((id, i) => cells.set(id, { x: (!wrapMode && !isIso && lines === 1) ? cx0.get(id) : i - (part.length - 1) / 2, y }));
+        maxY = y; y += CELL_H;
       }
-      y += LEVEL_GAP;
+      if (wrapMode) y += LEVEL_GAP;
     });
-    return { pos, height: y - LEVEL_GAP - CELL_H + NODE_H };
+    if (isolated.length && !wrapMode) {                 // 연결 없는 줄은 위 층들의 가운데에 맞춘다
+      const used = linked.map(id => cells.get(id).x), mid = used.length ? (Math.min(...used) + Math.max(...used)) / 2 : 0;
+      for (const id of isolated) cells.get(id).x += mid;
+    }
+    const xs = [...cells.values()].map(c => c.x), minX = Math.min(...xs), pos = new Map();
+    for (const [id, c] of cells) pos.set(id, { x: (c.x - minX) * CELL_W, y: c.y });
+    return { pos, height: maxY + NODE_H, width: (Math.max(...xs) - minX) * CELL_W + NODE_W };
   }
   function circle(order, b) {
     const pos = new Map(), n = order.length, rx = Math.max(0, (b.w - NODE_W) / 2), ry = Math.max(0, (b.h - NODE_H) / 2);
@@ -326,8 +371,8 @@
     let expanded = false;
     if (capacity(bounds) < ids.length) { const s = suggestBounds(ids.length); bounds = { w: Math.max(bounds.w, s.w), h: Math.max(bounds.h, s.h) }; expanded = true; }
     const info = directionInfo(idSet, edgesIn), useHier = info.directed.length > 0;   // 294-1: 방향 있는 연결이 하나라도 있으면 계층 후보를 우선한다
-    const hier = useHier && ids.length ? hierarchical(ids, info, bounds) : null;
-    if (hier && hier.height > bounds.h) { bounds = { w: bounds.w, h: hier.height }; expanded = true; }   // 층이 많아 세로가 모자라면 영역 높이를 늘린다
+    const hier = useHier && ids.length ? hierarchical(ids, info) : null;
+    if (hier && (hier.height > bounds.h || hier.width > bounds.w)) { bounds = { w: Math.max(bounds.w, hier.width), h: Math.max(bounds.h, hier.height) }; expanded = true; }   // 층·같은 층 개념이 많아 모자라면 영역을 늘린다
     const orig = new Map(nodes.map(n => [n.id, { x: Number.isFinite(n.x) ? n.x : 0, y: Number.isFinite(n.y) ? n.y : 0 }]));
     const origCross = crossings(orig, edges), origLen = totalLength(orig, edges);
     const origValid = !hasOverlap(orig, ids, 0) && isInside(orig, ids, bounds);

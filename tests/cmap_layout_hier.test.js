@@ -19,10 +19,10 @@ test('방향 있는 연결: 화살표 시작 개념이 위 줄(사용·일으킴
   }
 });
 
-test('일부·종류: 화살표 끝(전체·상위 개념)이 위 줄', () => {
+test('295-1: 일부·종류도 화살표 시작이 위 줄(294-1의 "뒤가 위" 규칙 폐기)', () => {
   for (const type of ['일부', '종류']) {
-    const r = run(3, [E(1, 2, type), E(2, 3, type)]);   // 1이 2의 일부, 2가 3의 일부 → 3이 가장 위
-    assert.ok(y(r, 3) < y(r, 2) && y(r, 2) < y(r, 1), type);
+    const r = run(3, [E(1, 2, type), E(2, 3, type)]);
+    assert.ok(y(r, 1) < y(r, 2) && y(r, 2) < y(r, 3), type);
   }
 });
 
@@ -106,15 +106,22 @@ test('입력(연결·노드) 순서를 바꿔도 같은 결과', () => {
   assert.deepStrictEqual(a.metrics, b.metrics);
 });
 
-test('폭을 넘는 층은 여러 줄로 감기고 같은 층 줄 사이가 층 사이보다 가깝다', () => {
-  const n = 9, edges = ids(8).map(i => E(1, i + 1, '일으킴'));    // 1 아래에 8개
-  const B = { w: 440, h: 700 };                                     // 한 줄에 2칸
-  const r = run(n, edges, B);
+test('폭을 넘는 층(8개 초과)은 여러 줄로 감기고, 같은 층 줄 간격은 층 사이 간격보다 좁다', () => {
+  const n = 11, edges = ids(10).map(i => E(1, i + 1, '일으킴'));    // 1 아래에 10개
+  const r = run(n, edges, { w: 440, h: 700 });
   assert.ok(!L.hasOverlap(r.positions, ids(n), 0) && L.isInside(r.positions, ids(n), r.bounds));
-  const ys = [...new Set([2, 3, 4, 5, 6, 7, 8, 9].map(i => y(r, i)))].sort((p, q) => p - q);
-  assert.ok(ys.length > 1, '여러 줄로 감김');
-  for (const i of [2, 3, 4, 5, 6, 7, 8, 9]) assert.ok(y(r, i) > y(r, 1));
-  assert.ok(ys[1] - ys[0] < y(r, 2) - y(r, 1) + 1 && ys[1] - ys[0] === L.CELL_H, '같은 층 줄 간격은 층 간격보다 좁다');
+  const kids = ids(10).map(i => i + 1), ys = [...new Set(kids.map(i => y(r, i)))].sort((p, q) => p - q);
+  assert.strictEqual(ys.length, 2, '두 줄로 감김');
+  for (const i of kids) assert.ok(y(r, i) > y(r, 1));
+  assert.strictEqual(ys[1] - ys[0], L.CELL_H, '감긴 줄은 붙여서');
+  assert.ok(ys[0] - y(r, 1) > L.CELL_H, '층 사이는 더 벌어짐');
+});
+
+test('8개 이하의 같은 층은 영역 폭을 넓혀 한 줄에 나란히', () => {
+  const r = run(7, ids(6).map(i => E(1, i + 1, '일으킴')), { w: 440, h: 700 });
+  assert.strictEqual(new Set(ids(6).map(i => y(r, i + 1))).size, 1);
+  assert.strictEqual(r.metrics.expanded, true);
+  assert.ok(L.isInside(r.positions, ids(7), r.bounds));
 });
 
 test('층이 많아 세로가 모자라면 영역 높이를 늘리고 영역 안에 놓는다', () => {
@@ -128,4 +135,77 @@ test('입력 배열은 바뀌지 않는다(연결 정보 포함)', () => {
   const nodes = nodesOf(4), edges = [E(1, 2, '사용'), E(2, 3, '구별')], snap = JSON.stringify([nodes, edges]);
   L.optimizeLayout(nodes, edges, { bounds: { w: 700, h: 600 } });
   assert.strictEqual(JSON.stringify([nodes, edges]), snap);
+});
+
+// ── 295-1: 기준 사례(증권 구조) ──
+const SEC = { 증권: 1, 유가증권: 2, 주식: 3, 회사채: 4, 국공채: 5, 조건환매부채권: 6, IPO: 7, 연결없음: 8 };
+const SEC_EDGES = [E(1, 2, '종류'), E(2, 3, '종류'), E(2, 4, '종류'), E(2, 5, '일부'), E(2, 6, '종류'), E(3, 7, '일부')];
+const cxOf = (r, id) => x(r, id) + L.NODE_W / 2, cyOf = (r, id) => y(r, id) + L.NODE_H / 2;
+function segHitsRect(r, a, b, c) {      // 선분(a-b 중심)이 노드 c 의 사각형을 지나는가
+  const [x0, y0, x1, y1] = [cxOf(r, a), cyOf(r, a), cxOf(r, b), cyOf(r, b)], rx = x(r, c), ry = y(r, c);
+  for (let k = 0; k <= 200; k++) { const t = k / 200, px = x0 + (x1 - x0) * t, py = y0 + (y1 - y0) * t; if (px > rx && px < rx + L.NODE_W && py > ry && py < ry + L.NODE_H) return true; }
+  return false;
+}
+const noThrough = (r, edges, n) => edges.every(e => ids(n).filter(c => c !== e.from && c !== e.to).every(c => !segHitsRect(r, e.from, e.to, c)));
+
+test('기준 사례: 줄·가운데 정렬·교차 0·선이 제3 노드를 가로지르지 않음·연결 없는 개념은 마지막 줄', () => {
+  const r = run(8, SEC_EDGES, { w: 400, h: 600 });
+  const S = SEC, ys = n => y(r, S[n]);
+  assert.ok(ys('증권') < ys('유가증권') && ys('유가증권') < ys('주식') && ys('주식') < ys('IPO'));
+  for (const n of ['회사채', '국공채', '조건환매부채권']) assert.strictEqual(ys(n), ys('주식'), n);
+  const lines = [ys('증권'), ys('유가증권'), ys('주식'), ys('IPO')];
+  assert.deepStrictEqual(lines.map((v, i) => v - lines[0] === i * L.CELL_H), [true, true, true, true], '줄 간격 균일 ' + lines);
+  const kidX = [3, 4, 5, 6].map(i => cxOf(r, i)), mid = (Math.min(...kidX) + Math.max(...kidX)) / 2;
+  assert.ok(Math.abs(cxOf(r, S['유가증권']) - mid) < 1, '유가 증권은 셋째 줄 개념들의 가운데');
+  assert.ok(Math.abs(cxOf(r, S['주식']) - cxOf(r, S['IPO'])) < 1, '주식 바로 위에 IPO');
+  assert.ok(Math.abs(cxOf(r, S['증권']) - cxOf(r, S['유가증권'])) < 1);
+  assert.strictEqual(L.crossings(r.positions, SEC_EDGES.map(e => [e.from, e.to])), 0);
+  assert.strictEqual(r.metrics.crossingsAfter, 0);
+  assert.ok(noThrough(r, SEC_EDGES, 8), '선이 제3 노드를 지나지 않음');
+  assert.ok(ys('연결없음') > ys('IPO'), '연결 없는 개념은 마지막 줄');
+  const gaps = [3, 4, 5, 6].map(i => x(r, i)).sort((p, q) => p - q).map((v, i, a) => i ? v - a[i - 1] : null).slice(1);
+  assert.ok(gaps.every(g => Math.abs(g - gaps[0]) < 0.5), '같은 줄 간격 균등');
+});
+
+test('기준 사례: 어떤 입력 순서·id 배정이어도 줄과 교차 0 유지', () => {
+  const perm = [5, 3, 8, 1, 7, 2, 6, 4];                     // id 를 섞어 이름 → id 대응을 바꾼다
+  const edges = SEC_EDGES.map(e => E(perm[e.from - 1], perm[e.to - 1], e.type));
+  const r = run(8, edges.slice().reverse(), { w: 400, h: 600 });
+  const Y = n => y(r, perm[SEC[n] - 1]);
+  assert.ok(Y('증권') < Y('유가증권') && Y('유가증권') < Y('주식') && Y('주식') < Y('IPO'));
+  assert.strictEqual(new Set(['주식', '회사채', '국공채', '조건환매부채권'].map(Y)).size, 1);
+  assert.strictEqual(L.crossings(r.positions, edges.map(e => [e.from, e.to])), 0);
+  assert.ok(noThrough(r, edges, 8));
+});
+
+test('트리: 서브트리끼리 겹치지 않아 교차 0, 부모는 자식 가운데 위', () => {
+  const edges = [E(1, 2, '일으킴'), E(1, 3, '일으킴'), E(2, 4, '일으킴'), E(2, 5, '일으킴'), E(2, 6, '일으킴'), E(3, 7, '일으킴'), E(3, 8, '일으킴'), E(6, 9, '일으킴')];
+  const r = run(9, edges, { w: 400, h: 600 });
+  assert.strictEqual(L.crossings(r.positions, edges.map(e => [e.from, e.to])), 0);
+  assert.ok(noThrough(r, edges, 9));
+  const kids = [4, 5, 6].map(i => cxOf(r, i));
+  assert.ok(Math.abs(cxOf(r, 2) - (Math.min(...kids) + Math.max(...kids)) / 2) < 1);
+  assert.deepStrictEqual([...new Set(ids(9).map(i => y(r, i)))].length, 4);
+});
+
+test('같은 깊이는 같은 y, 깊이 차는 줄 차와 일치', () => {
+  const edges = [E(1, 2, '사용'), E(1, 3, '일부'), E(2, 4, '종류'), E(3, 4, '조건'), E(4, 5, '선행'), E(1, 5, '연관')];
+  const r = run(6, edges, { w: 400, h: 600 });
+  assert.strictEqual(y(r, 2), y(r, 3));
+  assert.strictEqual(y(r, 4) - y(r, 2), L.CELL_H);
+  assert.strictEqual(y(r, 5) - y(r, 4), L.CELL_H);
+  assert.strictEqual(y(r, 2) - y(r, 1), L.CELL_H);
+  assert.ok(y(r, 6) > y(r, 5), '연결 없는 개념은 마지막 줄');
+});
+
+test('부모가 둘인 DAG: 선 교차가 없는 배치를 찾고, 단순 id 순서 배치보다 교차가 같거나 적다', () => {
+  const edges = [E(1, 5, '사용'), E(1, 6, '사용'), E(2, 6, '사용'), E(2, 7, '사용'), E(3, 7, '사용'), E(3, 8, '사용'), E(4, 8, '사용'), E(4, 5, '사용')];
+  const r = run(8, edges, { w: 400, h: 600 });
+  const plain = new Map(ids(8).map(i => [i, { x: ((i - 1) % 4) * L.CELL_W, y: i <= 4 ? 0 : L.CELL_H }]));
+  const pairsE = edges.map(e => [e.from, e.to]);
+  assert.ok(L.crossings(r.positions, pairsE) <= L.crossings(plain, pairsE));
+  assert.strictEqual(r.metrics.layout, 'hierarchy');
+  // 교차가 꼭 생기는 구조에서도 같은 입력은 같은 결과
+  const again = run(8, edges.slice().reverse(), { w: 400, h: 600 });
+  assert.deepStrictEqual([...again.positions], [...r.positions]);
 });
