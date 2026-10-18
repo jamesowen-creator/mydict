@@ -76,7 +76,7 @@ const near = (a, b, tol = 1) => Math.abs(a - b) <= tol;
 const FIXED_EXCEPT = { '#toast': 'center', '#ocr-open': 'right16' };
 
 for (const w of [768, 820, 1024, 1280]) {
-  test(`223 태블릿 ${w}px: 6개 화면의 헤더·제목 바·본문·fixed/sticky 요소가 문학 나침반과 같은 680px 열의 가운데(좌우 여백 차이 ≤ 1px)`, { skip: SKIP }, async () => {
+  test(`223 태블릿 ${w}px: 7개 화면의 헤더·제목 바·본문·fixed/sticky 요소가 문학 나침반과 같은 680px 열의 가운데(좌우 여백 차이 ≤ 1px)`, { skip: SKIP }, async () => {
     const col0 = (w - 680) / 2, col1 = col0 + 680;
     const ref = (await states('lit', w, ['목록']))['목록'];
     assert.ok(near(ref.header.x0, col0) && near(ref.header.x1, col1), `기준(문학 나침반) 헤더 ${ref.header.x0}~${ref.header.x1}`);
@@ -118,7 +118,7 @@ test('223 팝업: 개념 학습 지도 시트·상세 대화상자(dialog)가 �
 });
 
 for (const w of [320, 390]) {
-  test(`223 폰 ${w}px: 6개 화면(대표 상태)에 가로 스크롤 없음(문서 폭 ≤ ${w}), 헤더·body가 화면 전체 폭`, { skip: SKIP }, async () => {
+  test(`223 폰 ${w}px: 7개 화면(대표 상태)에 가로 스크롤 없음(문서 폭 ≤ ${w}), 헤더·body가 화면 전체 폭`, { skip: SKIP }, async () => {
     for (const key of Object.keys(SCREENS)) {
       for (const [st, m] of Object.entries(await states(key, w))) {
         assert.ok(m.sw <= w, `${key} ${w}px [${st}]: 문서 폭 ${m.sw} > ${w}`);
