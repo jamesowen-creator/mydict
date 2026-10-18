@@ -39,13 +39,13 @@
 - 디자인 문서(design-principles-238.md)는 255까지의 경과이고, 256~278의 디자인 관련 변경(입력 포커스, 섹션 라벨, OCR 밝은 패널, 토큰 44개, design_lint 기준선)은 concept-map-progress-275.md 9절에 기록. 다음 문서 갱신 때 합칠 수 있음.
 - 작업 방식 메모: 지시문에서 커밋과 푸시를 한 명령으로 잇지 않는다(245-1 사고). Claude Code PC의 시각 표기가 KST 표기인데 실제로는 UTC 값이라 9시간 이르니 보고 시각은 믿지 말고 필요하면 사용자 시각으로 확인. 결과 보고가 안 오면 transcript를 검색해 도착 여부를 확인하고, 필요하면 읽기 전용 상태 확인 블록을 쓴다(278-1 사례). 증상이 불분명한 보고("반응이 없다", "안 된다")는 구분 질문을 먼저 하고, 읽기 전용 진단 블록(283-1, 284-1) 뒤에 수정 블록을 낸다. 배포 때 sw 버전과 지도 HTML의 JS ?v= 값을 함께 올린다(정합 테스트 있음). 지시문에 "커밋과 푸시는 별도 명령"이라고만 쓰면 Claude Code가 대기하는 것으로 읽을 수 있으니(291-1), "테스트 통과 후 바로 실행, 서로 이어 쓰지 말고 별도 명령"이라고 쓴다.
 
-## 작가 노트 (작업 130~137, 기준일 2026-10-18)
+## 작가 노트 (작업 130~137·AN-1~AN-4, 기준일 2026-10-18)
 음악·미술 작가의 삶과 대표작을 가볍게 읽는 새 메뉴(/artist_notes.html). 한입 독서·과학과 코드·데이터·localStorage를 공유하지 않는 복제 독립 구조. 아래 값은 코드·JSON·검증 스크립트에서 확인한 것([확인함]).
 
 ### 작업 이력 (커밋 해시는 git log 기준)
 - 130: 한입 독서 UI 구조 조사, 작가 노트는 복제 독립 방식(과학 메뉴와 같은 방식)으로 결정. 해시 미확인. 참고: git의 "(작업130)" 커밋 d030dcf는 한입 독서 "수필" 장르 신설(2026-10-01)로 이 조사와 다른 작업이다. **작업 번호 겹침(git log로 확인함)**: 한입 독서 커밋이 "(작업130)" d030dcf, "(작업132)" f332af9, "(작업133)" e8af6c6, "(작업135)" 5790042(모두 2026-10-01)로 먼저 같은 번호를 썼다. 작가 노트 커밋은 "(132)~(135)"로 표기해 구분할 수 있으나 번호만으로는 헷갈리니 커밋 해시와 함께 인용한다.
 - 131-1 (c52c1fc): 작가 노트 메뉴·화면·데이터 구조 구현(샘플 2명: 베토벤·고흐), 홈 메뉴 추가.
-- 132 (a40bd43): 하단 내비(홈/정복/퀴즈), 정복하기, 작품 소개 그룹(대표작 + 그 밖의 작품), 연결 작가 구조 도입. 퀴즈 탭은 "준비 중".
+- 132 (a40bd43): 하단 내비(홈/정복/퀴즈), 정복하기, 작품 소개 그룹(대표작 + 그 밖의 작품), 연결 작가 구조 도입. 퀴즈 탭은 "준비 중"(AN-2에서 구현).
 - 133 (b76841b): 작가 4명(모네·김환기·모차르트·쇼팽) 추가, 총 6명(음악 3, 미술 3).
 - 134 (1d17e6f): 표시 이름(통용명 + 풀네임), 문단 나눔, 연결 작가를 같은 사조 기준으로 재정비하고 링크로 전환.
 - 135 (e984e80): 모네 연결에서 마네 삭제(모네의 연결은 르누아르 1명), tablet_layout 테스트 제목 "6개 화면"→"7개 화면". 문서 반영(이 절, 별도 커밋).
@@ -54,16 +54,20 @@
 - 136-b (71059bd): 검증 결과 수정 적용. 문장 47건(교체 44, 삭제 3), 필드 값 3건(쇼팽 「혁명」 year "1831경", 모네 수련 year "1914경–1926", 베토벤 「월광」 year "1801"+note "1802년 출판"), 베토벤 태그 변경, 베토벤↔쇼팽 연결 삭제(양쪽).
 - 137 (데이터 572de0b, 문서 별도 커밋): 모네 "삶과 시대" 한 문단으로 합침, 김환기 「론도」 note를 "국가등록문화유산으로 등록된 작품"으로(1938 연도는 확인 못 해 그대로), 이 절 반영.
 - 작업 번호 규칙: 작가 노트 작업 130~137의 번호는 저장소의 한입 독서 작업 번호(130, 132, 133, 135)와 겹쳐 쓰였다. 이후 작가 노트 작업은 AN-1, AN-2…로 부르고 기존 번호는 바꾸지 않는다.
-- AN-1: 퀴즈 구조 조사(보고만)와 이 문서의 출처 귀속 정정.
+- AN-1 (5c64a6f): 한입 독서 퀴즈 구조 조사(보고만)와 이 문서의 출처 귀속 정정, 작업 번호 규칙(AN-n) 추가.
+- 2차 내용 검증 (커밋 없음): 별도 세션(이 저장소 세션이 아님)에서 작가별 본문 대조를 진행했고 Claude Code는 수정만 적용했다. 대조는 검색 결과의 본문 발췌 기준이며 전문 열람은 아니다.
+- AN-2 (570cc0f, 56709a4, 579d181): 본문 보정 2건(570cc0f: 교향곡 40번 초연 서술, 해바라기 아를 연작 점수), 퀴즈 데이터 42문항·version 0.5·검증 규칙(56709a4), 퀴즈 화면과 테스트(579d181).
+- AN-3 (dd65600, 5021f0d, 35646c4, 98720c3, 0df58cc): 2차 검증 수정 21건 적용, 작가별 커밋 5개(베토벤 3, 고흐 11, 모네 2, 쇼팽 3, 김환기 2).
+- AN-4: 이 문서 반영(이 절의 퀴즈·검증 현황·미정 갱신).
 
 ### 새로 생긴·바뀐 파일
 - public/artist_notes.html, public/artist_notes_db.json, scripts/validate_artist_notes.js
 - package.json: `"validate:artist_notes": "node scripts/validate_artist_notes.js"` 1줄
 - 홈 메뉴: home-wheel/src/HomeWheelApp.jsx의 OPTIONS에 `artist_notes`("작가 노트") 1줄 → 기본 7개(개념 지도 권한 사용자는 추가 1개). 홈을 고치면 `npm run build:home` 뒤 public/home 산출물(index.html, 해시 붙은 js)을 함께 커밋해야 한다(131-1에서 그렇게 함).
-- 테스트: tests/design_tokens.test.js(파일 목록에 artist_notes.html), tests/ui/tablet_layout.ui.test.js(SCREENS에 artist: 목록·상세·정복·퀴즈 상태), tests/ui/reading_bottom_nav.ui.test.js(FILES에 art, 구조 테스트 라벨 목록, 사양 비교 루프).
+- 테스트: tests/design_tokens.test.js(파일 목록에 artist_notes.html), tests/ui/tablet_layout.ui.test.js(SCREENS에 artist: 목록·상세·정복·퀴즈 상태), tests/ui/reading_bottom_nav.ui.test.js(FILES에 art, 구조 테스트 라벨 목록, 사양 비교 루프). AN-2에서 퀴즈 화면 테스트 tests/ui/artist_quiz.ui.test.js를 새로 만들고 box_sweep, btn_contrast, reading_text_buttons, tablet_layout, ui_consistency, reading_bottom_nav에 퀴즈 관련 항목을 보탰다.
 
-### 데이터 구조 (public/artist_notes_db.json, version 0.4)
-- 최상위: version, last_updated, artists[]. 현재 6명: artist_001 베토벤, 002 고흐, 003 모네, 004 김환기, 005 모차르트, 006 쇼팽.
+### 데이터 구조 (public/artist_notes_db.json, version 0.5)
+- 최상위: version, last_updated, artists[], quiz[](AN-2). 현재 6명: artist_001 베토벤, 002 고흐, 003 모네, 004 김환기, 005 모차르트, 006 쇼팽.
 - 작가 필드: id, name(통용명), full_name(풀네임, 같아도 됨), name_original, field(음악|미술), birth_year, death_year, nationality, one_line, who, life, movement{name, tags[], text}, featured_works[{title, year, description, interpretation}], other_works[{title, year, note(선택)}], reputation{contemporary, posthumous}, summary, connected_artists[{name, reason, id}], checked, sources[].
 - 문단 구분은 본문 문자열 안의 빈 줄("\n\n")이며 화면이 문단마다 따로 그린다.
 - 수록·검증 규칙(scripts/validate_artist_notes.js가 검사하는 것):
@@ -73,28 +77,36 @@
   - name·full_name 필수, movement.tags는 비어 있지 않은 문자열 배열.
   - connected_artists 0~3명, reason 40자 이하, id는 null 또는 수록 작가 id.
   - checked·sources는 비어 있으면 "미검증"으로 허용하고 값이 있을 때만 형식(날짜, http(s) URL) 검사. 실행 결과에 미검증 작가 수를 출력.
-- **checked·sources는 "출처를 단 날짜와 URL"이며, 내용 검증을 마쳤다는 뜻이 아니다.** 내용 검증은 136-a~136-b에서 1차로 했고, 현황은 아래 "내용 검증" 절에 있다. checked·sources 값은 136-b까지 바꾸지 않았다.
+  - 퀴즈(quiz[], AN-2): id 중복 금지, type은 mcq|ox, artist_id는 실제 작가, verified_on은 YYYY-MM-DD 날짜, basis[] 필수. 4지선다는 question·options 4개(정규화 후 서로 다르고 모두 실제 작가 name)·answer(보기 중 정확히 1개, artist_id 작가의 name)이고 statement·explanation 금지. OX는 statement·answer(boolean)·explanation 필수, claim_tag가 있으면 answer가 그 작가 movement.tags 포함 여부와 일치, options·question 금지. basis[]의 각 항목(artist_id, path, equals 또는 includes 중 하나)은 현재 JSON에서 풀리고 값이 일치해야 한다(정답과 데이터가 어긋나면 오류). 글자 수 상한은 문항·진술 60자, 보기 20자, 해설 120자. 원문·미디어 금지 필드는 문항에도 적용.
+- **checked·sources는 "출처를 단 날짜와 URL"이며, 내용 검증을 마쳤다는 뜻이 아니다.** 내용 검증은 136-a~136-b(1차)와 AN-3(2차)로 했고, 현황은 아래 "내용 검증" 절에 있다. 2차 대조에서는 checked·sources를 갱신하지 않았다.
 - 연결 작가 규칙: 같은 예술 사조(movement.tags가 하나 이상 겹침)일 때만 연결하고 시대·교류·헌정·가족 등 다른 배경으로는 잇지 않는다. 0명이면 "연결 작가" 카드를 숨긴다. 수록 작가끼리는 양방향으로 맞춘다(검증: id가 있는 연결은 태그 겹침이 없으면 오류, 양방향이 아니면 경고만). 수록 외 작가는 웹 검색으로 같은 사조임을 확인한 경우에만 쓰고 id는 null. 현재 김환기는 태그가 "한국 추상미술"이라 연결 0명(카드 숨김).
-- 현재 movement.tags와 연결 수(JSON에서 확인함, version은 0.4 그대로): 베토벤 ["고전주의", "고전·낭만 전환기"] 2명(모차르트 artist_005, 하이든 null), 고흐 ["후기 인상주의"] 1명(고갱 null), 모네 ["인상주의"] 1명(르누아르 null), 김환기 ["한국 추상미술"] 0명, 모차르트 ["고전주의"] 2명(베토벤 artist_001, 하이든 null), 쇼팽 ["낭만주의"] 2명(리스트 null, 슈만 null).
+- 현재 movement.tags와 연결 수(JSON에서 확인함): 베토벤 ["고전주의", "고전·낭만 전환기"] 2명(모차르트 artist_005, 하이든 null), 고흐 ["후기 인상주의"] 1명(고갱 null), 모네 ["인상주의"] 1명(르누아르 null), 김환기 ["한국 추상미술"] 0명, 모차르트 ["고전주의"] 2명(베토벤 artist_001, 하이든 null), 쇼팽 ["낭만주의"] 2명(리스트 null, 슈만 null).
 - 베토벤↔쇼팽 연결을 136-b에서 지운 이유: 베토벤은 고전주의에서 낭만주의로 넘어가는 전환기의 중심 인물이지만 스스로는 낭만주의자가 아니었다는 서술이 있어(브리태니커 기사 내용이며, 별도 대화 세션에서 검색 결과 발췌 기준으로 확인한 것이고 전문을 열람한 것은 아니다. 이 세션에서는 확인하지 못했다) "같은 사조만 잇는다"는 기준에 맞지 않는다고 보고, 태그를 전환기로 바꾸고 연결을 양쪽에서 지웠다.
 - 쇼팽 "낭만주의" 태그 근거: 브리태니커 기사 서두로 확인함. 별도 대화 세션에서 검색 결과 발췌 기준으로 확인한 것이며, 전문을 열람한 것은 아니다. 이 세션에서는 확인하지 못했고, 136-a2의 열람 기록상으로는 "검증 불가(미확인)"이었음.
 
 ### 화면과 동작 (public/artist_notes.html)
-- 하단 내비 홈(캐러셀·범례) / 정복 / 퀴즈 3탭. 퀴즈는 "준비 중" 빈 상태이며 문제는 QUIZ_BANK 배열을 채워 확장한다.
-- localStorage 키: `artist_notes_conquest_<작가 id>`, `artist_notes_field_filter`. 한입 독서의 전역 함수에 의존하지 않는다.
+- 하단 내비 홈(캐러셀·범례) / 정복 / 퀴즈 3탭.
+- 퀴즈 탭(AN-2 구현): 문항은 JSON의 quiz[]에서 읽는다(화면 코드의 quizData()). 정복한 작가의 문항만 출제하고, 정복 0명이면 안내창(metisAlert)만 띄우고 시작하지 않는다(탭은 aria-disabled지만 눌러서 안내를 볼 수 있음). 라운드당 최대 8문항(4지선다 최대 4 + OX 최대 4, 작가별로 돌아가며 뽑고 섞음, 라벨 "작품 맞추기 퀴즈"·"OX 퀴즈"). 점수는 정복에 영향을 주지 않고, 틀린 문항은 저장하지 않으며(메모리의 quizState만 사용, 결과 화면에서만 표시) 풀이 중 다른 탭으로 가면 "퀴즈를 그만할까요?" 확인창이 뜬다. quiz 데이터가 비어 있으면 "퀴즈는 준비 중이에요" 화면이 나오는 동작은 남아 있다.
+- localStorage 키: `artist_notes_conquest_<작가 id>`, `artist_notes_field_filter`(퀴즈용 키는 없음). 한입 독서의 전역 함수에 의존하지 않는다.
 - 표시 이름: 목록 카드·상세 헤더·정복 탭 행은 통용명 + 풀네임(작은 글씨, 같으면 생략), 상단 바·연결 작가는 통용명만.
 - 연결 작가 링크는 수록 작가(id 있음)만 눌러서 이동하고 history에 한 칸씩 쌓는다. 뒤로 가기는 직전 작가로 돌아가며(이때 ‹ 라벨 "이전 작가로"), 이동해도 정복 상태와 필터 상태가 유지된다.
 - 권한: artist_notes.html에 perm_* 검사 코드가 없고 홈 OPTIONS 기본 배열에 있어 모든 사용자에게 열려 있다. [미확인: 서버 쪽 접근 제한 여부는 확인하지 않음]
 
+### 퀴즈 구조 (AN-2, public/artist_notes_db.json의 quiz[])
+- 문항 42개: 4지선다(mcq) 12, OX 30(O 15 / X 15). 작가별 7개씩(artist_001~006). OX 중 claim_tag 있는 것은 4개.
+- 문항 필드: id, type(mcq|ox), artist_id, basis[], verified_on(현재 모두 2026-10-18). mcq는 question, options[4], answer(작가 name). ox는 statement, answer(boolean), explanation, 선택 claim_tag.
+- 근거 참조(basis)는 데이터와 검증 스크립트(scripts/validate_artist_notes.js, `npm run validate:artist_notes`)에서만 쓰고 화면에는 표시하지 않는다. 검증 규칙은 위 "수록·검증 규칙"의 퀴즈 항목, 화면 동작은 "화면과 동작"의 퀴즈 탭 항목에 있다.
+- 문항 내용은 현재 본문 데이터와 basis로 연결되어 있어, 본문을 고치면 검증 스크립트가 어긋난 문항을 오류로 알려 준다.
+
 ### 삭제할 때 영향 범위
-- 새 파일 3개(artist_notes.html, artist_notes_db.json, validate_artist_notes.js) 삭제, package.json의 validate:artist_notes 1줄 삭제, HomeWheelApp.jsx OPTIONS 1줄 삭제 후 홈 재빌드(public/home 산출물 커밋), 테스트 3곳의 목록 항목 제거(design_tokens 파일 목록, tablet_layout SCREENS와 제목 "7개 화면"→"6개 화면", reading_bottom_nav FILES·라벨·루프). 한입 독서·과학에는 영향 없음.
+- 새 파일 3개(artist_notes.html, artist_notes_db.json, validate_artist_notes.js) 삭제, package.json의 validate:artist_notes 1줄 삭제, HomeWheelApp.jsx OPTIONS 1줄 삭제 후 홈 재빌드(public/home 산출물 커밋), 테스트 3곳의 목록 항목 제거(AN-2 이후에는 artist_quiz.ui.test.js 삭제와 퀴즈 항목을 보탠 다른 UI 테스트 6곳 정리도 필요)(design_tokens 파일 목록, tablet_layout SCREENS와 제목 "7개 화면"→"6개 화면", reading_bottom_nav FILES·라벨·루프). 한입 독서·과학에는 영향 없음.
 
 ### design_lint 규칙 (tests/design_lint.test.js, 이 화면을 만들며 확인한 것)
 - tests/design_lint_baseline.json에 없는 새 HTML 파일은 모든 항목이 0에서 시작해야 한다.
 - #hex 직접 지정은 원칙 색이어도 hex_direct로 세어져 실패한다. 새 파일이 var(--color-*)와 단계 안 글자 크기(11·12·13·14·15·16·18·22·32·48)·모서리(0·10·16·50%)만 쓰면 통과한다.
 - 이모지 정규식 범위(U+2702~27BF)에 ✓(U+2713)가 들어가 이모지로 센다(코드 주석은 ✓ 같은 텍스트 기호는 제외라고 적혀 있어 불일치). 그래서 작가 노트는 "정복함" 글자만 쓴다.
 
-### 내용 검증 (136-a~136-b)
+### 내용 검증 (136-a~AN-3)
 **검증 기준(실제로 적용한 것)**
 - 사실 1건당 독립 출처 2개 이상, 그중 1개 이상은 비위키로 하고, 본문을 열람해야 "일치"로 본다. 위키백과 계열 문서는 여러 개라도 독립 출처 1개로 센다.
 - 비위키로 인정하는 것: 브리태니커, 미술관·재단·공식 기관, 악보 출판사, 학술·전문 출판물. 인정하지 않는 것: 여행 정보 사이트, 검색 결과 요약만 본 것, 개인 블로그, 출처 없는 요약 사이트.
@@ -103,25 +115,23 @@
 - 확인하지 못한 문장은 삭제를 우선하고, 평가 문장은 출처 있는 평가만 남긴다. 검증 보고서에는 출처 URL을 적지 않는다.
 - 문장 ID 형식: 작가코드-필드-순번. BTH 베토벤, GOG 고흐, MON 모네, KHK 김환기, MOZ 모차르트, CHO 쇼팽. 필드는 oneline, who, life, movement, featured1/2-desc·interp, rep-contemporary·rep-posthumous, summary. other_works는 작가코드-OW-순번. 문단 구분("\n\n")은 문장 경계로 보고, 괄호·「」 안 마침표와 라틴 약어(E. T. A., K. 550, Op. 23)는 자르지 않는다.
 
-**현황(136-b 적용 후)**
-- 6명 144문장을 1차 검증했고 수정 47건(교체 44, 삭제 3)을 적용했다. 위키만 일치 문장의 비위키 보강은 아직 남아 있다. 브리태니커 일부 페이지 등 차단된 출처는 이 작업 환경에서 열리지 않았다(NGA, MoMA, 시카고미술관, 환기미술관, 국립국어원 포함).
-- 미검증 유지 문장 99건(위키만 일치 68, 미확인 31). 아래 [비]는 비위키 근거를 별도로 확인한 13건이다. 별도 대화 세션에서 검색 결과 발췌 기준으로 확인한 것이며, 전문을 열람한 것은 아니다. 이 세션에서는 확인하지 못했고, 136-a2 열람 기록에는 위키만 일치 또는 미확인으로 남아 있다.
-  - 베토벤 16건: BTH-oneline-1, BTH-who-1, BTH-who-2, BTH-life-1, BTH-life-2, BTH-movement-1[비], BTH-movement-2, BTH-movement-3, BTH-featured2-desc-1, BTH-featured2-desc-2, BTH-featured2-desc-3, BTH-featured2-interp-1, BTH-rep-contemporary-1, BTH-summary-1, BTH-OW-1, BTH-OW-4
-  - 고흐 26건: GOG-oneline-1, GOG-who-1[비], GOG-who-2, GOG-who-3[비], GOG-life-1, GOG-life-2, GOG-life-3, GOG-life-4, GOG-movement-2, GOG-movement-3, GOG-featured1-desc-1, GOG-featured1-desc-3, GOG-featured1-interp-1, GOG-featured1-interp-2, GOG-featured2-desc-3[비], GOG-featured2-interp-1, GOG-featured2-interp-2, GOG-rep-posthumous-1, GOG-rep-posthumous-2, GOG-rep-posthumous-3, GOG-summary-1, GOG-OW-1, GOG-OW-2, GOG-OW-3, GOG-OW-4, GOG-OW-5
-  - 모네 17건: MON-oneline-1[비], MON-who-1[비], MON-who-2, MON-movement-1, MON-movement-2, MON-movement-3, MON-movement-4[비], MON-featured1-desc-1, MON-featured1-interp-1, MON-featured1-interp-2, MON-rep-contemporary-1, MON-rep-contemporary-2, MON-rep-posthumous-2, MON-summary-1, MON-OW-1, MON-OW-2, MON-OW-3
-  - 김환기 7건: KHK-who-2, KHK-life-4, KHK-featured1-interp-1, KHK-OW-1, KHK-OW-2, KHK-OW-3, KHK-OW-4
-  - 모차르트 17건: MOZ-oneline-1, MOZ-who-1[비], MOZ-who-2, MOZ-who-3, MOZ-life-2, MOZ-movement-2, MOZ-featured1-desc-1, MOZ-featured1-desc-2, MOZ-featured2-desc-2, MOZ-rep-contemporary-1, MOZ-rep-posthumous-2, MOZ-summary-1, MOZ-OW-1, MOZ-OW-2, MOZ-OW-3, MOZ-OW-4, MOZ-OW-5
-  - 쇼팽 16건: CHO-who-2[비], CHO-who-3, CHO-who-4[비], CHO-life-1, CHO-life-3[비], CHO-movement-1, CHO-movement-3[비], CHO-featured1-desc-1, CHO-featured1-desc-2[비], CHO-featured2-desc-1, CHO-featured2-desc-2, CHO-featured2-interp-1, CHO-OW-1, CHO-OW-2, CHO-OW-3, CHO-OW-4
-- 근거가 약한 새 문장(보강 대기, 사용자 지정): CHO-featured1-interp-1, MON-featured1-desc-2, MOZ-featured1-desc-4, GOG-featured2-desc-2, MOZ-life-3, KHK-featured2-interp-1, KHK-featured2-desc-1, KHK-who-3.
-- 136-b 보고에서 근거가 확인되지 않았다고 따로 적은 새 문장: BTH-life-3("1만~3만 명", 검색 요약 근거), BTH-rep-posthumous-1, GOG-rep-contemporary-1, CHO-rep-contemporary-1("1832년 파리 데뷔"), CHO-oneline-1, CHO-movement-2, CHO-rep-posthumous-1, CHO-summary-1, MOZ-life-1, BTH-featured1-desc-1·2의 세부(로프코비츠 궁, 극장 이름, "마음을 바꿨다").
-- 136-b에서 처리하지 않아 그대로 남은 136-a2 권고: CHO-movement-3(브리태니커 소개문, 삭제 권고였음), 미확인 other_works 17건(예: MON-OW-1 「양산을 쓴 여인」). KHK-OW-1 「론도」는 note 표기만 137에서 고쳤고 1938 연도는 미확인 그대로.
-- 이 99건 목록은 저장소 다른 곳에 없어 이 문서에만 기록한다.
+**현황(AN-3 적용 후)**
+- 6명의 본문 문장(144문장)과 "그 밖의 작품"(25건)을 대조 완료했다. 수정은 1차 47건(136-b: 교체 44, 삭제 3)과 2차 21건(AN-3), 그 밖에 137·AN-2의 데이터 수정이 있다. 2차 대조는 별도 세션에서 검색 결과의 본문 발췌 기준으로 했고 전문 열람은 아니다. 이 세션에서는 확인하지 못했다. 브리태니커 일부 페이지 등 차단된 출처는 1차 때 이 작업 환경에서 열리지 않았다(NGA, MoMA, 시카고미술관, 환기미술관, 국립국어원 포함).
+- 단일 출처로 남은 항목: MOZ-life-3(오스트리아 미디어테크 1곳), MON-featured1-desc-2(블로그 1곳).
+- 보조 일치로 유지한 항목: CHO-OW-3(악보 판매처·교육 사이트), MON-OW-1(소장 기관 해설 1곳), KHK-featured1-interp-1(한국어 매체).
+- 김환기 항목은 한국어 1차 출처(환기미술관, 국립현대미술관)를 이 환경에서 열지 못했고 한국어 매체·공공기관·소장 기관 서술로 확인했다.
+- 위 기준(사실 1건당 독립 출처 2개 이상, 비위키 1개 이상, 위키 계열 1개 계산, 확인 못 한 문장은 삭제·완화)은 2차에도 그대로 적용했다. 위키백과 계열만 근거인 문장은 남기지 않았다.
+- checked·sources는 "출처를 단 날짜와 URL"이며 이번 2차 대조에서 갱신하지 않았다(값은 2026-10-17~18 날짜와 작가별 6~12개 URL 그대로).
+- 한국어 고유명사 표기는 국립국어원 용례를 열지 못해 추정 표기로 남은 것이 있다.
 
 ### 미정·후속 (결정이 아니라 "미정")
-- 내용 검증: 6명 144문장 1차 검증 완료, 수정 47건 적용. 위키만 일치 문장의 비위키 보강은 미정. 한국어 고유명사 표기는 국립국어원 용례를 열지 못해 추정 표기로 남음. 모네의 sources에는 마네 확인용으로 넣은 URL(britannica.com/print/article/361791)이 남아 있음.
-- 퀴즈: 퀴즈 탭은 "준비 중". 문제는 확인이 끝난 사실로만 만든다. 순서는 한입 독서 퀴즈 조사 → 핵심 사실 대조 → 문항 작성(작업 번호 미정).
+- 완료: 내용 검증(1차 136-b, 2차 AN-3), 퀴즈 문항 작성·구현(AN-2).
+- 퀴즈 확장(문항 추가, 오답노트)은 미정. 틀린 문항은 지금 저장하지 않는다.
+- 작가를 추가할 때 해야 할 일: 기존 작가의 수록 외 연결 작가에 id 채우기(아래), 새 문장 사실 대조, 퀴즈 문항과 basis 작성.
+- 모네의 sources에는 마네 확인용으로 넣은 URL(britannica.com/print/article/361791)이 남아 있음.
+- 신규 작가 추가 절차: 위키만 근거인 문장이 생기지 않게 하는 절차는 미정.
 - 출처 규칙: 위 "내용 검증" 절의 기준으로 정했다(136-a 이후 적용).
 - 문단 균형: 136-b에서 베토벤 "삶과 시대"·"누구인가", 모네 "누구인가", 고흐 "사후 평가"를 문장 경계에서 정리했고 137에서 모네 "삶과 시대"를 한 문단으로 합쳤다. 남은 불균형(모네 수련 연작 설명 2줄/4줄·3줄, 고흐 누구인가 4줄/2줄)은 문장 경계로 나아지지 않아 그대로 둠.
 - 홈 휠 7항목 배치는 부자연스러워 개념학습/개념지도 중 하나를 삭제한 뒤 최적화.
 - 미술 장르색(초록)이 디자인 원칙의 "정답 초록"과 의미가 겹침. 정복 표시의 ✓ 허용 여부, 정복 후 글자색 토큰 차이(--coral-ink가 없어 --primary-dark 사용)는 디자인 원칙 문서 정리 때 결정.
-- 연결 작가 중 수록 외 작가는 작가가 추가될 때 id를 채워 링크로 전환.
+- 연결 작가 중 수록 외 작가(하이든, 고갱, 르누아르, 리스트, 슈만)는 작가가 추가될 때 id를 채워 링크로 전환.
