@@ -15,7 +15,7 @@ test.after(async () => { if (browser) await browser.close(); if (srv) await srv.
 const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
 const jwt = () => `${b64({ alg: 'none' })}.${b64({ id: 7, name: '테스터', exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`;
 const DB_READY = "typeof DB !== 'undefined' && !!DB && getComputedStyle(document.getElementById('loading')).display === 'none' && !!document.querySelector('.metis-app-header-logo')";
-const FILES = { lit: '/literature_compass.html', sci: '/science_reading.html', dig: '/digest_reading.html' };
+const FILES = { lit: '/literature_compass.html', sci: '/science_reading.html', dig: '/digest_reading.html', art: '/artist_notes.html' };
 const MCQ = "[{ type: 'mcq', question: '다음 중 올바른 설명은?', options: ['첫째 보기', '둘째 보기', '셋째 보기', '넷째 보기'], answer: '셋째 보기', roundLabel: '4지선다' }, { type: 'mcq', question: '두 번째 문제', options: ['가', '나', '다', '라'], answer: '가', roundLabel: '4지선다' }]";
 const READ_QUIZ = `quizState = { questions: ${MCQ}, currentIdx: 0, score: 0, wrong: [], answered: false }; showView('view-quiz'); renderQuestion();`;
 
@@ -37,7 +37,7 @@ async function tap(page, tab) { await page.click(`#bottom-nav [data-tab="${tab}"
 const activeView = page => page.eval("document.querySelector('.view.active').id");
 
 // ───────────────────────── 구조·사양 ─────────────────────────
-for (const [key, labels] of [['lit', ['홈', '퀴즈', '사전']], ['sci', ['홈', '정복', '퀴즈']], ['dig', ['홈', '정복', '퀴즈']]]) {
+for (const [key, labels] of [['lit', ['홈', '퀴즈', '사전']], ['sci', ['홈', '정복', '퀴즈']], ['dig', ['홈', '정복', '퀴즈']], ['art', ['홈', '정복', '퀴즈']]]) {
   test(`${key}: 하단 내비 탭 ${labels.length}개(${labels.join('/')}), nav 라벨, 첫 화면에서 "홈"이 현재 탭, 옛 .tab-bar·.conquest-bar 없음`, { skip: SKIP }, async () => {
     const page = await open(key);
     assert.deepEqual((await tabs(page)).map(t => t.text), labels);
@@ -70,7 +70,7 @@ for (const w of [390, 1024]) {
     await d.eval(NO_MOTION); await settle(d);
     const dm = await d.eval(NAV_SPEC('nav', '.nav-tab', '.nav-tab.active'));
     await d.close();
-    for (const key of ['lit', 'sci', 'dig']) {
+    for (const key of ['lit', 'sci', 'dig', 'art']) {
       const page = await open(key, w);
       const m = await page.eval(NAV_SPEC('#bottom-nav', '.bottom-nav-tab', '.bottom-nav-tab.active'));
       await page.close();
@@ -90,7 +90,7 @@ for (const w of [390, 1024]) {
 }
 for (const w of [320, 768]) {
   test(`하단 내비 ${w}px(문학·과학·한입): 탭 균등 폭·가운데 열·가로 스크롤 없음·마지막 내용이 내비에 가려지지 않음`, { skip: SKIP }, async () => {
-    for (const key of ['lit', 'sci', 'dig']) {
+    for (const key of ['lit', 'sci', 'dig', 'art']) {
       const page = await open(key, w);
       const m = await page.eval(NAV_SPEC('#bottom-nav', '.bottom-nav-tab', '.bottom-nav-tab.active'));
       const col = Math.min(680, m.vw), c0 = (m.vw - col) / 2;

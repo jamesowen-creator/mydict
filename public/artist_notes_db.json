@@ -1,5 +1,5 @@
 {
-  "version": "0.1",
+  "version": "0.2",
   "last_updated": "2026-10-17",
   "artists": [
     {
@@ -17,7 +17,7 @@
         "name": "고전주의에서 낭만주의로",
         "text": "하이든과 모차르트로 대표되는 고전주의 양식에서 출발했고, 그의 음악이 낭만주의로 넘어가는 흐름을 이끈 것으로 평가받는다. 1810년 E. T. A. 호프만은 그를 낭만적인 작곡가로 높이 평가했다. 흔히 초기·중기·후기의 세 시기로 나누어 설명하며, 중기는 청력 상실의 위기 이후에 시작되었다고 본다."
       },
-      "works": [
+      "featured_works": [
         {
           "title": "교향곡 3번 「영웅」",
           "year": "1803–1804",
@@ -31,16 +31,54 @@
           "interpretation": "마지막 악장은 인류가 하나가 되는 이상을 노래한 것으로 해석된다. 자필 악보는 2001년 유네스코 세계기록유산에 올랐고, 그 선율의 기악 편곡은 1972년 유럽평의회, 1985년 유럽공동체의 상징 음악으로 채택되었다."
         }
       ],
+      "other_works": [
+        {
+          "title": "교향곡 5번",
+          "year": "1804–1808",
+          "note": "첫 스케치는 3번을 마친 1804년"
+        },
+        {
+          "title": "교향곡 6번 「전원」",
+          "year": "1807–1808",
+          "note": "5번과 같은 연주회에서 초연"
+        },
+        {
+          "title": "피아노 소나타 14번 「월광」",
+          "year": "1801–1802"
+        },
+        {
+          "title": "장엄미사",
+          "year": "1819–1823"
+        }
+      ],
       "reputation": {
         "contemporary": "생전 평가는 엇갈렸다. 「영웅」은 지나치게 길다는 비판과 걸작이라는 평을 함께 받았고, 오페라 「피델리오」 초판은 비평과 흥행 모두 실패했다. 9번의 마지막 악장도 초기 비평가들에게는 '난해하고 기이하다'는 말을 들었다.",
         "posthumous": "오늘날에는 서양 음악사의 중심 인물로 평가받고, 후기 현악 사중주는 그 갈래의 정점으로 꼽힌다. 브람스의 교향곡 1번이 9번의 주제를 인용한다는 점을 두고 한스 폰 뷜로는 '베토벤의 10번'이라 불렀다."
       },
       "summary": "청력을 잃어 가는 위기 속에서도 교향곡의 규모와 표현을 넓혀, 고전주의에서 낭만주의로 가는 길을 연 작곡가로 평가받는다.",
-      "see_also": ["요제프 하이든", "볼프강 아마데우스 모차르트", "요하네스 브람스"],
+      "connected_artists": [
+        {
+          "name": "볼프강 아마데우스 모차르트",
+          "reason": "같은 빈 고전주의 음악의 선배 작곡가",
+          "id": null
+        },
+        {
+          "name": "요제프 하이든",
+          "reason": "빈에서 베토벤을 가르친 고전주의 작곡가",
+          "id": null
+        },
+        {
+          "name": "요하네스 브람스",
+          "reason": "9번 주제를 인용한 낭만주의 작곡가",
+          "id": null
+        }
+      ],
       "checked": "2026-10-17",
       "sources": [
         "https://en.wikipedia.org/wiki/Ludwig_van_Beethoven",
-        "https://en.wikipedia.org/wiki/Symphony_No._9_(Beethoven)"
+        "https://en.wikipedia.org/wiki/Symphony_No._9_(Beethoven)",
+        "https://en.wikipedia.org/wiki/Symphony_No._5_(Beethoven)",
+        "https://www.naqt.com/you-gotta-know/works-by-beethoven.html"
       ]
     },
     {
@@ -58,7 +96,7 @@
         "name": "후기 인상주의",
         "text": "고흐는 흔히 후기 인상주의 화가로 분류된다. 20세기 초 야수파와 독일 표현주의 화가들이 그의 양식의 일부를 받아들였다고 설명된다. 1901년 파리 베른하임죈 화랑의 대규모 회고전은 드랭과 블라맹크를 자극해 야수파의 등장에 영향을 준 것으로 전해진다."
       },
-      "works": [
+      "featured_works": [
         {
           "title": "해바라기",
           "year": "1888",
@@ -72,17 +110,59 @@
           "interpretation": "고흐 자신은 1889년 11월 말 에밀 베르나르에게 보낸 편지에서 이 그림을 '실패'라고 불렀다. 후대에는 종교적·묵시록적 해석, 천문학적 해석, 정신 건강과 연결한 심리적 해석 등 여러 읽기가 나왔다."
         }
       ],
+      "other_works": [
+        {
+          "title": "감자 먹는 사람들",
+          "year": "1885"
+        },
+        {
+          "title": "아를의 침실",
+          "year": "1888",
+          "note": "세 가지 판본이 있다"
+        },
+        {
+          "title": "밤의 카페 테라스",
+          "year": "1888"
+        },
+        {
+          "title": "아이리스",
+          "year": "1889",
+          "note": "생레미 병원에 머물 때 그렸다"
+        },
+        {
+          "title": "까마귀가 나는 밀밭",
+          "year": "1890"
+        }
+      ],
       "reputation": {
         "contemporary": "비평가 알베르 오리에는 1889년 『르 모데르니스트 일뤼스트레』에서 그의 작품을 '불, 강렬함, 햇빛'이라 묘사했고, 1890년 1월 『메르퀴르 드 프랑스』에서는 그를 '천재'라 불렀다.",
         "posthumous": "여러 전시를 거치며 화가, 비평가, 수집가 사이에서 평판이 꾸준히 올랐다. 제1차 세계대전 전에는 오스트리아와 독일에서 먼저 명성이 높아졌고, 1914년 서간집 출간이 이를 거들었다. 어빙 스톤의 1934년 소설 『Lust for Life』와 1956년 영화는 특히 미국에서 그의 인지도를 키웠다."
       },
       "summary": "짧은 활동 기간에 강렬한 색과 붓질로 독자적인 화풍을 만들었고, 사후에 후기 인상주의를 대표하는 화가로 자리 잡았다고 평가받는다.",
-      "see_also": ["폴 고갱", "테오 반 고흐"],
+      "connected_artists": [
+        {
+          "name": "클로드 모네",
+          "reason": "후기 인상주의보다 앞선 인상주의 화가",
+          "id": null
+        },
+        {
+          "name": "폴 고갱",
+          "reason": "아를에서 함께 작업한 후기 인상주의 화가",
+          "id": null
+        },
+        {
+          "name": "김환기",
+          "reason": "색과 점·선의 표현으로 비교해 볼 만한 한국 화가",
+          "id": null
+        }
+      ],
       "checked": "2026-10-17",
       "sources": [
         "https://en.wikipedia.org/wiki/Vincent_van_Gogh",
         "https://en.wikipedia.org/wiki/Sunflowers_(Van_Gogh_series)",
-        "https://en.wikipedia.org/wiki/The_Starry_Night"
+        "https://en.wikipedia.org/wiki/The_Starry_Night",
+        "https://www.thecollector.com/essential-vincent-van-gogh-paintings/",
+        "https://www.pbs.org/wnet/secrets/van-goghs-ear-virtual-gallery/3247"
       ]
     }
   ]

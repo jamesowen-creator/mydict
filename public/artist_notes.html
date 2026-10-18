@@ -26,6 +26,7 @@
     --border: var(--color-line);
     --genre-music: var(--color-accent-ink);
     --genre-art: var(--color-ok-ink);
+    --navbar-h: 78px;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -60,7 +61,7 @@
   #loading p { color: var(--text2); font-size: 14px; }
 
   /* ── Views ── */
-  .view { display: none; min-height: 100dvh; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); }
+  .view { display: none; min-height: 100dvh; padding-bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom, 0px) + 16px); }
   .view.active { display: block; }
 
   .screen-bar-title.one-line { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -70,7 +71,7 @@
      overflow:hidden 은 바깥 래퍼(.carousel-clip)에만 건다. --hdr-h 는 공통 헤더 실제 높이(JS 측정). */
   #view-list.active {
     display: flex; flex-direction: column;
-    min-height: calc(100dvh - var(--hdr-h, 0px));
+    min-height: calc(100dvh - var(--hdr-h, 0px) - var(--navbar-h));
   }
   #view-list .content {
     flex: 1; display: flex; flex-direction: column;
@@ -117,6 +118,7 @@
     font-size: 12px; letter-spacing: 0.04em; color: var(--text2);
   }
   .carousel-card-meta .g { color: var(--genre-ink); font-weight: 700; }
+  .carousel-card-done { color: var(--primary-dark); font-weight: 700; }
   .carousel-card-title {
     margin-top: auto;
     font-size: var(--title-size, 22px); font-weight: 500; line-height: 1.3;
@@ -210,7 +212,68 @@
     padding: 4px 0 4px 12px;
     font-size: 15px; font-weight: 600; line-height: 1.6; color: var(--text1); word-break: keep-all;
   }
-  .artist-see-also { margin-top: 16px; font-size: 13px; color: var(--text2); }
+  /* 그 밖의 작품: 한 줄씩 나열(작품명 · 연도 / 짧은 한 구절) */
+  .other-works, .connected-list { list-style: none; }
+  .other-work, .connected-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .other-work:last-child, .connected-item:last-child { border-bottom: none; }
+  .other-work-title { font-size: 15px; font-weight: 500; line-height: 1.5; color: var(--text1); word-break: keep-all; }
+  .other-work-year { font-size: 13px; color: var(--text2); font-family: var(--font-num); }
+  .other-work-note, .connected-reason { margin-top: 2px; font-size: 13px; line-height: 1.5; color: var(--text2); word-break: keep-all; }
+  /* 연결 작가: 이름 + 한 줄 이유 텍스트(링크 없음) */
+  .connected-name { font-size: 15px; font-weight: 700; line-height: 1.5; color: var(--text1); }
+
+  /* 정복하기: 한입 독서 상세와 같은 위치(제목 줄 오른쪽)·박스 없는 글자 */
+  .conquest-btn {
+    flex: none; min-height: var(--ctl-min-h); padding: 10px 8px; margin-right: -8px;
+    border: none; border-radius: 0; background: transparent; cursor: pointer;
+    font-size: 15px; font-weight: 500; white-space: nowrap; font-family: var(--font-sans);
+    color: var(--text2);
+  }
+  .conquest-btn.conquered { color: var(--primary-dark); font-weight: 700; }
+  .conquest-btn:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
+
+  /* ── 하단 내비: 한입 독서와 같은 구조·높이 ── */
+  .bottom-nav {
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    box-shadow: var(--shadow-nav);
+    padding: 0 16px max(8px, env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 0;
+    position: fixed;
+    left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--content-max);
+    bottom: 0; z-index: 100;
+    min-height: var(--navbar-h);
+  }
+  .bottom-nav-tabs { display: flex; flex: 1; gap: 0; }
+  .bottom-nav-tab {
+    display: flex; flex-direction: row; align-items: baseline; justify-content: center; gap: 2px;
+    flex: 1 1 0; min-width: 0; min-height: var(--ctl-min-h);
+    padding: 10px 0;
+    font-family: var(--font-sans); font-size: 15px; font-weight: 500; line-height: normal;
+    color: var(--text2); cursor: pointer;
+    border-top: 3px solid transparent; border-bottom: none; border-left: none; border-right: none;
+    background: none; white-space: nowrap;
+  }
+  .bottom-nav-tab:hover:not(.active) { color: var(--text1); }
+  .bottom-nav-tab.active { color: var(--primary-dark); border-top-color: var(--primary); }
+  .bottom-nav-tab:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
+  @media (max-width: 460px) { .bottom-nav-tab { font-size: 13px; } }
+
+  /* 정복 탭 / 퀴즈 탭 */
+  #view-conq .content, #view-quiz .content { padding: 20px 16px; }
+  .tab-title { font-size: 22px; font-weight: 700; color: var(--text1); margin-bottom: 4px; }
+  .tab-sub { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
+  .conq-group { margin-bottom: 20px; }
+  .conq-group-label { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--primary-dark); padding-bottom: 4px; border-bottom: 2px solid var(--primary); margin-bottom: 4px; }
+  .conq-row {
+    display: flex; align-items: center; width: 100%; min-height: var(--ctl-min-h); padding: 10px 0; text-align: left;
+    background: none; border: none; border-bottom: 1px solid var(--border); border-radius: 0; cursor: pointer;
+    font-family: var(--font-sans); font-size: 15px; font-weight: 500; color: var(--text1);
+  }
+  .conq-group .conq-row:last-child { border-bottom: none; }
+  .conq-row:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .conq-row:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
+  .empty-note { padding: 24px 0; font-size: 14px; color: var(--text2); }
 
   /* ── Misc ── */
   .error-msg { text-align: center; padding: 40px 24px; color: var(--color-danger); font-size: 14px; }
@@ -243,9 +306,36 @@
       </svg>
     </button>
     <h1 class="screen-bar-title one-line" id="artist-bar-title"></h1>
+    <button class="conquest-btn screen-bar-end" id="conquest-btn" aria-pressed="false" onclick="toggleConquest()">정복하기</button>
   </div>
   <div class="content" id="artist-content"></div>
 </div>
+
+<!-- 정복 탭 -->
+<div id="view-conq" class="view">
+  <div class="content">
+    <div class="tab-title">정복</div>
+    <div class="tab-sub" id="conq-sub"></div>
+    <div id="conq-list"></div>
+  </div>
+</div>
+
+<!-- 퀴즈 탭: 구조만. 문제는 내용 검증 뒤 QUIZ_BANK 에 채운다 -->
+<div id="view-quiz" class="view">
+  <div class="content">
+    <div class="tab-title">퀴즈</div>
+    <div id="quiz-body"></div>
+  </div>
+</div>
+
+<!-- 하단 내비: 홈 / 정복 / 퀴즈 -->
+<nav id="bottom-nav" class="bottom-nav" aria-label="작가 노트 메뉴">
+  <div class="bottom-nav-tabs">
+    <button type="button" class="bottom-nav-tab" id="nav-home" data-tab="home">홈</button>
+    <button type="button" class="bottom-nav-tab" id="nav-conq" data-tab="conq">정복</button>
+    <button type="button" class="bottom-nav-tab" id="nav-quiz" data-tab="quiz">퀴즈</button>
+  </div>
+</nav>
 
 <script>
 // ── State ──
@@ -269,9 +359,21 @@ function escHtml(s) {
 }
 const years = a => `${a.birth_year} – ${a.death_year}`;
 
+// 정복 상태: 'artist_notes_conquest_<id>' (한입 독서의 digest_conquest_ 와 분리)
+function isConquered(id) { return lsGet('artist_notes_conquest_' + id) === 'true'; }
+function setConquered(id, val) { lsSet('artist_notes_conquest_' + id, val ? 'true' : 'false'); }
+function getConqueredArtists() { return DB ? DB.artists.filter(a => isConquered(a.id)) : []; }
+
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  // 홈 = 목록·상세 / 정복 / 퀴즈
+  const tab = id === 'view-quiz' ? 'quiz' : id === 'view-conq' ? 'conq' : 'home';
+  for (const b of document.querySelectorAll('#bottom-nav [data-tab]')) {
+    const on = b.dataset.tab === tab;
+    b.classList.toggle('active', on);
+    if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  }
 }
 
 // ── History ── 목록을 바닥 상태로 깔고 상세는 그 위에 한 칸만 쌓는다(이미 한 칸 위면 replace)
@@ -279,7 +381,7 @@ let _navFromPop = false;
 function navState(state) {
   if (_navFromPop) return;
   const cur = history.state && history.state.view;
-  if (!cur || cur === 'list') history.pushState(state, '');
+  if (!cur || cur === 'list' || cur === 'conq' || cur === 'quiz') history.pushState(state, '');
   else history.replaceState(state, '');
 }
 function syncListHistoryState() {
@@ -298,6 +400,10 @@ window.addEventListener('popstate', e => {
   try {
     if (st.view === 'artist' && DB.artists.some(a => a.id === st.id)) {
       showArtist(st.id);
+    } else if (st.view === 'conq') {
+      renderAndShowConq();
+    } else if (st.view === 'quiz') {
+      renderAndShowQuiz();
     } else {
       if ('filter' in st) fieldFilter = st.filter;
       showListView();
@@ -371,8 +477,8 @@ const Carousel = (() => {
 
   function computeMetrics() {
     const w = Math.min(window.innerWidth, 480);
-    // 짧은 화면에서도 범례·이동 버튼이 화면 안에 들어오도록 카드 높이를 남은 높이에 맞춘다(하단 내비 없음)
-    const maxH = Math.max(200, window.innerHeight - 240);
+    // 짧은 화면에서도 범례·이동 버튼이 화면 안에 들어오도록 카드 높이를 남은 높이에 맞춘다(하단 내비 78px 포함)
+    const maxH = Math.max(200, window.innerHeight - 318);
     let cardW = clamp(Math.round(w * 0.62), 190, 270);
     let cardH = Math.round(cardW * 1.4);
     if (cardH > maxH) { cardH = maxH; cardW = Math.min(cardW, Math.round(cardH * 0.9)); }
@@ -561,6 +667,12 @@ const Carousel = (() => {
       <div class="carousel-card-years"></div>
       <div class="carousel-card-line"></div>`;
     el.querySelector('.g').textContent = a.field || '';
+    if (isConquered(a.id)) {
+      const done = document.createElement('span');
+      done.className = 'carousel-card-done';
+      done.textContent = '정복';
+      el.querySelector('.carousel-card-meta').append(done);
+    }
     el.querySelector('.carousel-card-title').textContent = a.name;
     el.querySelector('.carousel-card-years').textContent = years(a);
     el.querySelector('.carousel-card-line').textContent = a.one_line;
@@ -696,7 +808,7 @@ function goList() {
   showListView();
 }
 
-// ── View 2: 작가 상세 (카드 = 섹션 한 장: 누구인가 → 삶과 시대 → 예술 사조 → 대표작(작품마다 1장) → 평판 → 한 줄 정리) ──
+// ── View 2: 작가 상세 (카드 = 섹션 한 장: 누구인가 → 삶과 시대 → 예술 사조 → 대표작(작품마다 1장) → 그 밖의 작품 → 평판 → 한 줄 정리 → 연결 작가) ──
 function section(label, inner) {
   return `<div class="artist-section"><div class="artist-section-label">${escHtml(label)}</div>${inner}</div>`;
 }
@@ -714,26 +826,85 @@ function showArtist(artistId) {
       ${a.name_original ? `<div class="artist-name-original">${escHtml(a.name_original)}</div>` : ''}
       <div class="artist-meta"><span class="g">${escHtml(a.field)}</span> · ${escHtml(years(a))} · ${escHtml(a.nationality)}</div>
     </div>`;
-  const works = a.works.map(w => section(`대표작 · ${w.title}`, `
+  const works = a.featured_works.map(w => section(`대표작 · ${w.title}`, `
       <div class="work-year">${escHtml(w.year)}</div>
       <div class="artist-body">${escHtml(w.description)}</div>
       <div class="artist-body work-interp">${escHtml(w.interpretation)}</div>`)).join('');
-  const seeAlso = a.see_also && a.see_also.length
-    ? `<div class="artist-see-also">함께 보면 좋은 이름 · ${a.see_also.map(escHtml).join(', ')}</div>` : '';
+  const others = (a.other_works || []).length
+    ? section('그 밖의 작품', `<ul class="other-works">${a.other_works.map(w => `<li class="other-work">
+        <div class="other-work-title">${escHtml(w.title)} <span class="other-work-year">· ${escHtml(w.year)}</span></div>
+        ${w.note ? `<div class="other-work-note">${escHtml(w.note)}</div>` : ''}</li>`).join('')}</ul>`) : '';
+  const connected = (a.connected_artists || []).length
+    ? section('연결 작가', `<ul class="connected-list">${a.connected_artists.map(c => `<li class="connected-item">
+        <div class="connected-name">${escHtml(c.name)}</div><div class="connected-reason">${escHtml(c.reason)}</div></li>`).join('')}</ul>`) : '';
 
   content.innerHTML = header
     + section('누구인가', `<div class="artist-body">${escHtml(a.who)}</div>`)
     + section('삶과 시대', `<div class="artist-body">${escHtml(a.life)}</div>`)
     + section('예술 사조', `<div class="artist-sub">${escHtml(a.movement.name)}</div><div class="artist-body">${escHtml(a.movement.text)}</div>`)
     + works
+    + others
     + section('평판', `<div class="artist-sub">당대의 평가</div><div class="artist-body">${escHtml(a.reputation.contemporary)}</div>
         <div class="artist-sub">후대의 평가</div><div class="artist-body">${escHtml(a.reputation.posthumous)}</div>`)
-    + section('한 줄 정리', `<div class="artist-summary">${escHtml(a.summary)}</div>${seeAlso}`);
+    + section('한 줄 정리', `<div class="artist-summary">${escHtml(a.summary)}</div>`)
+    + connected;
+  updateConquestBtn();
 
   showView('view-artist');
   window.scrollTo(0, 0);
   navState({ view: 'artist', id: artistId });
 }
+
+function updateConquestBtn() {
+  const btn = document.getElementById('conquest-btn');
+  const on = isConquered(currentArtistId);
+  btn.classList.toggle('conquered', on);
+  btn.setAttribute('aria-pressed', String(on));
+  btn.textContent = on ? '정복함' : '정복하기';
+}
+function toggleConquest() {
+  setConquered(currentArtistId, !isConquered(currentArtistId));
+  updateConquestBtn();
+}
+
+// ── 하단 내비 / 정복 탭 / 퀴즈 탭 ──
+function onTab(tab) {
+  const active = document.querySelector('.view.active').id;
+  if (active === (tab === 'home' ? 'view-list' : tab === 'conq' ? 'view-conq' : 'view-quiz')) { window.scrollTo(0, 0); return; }
+  if (tab === 'home') {
+    showListView();
+    if (history.state && history.state.view !== 'list') history.replaceState({ view: 'list', filter: fieldFilter }, '');
+  } else if (tab === 'conq') {
+    renderAndShowConq();
+    navState({ view: 'conq' });
+  } else {
+    renderAndShowQuiz();
+    navState({ view: 'quiz' });
+  }
+}
+for (const b of document.querySelectorAll('#bottom-nav [data-tab]')) b.addEventListener('click', () => onTab(b.dataset.tab));
+
+function renderConq() {
+  const list = getConqueredArtists();
+  document.getElementById('conq-sub').textContent = list.length ? '정복한 작가 ' + list.length + '명' : '';
+  const box = document.getElementById('conq-list');
+  if (!list.length) { box.innerHTML = '<div class="empty-note">아직 정복한 항목이 없어요</div>'; return; }
+  const fields = FIELD_ORDER.filter(f => list.some(a => a.field === f)).concat([...new Set(list.map(a => a.field))].filter(f => !FIELD_ORDER.includes(f)));
+  box.innerHTML = fields.map(f => `
+    <div class="conq-group">
+      <div class="conq-group-label">${escHtml(f)}</div>
+      ${list.filter(a => a.field === f).sort((x, y) => x.name.localeCompare(y.name, 'ko')).map(a => `<button type="button" class="conq-row" data-artist-id="${escHtml(a.id)}">${escHtml(a.name)}</button>`).join('')}
+    </div>`).join('');
+  box.querySelectorAll('.conq-row').forEach(b => b.addEventListener('click', () => showArtist(b.dataset.artistId)));
+}
+function renderAndShowConq() { renderConq(); showView('view-conq'); window.scrollTo(0, 0); }
+
+// 퀴즈: 문제는 내용 검증 뒤에 QUIZ_BANK 에 채운다. 비어 있으면 준비 중 안내만 보인다
+const QUIZ_BANK = [];
+function renderQuiz() {
+  document.getElementById('quiz-body').innerHTML = QUIZ_BANK.length ? '' : '<div class="empty-note">퀴즈는 준비 중이에요</div>';
+}
+function renderAndShowQuiz() { renderQuiz(); showView('view-quiz'); window.scrollTo(0, 0); }
 
 // ── Boot ──
 loadDB();
