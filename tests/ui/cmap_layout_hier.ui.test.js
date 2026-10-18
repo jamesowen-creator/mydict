@@ -73,7 +73,8 @@ test('계층 지도: 배치 최적화 미리보기 → 적용하면 위→아래
   const rowsY = [y('증권'), y('유가증권'), y('주식'), y('IPO')];
   assert.deepEqual(rowsY.map((v, i) => v - rowsY[0] === i * (rowsY[1] - rowsY[0])), [true, true, true, true], '줄 간격 균일');
   const kx = ['주식', '회사채', '국공채', '조건환매부채권'].map(mx);
-  assert.ok(Math.abs(mx('유가증권') - (Math.min(...kx) + Math.max(...kx)) / 2) < 1, '유가 증권은 하위 개념들의 가운데');
+  // 304-1: 종류 묶음({주식, 회사채, 조건환매부채권} | {국공채}) 사이에 GROUP_GAP(16px)이 들어가 부모는 자식 평균 위치에 놓인다 — 정확한 가운데에서 8px 이내
+  assert.ok(Math.abs(mx('유가증권') - (Math.min(...kx) + Math.max(...kx)) / 2) < 9, '유가 증권은 하위 개념들의 가운데(종류 묶음 간격 허용)');
   assert.ok(Math.abs(mx('주식') - mx('IPO')) < 1, '주식 바로 위에 IPO');
   assert.ok(y('메모') > y('IPO'), '연결 없는 개념은 마지막 줄');
   assert.equal(g1.save_status, 'saved', '위치만 바뀌어 저장됨 유지');

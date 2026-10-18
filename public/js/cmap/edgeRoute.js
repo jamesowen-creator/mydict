@@ -3,14 +3,14 @@
 //     nodes: [{ id, x, y }] 노드 사각형의 왼쪽 위(세계 좌표), 크기는 132 × 44(mapGeometry.js·mapCore.js 의 MAPD 와 같은 값)
 //     edges: [{ key, from, to, label, type? }]  label = 선 위에 쓸 글자(이미 12자로 자른 것, 없으면 ''), type = 관계 종류(302-1: 줄기 묶음 판정에만 쓴다, 없으면 묶지 않음)
 //     반환: Map(key → { d, mx, my, sides, p0, p3, hits, candidateHits, labelBox, t })
-//       302-1 추가: fallback(303-1: 직각 가지 대상 종류인데 곡선으로 돌린 연결) · labelMode('trunk' 줄기에 한 번 | 'branch' 갈래마다 | null) · group(묶음 id 또는 null) · hitD(묶인 연결의 갈래 구간만의 경로, 클릭 영역용) · noLabel(true 면 라벨을 그리지 않음: 묶음에서 key 가 가장 앞선 연결만 false)
+//       302-1 추가: fallback(303-1: 직각 가지 대상 종류인데 곡선으로 돌린 연결) · labelMode('bundle' 다발 중간에 한 번 | 'end' 선 끝마다 | null) · group(묶음 id 또는 null) · hitD(묶인 연결의 갈래 구간만의 경로, 클릭 영역용) · noLabel(true 면 라벨을 그리지 않음: 묶음에서 key 가 가장 앞선 연결만 false)
 //       d = path 의 d, (mx, my) = 라벨을 둘 곡선 위의 점(글자는 mapView 가 (mx, my - 4) 에 가운데 맞춤으로 쓴다), sides = [시작 면, 끝 면] ('t' 위 · 'b' 아래 · 'l' 왼쪽 · 'r' 오른쪽)
 //       화살촉은 SVG marker(orient=auto)라 곡선 끝 접선 방향을 따른다: 끝 접선은 끝 면의 바깥에서 노드 쪽으로 들어온다.
 // 규칙(요약):
 //  1) 접속면: 같은 열(가로 어긋남 ≤ COLUMN_TOL)이거나 세로 간격이 노드 높이 이상이면서 세로 성분이 우세하면 위쪽 노드의 아래 면 → 아래쪽 노드의 위 면, 그 밖에는 오른쪽 → 왼쪽(또는 반대).
 //  2) 제3의 노드를 가로지르면 접속면 후보 6가지(기본 · 다른 축의 기본 · 섞은 2가지 · 같은 쪽 면으로 바깥을 돌아가는 2가지) 중 가로지름이 가장 적은 것(동점은 앞선 후보).
 //  3) 같은 노드의 같은 면에 연결이 여럿이면 접속점을 면을 따라 균등하게 나눈다(상대 노드의 위치 순으로 정렬해 교차를 줄임).
-//  3b) 302-1·303-1: 같은 부모·같은 종류의 방향 있는 연결(자식 1개도)은 직각 가지 한 줄기. 한 부모의 묶음이 여럿이면 막대 높이를 계단식으로 나눈다(BAR_STEP)(M 줄기 L 막대 L 갈래 L 자식 위)로 그린다. 자식이 부모보다 MIN_GAP 이상 아래에 있고 선이 다른 노드를 지나지 않을 때만, 아니면 묶음 전체를 곡선으로
+//  3b) 304-1: 같은 부모·같은 종류의 방향 있는 연결은 곡선 다발(부모 아래 면의 가까운 점에서 나란히 출발해 자식 쪽에서 갈라짐). 선 단위 폴백은 기존 곡선(M 줄기 L 막대 L 갈래 L 자식 위)로 그린다. 자식이 부모보다 MIN_GAP 이상 아래에 있고 선이 다른 노드를 지나지 않을 때만, 아니면 묶음 전체를 곡선으로
 //  4) 라벨은 곡선 위 t = 0.5 를 먼저 보고, 노드나 이미 놓인 라벨과 겹치면 0.3~0.7 사이에서 옮긴다(최선 노력, 완전 보장 아님).
 // 클래식 스크립트(window.CmapEdgeRoute)이면서 Node 테스트에서는 require 로 불러올 수 있다.
 (function (root) {
@@ -81,15 +81,23 @@
   const labelWidth = text => { let w = 6; for (const ch of Array.from(text || '')) w += ch.charCodeAt(0) > 0x2e7f ? 12 : 7; return w; };
   const overlapArea = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
 
-  // 302-1: 같은 부모(from)·같은 관계 종류·같은 표시 문구인 방향 있는 연결이 2개 이상이면 "세로 줄기 → 가로 막대 → 세로 갈래" 직각 가지 한 줄기로 그린다(방향 없는 4종은 대상이 아님).
-  //   판정은 층 구조가 아니라 현재 노드 좌표로 한다. 조건을 못 지키면 묶음 전체를 기존 곡선으로 그린다(일부만 곡선으로 두지 않음).
+  // 304-1: 방향 있는 6종은 "곡선 다발"로 그린다. 같은 부모(from)·같은 종류의 선들이 부모 아래 면의 서로 다른 가까운 점(STRAND_GAP 간격)에서
+  //   나란히 출발해 한 다발처럼 달리다가 자식 쪽에서 부드럽게 갈라진다(3차 베지어 한 개, 시작·끝 접선 모두 아래). 종류가 다른 다발 사이는 BUNDLE_GAP.
+  //   선 단위 폴백: 자식이 부모 아래보다 MIN_GAP 이상 아래가 아니거나(ㄱ) 곡선이 다른 노드를 지나면(ㄴ) 그 선만 기존 곡선 규칙으로 그린다.
   const BUNDLE_TYPES = ['사용', '일부', '종류', '일으킴', '선행', '조건'];
-  const BAR_STEP = 8;                  // 303-1: 한 부모의 묶음이 여럿이면 막대 높이를 계단식으로 나눈다. 막대 사이(부모 아래~첫 막대 포함) 간격이 이보다 좁아지면 뒤쪽 묶음은 곡선
-  const MIN_GAP = 32;                 // 모든 자식의 위 가장자리가 부모 아래 가장자리보다 이만큼 이상 아래여야 묶는다
-  const segHits = (ax, ay, bx, by, n) => {   // 가로 또는 세로 선분이 노드 사각형(INFLATE 만큼 부풀림)과 겹치는가
-    const x0 = n.x - INFLATE, x1 = n.x + W + INFLATE, y0 = n.y - INFLATE, y1 = n.y + H + INFLATE;
-    return Math.max(ax, bx) > x0 && Math.min(ax, bx) < x1 && Math.max(ay, by) > y0 && Math.min(ay, by) < y1;
-  };
+  const MIN_GAP = 32;                  // 자식 위 가장자리가 부모 아래 가장자리보다 이만큼 이상 아래여야 다발로 그린다
+  const STRAND_GAP = 6, MIN_STRAND_GAP = 3, BUNDLE_GAP = 16;   // 한 다발 안 선 간격(부모 폭이 모자라면 MIN_STRAND_GAP 까지 줄임)과 다발 사이 간격
+  const FACE_MARGIN = PORT_MARGIN.b;   // 부모 아래 면에서 둥근 모서리를 피하는 여백(다발이 쓸 수 있는 폭 = W - 2 × FACE_MARGIN)
+  const T_BUNDLE = [0.3, 0.25, 0.35, 0.2, 0.4, 0.15, 0.45];   // 다발 라벨: 가운데 선의 이 구간에서 자리를 찾는다
+  const T_END = [0.85, 0.8, 0.9];                              // 선 끝 라벨(자식 위 쪽)
+  const HIT_FROM = 0.6;                                        // 클릭 영역: 곡선의 t = 0.6 부터 끝까지(시작 부근 다발 구간은 반응 없음)
+  const lerp = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+  function tailOf(b, t) {              // de Casteljau 분할: t 부터 끝까지의 부분 곡선
+    const a = lerp(b.p0, b.p1, t), m = lerp(b.p1, b.p2, t), c = lerp(b.p2, b.p3, t), d = lerp(a, m, t), e = lerp(m, c, t), f = lerp(d, e, t);
+    return { p0: f, p1: e, p2: c, p3: b.p3 };
+  }
+  const downCurve = (p0, p3) => { const c = Math.max(20, 0.5 * (p3.y - p0.y)); return { p0, p1: { x: p0.x, y: p0.y + c }, p2: { x: p3.x, y: p3.y - c }, p3 }; };
+  const cmpK = (a, b) => (typeof a === typeof b ? cmp(a, b) : (typeof a === 'number' ? -1 : 1));
 
   function routeAll(nodesIn, edgesIn) {
     const nodes = (nodesIn || []).map(n => ({ id: n.id, x: finite(n.x), y: finite(n.y) }));
@@ -113,29 +121,38 @@
       pick.set(e.key, { sides: uniq[best], candidateHits: hits });
     }
 
-    // 1.5) 묶음 후보(302-1, 303-1): 키 = from + 관계 종류(문구는 키에 넣지 않음, 자식 1개도 묶음). 자식이 모두 부모보다 MIN_GAP 이상 아래에 있는 것만 후보
-    const cand = new Map();
+    // 1.5) 다발 후보 선: 방향 있는 6종이고 자식이 부모 아래 가장자리보다 MIN_GAP 이상 아래에 있는 선(ㄱ). 못 지키는 선은 처음부터 폴백
+    const active = new Set();
     for (const e of edges) {
       if (!BUNDLE_TYPES.includes(e.type) || e.from === e.to) continue;
-      const id = e.from + '|' + e.type;                 // 303-1: 문구는 키에 넣지 않는다(종류가 다르면 합치지 않음), 자식 1개도 직각 가지
-      if (!cand.has(id)) cand.set(id, { id, from: e.from, list: [] });
-      cand.get(id).list.push(e);
-    }
-    const active = new Map();
-    for (const b of cand.values()) {
-      const p = byId.get(b.from);
-      if (!b.list.every(e => byId.get(e.to).y >= p.y + H + MIN_GAP)) continue;      // ㄱ
-      const kids = b.list.map(e => byId.get(e.to));
-      b.center = { x: kids.reduce((s, k) => s + k.x, 0) / kids.length, y: kids.reduce((s, k) => s + k.y, 0) / kids.length };   // 부모 아래 면에서 접속점 순서를 정할 때 쓰는 대표 위치
-      active.set(b.id, b);
+      if (byId.get(e.to).y >= byId.get(e.from).y + H + MIN_GAP) active.add(e.key);
     }
 
-    // 2) 접속점 나누기: 같은 노드의 같은 면에 모인 연결을 상대 노드의 위치 순(위/아래 면은 가로, 옆 면은 세로)으로 늘어놓고 면을 균등 분할
-    //    묶음은 부모 아래 면에서 접속점 한 자리만 쓴다(묶음의 첫 연결 1개로 센다). 묶음의 자식 쪽은 연결마다 기존 규칙 그대로
-    const bundleOf = new Map();
+    // 2) 접속점 나누기(기존 규칙) + 다발의 부모 쪽 자리. 한 부모의 다발 전체가 부모 아래 면에서 "덩어리 1개"로 센다(덩어리 안 선 위치는 아래에서 따로 정함)
+    const bundleOf = new Map(), blocks = new Map();
     function assignPorts() {
-      bundleOf.clear();
-      for (const b of active.values()) for (const e of b.list) bundleOf.set(e.key, b);
+      bundleOf.clear(); blocks.clear();
+      const bundles = new Map();
+      for (const e of edges) {
+        if (!active.has(e.key)) continue;
+        const id = e.from + '|' + e.type;
+        if (!bundles.has(id)) bundles.set(id, { id, from: e.from, lines: [] });
+        bundles.get(id).lines.push(e);
+        bundleOf.set(e.key, bundles.get(id));
+      }
+      for (const b of bundles.values()) {
+        b.firstKey = b.lines[0].key;                                  // edges 가 key 순이라 첫 선이 가장 앞선 key
+        b.lines.sort((p, q) => cmp(byId.get(p.to).x, byId.get(q.to).x) || cmp(byId.get(p.to).y, byId.get(q.to).y) || cmp(p.key, q.key));   // 다발 안: 자식 x 순
+        b.mean = b.lines.reduce((s, e) => s + byId.get(e.to).x, 0) / b.lines.length;
+        if (!blocks.has(b.from)) blocks.set(b.from, { from: b.from, bundles: [] });
+        blocks.get(b.from).bundles.push(b);
+      }
+      for (const bl of blocks.values()) {
+        bl.bundles.sort((p, q) => cmp(p.mean, q.mean) || cmpK(p.firstKey, q.firstKey));    // 평균 x 작은 다발이 왼쪽
+        const kids = bl.bundles.flatMap(b => b.lines.map(e => byId.get(e.to)));
+        bl.center = { x: kids.reduce((s, k) => s + k.x, 0) / kids.length, y: kids.reduce((s, k) => s + k.y, 0) / kids.length };
+        bl.key = 'blk:' + bl.from;
+      }
       const groups = new Map();
       const add = (nodeId, side, key, other, end) => {   // end: 0 = 이 연결의 시작(from) 쪽 접속점, 1 = 끝(to) 쪽
         const k = nodeId + '|' + side;
@@ -143,55 +160,54 @@
         groups.get(k).list.push({ key, end, other });
       };
       for (const e of edges) {
-        const b = bundleOf.get(e.key);
-        if (b) { add(e.to, 't', e.key, byId.get(e.from), 1); if (e === b.list[0]) add(e.from, 'b', e.key, b.center, 0); continue; }
+        if (active.has(e.key)) { add(e.to, 't', e.key, byId.get(e.from), 1); continue; }
         const s = pick.get(e.key).sides; add(e.from, s[0], e.key, byId.get(e.to), 0); add(e.to, s[1], e.key, byId.get(e.from), 1);
       }
+      for (const bl of blocks.values()) add(bl.from, 'b', bl.key, bl.center, 0);
       const fr = new Map();   // key → [시작 접속점 비율, 끝 접속점 비율]
       for (const e of edges) fr.set(e.key, [0.5, 0.5]);
+      for (const bl of blocks.values()) fr.set(bl.key, [0.5, 0.5]);
       for (const g of groups.values()) {
         const vertical = g.side === 't' || g.side === 'b';
-        g.list.sort((a, b) => cmp(vertical ? a.other.x : a.other.y, vertical ? b.other.x : b.other.y) || cmp(vertical ? a.other.y : a.other.x, vertical ? b.other.y : b.other.x) || cmp(a.key, b.key) || cmp(a.end, b.end));
+        g.list.sort((a, b) => cmp(vertical ? a.other.x : a.other.y, vertical ? b.other.x : b.other.y) || cmp(vertical ? a.other.y : a.other.x, vertical ? b.other.y : b.other.x) || cmpK(a.key, b.key) || cmp(a.end, b.end));
         g.list.forEach((it, i) => { fr.get(it.key)[it.end] = (i + 1) / (g.list.length + 1); });
       }
       return fr;
     }
-    // 303-1: 막대 높이 계단식. 한 부모의 묶음 n개를 자식들의 평균 x가 작은 순(같으면 첫 key 순)으로 세워, i번째 막대를
-    //   부모 아래 가장자리와 가장 가까운 자식 위 가장자리 사이의 i/(n+1) 높이에 둔다. 간격 (사이/(n+1))이 BAR_STEP 보다 좁으면 뒤쪽 묶음을 곡선으로 돌린다
-    function assignBars() {
-      const byParent = new Map();
-      for (const b of active.values()) { if (!byParent.has(b.from)) byParent.set(b.from, []); byParent.get(b.from).push(b); }
-      for (const list of byParent.values()) {
-        list.sort((a, b) => cmp(a.center.x, b.center.x) || cmp(a.list[0].key, b.list[0].key));
-        const p = byId.get(list[0].from), y0 = p.y + H;
-        const top = Math.min(...list.flatMap(b => b.list.map(e => byId.get(e.to).y)));
-        while (list.length && (top - y0) / (list.length + 1) < BAR_STEP) active.delete(list.pop().id);
-        list.forEach((b, i) => { b.barY = y0 + (top - y0) * (i + 1) / (list.length + 1); });
+    // 부모 아래 면의 선 시작 x: 덩어리(다발들)를 덩어리 자리 중심으로 놓고 다발 안 STRAND_GAP, 다발 사이 BUNDLE_GAP. 폭이 넘치면 STRAND_GAP 을 MIN_STRAND_GAP 까지 줄이고, 그래도 넘치면 면 균등 분할로 되돌린다
+    function placeStarts(fr) {
+      const startX = new Map(), uniform = new Set();
+      for (const bl of blocks.values()) {
+        const p = byId.get(bl.from), avail = W - 2 * FACE_MARGIN, nb = bl.bundles.length, N = bl.bundles.reduce((s, b) => s + b.lines.length, 0);
+        const widthOf = s => (N - nb) * s + (nb - 1) * BUNDLE_GAP;
+        let s = STRAND_GAP;
+        if (widthOf(s) > avail && N - nb > 0) s = Math.max(MIN_STRAND_GAP, (avail - (nb - 1) * BUNDLE_GAP) / (N - nb));
+        if (widthOf(s) > avail + 1e-9) {                              // 면 균등 분할(기존 규칙)로 되돌림: 덩어리 안 모든 선을 순서대로 같은 간격으로
+          let k = 0; for (const b of bl.bundles) for (const e of b.lines) { startX.set(e.key, p.x + FACE_MARGIN + avail * (++k) / (N + 1)); uniform.add(e.key); }
+          continue;
+        }
+        const T = widthOf(s), cx = portPoint(p, 'b', fr.get(bl.key)[0]).x;
+        let x = Math.max(p.x + FACE_MARGIN, Math.min(p.x + W - FACE_MARGIN - T, cx - T / 2));
+        bl.bundles.forEach((b, bi) => { if (bi) x += BUNDLE_GAP; b.lines.forEach((e, li) => { if (li) x += s; startX.set(e.key, x); }); });
       }
+      return { startX, uniform };
     }
-    // 묶음 모양(직각 가지)과 ㄴ 조건: 줄기·막대·갈래가 부모와 그 갈래의 자식 말고 다른 노드를 지나지 않아야 한다
-    function bundleShape(b, fr) {
-      const p = byId.get(b.from), y0 = p.y + H, tx = portPoint(p, 'b', fr.get(b.list[0].key)[0]).x;
-      const kids = b.list.map(e => ({ e, n: byId.get(e.to), bx: portPoint(byId.get(e.to), 't', fr.get(e.key)[1]).x }));
-      const barY = b.barY;
-      const xs = [tx, ...kids.map(k => k.bx)], x0 = Math.min(...xs), x1 = Math.max(...xs);
-      let ok = true;
-      for (const n of nodes) {
-        if (n.id === b.from) continue;
-        if (segHits(tx, y0, tx, barY, n) || (x1 > x0 && segHits(x0, barY, x1, barY, n))) { ok = false; break; }
-        for (const k of kids) if (n.id !== k.n.id && segHits(k.bx, barY, k.bx, k.n.y, n)) { ok = false; break; }
-        if (!ok) break;
-      }
-      return { ok, p, y0, tx, barY, kids, x0, x1 };
-    }
-    let frac;
+    // 선 단위 폴백 반복: 모든 다발 선의 곡선을 만들어 ㄴ(다른 노드를 지나지 않음)을 못 지키는 선을 빼고, 자리 배정을 다시 계산한다
+    let frac, starts, curves;
     for (;;) {
-      assignBars();
       frac = assignPorts();
+      starts = placeStarts(frac);
+      curves = new Map();
       const bad = [];
-      for (const b of active.values()) { b.shape = bundleShape(b, frac); if (!b.shape.ok) bad.push(b.id); }
+      for (const e of edges) {
+        if (!active.has(e.key)) continue;
+        const p = byId.get(e.from), c = byId.get(e.to);
+        const b = downCurve({ x: starts.startX.get(e.key), y: p.y + H }, portPoint(c, 't', frac.get(e.key)[1]));
+        curves.set(e.key, b);
+        if (hitCount(b, nodes, e.from, e.to) > 0) bad.push(e.key);
+      }
       if (!bad.length) break;
-      for (const id of bad) active.delete(id);            // 못 지키는 묶음은 통째로 기존 곡선
+      for (const k of bad) active.delete(k);              // 못 지키는 선만 기존 곡선(선 단위 폴백)
     }
 
     // 3) 경로와 라벨 위치
@@ -204,42 +220,33 @@
       for (const o of placed) cost += overlapArea(box, o);
       return cost;
     };
+    const bestAlong = (b, ts, w, has) => {
+      let best = null;
+      for (const t of ts) {
+        const q = at(b, t), box = labelBoxAt(q, w, has), cost = labelCost(box, has);
+        if (!best || cost < best.cost) best = { t, q, box, cost };
+        if (cost === 0) break;
+      }
+      return best;
+    };
     for (const e of edges) {
       const pa = byId.get(e.from), pb = byId.get(e.to), { sides, candidateHits } = pick.get(e.key), f = frac.get(e.key);
       const bd = bundleOf.get(e.key);
-      if (bd) {
-        const s = bd.shape, k = s.kids.find(x => x.e.key === e.key), w = labelWidth(e.label), has = !!e.label;
-        const first = e === bd.list[0];
-        if (bd.mode === undefined) {                         // 라벨 방식은 묶음의 첫 연결에서 한 번 정한다
-          bd.mode = 'branch';                                //   문구가 서로 다르면 갈래마다 자기 문구를 단다
-          if (bd.list.every(x => (x.label || '') === (bd.list[0].label || ''))) {   // 문구가 모두 같으면 줄기에 한 번: 줄기 세로 구간 중간 → 줄기 옆 → 막대 위 → 줄기의 다른 자리
-            const mid = (s.y0 + s.barY) / 2, qs = [{ x: s.tx, y: mid }, { x: s.tx - w / 2 - 5, y: mid }, { x: s.tx + w / 2 + 5, y: mid }];
-            if (s.x1 > s.x0) for (const r of [0.5, 0.35, 0.65, 0.2, 0.8]) qs.push({ x: s.x0 + (s.x1 - s.x0) * r, y: s.barY });
-            qs.push({ x: s.tx, y: s.y0 + (s.barY - s.y0) * 0.75 }, { x: s.tx, y: s.y0 + (s.barY - s.y0) * 0.35 });
-            let best = null;
-            for (const q of qs) {
-              const box = labelBoxAt(q, w, has), cost = labelCost(box, has);
-              if (!best || cost < best.cost) best = { q, box, cost };
-              if (cost === 0) break;
-            }
-            if (best.cost === 0) { bd.mode = 'trunk'; bd.label = best; placed.push(best.box); }   // 겹치지 않는 자리가 없으면 갈래마다 다는 방식으로 되돌린다
+      if (bd && active.has(e.key)) {
+        const b = curves.get(e.key), w = labelWidth(e.label), has = !!e.label;
+        if (bd.mode === undefined) {                         // 라벨 방식은 다발의 첫 연결(key 가장 앞선 선)에서 한 번 정한다
+          bd.mode = 'end';
+          if (bd.lines.every(x => (x.label || '') === (bd.lines[0].label || ''))) {   // 문구가 모두 같으면 다발 중간(가운데 선의 t 0.15~0.45)에 한 번, 겹치면 선 끝 방식으로 되돌린다
+            const mid = bd.lines[Math.floor((bd.lines.length - 1) / 2)], best = bestAlong(curves.get(mid.key), T_BUNDLE, labelWidth(mid.label), !!mid.label);
+            if (best.cost === 0) { bd.mode = 'bundle'; bd.label = best; placed.push(best.box); }
           }
         }
-        const pts = [[s.tx, s.y0], [s.tx, s.barY], [k.bx, s.barY], [k.bx, k.n.y]];
-        const dd = []; pts.forEach((pt, i) => { if (i === 0 || pt[0] !== pts[i - 1][0] || pt[1] !== pts[i - 1][1]) dd.push(pt); });   // 길이 0인 구간은 생략
-        for (let i = dd.length - 2; i > 0; i--) if ((dd[i - 1][0] === dd[i][0] && dd[i][0] === dd[i + 1][0]) || (dd[i - 1][1] === dd[i][1] && dd[i][1] === dd[i + 1][1])) dd.splice(i, 1);   // 일직선 위의 가운데 점도 생략(줄기 x = 갈래 x 이면 곧은 세로선 M L)
-        const d = dd.map((pt, i) => (i ? 'L' : 'M') + r1(pt[0]) + ',' + r1(pt[1])).join(' ');
-        const hitD = `M${r1(k.bx)},${r1(s.barY)} L${r1(k.bx)},${r1(k.n.y)}`;
-        const common = { d, hitD, group: bd.id, sides: ['b', 't'], p0: { x: s.tx, y: s.y0 }, p3: { x: k.bx, y: k.n.y }, hits: 0, candidateHits, fallback: false, labelMode: bd.mode };
-        if (bd.mode === 'trunk') {
-          out.set(e.key, { ...common, noLabel: !first, mx: r1(bd.label.q.x), my: r1(bd.label.q.y), labelBox: first ? bd.label.box : { x0: bd.label.q.x, x1: bd.label.q.x, y0: bd.label.q.y, y1: bd.label.q.y }, labelCost: bd.label.cost, t: 0.5 });
-        } else {                                               // 갈래마다: 막대와 자식 위 가장자리 사이, 갈래 x 기준으로 노드·다른 라벨과 겹치지 않는 자리를 찾는다
-          let best = null;
-          for (const t of T_LIST) {
-            const q = { x: k.bx, y: s.barY + (k.n.y - s.barY) * t }, box = labelBoxAt(q, w, has), cost = labelCost(box, has);
-            if (!best || cost < best.cost) best = { t, q, box, cost };
-            if (cost === 0) break;
-          }
+        const common = { d: pathD(b), hitD: pathD(tailOf(b, HIT_FROM)), group: bd.id, sides: ['b', 't'], p0: b.p0, p3: b.p3, hits: 0, candidateHits, fallback: false, labelMode: bd.mode };
+        if (bd.mode === 'bundle') {
+          const first = e.key === bd.firstKey;
+          out.set(e.key, { ...common, noLabel: !first, mx: r1(bd.label.q.x), my: r1(bd.label.q.y), labelBox: first ? bd.label.box : { x0: bd.label.q.x, x1: bd.label.q.x, y0: bd.label.q.y, y1: bd.label.q.y }, labelCost: bd.label.cost, t: bd.label.t });
+        } else {                                               // 선 끝: 각 선 자신의 문구를 자기 선의 자식 위 쪽(t 0.8~0.9)에 단다
+          const best = bestAlong(b, T_END, w, has);
           placed.push(best.box);
           out.set(e.key, { ...common, noLabel: false, mx: r1(best.q.x), my: r1(best.q.y), labelBox: best.box, labelCost: best.cost, t: best.t });
         }
@@ -259,7 +266,7 @@
     return out;
   }
 
-  const api = { W, H, COLUMN_TOL, MIN_VERT, ROW_UNIT, COL_UNIT, MIN_GAP, BAR_STEP, BUNDLE_TYPES, preferredSides, routeAll, labelWidth };
+  const api = { W, H, COLUMN_TOL, MIN_VERT, ROW_UNIT, COL_UNIT, MIN_GAP, STRAND_GAP, MIN_STRAND_GAP, BUNDLE_GAP, HIT_FROM, BUNDLE_TYPES, preferredSides, routeAll, labelWidth };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.CmapEdgeRoute = api;
 })(typeof window !== 'undefined' ? window : globalThis);

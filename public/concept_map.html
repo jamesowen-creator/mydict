@@ -283,7 +283,7 @@
   .m-node.temp rect { stroke-dasharray: 5 3; }
   .m-node:focus-visible rect { stroke: var(--color-text); stroke-width: 2.5; }
   .m-node-text { font-size: 13px; font-weight: 700; fill: var(--color-text); pointer-events: none; }
-  .m-edge-line { fill: none; stroke: var(--color-text-sub); stroke-width: 1.2; stroke-linejoin: round; pointer-events: none; }   /* 302-1: 줄기 가지의 직각 모서리를 둥글게(PDF 에도 옮겨지는 속성) */
+  .m-edge-line { fill: none; stroke: var(--color-text-sub); stroke-width: 1.2; pointer-events: none; }
   .m-edge-opp .m-edge-line { stroke: var(--color-danger); stroke-dasharray: 6 4; }   /* 286-1: 대립 = 위험 토큰 색 + 점선(색만으로 구분하지 않음). 방향 없음 유형은 화살촉이 없다 */
   .m-edge-opp .m-edge-label { fill: var(--color-danger-ink); }
   .m-edge-hit { fill: none; stroke: transparent; stroke-width: 28; vector-effect: non-scaling-stroke; pointer-events: stroke; cursor: pointer; }   /* 눈에 안 보이는 클릭 영역: 화면 28px 고정(개념학습과 같음) */
@@ -298,19 +298,19 @@
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
 <!-- 283-2: ?v= 값은 public/sw.js 의 CACHE_NAME(metis-v47) 숫자와 같게 두고 배포마다 함께 올린다(옛 캐시 JS가 새 HTML과 섞여 내비가 죽는 일을 막는다. tests/concept_map_cache.test.js 가 검사) -->
-<script src="/js/map/mapCore.js?v=49"></script>
-<script src="/js/cmap/mapGeometry.js?v=49"></script>
-<script src="/js/cmap/layoutOptimize.js?v=49"></script>
-<script src="/js/cmap/edgeRoute.js?v=49"></script>
-<script src="/js/cmap/pairPicker.js?v=49"></script>
-<script src="/js/cmap/markState.js?v=49"></script>
-<script src="/js/cmap/mapPdf.js?v=49"></script>
-<script src="/js/cmap/mapView.js?v=49"></script>
-<script src="/js/cmap/mapStart.js?v=49"></script>
-<script src="/js/cmap/narrateView.js?v=49"></script>
-<script src="/js/cmap/reviewView.js?v=49"></script>
-<script src="/js/cmap/micRecorder.js?v=49"></script>
-<script src="/js/cmap/answerView.js?v=49"></script>
+<script src="/js/map/mapCore.js?v=50"></script>
+<script src="/js/cmap/mapGeometry.js?v=50"></script>
+<script src="/js/cmap/layoutOptimize.js?v=50"></script>
+<script src="/js/cmap/edgeRoute.js?v=50"></script>
+<script src="/js/cmap/pairPicker.js?v=50"></script>
+<script src="/js/cmap/markState.js?v=50"></script>
+<script src="/js/cmap/mapPdf.js?v=50"></script>
+<script src="/js/cmap/mapView.js?v=50"></script>
+<script src="/js/cmap/mapStart.js?v=50"></script>
+<script src="/js/cmap/narrateView.js?v=50"></script>
+<script src="/js/cmap/reviewView.js?v=50"></script>
+<script src="/js/cmap/micRecorder.js?v=50"></script>
+<script src="/js/cmap/answerView.js?v=50"></script>
 
 <div id="loading" role="status"><p>불러오는 중…</p></div>
 

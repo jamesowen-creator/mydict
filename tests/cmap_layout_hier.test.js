@@ -156,7 +156,8 @@ test('기준 사례: 줄·가운데 정렬·교차 0·선이 제3 노드를 가�
   const lines = [ys('증권'), ys('유가증권'), ys('주식'), ys('IPO')];
   assert.deepStrictEqual(lines.map((v, i) => v - lines[0] === i * L.CELL_H), [true, true, true, true], '줄 간격 균일 ' + lines);
   const kidX = [3, 4, 5, 6].map(i => cxOf(r, i)), mid = (Math.min(...kidX) + Math.max(...kidX)) / 2;
-  assert.ok(Math.abs(cxOf(r, S['유가증권']) - mid) < 1, '유가 증권은 셋째 줄 개념들의 가운데');
+  // 304-1: 종류 묶음({주식, 회사채, 조건환매부채권} | {국공채}) 사이에 GROUP_GAP(16px)이 들어가 간격이 고르지 않으므로 부모는 자식 평균 위치(등위 회귀 목표)에 놓인다 — 정확한 가운데에서 GROUP_GAP/2 이내
+  assert.ok(Math.abs(cxOf(r, S['유가증권']) - mid) < L.GROUP_GAP / 2 + 1, '유가 증권은 셋째 줄 개념들의 가운데(종류 묶음 간격만큼 허용)');
   assert.ok(Math.abs(cxOf(r, S['주식']) - cxOf(r, S['IPO'])) < 1, '주식 바로 위에 IPO');
   assert.ok(Math.abs(cxOf(r, S['증권']) - cxOf(r, S['유가증권'])) < 1);
   assert.strictEqual(L.crossings(r.positions, SEC_EDGES.map(e => [e.from, e.to])), 0);
@@ -164,7 +165,12 @@ test('기준 사례: 줄·가운데 정렬·교차 0·선이 제3 노드를 가�
   assert.ok(noThrough(r, SEC_EDGES, 8), '선이 제3 노드를 지나지 않음');
   assert.ok(ys('연결없음') > ys('IPO'), '연결 없는 개념은 마지막 줄');
   const gaps = [3, 4, 5, 6].map(i => x(r, i)).sort((p, q) => p - q).map((v, i, a) => i ? v - a[i - 1] : null).slice(1);
-  assert.ok(gaps.every(g => Math.abs(g - gaps[0]) < 0.5), '같은 줄 간격 균등');
+  // 304-1: 간격은 칸 폭(CELL_W)이고, 서로 다른 종류 묶음 사이 하나만 GROUP_GAP 만큼 더 넓다. 같은 종류 자식(주식·회사채·조건환매부채권)은 서로 이웃하다
+  const sorted = [3, 4, 5, 6].map(i => ({ i, x: x(r, i) })).sort((p, q) => p.x - q.x);
+  const extra = sorted.slice(1).map((v, k) => v.x - sorted[k].x - L.CELL_W);
+  assert.ok(extra.every(g => Math.abs(g) < 0.5 || Math.abs(g - L.GROUP_GAP) < 0.5), '간격 = CELL_W 또는 CELL_W + GROUP_GAP: ' + extra);
+  const kindOrder = sorted.map(v => v.i), pos5 = kindOrder.indexOf(5);
+  assert.ok(pos5 === 0 || pos5 === 3, '일부(국공채)는 종류 3개의 한쪽 끝에 붙는다(종류 3개가 연속): ' + kindOrder);
 });
 
 test('기준 사례: 어떤 입력 순서·id 배정이어도 줄과 교차 0 유지', () => {
@@ -208,4 +214,61 @@ test('부모가 둘인 DAG: 선 교차가 없는 배치를 찾고, 단순 id 순
   // 교차가 꼭 생기는 구조에서도 같은 입력은 같은 결과
   const again = run(8, edges.slice().reverse(), { w: 400, h: 600 });
   assert.deepStrictEqual([...again.positions], [...r.positions]);
+});
+
+// ── 304-1: 같은 층에서 같은 부모(부모 1명인 노드)·같은 종류의 자식을 연속 배치하고 종류 묶음 사이에 GROUP_GAP ──
+const rowOrder = (r, list) => list.slice().sort((p, q) => x(r, p) - x(r, q)).map(i => i);
+
+test('304-1 배치: 같은 부모의 같은 종류 자식이 연속해서 놓이고, 종류가 다른 이웃 사이에만 GROUP_GAP(16px)이 더해진다', () => {
+  const kind = { 2: '종류', 3: '일부', 4: '종류', 5: '일부', 6: '종류' };
+  const edges = [2, 3, 4, 5, 6].map(i => E(1, i, kind[i]));
+  const r = run(6, edges, { w: 1200, h: 700 });
+  const order = rowOrder(r, [2, 3, 4, 5, 6]);
+  const changes = order.slice(1).filter((id, i) => kind[id] !== kind[order[i]]).length;
+  assert.strictEqual(changes, 1, '종류가 한 번만 바뀐다(같은 종류가 연속): ' + order.map(i => kind[i]));
+  const gaps = order.slice(1).map((id, i) => x(r, id) - x(r, order[i]) - L.CELL_W);
+  assert.deepStrictEqual(gaps.map(g => Math.round(g * 10) / 10).sort((a, b) => a - b), [0, 0, 0, L.GROUP_GAP], '간격은 CELL_W, 종류가 바뀌는 곳만 CELL_W + GROUP_GAP: ' + gaps);
+  assert.strictEqual(L.GROUP_GAP, 16);
+  assert.ok(!L.hasOverlap(r.positions, ids(6), 0));
+  assert.deepStrictEqual([...run(6, edges.slice().reverse(), { w: 1200, h: 700 }).positions], [...r.positions], '결정성');
+});
+
+test('304-1 배치: 부모가 가진 종류가 하나뿐이거나 종류 정보가 없으면 기존 결과와 같다', () => {
+  const kidsOf = type => [2, 3, 4, 5].map(i => E(1, i, type)).concat([E(2, 6, type), E(4, 7, type)]);
+  const one = run(7, kidsOf('종류'), { w: 1200, h: 700 }), none = run(7, kidsOf(undefined), { w: 1200, h: 700 }), nul = run(7, kidsOf(null), { w: 1200, h: 700 });
+  assert.deepStrictEqual([...one.positions], [...none.positions], '종류 하나 = 종류 정보 없음');
+  assert.deepStrictEqual([...nul.positions], [...none.positions]);
+  // 종류가 바뀌어도 한 부모에 종류가 하나뿐인 부모끼리는 간격이 균등(GROUP_GAP 없음)
+  const row = rowOrder(one, [2, 3, 4, 5]);
+  assert.ok(row.slice(1).every((id, i) => Math.abs(x(one, id) - x(one, row[i]) - L.CELL_W) < 0.5));
+});
+
+test('304-1 배치: 부모가 여럿인 노드(수렴)는 묶음에서 제외되고 그 이웃 사이에는 추가 간격이 없다', () => {
+  // 노드 4 는 부모 1(종류)과 부모 5(사용) 둘을 가진다. 부모 1 의 다른 자식: 2(종류), 3(일부)
+  const edges = [E(1, 2, '종류'), E(1, 3, '일부'), E(1, 4, '종류'), E(5, 4, '사용')];
+  const r = run(5, edges, { w: 1200, h: 700 });
+  const sameRow = [2, 3, 4].filter(i => y(r, i) === y(r, 4));
+  const order = rowOrder(r, sameRow), pos = order.indexOf(4);
+  for (const nb of [order[pos - 1], order[pos + 1]].filter(Boolean)) assert.ok(Math.abs(Math.abs(x(r, nb) - x(r, 4)) - L.CELL_W) < 0.5, `수렴 노드 이웃 ${nb} 와 간격 = CELL_W`);
+  assert.deepStrictEqual([...run(5, edges.slice().reverse(), { w: 1200, h: 700 }).positions], [...r.positions]);
+});
+
+test('304-1 배치: 층 감김(한 층 9개 이상)과 공존 — 같은 종류는 연속, 겹침 없음, 영역 안, 결정성', () => {
+  const kind = i => (i % 2 ? '종류' : '일부');
+  const edges = Array.from({ length: 10 }, (_, k) => E(1, 2 + k, kind(2 + k)));
+  const r = run(11, edges, { w: 800, h: 700 });
+  assert.strictEqual(r.metrics.layout, 'hierarchy');
+  const kids = Array.from({ length: 10 }, (_, k) => 2 + k);
+  const order = kids.slice().sort((p, q) => y(r, p) - y(r, q) || x(r, p) - x(r, q));
+  const changes = order.slice(1).filter((id, i) => kind(id) !== kind(order[i])).length;
+  assert.strictEqual(changes, 1, '감긴 줄에서도 종류가 한 번만 바뀐다: ' + order.map(kind));
+  assert.ok(!L.hasOverlap(r.positions, ids(11), 0)); assert.ok(L.isInside(r.positions, ids(11), r.bounds));
+  assert.deepStrictEqual([...run(11, edges.slice().reverse(), { w: 800, h: 700 }).positions], [...r.positions]);
+});
+
+test('304-1 배치: 기준 사례(증권 구조)는 종류 3개가 연속이고 국공채(일부)가 한쪽 끝에 붙는다', () => {
+  const r = run(8, SEC_EDGES, { w: 400, h: 600 });
+  const order = rowOrder(r, [3, 4, 5, 6]);   // 3 주식, 4 회사채, 5 국공채(일부), 6 조건환매부채권
+  assert.ok(order[0] === 5 || order[3] === 5, '국공채는 끝: ' + order);
+  assert.strictEqual(L.crossings(r.positions, SEC_EDGES.map(e => [e.from, e.to])), 0);
 });

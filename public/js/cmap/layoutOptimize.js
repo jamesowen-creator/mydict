@@ -1,5 +1,5 @@
 // 작업273-3: 개념 지도 배치 최적화(계산만, AI 호출 없음, DOM 없음). 노드 위치만 계산하고 노드 집합·간선은 읽기만 하며 바꾸지 않는다(의미 불변).
-//   const r = CmapLayout.optimizeLayout(nodes, edges, { bounds })
+//   const r = CmapLayout.optimizeLayout(nodes, edges, { bounds })   (304-1: 같은 층에서 같은 부모의 같은 종류 자식을 연속 배치하고 종류 묶음 사이를 GROUP_GAP 만큼 더 띄움 — edges[].type 사용)
 //     nodes: [{ id, x, y }] (x, y = 지금 화면에 보이는 위치, 노드 사각형의 왼쪽 위), edges: [{ from, to, type?, sym? }] (노드 id 쌍, 문구는 배치에 쓰지 않음)
 //       294-1: 연결에 sym(boolean: true = 방향 없음)을 주면 방향 정보를 쓴다. sym 이 false 인 연결 = 방향 있음(위→아래: 유형과 관계없이 from(화살표 시작)이 위, 295-1).
 //       sym 을 주지 않으면(예전 호출) 방향 정보가 없는 것이라 계층 후보를 만들지 않고 아래 일반 후보 선택만 쓴다.
@@ -151,6 +151,7 @@
   }
   // ── 계층 배치(294-1): 방향 있는 연결은 위→아래 층, 방향 없는 연결은 같은 층에서 이웃, 연결 없는 개념은 맨 아래 층 ──
   const WRAP_COLS = 8;                         // 295-1: 한 층이 이 개수를 넘으면 여러 줄로 감는다(그 안에서는 영역 폭을 넓혀 한 줄에 놓는다)
+  const GROUP_GAP = 16;                        // 304-1: 같은 부모의 서로 다른 종류 자식 묶음 사이에 더 두는 가로 간격(px). 층 간격(CELL_H)은 그대로
   const LEVEL_GAP = 24;                        // 층과 층 사이에 더 두는 간격(한 층이 여러 줄로 감길 때 같은 층임이 보이게)
   const byKeyId = key => (p, q) => key.get(p) - key.get(q) || p - q;
 
@@ -160,16 +161,16 @@
       if (!idSet.has(e.from) || !idSet.has(e.to) || e.from === e.to) continue;
       const key = Math.min(e.from, e.to) + ':' + Math.max(e.from, e.to);
       if (!recs.has(key)) recs.set(key, { a: Math.min(e.from, e.to), b: Math.max(e.from, e.to), dirs: [] });
-      if (typeof e.sym === 'boolean' && !e.sym) recs.get(key).dirs.push([e.from, e.to]);   // 295-1: 방향 있는 모든 유형(유형 없음 포함)은 화살표 시작이 위
+      if (typeof e.sym === 'boolean' && !e.sym) recs.get(key).dirs.push([e.from, e.to, e.type || null]);   // 304-1: 종류(type)도 함께 보관한다(같은 부모·같은 종류 자식 인접 배치용)   // 295-1: 방향 있는 모든 유형(유형 없음 포함)은 화살표 시작이 위
     }
-    const directed = [], undirected = [];
+    const directed = [], undirected = [], types = new Map();
     for (const r of recs.values()) {
-      if (r.dirs.length) directed.push(r.dirs.sort((p, q) => p[0] - q[0] || p[1] - q[1])[0]);
+      if (r.dirs.length) { const d = r.dirs.sort((p, q) => p[0] - q[0] || p[1] - q[1])[0]; directed.push([d[0], d[1]]); types.set(d[0] + '>' + d[1], d[2]); }
       else undirected.push([r.a, r.b]);
     }
     directed.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
     undirected.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
-    return { directed, undirected };
+    return { directed, undirected, types };
   }
 
   function hierarchical(ids, info) {
@@ -278,6 +279,36 @@
       if (c < bestC) { bestC = c; bestRows = rows.map(l => l.slice()); }
     }
     bestRows.forEach((l, i) => { rows[i] = l; });
+    // 304-1: 같은 층에서 같은 부모(부모 1명인 노드만)·같은 종류로 이어진 자식은 연속해서 놓고, 서로 다른 종류 묶음 사이에는 GROUP_GAP 만큼 더 띄운다.
+    //   부모가 가진 종류가 하나뿐이거나 종류 정보가 없으면 아무것도 바꾸지 않는다(기존 결과 그대로). 묶음은 평균 위치가 작은 순
+    const typeOf = (p, u) => info.types.get(p + '>' + u) || null;
+    const soloParent = id => (par.get(id).length === 1 ? par.get(id)[0] : null);
+    const typesOfParent = new Map();
+    for (const id of linked) { const p = soloParent(id), ty = p === null ? null : typeOf(p, id); if (!ty) continue; if (!typesOfParent.has(p)) typesOfParent.set(p, new Set()); typesOfParent.get(p).add(ty); }
+    const mixedParent = [...typesOfParent.values()].some(s => s.size >= 2);
+    if (mixedParent) {
+      const regroupRow = arr => {
+        const units = [], gmap = new Map();
+        arr.forEach((id, i) => {
+          const p = soloParent(id), ty = p === null ? null : typeOf(p, id);
+          if (ty && typesOfParent.get(p).size >= 2) { const k = p + '|' + ty; if (!gmap.has(k)) { gmap.set(k, { ids: [], sum: 0, first: i }); units.push(gmap.get(k)); } const g = gmap.get(k); g.ids.push(id); g.sum += i; }
+          else units.push({ ids: [id], sum: i, first: i });
+        });
+        units.forEach(u => { u.k = u.sum / u.ids.length; });
+        units.sort((a, b) => a.k - b.k || a.first - b.first);
+        return units.flatMap(u => u.ids);
+      };
+      rows.forEach((l, li) => { rows[li] = regroupRow(l); rows[li].forEach((id, i) => frac.set(id, (i + 0.5) / rows[li].length)); });
+    }
+    const gapCum = arr => {                       // 줄 안 i번째 노드 앞까지 쌓인 추가 가로 간격(칸 단위). 같은 부모의 다른 종류 이웃 사이에만 GROUP_GAP
+      const g = [0];
+      for (let i = 1; i < arr.length; i++) {
+        const a = arr[i - 1], b = arr[i], pa = mixedParent ? soloParent(a) : null, pb = mixedParent ? soloParent(b) : null;
+        const ta = pa === null ? null : typeOf(pa, a), tb = pb === null ? null : typeOf(pb, b);
+        g.push(g[i - 1] + (pa !== null && pa === pb && ta && tb && ta !== tb ? GROUP_GAP / CELL_W : 0));
+      }
+      return g;
+    };
     // 가로 위치: 부모는 자식들의 가운데 위, 같은 줄은 균등한 간격(순서를 지키며 목표에 가장 가깝게 = 등위 회귀)
     const pav = t => {
       const bl = [];
@@ -290,11 +321,12 @@
     };
     const wrapMode = rows.some(l => l.length > WRAP_COLS);
     const cx0 = new Map();            // 칸 단위 가로 위치(칸 폭 = CELL_W)
-    rows.forEach(l => l.forEach((id, i) => cx0.set(id, i - (l.length - 1) / 2)));
+    rows.forEach(l => { const g = gapCum(l); l.forEach((id, i) => cx0.set(id, i + g[i] - (l.length - 1 + g[l.length - 1]) / 2)); });
     if (!wrapMode) {
       const settle = (li, from) => {
         const t = rows[li].map(id => { const nb = from(id); return nb.length ? nb.reduce((s0, m) => s0 + cx0.get(m), 0) / nb.length : cx0.get(id); });
-        pav(t).forEach((v, i) => cx0.set(rows[li][i], v));
+        const g = gapCum(rows[li]);
+        pav(t.map((v, i) => v - g[i])).forEach((v, i) => cx0.set(rows[li][i], v + g[i]));   // 304-1: 간격 g 를 뺀 목표로 등위 회귀를 하고 다시 더하면 이웃 간격이 1 + (g 차이) 이상
       };
       const up = () => { for (let li = rows.length - 2; li >= 0; li--) settle(li, id => chi.get(id)); };
       const dn = () => { for (let li = 1; li < rows.length; li++) settle(li, id => par.get(id)); };
@@ -309,7 +341,8 @@
       const lines = Math.ceil(l.length / WRAP_COLS), per = Math.ceil(l.length / lines);
       for (let k = 0; k < lines; k++) {
         const part = l.slice(k * per, (k + 1) * per);
-        part.forEach((id, i) => cells.set(id, { x: (!wrapMode && !isIso && lines === 1) ? cx0.get(id) : i - (part.length - 1) / 2, y }));
+        const pg = gapCum(part);
+        part.forEach((id, i) => cells.set(id, { x: (!wrapMode && !isIso && lines === 1) ? cx0.get(id) : i + pg[i] - (part.length - 1 + pg[part.length - 1]) / 2, y }));
         maxY = y; y += CELL_H;
       }
       if (wrapMode) y += LEVEL_GAP;
@@ -410,7 +443,7 @@
     return { positions: best.pos, metrics: { crossingsBefore: origCross, crossingsAfter: best.c, lengthBefore: origLen, lengthAfter: best.l, changed: true, expanded, layout: 'general', reason: REASON_GENERAL }, bounds };
   }
 
-  const api = { NODE_W, NODE_H, GAP, CELL_W, CELL_H, suggestBounds, optimizeLayout, crossings, totalLength, hasOverlap, isInside };
+  const api = { NODE_W, NODE_H, GAP, GROUP_GAP, CELL_W, CELL_H, suggestBounds, optimizeLayout, crossings, totalLength, hasOverlap, isInside };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.CmapLayout = api;
 })(typeof window !== 'undefined' ? window : globalThis);
