@@ -9,6 +9,9 @@
  *   3. field는 "음악" 또는 "미술"
  *   4. 고인만 수록: death_year는 정수이고 birth_year보다 커야 하며, 생존 작가용 필드(alive 등)는 없어야 함
  *   5. checked·sources는 비어 있으면 "미검증"으로 허용(작업132). 값이 있을 때만 형식 검사
+ *   5a. (작업134) name=통용명, full_name=풀네임 필수(같아도 됨). movement.tags는 비어 있지 않은 문자열 배열.
+ *       connected_artists는 0~3명, id는 null 또는 수록 작가 id. id가 있으면 상대 작가의 movement.tags와 하나 이상 겹쳐야 함(아니면 오류).
+ *       수록 작가끼리 연결이 양방향이 아니면 경고(오류 아님). 카드 본문의 문단 구분("\n")은 글자 수에 넣지 않음
  *   5b. other_works: title·year 필수, note는 40자 이하(선택). connected_artists: name·reason 필수, reason 40자 이하, id는 null 또는 문자열
  *   6. 카드 한 장의 본문은 400자 이하 (who, life, movement.text, 대표작 1건=description+interpretation,
  *      reputation=contemporary+posthumous, summary)
@@ -28,11 +31,12 @@ const DB_PATH = process.argv.slice(2).find(a => !a.startsWith('--')) ||
 const FIELDS = ['음악', '미술'];
 const CARD_MAX = 400;
 const FORBIDDEN_KEYS = ['full_text', 'lyrics', 'lyric', 'text_original', 'original_text', 'score', 'alive', 'image', 'images', 'audio'];
-const REQUIRED_STR = ['id', 'name', 'field', 'nationality', 'one_line', 'who', 'life', 'summary'];
+const REQUIRED_STR = ['id', 'name', 'full_name', 'field', 'nationality', 'one_line', 'who', 'life', 'summary'];
 const SHORT_MAX = 40;
 let unverified = 0;
 
 const errors = [];
+const warnings = [];
 const isStr = v => typeof v === 'string' && v.trim() !== '';
 const isInt = v => Number.isInteger(v);
 function isDate(s) {
@@ -63,6 +67,7 @@ for (const a of db.artists || []) {
   for (const k of FORBIDDEN_KEYS) if (k in a) err(`금지 필드 "${k}" (가사·원문·이미지·음원은 싣지 않음)`);
 
   if (!a.movement || !isStr(a.movement.name) || !isStr(a.movement.text)) err('movement{name,text} 없음');
+  if (!a.movement || !Array.isArray(a.movement.tags) || a.movement.tags.length === 0 || !a.movement.tags.every(isStr)) err('movement.tags는 비어 있지 않은 문자열 배열이어야 함');
   if (!a.reputation || !isStr(a.reputation.contemporary) || !isStr(a.reputation.posthumous)) err('reputation{contemporary,posthumous} 없음');
   const hasChecked = a.checked != null && a.checked !== '';
   const hasSources = Array.isArray(a.sources) && a.sources.length > 0;
@@ -78,10 +83,20 @@ for (const a of db.artists || []) {
     for (const k of FORBIDDEN_KEYS) if (k in w) err(`other_works[${i}] 금지 필드 "${k}"`);
   });
   if (!Array.isArray(a.connected_artists)) err('connected_artists는 배열이어야 함');
-  else a.connected_artists.forEach((c, i) => {
+  else if (a.connected_artists.length > 3) err('connected_artists는 0~3명이어야 함');
+  if (Array.isArray(a.connected_artists)) a.connected_artists.forEach((c, i) => {
     if (!isStr(c.name)) err(`connected_artists[${i}].name 없음`);
     if (!isStr(c.reason) || len(c.reason) > SHORT_MAX) err(`connected_artists[${i}].reason은 ${SHORT_MAX}자 이하 문자열`);
     if (!('id' in c) || !(c.id === null || typeof c.id === 'string')) err(`connected_artists[${i}].id는 null 또는 문자열`);
+    else if (c.id !== null) {
+      const other = (db.artists || []).find(x => x.id === c.id);
+      if (!other) err(`connected_artists[${i}].id "${c.id}"는 수록 작가가 아님`);
+      else {
+        const mine = (a.movement && a.movement.tags) || [], theirs = (other.movement && other.movement.tags) || [];
+        if (!mine.some(t => theirs.includes(t))) err(`connected_artists[${i}] ${other.name}: movement.tags가 겹치지 않음(같은 사조만 연결)`);
+        if (!(other.connected_artists || []).some(x => x && x.id === a.id)) warnings.push(`${a.name} → ${other.name} 연결이 양방향이 아님`);
+      }
+    }
   });
 
   if (!Array.isArray(a.featured_works) || a.featured_works.length < 2 || a.featured_works.length > 3) err('featured_works는 2~3개여야 함');
@@ -90,7 +105,7 @@ for (const a of db.artists || []) {
     for (const k of FORBIDDEN_KEYS) if (k in w) err(`featured_works[${i}] 금지 필드 "${k}"`);
   });
 
-  const card = (name, text) => { const n = len(text); if (n > CARD_MAX) err(`${name} ${n}자 - 카드 본문은 ${CARD_MAX}자 이하`); };
+  const card = (name, text) => { const n = len(String(text).replace(/\n/g, '')); if (n > CARD_MAX) err(`${name} ${n}자 - 카드 본문은 ${CARD_MAX}자 이하`); };
   card('who', a.who || '');
   card('life', a.life || '');
   card('movement.text', (a.movement && a.movement.text) || '');
@@ -99,6 +114,7 @@ for (const a of db.artists || []) {
   card('summary', a.summary || '');
 }
 
+warnings.forEach(w => console.warn('경고: ' + w));
 if (errors.length) {
   console.error(`artist_notes 검증 실패 (${errors.length}건)`);
   errors.forEach(e => console.error(' - ' + e));

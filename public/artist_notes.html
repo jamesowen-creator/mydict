@@ -206,6 +206,8 @@
   .artist-body + .artist-sub { margin-top: 16px; }
   .work-year { font-size: 13px; color: var(--text2); font-family: var(--font-num); margin-bottom: 8px; }
   .work-interp { margin-top: 12px; padding-left: 12px; border-left: 2px solid var(--genre-ink); }
+  /* 통용명 옆 풀네임(작은 보조 글씨). 한 덩어리로 줄바꿈되어 좁으면 아래 줄로 내려간다 */
+  .full-name { display: inline-block; font-size: 13px; font-weight: 400; line-height: 1.4; letter-spacing: 0; color: var(--text2); }
   /* 인용 강조 규칙: 배경 박스 없이 왼쪽 2px 세로선만 */
   .artist-summary {
     border-left: 2px solid var(--genre-ink);
@@ -214,13 +216,19 @@
   }
   /* 그 밖의 작품: 한 줄씩 나열(작품명 · 연도 / 짧은 한 구절) */
   .other-works, .connected-list { list-style: none; }
-  .other-work, .connected-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .other-work { padding: 10px 0; }
+  .other-work, .connected-item { border-bottom: 1px solid var(--border); }
   .other-work:last-child, .connected-item:last-child { border-bottom: none; }
+  .connected-inner { display: block; width: 100%; min-height: var(--ctl-min-h); padding: 10px 0; text-align: left; background: none; border: none; border-radius: 0; font-family: var(--font-sans); }
+  .connected-link { cursor: pointer; }
+  .connected-link .connected-name { color: var(--primary-dark); text-decoration: underline; text-underline-offset: 3px; }
+  .connected-link:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
   .other-work-title { font-size: 15px; font-weight: 500; line-height: 1.5; color: var(--text1); word-break: keep-all; }
   .other-work-year { font-size: 13px; color: var(--text2); font-family: var(--font-num); }
+  .connected-reason { display: block; }
   .other-work-note, .connected-reason { margin-top: 2px; font-size: 13px; line-height: 1.5; color: var(--text2); word-break: keep-all; }
-  /* 연결 작가: 이름 + 한 줄 이유 텍스트(링크 없음) */
-  .connected-name { font-size: 15px; font-weight: 700; line-height: 1.5; color: var(--text1); }
+  /* 연결 작가: 이름 + 사조 한 줄. 수록 작가는 눌러서 상세로 이동, 아닌 작가는 텍스트 */
+  .connected-name { display: block; font-size: 15px; font-weight: 700; line-height: 1.5; color: var(--text1); }
 
   /* 정복하기: 한입 독서 상세와 같은 위치(제목 줄 오른쪽)·박스 없는 글자 */
   .conquest-btn {
@@ -271,6 +279,7 @@
     font-family: var(--font-sans); font-size: 15px; font-weight: 500; color: var(--text1);
   }
   .conq-group .conq-row:last-child { border-bottom: none; }
+  .conq-name { display: block; }
   .conq-row:hover { text-decoration: underline; text-underline-offset: 3px; }
   .conq-row:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
   .empty-note { padding: 24px 0; font-size: 14px; color: var(--text2); }
@@ -357,6 +366,10 @@ const fieldInk = f => FIELD_INK[f] || FIELD_FALLBACK_INK;
 function escHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+// 문단 구분은 데이터의 빈 줄("\n\n"). 문단마다 한 덩어리로 그린다
+const paras = (text, cls) => String(text).split('\n\n').map(t => `<div class="${cls}">${escHtml(t)}</div>`).join('');
+// 통용명 + (다르면) 풀네임 보조 글씨
+const nameHtml = a => escHtml(a.name) + (a.full_name && a.full_name !== a.name ? ` <span class="full-name">${escHtml(a.full_name)}</span>` : '');
 const years = a => `${a.birth_year} – ${a.death_year}`;
 
 // 정복 상태: 'artist_notes_conquest_<id>' (한입 독서의 digest_conquest_ 와 분리)
@@ -378,10 +391,10 @@ function showView(id) {
 
 // ── History ── 목록을 바닥 상태로 깔고 상세는 그 위에 한 칸만 쌓는다(이미 한 칸 위면 replace)
 let _navFromPop = false;
-function navState(state) {
+function navState(state, forcePush) {
   if (_navFromPop) return;
   const cur = history.state && history.state.view;
-  if (!cur || cur === 'list' || cur === 'conq' || cur === 'quiz') history.pushState(state, '');
+  if (forcePush || !cur || cur === 'list' || cur === 'conq' || cur === 'quiz') history.pushState(state, '');
   else history.replaceState(state, '');
 }
 function syncListHistoryState() {
@@ -673,7 +686,7 @@ const Carousel = (() => {
       done.textContent = '정복';
       el.querySelector('.carousel-card-meta').append(done);
     }
-    el.querySelector('.carousel-card-title').textContent = a.name;
+    el.querySelector('.carousel-card-title').innerHTML = nameHtml(a);
     el.querySelector('.carousel-card-years').textContent = years(a);
     el.querySelector('.carousel-card-line').textContent = a.one_line;
     return el;
@@ -812,47 +825,56 @@ function goList() {
 function section(label, inner) {
   return `<div class="artist-section"><div class="artist-section-label">${escHtml(label)}</div>${inner}</div>`;
 }
-function showArtist(artistId) {
+// viaLink: 연결 작가에서 온 이동 - 상세 위에 한 칸 더 쌓아 뒤로 가기가 직전 작가로 돌아가게 한다
+function showArtist(artistId, viaLink) {
   const a = DB.artists.find(x => x.id === artistId);
   if (!a) return;
   currentArtistId = artistId;
+  const stacked = !!viaLink || (_navFromPop && history.state && history.state.from === 'artist');
+  document.querySelector('#view-artist .screen-bar-back').setAttribute('aria-label', stacked ? '이전 작가로' : '목록으로');
   document.getElementById('artist-bar-title').textContent = a.name;
   const content = document.getElementById('artist-content');
   content.style.setProperty('--genre-ink', fieldInk(a.field));
 
   const header = `
     <div class="artist-header">
-      <div class="artist-name">${escHtml(a.name)}</div>
+      <div class="artist-name">${nameHtml(a)}</div>
       ${a.name_original ? `<div class="artist-name-original">${escHtml(a.name_original)}</div>` : ''}
       <div class="artist-meta"><span class="g">${escHtml(a.field)}</span> · ${escHtml(years(a))} · ${escHtml(a.nationality)}</div>
     </div>`;
   const works = a.featured_works.map(w => section(`대표작 · ${w.title}`, `
       <div class="work-year">${escHtml(w.year)}</div>
-      <div class="artist-body">${escHtml(w.description)}</div>
-      <div class="artist-body work-interp">${escHtml(w.interpretation)}</div>`)).join('');
+      ${paras(w.description, 'artist-body')}
+      <div class="work-interp">${paras(w.interpretation, 'artist-body')}</div>`)).join('');
   const others = (a.other_works || []).length
     ? section('그 밖의 작품', `<ul class="other-works">${a.other_works.map(w => `<li class="other-work">
         <div class="other-work-title">${escHtml(w.title)} <span class="other-work-year">· ${escHtml(w.year)}</span></div>
         ${w.note ? `<div class="other-work-note">${escHtml(w.note)}</div>` : ''}</li>`).join('')}</ul>`) : '';
+  const connectedItem = c => {
+    const inner = `<span class="connected-name">${escHtml(c.name)}</span><span class="connected-reason">${escHtml(c.reason)}</span>`;
+    return DB.artists.some(x => x.id === c.id)
+      ? `<li class="connected-item"><button type="button" class="connected-inner connected-link" data-artist-id="${escHtml(c.id)}">${inner}</button></li>`
+      : `<li class="connected-item"><div class="connected-inner">${inner}</div></li>`;
+  };
   const connected = (a.connected_artists || []).length
-    ? section('연결 작가', `<ul class="connected-list">${a.connected_artists.map(c => `<li class="connected-item">
-        <div class="connected-name">${escHtml(c.name)}</div><div class="connected-reason">${escHtml(c.reason)}</div></li>`).join('')}</ul>`) : '';
+    ? section('연결 작가', `<ul class="connected-list">${a.connected_artists.map(connectedItem).join('')}</ul>`) : '';
 
   content.innerHTML = header
-    + section('누구인가', `<div class="artist-body">${escHtml(a.who)}</div>`)
-    + section('삶과 시대', `<div class="artist-body">${escHtml(a.life)}</div>`)
-    + section('예술 사조', `<div class="artist-sub">${escHtml(a.movement.name)}</div><div class="artist-body">${escHtml(a.movement.text)}</div>`)
+    + section('누구인가', paras(a.who, 'artist-body'))
+    + section('삶과 시대', paras(a.life, 'artist-body'))
+    + section('예술 사조', `<div class="artist-sub">${escHtml(a.movement.name)}</div>${paras(a.movement.text, 'artist-body')}`)
     + works
     + others
-    + section('평판', `<div class="artist-sub">당대의 평가</div><div class="artist-body">${escHtml(a.reputation.contemporary)}</div>
-        <div class="artist-sub">후대의 평가</div><div class="artist-body">${escHtml(a.reputation.posthumous)}</div>`)
+    + section('평판', `<div class="artist-sub">당대의 평가</div>${paras(a.reputation.contemporary, 'artist-body')}
+        <div class="artist-sub">후대의 평가</div>${paras(a.reputation.posthumous, 'artist-body')}`)
     + section('한 줄 정리', `<div class="artist-summary">${escHtml(a.summary)}</div>`)
     + connected;
   updateConquestBtn();
+  content.querySelectorAll('.connected-link').forEach(b => b.addEventListener('click', () => showArtist(b.dataset.artistId, true)));
 
   showView('view-artist');
   window.scrollTo(0, 0);
-  navState({ view: 'artist', id: artistId });
+  navState({ view: 'artist', id: artistId, from: stacked ? 'artist' : 'other' }, !!viaLink);
 }
 
 function updateConquestBtn() {
@@ -893,7 +915,7 @@ function renderConq() {
   box.innerHTML = fields.map(f => `
     <div class="conq-group">
       <div class="conq-group-label">${escHtml(f)}</div>
-      ${list.filter(a => a.field === f).sort((x, y) => x.name.localeCompare(y.name, 'ko')).map(a => `<button type="button" class="conq-row" data-artist-id="${escHtml(a.id)}">${escHtml(a.name)}</button>`).join('')}
+      ${list.filter(a => a.field === f).sort((x, y) => x.name.localeCompare(y.name, 'ko')).map(a => `<button type="button" class="conq-row" data-artist-id="${escHtml(a.id)}"><span class="conq-name">${nameHtml(a)}</span></button>`).join('')}
     </div>`).join('');
   box.querySelectorAll('.conq-row').forEach(b => b.addEventListener('click', () => showArtist(b.dataset.artistId)));
 }
