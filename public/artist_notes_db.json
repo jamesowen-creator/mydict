@@ -71,7 +71,7 @@
         {
           "name": "요제프 하이든",
           "reason": "같은 고전주의 작곡가",
-          "id": null
+          "id": "artist_007"
         }
       ],
       "checked": "2026-10-17",
@@ -150,7 +150,7 @@
         {
           "name": "폴 고갱",
           "reason": "같은 후기 인상주의 화가",
-          "id": null
+          "id": "artist_011"
         }
       ],
       "checked": "2026-10-17",
@@ -222,7 +222,7 @@
         {
           "name": "오귀스트 르누아르",
           "reason": "같은 인상주의 화가",
-          "id": null
+          "id": "artist_010"
         }
       ],
       "checked": "2026-10-18",
@@ -297,7 +297,13 @@
         "posthumous": "사후 환기미술관이 문을 열었고, 2019년 「우주」가 경매에서 낙찰되며 가장 비싼 국내 화가로 소개되었다."
       },
       "summary": "한국 전통 소재를 추상으로 풀어내다 점으로 화면을 채우는 점화에 이르러, 한국 추상미술의 선구자로 평가받는다.",
-      "connected_artists": [],
+      "connected_artists": [
+        {
+          "name": "유영국",
+          "reason": "같은 한국 추상미술 화가",
+          "id": "artist_012"
+        }
+      ],
       "checked": "2026-10-18",
       "sources": [
         "https://www.newsis.com/view/NISX20190924_0000777928",
@@ -387,7 +393,7 @@
         {
           "name": "요제프 하이든",
           "reason": "같은 고전주의 작곡가",
-          "id": null
+          "id": "artist_007"
         }
       ],
       "checked": "2026-10-18",
@@ -470,12 +476,12 @@
         {
           "name": "프란츠 리스트",
           "reason": "같은 낭만주의 작곡가",
-          "id": null
+          "id": "artist_009"
         },
         {
           "name": "로베르트 슈만",
           "reason": "같은 낭만주의 작곡가",
-          "id": null
+          "id": "artist_008"
         }
       ],
       "checked": "2026-10-18",
@@ -557,12 +563,12 @@
         {
           "name": "모차르트",
           "reason": "같은 고전주의 작곡가",
-          "id": null
+          "id": "artist_005"
         },
         {
           "name": "베토벤",
           "reason": "같은 고전주의 작곡가",
-          "id": null
+          "id": "artist_001"
         }
       ],
       "checked": "2026-10-18",
@@ -639,12 +645,12 @@
         {
           "name": "쇼팽",
           "reason": "같은 낭만주의 작곡가",
-          "id": null
+          "id": "artist_006"
         },
         {
           "name": "프란츠 리스트",
           "reason": "같은 낭만주의 작곡가",
-          "id": null
+          "id": "artist_009"
         }
       ],
       "checked": "2026-10-18",
@@ -721,12 +727,12 @@
         {
           "name": "쇼팽",
           "reason": "같은 낭만주의 작곡가",
-          "id": null
+          "id": "artist_006"
         },
         {
           "name": "로베르트 슈만",
           "reason": "같은 낭만주의 작곡가",
-          "id": null
+          "id": "artist_008"
         }
       ],
       "checked": "2026-10-18",
@@ -803,7 +809,7 @@
         {
           "name": "클로드 모네",
           "reason": "같은 인상주의 화가",
-          "id": null
+          "id": "artist_003"
         }
       ],
       "checked": "2026-10-18",
@@ -875,7 +881,7 @@
         {
           "name": "빈센트 반 고흐",
           "reason": "같은 후기 인상주의 화가",
-          "id": null
+          "id": "artist_002"
         }
       ],
       "checked": "2026-10-18",
@@ -947,7 +953,7 @@
         {
           "name": "김환기",
           "reason": "같은 한국 추상미술 화가",
-          "id": null
+          "id": "artist_004"
         }
       ],
       "checked": "2026-10-18",
