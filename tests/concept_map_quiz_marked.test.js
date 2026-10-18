@@ -3,7 +3,7 @@
 // AI 없음. 가짜 DB 는 실제 PG 제약을 흉내 낸 것이다(한계). 서버는 t.after 로 종료한다. 실행: node --test tests/concept_map_quiz_marked.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createCmapDb } = require('./helpers/cmap_db');
+const { createCmapDb, legacyEdgeCall } = require('./helpers/cmap_db');
 const { startApp } = require('./helpers/app');
 const Q = require('../lib/cmap_quiz');
 
@@ -13,7 +13,7 @@ async function setup() {
   db.addUser(2, { perm_concept_map: true });
   db.addUser(3, { perm_concept_map: false });
   const t = await startApp(['routes/concept_map.js'], { db });
-  const call = (method, url, body, user = 1) => t.call(method, url, body, { user });
+  const call = legacyEdgeCall(db, (method, url, body, user = 1) => t.call(method, url, body, { user }));   // 307-1: 옛 유형 연결은 "이미 저장된" 상태로 직접 넣는다
   // 개념 a b c d e f 와 지도 밖 개념 x. 연결: a→b(일으킴) b→c(사용) c→d(구별) d→e(일부) a→c(종류). f 는 연결 없음(고립)
   const world = async (user = 1) => {
     const sci = (await call('POST', '/api/cmap/topics', { title: '과학' }, user)).body.topic;

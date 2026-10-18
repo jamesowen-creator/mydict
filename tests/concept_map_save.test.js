@@ -2,7 +2,7 @@
 // 서버는 t.after 로 종료한다. 실행: node --test tests/concept_map_save.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createCmapDb } = require('./helpers/cmap_db');
+const { createCmapDb, legacyEdgeCall } = require('./helpers/cmap_db');
 const { startApp } = require('./helpers/app');
 const H = require('../lib/cmap_hash');
 
@@ -12,7 +12,7 @@ async function setup() {
   db.addUser(2, { perm_concept_map: true });
   db.addUser(3, { perm_concept_map: false });
   const t = await startApp(['routes/concept_map.js'], { db });
-  const call = (method, url, body, user = 1) => t.call(method, url, body, { user });
+  const call = legacyEdgeCall(db, (method, url, body, user = 1) => t.call(method, url, body, { user }));   // 307-1: 옛 유형 연결은 "이미 저장된" 상태로 직접 넣는다
   const world = async () => {
     const sci = (await call('POST', '/api/cmap/topics', { title: '과학' })).body.topic;
     const ids = {};

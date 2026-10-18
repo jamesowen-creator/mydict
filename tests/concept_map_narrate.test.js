@@ -3,7 +3,7 @@
 // 서버는 t.after 로 종료한다. 실행: node --test tests/concept_map_narrate.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createCmapDb } = require('./helpers/cmap_db');
+const { createCmapDb, legacyEdgeCall } = require('./helpers/cmap_db');
 
 process.env.ADMIN_EMAILS = 'u7@example.com';
 const { startApp, createAnthropicMock } = require('./helpers/app');
@@ -17,7 +17,7 @@ async function setup({ cap } = {}) {
   db.addUser(7, { perm_concept_map: true, role: 'admin' });
   const anthropic = createAnthropicMock();
   const t = await startApp(['routes/concept_map.js', 'routes/admin.js'], { db, anthropic });
-  const call = (method, url, body, user = 1) => t.call(method, url, body, { user });
+  const call = legacyEdgeCall(db, (method, url, body, user = 1) => t.call(method, url, body, { user }));   // 307-1: 옛 유형 연결은 "이미 저장된" 상태로 직접 넣는다
   const topic = async (title, parent_id, user = 1) => (await call('POST', '/api/cmap/topics', parent_id === undefined ? { title } : { title, parent_id }, user)).body.topic;
   const concept = async (topicId, body, user = 1) => (await call('POST', `/api/cmap/topics/${topicId}/concepts`, typeof body === 'string' ? { term: body } : body, user)).body.concept;
   const events = name => db.tables.api_usage.filter(r => r.event_type === name);

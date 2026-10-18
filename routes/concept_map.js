@@ -580,7 +580,7 @@ router.get('/api/cmap/topics/:rootId/map', guard, handle(async req => {
       map, nodes: nodes.map(n => ({ concept_id: n.concept_id, x: n.x, y: n.y })), edges: edges.map(M.withDisplay),
       marked_concept_ids: markRows.map(r => r.concept_id).filter(id => inTree.has(id)).sort((a, b) => a - b),
       concepts: tree.concepts.map(x => ({ id: x.id, topic_id: x.topic_id, term: x.term, english: x.english, brief: briefOf(x.explanation) })), topics: tree.topics.map(t => ({ id: t.id, parent_id: t.parent_id, title: t.title, sort_order: t.sort_order })),
-      relation_types: M.RELATION_TYPES, symmetric_types: M.SYMMETRIC_TYPES,
+      relation_types: M.SELECTABLE_RELATION_TYPES, all_relation_types: M.ALL_RELATION_TYPES, symmetric_types: M.SYMMETRIC_TYPES,   // 307-1: relation_types = 새로 고를 3종, all_relation_types = 저장된 옛 연결까지 포함한 10종
     } };
   });
 }));
@@ -722,7 +722,7 @@ router.patch('/api/cmap/edges/:id', guard, handle(async req => {
   const body = bodyOf(req);
   let label;
   if (has(body, 'label')) { const l = M.readOptionalLabel(body.label); if (l.error) throw bad(l.error); label = l.value; }   // 286-1: null = 문구 지우기
-  const type = has(body, 'relation_type') ? M.readRelationType(body.relation_type) : { value: undefined };
+  const type = has(body, 'relation_type') ? M.readRelationType(body.relation_type, M.ALL_RELATION_TYPES) : { value: undefined };   // 307-1: 옛 7종은 아래에서 "이미 저장된 값과 같을 때만" 허용
   if (type.error) throw bad(type.error);
   const reverse = body.reverse === true;
   if (has(body, 'reverse') && typeof body.reverse !== 'boolean') throw bad('reverse는 true/false여야 합니다.');
@@ -733,6 +733,7 @@ router.patch('/api/cmap/edges/:id', guard, handle(async req => {
     const cur = found[0];
     await ownMap(c, cur.map_id, req.user.id, { lock: true });
     const nextType = type.value === undefined ? cur.relation_type : type.value;
+    if (type.value && !M.SELECTABLE_RELATION_TYPES.includes(type.value) && type.value !== cur.relation_type) throw bad(`관계 종류는 ${M.SELECTABLE_RELATION_TYPES.join(', ')} 중 하나이거나 비워 두어야 합니다. (이미 저장된 옛 유형은 그대로 둘 수 있어요)`);
     let from = cur.from_concept_id, to = cur.to_concept_id;
     if (reverse) {
       if (M.isSymmetric(nextType)) throw bad(`'${nextType}'은 방향이 없어 바꿀 수 없습니다.`);

@@ -58,7 +58,7 @@ test('같은 열의 두 노드는 위/아래 면으로 이어진다(오른쪽으
   noErrors(page);
 });
 
-test('한 노드에서 나가는 선 여러 개는 접속점이 나뉘고(경로 시작점이 모두 다름, 면 안), 라벨 글자끼리 겹치지 않으며, 대립은 점선·적색, 방향 없음은 화살촉 없음', { skip: SKIP, timeout: 60000 }, async t => {
+test('한 노드에서 나가는 선 여러 개는 접속점이 나뉘고(경로 시작점이 모두 다름, 면 안), 라벨 글자끼리 겹치지 않으며, 대립은 굵은 실선·적색·양쪽 화살촉, 종류·방향 없음은 화살촉 없음', { skip: SKIP, timeout: 60000 }, async t => {
   const { page } = await open(t);
   const pos = [[150, 20], [0, 220], [150, 220], [300, 220], [150, 420]];
   const w = await world(page, pos, [[0, 1, '일부', '일부'], [0, 2, '종류', '종류'], [0, 3, '대립', '반대'], [0, 4, '유사', null]]);
@@ -76,8 +76,9 @@ test('한 노드에서 나가는 선 여러 개는 접속점이 나뉘고(경로
     assert.ok(!o, `라벨 겹침 없음: ${boxes[i].text} / ${boxes[j].text}`);
   }
   const opp = rows.filter(r => r.opp), sym = rows.filter(r => r.marker === null);
-  assert.equal(opp.length, 1); assert.notEqual(opp[0].dash, 'none'); assert.equal(opp[0].marker, null, '대립은 방향 없음이라 화살촉 없음');
-  assert.equal(sym.length, 2, '대립·유사 = 화살촉 없음 2개'); assert.equal(rows.filter(r => r.marker === 'url(#m-arrow)').length, 2);
+  // 307-1: 대립 = 굵은 실선 + 양쪽 화살촉(대립용 marker), 종류·옛 유사 = 화살촉 없음, 일부 = 끝 화살촉
+  assert.equal(opp.length, 1); assert.equal(opp[0].dash, 'none', '점선 폐지'); assert.equal(opp[0].marker, 'url(#m-arrow-opp)', '대립은 끝 화살촉(대립용 marker)');
+  assert.equal(sym.length, 2, '종류·유사 = 화살촉 없음 2개'); assert.equal(rows.filter(r => r.marker === 'url(#m-arrow)').length, 1, '일부만 일반 화살촉');
   assert.equal(await page.eval("[...document.querySelectorAll('#map-svg .m-edge-label')].map(t => t.textContent).sort().join(',')"), ['반대', '유사', '일부', '종류'].sort().join(','), '문구가 없으면 유형 이름');
   noErrors(page);
 });

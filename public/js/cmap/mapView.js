@@ -14,28 +14,42 @@
   const TYPE_HINT = {
     '': '관계 종류는 선택 사항이에요. 문구만 써도 됩니다.',
     '사용': '앞 개념이 뒤 개념을 쓰거나, 뒤 개념에 기대는 관계예요.',
-    '일부': '앞 개념이 뒤 개념의 일부예요.',
-    '종류': '앞 개념이 뒤 개념의 한 종류예요.',
+    '일부': '앞 개념의 일부가 뒤 개념이에요. 화살촉이 있는 선으로 그려져요.',   // 307-1: 입력 방향은 앞=상위(저장된 연결 방향은 그대로)
+    '종류': '앞 개념의 한 종류가 뒤 개념이에요. 화살촉 없는 선으로 그려져요.',
     '일으킴': '앞 개념이 뒤 개념을 일으켜요. 어떻게 일으키는지(작동 방식)를 문구에 적어 주세요. 예: 마찰이 열을 일으킴',
     '구별': '헷갈리기 쉬운 두 개념이에요. 방향이 없어요.',
     '선행': 'A 다음에 B가 와요 (순서·단계)',
     '조건': 'A가 B의 전제·조건이에요',
     '유사': 'A와 B는 비슷해요 (방향 없음)',
-    '대립': 'A와 B는 반대되거나 맞서요 (방향 없음)',
+    '대립': 'A와 B는 반대되거나 맞서요 (방향 없음, 굵은 쌍방향 화살표로 그려져요)',
     '연관': 'A와 B는 관련 있어요 (방향 없음)',
   };
   // 286-1: 방향 없음 유형은 서버가 내려주는 목록(symmetric_types)을 따른다(열기 전 기본값은 4개)
   const SYM_DEFAULT = ['구별', '유사', '대립', '연관'];
   const isSym = t => (M.symTypes || SYM_DEFAULT).includes(t);
   const TYPE_LABEL = { '사용': '사용(의존)' };
+  // 307-1: 화살촉은 "방향 있음/없음"과 따로 정한다. 종류 = 없음(방향은 배치로 읽음, 앞=상위), 일부 = 끝 화살촉, 대립 = 양쪽 화살촉(굵은 쌍방향),
+  //   옛 유형은 지금처럼: 구별·유사·연관은 없음, 사용·일으킴·선행·조건·종류 없음(null)은 끝 화살촉
+  function markersOf(type) {
+    if (type === '대립') return { 'marker-start': 'url(#m-arrow-opp)', 'marker-end': 'url(#m-arrow-opp)' };
+    if (type === '종류' || isSym(type)) return {};
+    return { 'marker-end': 'url(#m-arrow)' };
+  }
+  // 두 렌더러(render·renderQuiz)가 같은 정의를 쓴다. 대립 화살촉은 userSpaceOnUse 라 선이 굵어져도 크기가 변하지 않는다(약 9px)
+  function arrowDefs() {
+    return sv('defs', {},
+      sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-path' })),
+      sv('marker', { id: 'm-arrow-opp', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '9', markerHeight: '9', markerUnits: 'userSpaceOnUse', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-opp-path' })));
+  }
   // 연결 대화상자·퀴즈 대화상자의 유형 select 를 서버 목록으로 채운다(한 곳에서 관리). 방향 없음 유형에는 "(방향 없음)"을 붙이고 묶음으로 나눈다
-  function fillTypeSelects(types, sym) {
+  function fillTypeSelects(types, sym, allTypes) {   // 307-1: 편집·일괄 연결 = types(새로 고를 3종), 퀴즈 = allTypes(전체 10종: 저장된 옛 연결을 맞힐 수 있어야 함)
     for (const id of ['edge-type', 'quiz-type', 'bulk-type']) {
+      const list = id === 'quiz-type' ? (allTypes && allTypes.length ? allTypes : types) : types;
       const sel = $(id), keep = sel.value;
       sel.textContent = '';
       sel.append(h('option', { value: '', text: '선택 안 함' }));
       const g1 = h('optgroup', { label: '방향 있음' }), g2 = h('optgroup', { label: '방향 없음' });
-      for (const t of types) (sym.includes(t) ? g2 : g1).append(h('option', { value: t, text: sym.includes(t) ? t + '(방향 없음)' : (TYPE_LABEL[t] || t) }));
+      for (const t of list) (sym.includes(t) ? g2 : g1).append(h('option', { value: t, text: sym.includes(t) ? t + '(방향 없음)' : (TYPE_LABEL[t] || t) }));
       sel.append(g1, g2);
       sel.value = keep;
     }
@@ -77,7 +91,7 @@
     if (M.mode === 'quiz' && M.quiz) return renderQuiz();
     const svg = M.svg;
     svg.textContent = '';
-    const defs = sv('defs', {}, sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-path' })));
+    const defs = arrowDefs();
     const edgeLayer = sv('g', { class: 'm-edges' }), nodeLayer = sv('g', { class: 'm-nodes' });
     // 290-1: 선 경로는 개념 지도 전용 edgeRoute.js 가 한꺼번에 계산한다(접속면 선택·접속점 나누기·가로지름 회피·라벨 위치). 공용 mapCore.js 의 edgeGeom 은 쓰지 않는다
     const lblOf = e => clipText(e.display_label || e.label || '', 12);   // 286-1: 문구가 없으면 유형 이름(서버가 채운 display_label)
@@ -90,7 +104,7 @@
       const lbl = lblOf(e);
       edgeLayer.append(sv('g', { class: 'm-edge' + (e.relation_type === '대립' ? ' m-edge-opp' : ''), 'data-edge': e.id, 'data-t': 'edge', role: 'button', tabindex: 0, 'aria-label': `${termOf(e.from_concept_id)}${sym ? '와 ' : ' → '}${termOf(e.to_concept_id)}: ${e.display_label || e.label} (${typeLabel(e.relation_type)}), 눌러서 고치기` },
         sv('path', { d: geo.hitD || geo.d, class: 'm-edge-hit' }),   // 302-1: 줄기에 묶인 연결은 갈래 구간만 눌린다(줄기 구간은 반응 없음)
-        sv('path', { d: geo.d, class: 'm-edge-line', 'marker-end': sym ? null : 'url(#m-arrow)' }),
+        sv('path', Object.assign({ d: geo.d, class: 'm-edge-line' }, markersOf(e.relation_type))),
         sv('text', { x: geo.mx, y: geo.my - 4, class: 'm-edge-label', 'text-anchor': 'middle' }, geo.noLabel ? '' : lbl)));   // 줄기의 라벨은 묶음에서 한 번만
     }
     for (const id of M.nodes.keys()) {
@@ -272,8 +286,8 @@
     const r = await api('GET', '/api/cmap/topics/' + rootId + '/map');
     if (!okStatus(r)) { $('map-load-msg').textContent = errText(r, '지도를 불러오지 못했습니다.'); return false; }
     const b = r.body;
-    M.rootId = rootId; M.map = b.map; M.types = b.relation_types || []; M.symTypes = b.symmetric_types || SYM_DEFAULT;
-    fillTypeSelects(M.types, M.symTypes);
+    M.rootId = rootId; M.map = b.map; M.types = b.relation_types || []; M.allTypes = b.all_relation_types || M.types; M.symTypes = b.symmetric_types || SYM_DEFAULT;
+    fillTypeSelects(M.types, M.symTypes, M.allTypes);
     M.concepts = new Map(b.concepts.map(c => [c.id, c]));
     M.topics = b.topics;
     M.nodes = new Map(b.nodes.map(n => [n.concept_id, { x: n.x, y: n.y }]));
@@ -412,7 +426,11 @@
     ED = { mode, edge: d.edge || null, from: d.from, to: d.to, flips: 0 };
     $('edge-heading').textContent = mode === 'create' ? '연결 만들기' : '연결 고치기';
     $('edge-label').value = d.edge && d.edge.label ? d.edge.label : '';
-    $('edge-type').value = d.edge && d.edge.relation_type ? d.edge.relation_type : '';
+    const sel = $('edge-type');
+    for (const o of [...sel.querySelectorAll('option[data-legacy]')]) o.remove();   // 지난번에 추가한 옛 유형 옵션은 지운다
+    const cur = d.edge && d.edge.relation_type ? d.edge.relation_type : '';
+    if (cur && !M.types.includes(cur)) sel.insertBefore(h('option', { value: cur, text: '(옛 유형) ' + (TYPE_LABEL[cur] || cur), 'data-legacy': '1' }), sel.children[1] || null);   // 307-1
+    sel.value = mode === 'create' ? ((M.types.includes('종류') && '종류') || '') : cur;   // 새 연결의 기본 선택은 종류, 유형이 없던 옛 연결은 '선택 안 함'
     $('edge-msg').textContent = '';
     $('edge-delete').hidden = mode !== 'edit';
     refreshEdgeDialog();
@@ -482,7 +500,8 @@
       cb.addEventListener('change', () => { if (cb.checked) BK.sel.add(id); else BK.sel.delete(id); refreshBulk(); });
       list.append(h('label', { class: 'pick-row' + (off ? ' off' : ''), for: 'bulk-pick-' + id }, cb, h('span', { class: 'pick-term', text: termOf(id) }), off ? h('span', { class: 'pick-en', 'data-t': 'bulk-linked', text: '이미 연결됨' }) : null));
     }
-    $('bulk-type').value = ''; $('bulk-label').value = ''; $('bulk-msg').textContent = '';
+    $('bulk-type').value = M.types.includes('종류') ? '종류' : ''; $('bulk-label').value = '';   // 307-1: 새 연결 기본 유형 = 종류
+     $('bulk-msg').textContent = '';
     refreshBulk();
     openDlg($('bulk-dlg'));
     $('bulk-type').focus();
@@ -631,13 +650,13 @@
   function renderQuiz() {
     const svg = M.svg, q = M.quiz;
     svg.textContent = '';
-    const defs = sv('defs', {}, sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-path' })));
+    const defs = arrowDefs();
     const edgeLayer = sv('g', { class: 'm-edges' }), nodeLayer = sv('g', { class: 'm-nodes' });
     const qRoutes = ER.routeAll(q.nodes.map(n => ({ id: n.id, x: posOf(n.id).x, y: posOf(n.id).y })), q.answers.map(a => ({ key: a.from + '-' + a.to, from: a.from, to: a.to, label: a.type ? a.type : '', type: a.type || null })));
     for (const a of q.answers) {
       const geo = qRoutes.get(a.from + '-' + a.to);
       edgeLayer.append(sv('g', { class: 'm-edge' + (a.type === '대립' ? ' m-edge-opp' : ''), 'data-answer': a.from + '-' + a.to },
-        sv('path', { d: geo.d, class: 'm-edge-line', 'marker-end': isSym(a.type) ? null : 'url(#m-arrow)' }),
+        sv('path', Object.assign({ d: geo.d, class: 'm-edge-line' }, markersOf(a.type))),
         sv('text', { x: geo.mx, y: geo.my - 4, class: 'm-edge-label', 'text-anchor': 'middle' }, geo.noLabel ? '' : (a.type ? a.type : ''))));
     }
     for (const n of q.nodes) {

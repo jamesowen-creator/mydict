@@ -205,4 +205,22 @@ function createCmapDb() {
   return db;
 }
 
-module.exports = { createCmapDb };
+// 307-1: 옛 7종(사용·일으킴·선행·조건·구별·유사·연관)은 이제 API 로 새로 만들 수 없다. "이미 저장된 옛 유형 연결"이 있는 상태를 만들려고, 옛 유형으로 연결을 만드는 POST 만
+// 가짜 DB 에 행을 직접 넣는다(서버 검증을 거치지 않음. 방향 없음 정규화·같은 쌍 한 번만은 옛 서버와 같게). 그 밖의 호출은 그대로 서버로 보낸다.
+const LEGACY_ONLY_TYPES = ['사용', '일으킴', '선행', '조건', '구별', '유사', '연관'];
+function legacyEdgeCall(db, call) {
+  const M = require('../../lib/cmap_map');
+  return (method, url, body, user = 1) => {
+    const m = method === 'POST' && /^\/api\/cmap\/maps\/(\d+)\/edges$/.exec(url);
+    if (!m || !body || typeof body.relation_type !== 'string' || !LEGACY_ONLY_TYPES.includes(body.relation_type)) return call(method, url, body, user);
+    const mapId = Number(m[1]);
+    const dir = M.normalizeDirection(body.from_concept_id, body.to_concept_id, body.relation_type);
+    const label = typeof body.label === 'string' && body.label.trim() !== '' ? body.label.trim() : null;
+    if (db.edges.some(e => e.map_id === mapId && ((e.from_concept_id === dir.from && e.to_concept_id === dir.to) || (e.from_concept_id === dir.to && e.to_concept_id === dir.from)))) return Promise.resolve({ status: 409, body: { ok: false, error: '이미 이어진 두 개념입니다.' } });
+    const row = { id: db.seq.e++, map_id: mapId, from_concept_id: dir.from, to_concept_id: dir.to, relation_type: body.relation_type, label, created_at: new Date() };
+    db.edges.push(row);
+    return Promise.resolve({ status: 201, body: { edge: M.withDisplay(row) } });
+  };
+}
+
+module.exports = { legacyEdgeCall, LEGACY_ONLY_TYPES, createCmapDb };

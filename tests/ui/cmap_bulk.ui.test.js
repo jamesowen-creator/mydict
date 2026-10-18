@@ -86,19 +86,21 @@ test('대화상자(390px): 시작 개념 고정, 이미 연결된 노드는 비�
   await page.click('#bulk-pick-' + w.ids[2]); await page.click('#bulk-pick-' + w.ids[3]);
   assert.equal(await page.text('#bulk-count'), '2개 선택');
   assert.equal(await page.text('#bulk-ok'), '연결 2개 만들기');
+  assert.equal(await page.eval("document.getElementById('bulk-type').value"), '종류', '307-1: 새 연결의 기본 유형은 종류');
+  await setSel(page, 'bulk-type', '');
   assert.equal(await page.eval("document.getElementById('bulk-ok').disabled"), true, '유형도 문구도 없음');
   assert.equal(await page.text('#bulk-hint'), '유형을 고르거나 문구를 입력해 주세요');
-  // 유형 select: 서버 목록 10개 묶음
+  // 유형 select: 서버가 내려준 새로 고를 3종(307-1)
   const opts = await page.eval("[...document.querySelectorAll('#bulk-type option')].map(o => [o.value, o.parentElement.label || ''])");
-  assert.deepEqual(opts.map(o => o[0]), ['', '사용', '일부', '종류', '일으킴', '선행', '조건', '구별', '유사', '대립', '연관']);
+  assert.deepEqual(opts.map(o => o[0]), ['', '종류', '일부', '대립']);
   assert.deepEqual([...new Set(opts.map(o => o[1]))], ['', '방향 있음', '방향 없음']);
   // 방향 안내
-  await setSel(page, 'bulk-type', '선행');
-  assert.equal(await page.text('#bulk-type-hint'), 'A 다음에 B가 와요 (순서·단계)');
+  await setSel(page, 'bulk-type', '일부');
+  assert.equal(await page.text('#bulk-type-hint'), '앞 개념의 일부가 뒤 개념이에요. 화살촉이 있는 선으로 그려져요.');
   assert.equal(await page.text('#bulk-dir'), '‘a개념’ → 선택한 개념들 방향으로 만들어져요');
-  assert.equal(await page.text('#bulk-label-hint'), '비우면 ‘선행’처럼 유형 이름이 표시돼요');
+  assert.equal(await page.text('#bulk-label-hint'), '비우면 ‘일부’처럼 유형 이름이 표시돼요');
   assert.equal(await page.eval("document.getElementById('bulk-ok').disabled"), false);
-  await setSel(page, 'bulk-type', '유사');
+  await setSel(page, 'bulk-type', '대립');
   assert.equal(await page.text('#bulk-dir'), '방향 없이 연결돼요');
   await setSel(page, 'bulk-type', '');
   assert.equal(await page.eval("document.getElementById('bulk-ok').disabled"), true);
@@ -121,19 +123,19 @@ test('성공: 선 n개가 그려지고(방향 있음은 화살촉), 상태가 "�
   assert.ok((await page.text('#map-save-state')).startsWith('저장됨'), '시작 상태는 저장됨');
   await openBulk(page, w.ids[0]);
   await page.click('#bulk-pick-' + w.ids[2]); await page.click('#bulk-pick-' + w.ids[3]);
-  await setSel(page, 'bulk-type', '선행');
+  await setSel(page, 'bulk-type', '일부');
   await page.click('#bulk-ok');
   await page.waitFor("!document.getElementById('bulk-dlg').open", 6000, '대화상자 닫힘');
   await page.waitFor("document.querySelectorAll('#map-svg .m-edge').length === 3", 4000, '선 3개');
-  assert.deepEqual(srv.db.edges.map(e => [e.from_concept_id, e.to_concept_id, e.relation_type, e.label]).slice(1), [[w.ids[0], w.ids[2], '선행', null], [w.ids[0], w.ids[3], '선행', null]]);
+  assert.deepEqual(srv.db.edges.map(e => [e.from_concept_id, e.to_concept_id, e.relation_type, e.label]).slice(1), [[w.ids[0], w.ids[2], '일부', null], [w.ids[0], w.ids[3], '일부', null]]);
   assert.equal(await page.eval("document.querySelectorAll('#map-svg .m-edge .m-edge-line[marker-end]').length"), 3, '방향 있음은 화살촉');
-  // 302-1: 같은 부모(a개념)에서 나가는 같은 종류('선행')·같은 문구(문구가 없어 유형 이름) 연결 2개는 한 줄기로 묶여 라벨이 한 번만 나온다(문구가 없으면 유형 이름 — 묶이지 않았다면 2개)
-  assert.equal(await page.eval("[...document.querySelectorAll('#map-svg .m-edge-label')].filter(e => e.textContent === '선행').length"), 1, '문구가 없으면 유형 이름, 줄기에는 한 번만');
-  // 304-1: 방향 있는 선 3개(기존 사용 1 + 선행 2)는 모두 곡선 한 개(M C)이고, 같은 부모의 같은 종류(선행) 2개는 부모 아래 면에서 6px(STRAND_GAP) 간격으로 나란히 출발한다
+  // 302-1: 같은 부모(a개념)에서 나가는 같은 종류('일부')·같은 문구(문구가 없어 유형 이름) 연결 2개는 한 줄기로 묶여 라벨이 한 번만 나온다(문구가 없으면 유형 이름 — 묶이지 않았다면 2개)
+  assert.equal(await page.eval("[...document.querySelectorAll('#map-svg .m-edge-label')].filter(e => e.textContent === '일부').length"), 1, '문구가 없으면 유형 이름, 다발에는 한 번만');
+  // 304-1: 방향 있는 선 3개(기존 사용 1 + 일부 2)는 모두 곡선 한 개(M C)이고, 같은 부모의 같은 종류(일부) 2개는 부모 아래 면에서 6px(STRAND_GAP) 간격으로 나란히 출발한다
   const ds = await page.eval("[...document.querySelectorAll('#map-svg .m-edge-line')].map(p => p.getAttribute('d'))");
   assert.equal(ds.filter(d => /^M[-\d.]+,[-\d.]+ C[-\d.]+,[-\d.]+ [-\d.]+,[-\d.]+ [-\d.]+,[-\d.]+$/.test(d)).length, 3, '곡선 한 개(M C) 3개');
   const sx = ds.slice(1).map(d => Number(d.match(/^M([-\d.]+),/)[1])), sy = ds.slice(1).map(d => Number(d.match(/^M[-\d.]+,([-\d.]+)/)[1]));
-  assert.equal(sy[0], sy[1], '두 선행 선은 부모 아래 가장자리의 같은 높이에서 출발'); assert.equal(Math.abs(sx[1] - sx[0]), 6, '6px 간격으로 나란히');
+  assert.equal(sy[0], sy[1], '두 일부 선은 부모 아래 가장자리의 같은 높이에서 출발'); assert.equal(Math.abs(sx[1] - sx[0]), 6, '6px 간격으로 나란히');
   assert.equal(await page.text('#map-save-state'), '저장 후 변경됨');
   assert.equal(await page.text('#map-note'), '연결 2개를 만들었어요');
   assert.equal(await page.eval("document.getElementById('map-bulk-row').hidden"), true);
@@ -143,7 +145,7 @@ test('성공: 선 n개가 그려지고(방향 있음은 화살촉), 상태가 "�
   noErrors(page);
 });
 
-test('방향 없음(대립): 선이 화살촉 없이 위험 색 점선으로 그려지고, 문구를 쓰면 모든 선에 같은 문구', { skip: SKIP, timeout: 60000 }, async t => {
+test('방향 없음(대립): 선이 굵은(2.2) 위험 색 실선에 양쪽 화살촉(점선 폐지)으로 그려지고, 문구를 쓰면 모든 선에 같은 문구', { skip: SKIP, timeout: 60000 }, async t => {
   const { srv, page } = await open(t);
   const w = await world(page);
   await openBulk(page, w.ids[3]);
@@ -152,7 +154,8 @@ test('방향 없음(대립): 선이 화살촉 없이 위험 색 점선으로 그
   assert.equal(await page.text('#bulk-dir'), '방향 없이 연결돼요');
   await page.click('#bulk-ok');
   await page.waitFor("document.querySelectorAll('#map-svg .m-edge.m-edge-opp').length === 2", 6000, '대립 선 2개');
-  assert.equal(await page.eval("document.querySelectorAll('#map-svg .m-edge-opp .m-edge-line[marker-end]').length"), 0, '화살촉 없음');
+  assert.equal(await page.eval("document.querySelectorAll('#map-svg .m-edge-opp .m-edge-line[marker-end=\"url(#m-arrow-opp)\"][marker-start=\"url(#m-arrow-opp)\"]').length"), 2, '307-1: 양쪽 화살촉(marker-start + marker-end)');
+  assert.equal(await page.eval("getComputedStyle(document.querySelector('.m-edge-opp .m-edge-line')).strokeWidth + '|' + getComputedStyle(document.querySelector('.m-edge-opp .m-edge-line')).strokeDasharray"), '2.2px|none', '굵게, 점선 폐지');
   assert.equal(await page.eval("getComputedStyle(document.querySelector('.m-edge-opp .m-edge-line')).stroke"), 'rgb(220, 38, 38)');
   assert.deepEqual(srv.db.edges.slice(1).map(e => [e.from_concept_id, e.to_concept_id, e.label]), [[w.ids[1], w.ids[3], '맞섬'], [w.ids[2], w.ids[3], '맞섬']], '작은 id 가 앞으로 정규화');
   noErrors(page);
@@ -163,7 +166,7 @@ test('건너뜀 안내: 그 사이 다른 곳에서 이미 연결된 쌍은 서�
   const w = await world(page);
   await openBulk(page, w.ids[0]);
   await page.click('#bulk-pick-' + w.ids[2]); await page.click('#bulk-pick-' + w.ids[3]);
-  await setSel(page, 'bulk-type', '연관');
+  await setSel(page, 'bulk-type', '종류');
   await seed(page, 'POST', `/api/cmap/maps/${w.map.id}/edges`, { from_concept_id: w.ids[3], to_concept_id: w.ids[0], relation_type: '사용' });   // 화면이 모르는 새 연결(d → a)
   await page.click('#bulk-ok');
   await page.waitFor("!document.getElementById('bulk-dlg').open", 6000);
@@ -177,14 +180,14 @@ test('실패하면 대화상자 안에 한 줄 오류가 나오고 입력(선택
   const w = await world(page);
   await openBulk(page, w.ids[0]);
   await page.click('#bulk-pick-' + w.ids[2]); await page.click('#bulk-pick-' + w.ids[3]);
-  await setSel(page, 'bulk-type', '조건'); await page.type('#bulk-label', '전제');
+  await setSel(page, 'bulk-type', '종류'); await page.type('#bulk-label', '전제');
   await page.eval("window.__rf = window.fetch; window.fetch = (u, o) => (/\\/edges\\/bulk$/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ ok: false, error: '일시적인 오류' }), { status: 500 })) : window.__rf(u, o)); 0");
   await page.click('#bulk-ok');
   await page.waitFor("document.getElementById('bulk-msg').textContent.length > 0", 4000, '오류 안내');
   assert.equal(await page.text('#bulk-msg'), '일시적인 오류');
   assert.equal(await page.eval("document.getElementById('bulk-dlg').open"), true);
   assert.equal(await page.text('#bulk-count'), '2개 선택');
-  assert.equal(await page.eval("document.getElementById('bulk-type').value + '|' + document.getElementById('bulk-label').value"), '조건|전제');
+  assert.equal(await page.eval("document.getElementById('bulk-type').value + '|' + document.getElementById('bulk-label').value"), '종류|전제');
   assert.equal(await page.eval("document.getElementById('bulk-ok').disabled"), false, '다시 시도 가능');
   assert.equal(srv.db.edges.length, 1); assert.equal(await edgeCount(page), 1);
   await page.eval('window.fetch = window.__rf; 0');
@@ -199,7 +202,7 @@ test('만드는 중에는 버튼이 비활성("만드는 중…")이고 연속 �
   const w = await world(page);
   await openBulk(page, w.ids[0]);
   await page.click('#bulk-pick-' + w.ids[2]); await page.click('#bulk-pick-' + w.ids[3]);
-  await setSel(page, 'bulk-type', '유사');
+  await setSel(page, 'bulk-type', '일부');
   await page.eval("window.__n = 0; window.__rf = window.fetch; window.fetch = (u, o) => { if (/\\/edges\\/bulk$/.test(String(u))) { window.__n++; return new Promise(r => setTimeout(r, 700)).then(() => window.__rf(u, o)); } return window.__rf(u, o); }; 0");
   await page.eval("(() => { const b = document.getElementById('bulk-ok'); b.click(); b.click(); document.getElementById('bulk-form').requestSubmit(); })()");
   await page.waitFor("document.getElementById('bulk-ok').disabled && document.getElementById('bulk-ok').textContent === '만드는 중…'", 2000, '만드는 중');

@@ -6,7 +6,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
-const { createCmapDb } = require('../../helpers/cmap_db');
+const { createCmapDb, LEGACY_ONLY_TYPES } = require('../../helpers/cmap_db');
+const CM = require('../../../lib/cmap_map');
 const { startApp, createAnthropicMock } = require('../../helpers/app');
 
 const PUBLIC = path.resolve(__dirname, '..', '..', '..', 'public');
@@ -30,6 +31,20 @@ async function startCmapServer({ perm = true } = {}) {
       if (url.pathname.startsWith('/api/cmap/')) {
         try {
           const body = Buffer.concat(chunks);
+          // 307-1: 옛 7종은 서버가 새 연결로는 받지 않는다. 화면 테스트가 "이미 저장된 옛 유형 연결"을 시드할 수 있도록, 옛 유형으로 연결을 만드는 POST 만 가짜 DB 에 직접 넣는다(실제 화면의 선택지에는 옛 유형이 없어 사용자 조작과 섞이지 않는다)
+          const em = req.method === 'POST' && /^\/api\/cmap\/maps\/(\d+)\/edges$/.exec(url.pathname);
+          if (em && body.length) {
+            let j = null; try { j = JSON.parse(body.toString('utf8')); } catch (e) { j = null; }
+            if (j && typeof j.relation_type === 'string' && LEGACY_ONLY_TYPES.includes(j.relation_type)) {
+              const mapId = Number(em[1]);
+              const dir = CM.normalizeDirection(j.from_concept_id, j.to_concept_id, j.relation_type);
+              const label = typeof j.label === 'string' && j.label.trim() !== '' ? j.label.trim() : null;
+              if (db.edges.some(e => e.map_id === mapId && ((e.from_concept_id === dir.from && e.to_concept_id === dir.to) || (e.from_concept_id === dir.to && e.to_concept_id === dir.from)))) { res.writeHead(409, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: '이미 이어진 두 개념입니다.' })); return; }
+              const row = { id: db.seq.e++, map_id: mapId, from_concept_id: dir.from, to_concept_id: dir.to, relation_type: j.relation_type, label, created_at: new Date() };
+              db.edges.push(row);
+              res.writeHead(201, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, edge: CM.withDisplay(row) })); return;
+            }
+          }
           const headers = {};
           if (req.headers.authorization) headers.Authorization = req.headers.authorization;
           if (req.headers['content-type']) headers['Content-Type'] = req.headers['content-type'];
