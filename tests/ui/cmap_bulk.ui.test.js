@@ -129,7 +129,7 @@ test('성공: 선 n개가 그려지고(방향 있음은 화살촉), 상태가 "�
   assert.equal(await page.eval("document.querySelectorAll('#map-svg .m-edge .m-edge-line[marker-end]').length"), 3, '방향 있음은 화살촉');
   // 302-1: 같은 부모(a개념)에서 나가는 같은 종류('선행')·같은 문구(문구가 없어 유형 이름) 연결 2개는 한 줄기로 묶여 라벨이 한 번만 나온다(문구가 없으면 유형 이름 — 묶이지 않았다면 2개)
   assert.equal(await page.eval("[...document.querySelectorAll('#map-svg .m-edge-label')].filter(e => e.textContent === '선행').length"), 1, '문구가 없으면 유형 이름, 줄기에는 한 번만');
-  assert.equal(await page.eval("[...document.querySelectorAll('#map-svg .m-edge-line')].filter(p => !p.getAttribute('d').includes('C') && p.getAttribute('d').split('L').length >= 3).length"), 2, '두 선행 연결은 곡선(C)이 아닌 직각 가지(M L L ...)');
+  assert.equal(await page.eval("[...document.querySelectorAll('#map-svg .m-edge-line')].filter(p => !p.getAttribute('d').includes('C')).length"), 3, '303-1: 방향 있는 선 3개(기존 사용 1 + 선행 2)는 모두 곡선이 아닌 직각 가지(자식 1개도 직각)');
   assert.equal(await page.text('#map-save-state'), '저장 후 변경됨');
   assert.equal(await page.text('#map-note'), '연결 2개를 만들었어요');
   assert.equal(await page.eval("document.getElementById('map-bulk-row').hidden"), true);

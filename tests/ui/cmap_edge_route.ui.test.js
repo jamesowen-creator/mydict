@@ -46,9 +46,9 @@ test('같은 열의 두 노드는 위/아래 면으로 이어진다(오른쪽으
   assert.equal(rows.length, 2);
   const nodeY = await page.eval(`Object.fromEntries(window.CmapMap._state().nodes.map(n => [n.id, [n.x, n.y]]))`);
   const [p0, p1] = rows.map(r => pathPts(r.d));
-  assert.equal(p0[1], nodeY[w.ids[0]][1] + 44, '첫 선은 위 노드의 아래 면에서 시작'); assert.equal(p0[7], nodeY[w.ids[1]][1], '아래 노드의 위 면으로 끝');
-  assert.equal(p1[1], nodeY[w.ids[1]][1] + 44); assert.equal(p1[7], nodeY[w.ids[2]][1], 'x 가 8 어긋나도 위/아래 면');
-  for (const p of [p0, p1]) { const xs = [p[0], p[2], p[4], p[6]]; assert.ok(Math.max(...xs) - Math.min(...xs) < 60, '옆으로 크게 돌지 않음: ' + xs); }
+  assert.equal(p0[1], nodeY[w.ids[0]][1] + 44, '첫 선은 위 노드의 아래 면에서 시작'); assert.equal(p0[p0.length - 1], nodeY[w.ids[1]][1], '아래 노드의 위 면으로 끝(303-1: 직각 가지 — 마지막 점이 자식 위 가장자리)');
+  assert.equal(p1[1], nodeY[w.ids[1]][1] + 44); assert.equal(p1[p1.length - 1], nodeY[w.ids[2]][1], 'x 가 8 어긋나도 위/아래 면');
+  for (const p of [p0, p1]) { const xs = p.filter((_, i) => i % 2 === 0); assert.ok(Math.max(...xs) - Math.min(...xs) < 60, '옆으로 크게 돌지 않음: ' + xs); }
   assert.ok(rows.every(r => r.marker === 'url(#m-arrow)' && r.hit), '화살촉과 클릭 영역');
   // 선 위 클릭(가운데 점)으로 연결 고치기 대화상자가 열린다
   const pt = await page.eval(`(() => { const svg = document.getElementById('map-svg'), path = document.querySelector('.m-edge .m-edge-hit'); const q = path.getPointAtLength(path.getTotalLength() / 2); const sp = svg.createSVGPoint(); sp.x = q.x; sp.y = q.y; const m = sp.matrixTransform(path.getScreenCTM()); return { x: m.x, y: m.y }; })()`);

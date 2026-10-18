@@ -66,7 +66,9 @@ test('편집 시트: 같은 부모·종류·문구 3개는 직각 가지 한 줄
   assert.equal(new Set(bundle.map(b => pts(b.d).slice(0, 2).join(','))).size, 1, '줄기 시작점 한 자리');
   assert.equal(bundle.filter(b => b.label === '열').length, 1, '줄기 라벨은 한 번');
   assert.equal(bundle.filter(b => b.label === '').length, 2);
-  assert.ok(usage.d.includes('C') && usage.label === '쓴다' && usage.hit === usage.d, '종류·문구가 다른 선은 곡선 그대로, 클릭 영역도 전체 경로');
+  assert.ok(!usage.d.includes('C') && usage.label === '쓴다' && usage.hit !== usage.d && usage.marker === 'url(#m-arrow)', '303-1: 종류가 다른 연결(자식 1개)도 별도 줄기의 직각 가지, 클릭 영역은 갈래만');
+  assert.notEqual(pts(usage.d)[0], pts(bundle[0].d)[0], '종류가 다르면 부모 아래 면의 접속점이 다름');
+  assert.notEqual(pts(usage.d)[3], pts(bundle[0].d)[3], '막대 높이도 다름(계단식)');
   assert.ok(sym.d.includes('C') && sym.marker === null && sym.label === '닮음', '방향 없음은 지금 방식');
   noErrors(page);
 });
@@ -108,8 +110,11 @@ test('퀴즈 모드도 같은 규칙(같은 부모 + 같은 종류 이름 + 자�
   // 종류가 다르면 묶이지 않는다
   await page.eval(`window.CmapMap.quizSetAnswers(${JSON.stringify([{ ...pick[0] }, { ...pick[1], type: '조건' }])}); 0`);
   await page.waitFor("document.querySelectorAll('#map-svg [data-answer]').length === 2", 4000);
-  const q2 = await page.eval(`[...document.querySelectorAll('#map-svg [data-answer] .m-edge-line')].map(p => p.getAttribute('d'))`);
-  assert.ok(q2.every(d => d.includes('C')), '종류가 다르면 곡선');
+  const q2 = await page.eval(`[...document.querySelectorAll('#map-svg [data-answer]')].map(g => ({ a: g.dataset.answer, d: g.querySelector('.m-edge-line').getAttribute('d'), label: g.querySelector('.m-edge-label').textContent }))`);
+  const r2 = await page.eval(`(() => { const pos = ${JSON.stringify(pos)}; const r = CmapEdgeRoute.routeAll(pos, ${JSON.stringify([{ ...pick[0] }, { ...pick[1], type: '조건' }])}.map(a => ({ key: a.from + '-' + a.to, from: a.from, to: a.to, label: a.type, type: a.type }))); return [...r].map(([k, v]) => [k, v.d, v.group]); })()`);
+  for (const [k, d] of r2) assert.equal(q2.find(x => x.a === k).d, d, '퀴즈 화면의 선은 routeAll 결과와 같다: ' + k);
+  assert.notEqual(r2[0][2], r2[1][2], '종류가 다르면 별도 줄기(group 이 다르거나 곡선 폴백)');
+  assert.equal(q2.filter(x => x.label !== '').length, 2, '종류가 다르면 라벨이 각자 하나씩');
   await page.eval("window.CmapMap.quizEnd(); window.CmapMap.setMode('map'); 0");
   noErrors(page);
 });
@@ -123,11 +128,61 @@ test('PDF: 만든 SVG 에 줄기 경로(M L L, 곡선 없음)와 stroke-linejoin
   const doc = await page.eval(`(() => { const d = new DOMParser().parseFromString(window.__svg, 'image/svg+xml');
     return { lines: [...d.querySelectorAll('.m-edge-line')].map(el => ({ d: el.getAttribute('d'), style: el.getAttribute('style') || '', marker: el.getAttribute('marker-end') })), labels: [...d.querySelectorAll('.m-edge-label')].map(el => el.textContent), hit: d.querySelectorAll('.m-edge-hit').length, mk: !!d.querySelector('marker#m-arrow') }; })()`);
   assert.equal(doc.lines.length, 5);
-  const bundled = doc.lines.filter(l => !l.d.includes('C') && l.d.split('L').length >= 3);
-  assert.equal(bundled.length, 3, '줄기 경로 3개가 PDF 에 들어감');
+  const bundled = doc.lines.filter(l => !l.d.includes('C') && l.d.includes('L'));
+  assert.equal(bundled.length, 4, '303-1: 방향 있는 연결 4개(일으킴 3 + 사용 1)의 직각 경로가 PDF 에 들어감');
   for (const l of bundled) { assert.match(l.style, /stroke-linejoin:\s*round/); assert.match(l.style, /stroke-width:\s*1\.2(px)?(;|$)/); assert.equal(l.marker, 'url(#m-arrow)'); }
   assert.equal(doc.labels.filter(x => x === '열').length, 1, '줄기 라벨 한 번');
   assert.equal(doc.hit, 0); assert.ok(doc.mk);
   void edges;
+  noErrors(page);
+});
+
+// 303-1: 사용자 캡처 구조(증권 → 유가 증권, 유가 증권 아래 종류 3개 + 일부 1개, 주식 아래 일부 1개)를 문구가 서로 다르게 만든다
+async function world2(t) {
+  const srv = await startCmapServer();
+  t.after(() => srv.close());
+  const page = await browser.newPage({ width: 390, height: 844, token: srv.token() });
+  t.after(() => page.close());
+  await page.goto(srv.url + '/concept_map.html');
+  await page.waitFor("!document.getElementById('app').hidden", 8000, '화면 표시');
+  await sleep(150);
+  const top = (await seed(page, 'POST', '/api/cmap/topics', { title: '증권' })).topic;
+  const terms = ['증권', '유가 증권', '주식', '회사채', '조건환매', '국공채', 'IPO'];
+  const at = [[306, 0], [306, 96], [0, 192], [204, 192], [408, 192], [612, 192], [0, 288]];
+  const ids = [];
+  for (const term of terms) ids.push((await seed(page, 'POST', `/api/cmap/topics/${top.id}/concepts`, { term })).concept.id);
+  const map = (await seed(page, 'GET', `/api/cmap/topics/${top.id}/map`)).map;
+  for (const [i, id] of ids.entries()) { await seed(page, 'POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: id }); await seed(page, 'PATCH', `/api/cmap/maps/${map.id}/nodes/${id}`, { x: at[i][0], y: at[i][1] }); }
+  const E = [[0, 1, '종류', '증권의 종류'], [1, 2, '종류', '종류'], [1, 3, '종류', '채권 종류'], [1, 4, '종류', '종류'], [1, 5, '일부', '일부'], [2, 6, '일부', '일부']];
+  const edges = [];
+  for (const [a, b, type, label] of E) edges.push((await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[a], to_concept_id: ids[b], relation_type: type, label })).edge);
+  await page.eval('refresh()'); await page.eval(`Nav.enterTopic(${top.id}).then(() => 0)`);
+  await page.click('#nav-map'); await page.waitFor("!!document.getElementById('start-list')", 6000);
+  await page.click('#map-open'); await page.waitFor("document.getElementById('map-sheet').open && document.querySelectorAll('#map-svg .m-edge').length === 6", 6000); await sleep(250);
+  await page.click('#map-fit');
+  return { page, ids, edges };
+}
+
+test('303-1 종류별 줄기: 같은 부모의 종류 3개(문구가 서로 다름)는 한 묶음에 갈래마다 라벨, 일부는 다른 줄기, 곡선 없음, 막대 높이가 다름', { skip: SKIP, timeout: 90000 }, async t => {
+  const { page, edges } = await world2(t);
+  const r = await rows(page), by = new Map(r.map(x => [x.id, x]));
+  assert.equal(r.filter(x => x.d.includes('C')).length, 0, '곡선이 남지 않음(방향 있는 연결은 모두 직각 가지)');
+  const kinds = [1, 2, 3].map(i => by.get(edges[i].id)), part = by.get(edges[4].id);
+  assert.deepEqual(kinds.map(x => x.label), ['종류', '채권 종류', '종류'], '문구가 다르면 갈래마다 자기 문구');
+  assert.equal(new Set(kinds.map(x => pts(x.d)[0])).size, 1, '종류 3개는 한 줄기');
+  assert.notEqual(pts(part.d)[0], pts(kinds[0].d)[0], '일부는 다른 줄기(다른 접속점)');
+  assert.notEqual(pts(part.d)[3], pts(kinds[0].d)[3], '막대 높이가 다름');
+  assert.ok(Math.abs(pts(part.d)[3] - pts(kinds[0].d)[3]) >= 8, '막대 사이 간격 8px 이상');
+  const single = by.get(edges[0].id);
+  assert.ok(!single.d.includes('C') && single.label === '증권의 종류', '자식 1개도 직각(곧은 세로선)');
+  // 갈래가 짧아도 클릭 영역(28px 화면 고정)이 있고, 갈래를 누르면 그 연결의 시트가 열린다
+  const idx = r.findIndex(x => x.id === edges[2].id);
+  const len = await page.eval(`document.querySelectorAll('#map-svg .m-edge-hit')[${idx}].getTotalLength()`);
+  assert.ok(len > 0);
+  assert.equal(await page.eval(`getComputedStyle(document.querySelectorAll('#map-svg .m-edge-hit')[${idx}]).strokeWidth`), '28px');
+  const pt = await screenPt(page, '#map-svg .m-edge-hit', idx, len / 2);
+  await click(page, pt);
+  await page.waitFor("document.getElementById('edge-dlg').open", 3000, '연결 고치기');
+  assert.match(await page.eval("document.getElementById('edge-dlg').innerText"), /회사채/);
   noErrors(page);
 });
