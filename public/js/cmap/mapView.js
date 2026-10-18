@@ -81,7 +81,7 @@
     const edgeLayer = sv('g', { class: 'm-edges' }), nodeLayer = sv('g', { class: 'm-nodes' });
     // 290-1: 선 경로는 개념 지도 전용 edgeRoute.js 가 한꺼번에 계산한다(접속면 선택·접속점 나누기·가로지름 회피·라벨 위치). 공용 mapCore.js 의 edgeGeom 은 쓰지 않는다
     const lblOf = e => clipText(e.display_label || e.label || '', 12);   // 286-1: 문구가 없으면 유형 이름(서버가 채운 display_label)
-    const routes = ER.routeAll([...M.nodes.keys()].map(id => ({ id, x: posOf(id).x, y: posOf(id).y })), M.edges.map(e => ({ key: e.id, from: e.from_concept_id, to: e.to_concept_id, label: lblOf(e) })));
+    const routes = ER.routeAll([...M.nodes.keys()].map(id => ({ id, x: posOf(id).x, y: posOf(id).y })), M.edges.map(e => ({ key: e.id, from: e.from_concept_id, to: e.to_concept_id, label: lblOf(e), type: e.relation_type })));   // 302-1: type 은 줄기 묶음 판정용
     for (const e of M.edges) {
       const a = M.nodes.get(e.from_concept_id), b = M.nodes.get(e.to_concept_id);
       if (!a || !b) continue;
@@ -89,9 +89,9 @@
       const sym = isSym(e.relation_type);
       const lbl = lblOf(e);
       edgeLayer.append(sv('g', { class: 'm-edge' + (e.relation_type === '대립' ? ' m-edge-opp' : ''), 'data-edge': e.id, 'data-t': 'edge', role: 'button', tabindex: 0, 'aria-label': `${termOf(e.from_concept_id)}${sym ? '와 ' : ' → '}${termOf(e.to_concept_id)}: ${e.display_label || e.label} (${typeLabel(e.relation_type)}), 눌러서 고치기` },
-        sv('path', { d: geo.d, class: 'm-edge-hit' }),
+        sv('path', { d: geo.hitD || geo.d, class: 'm-edge-hit' }),   // 302-1: 줄기에 묶인 연결은 갈래 구간만 눌린다(줄기 구간은 반응 없음)
         sv('path', { d: geo.d, class: 'm-edge-line', 'marker-end': sym ? null : 'url(#m-arrow)' }),
-        sv('text', { x: geo.mx, y: geo.my - 4, class: 'm-edge-label', 'text-anchor': 'middle' }, lbl)));
+        sv('text', { x: geo.mx, y: geo.my - 4, class: 'm-edge-label', 'text-anchor': 'middle' }, geo.noLabel ? '' : lbl)));   // 줄기의 라벨은 묶음에서 한 번만
     }
     for (const id of M.nodes.keys()) {
       const p = posOf(id), n = M.nodes.get(id);
@@ -633,12 +633,12 @@
     svg.textContent = '';
     const defs = sv('defs', {}, sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-path' })));
     const edgeLayer = sv('g', { class: 'm-edges' }), nodeLayer = sv('g', { class: 'm-nodes' });
-    const qRoutes = ER.routeAll(q.nodes.map(n => ({ id: n.id, x: posOf(n.id).x, y: posOf(n.id).y })), q.answers.map(a => ({ key: a.from + '-' + a.to, from: a.from, to: a.to, label: a.type ? a.type : '' })));
+    const qRoutes = ER.routeAll(q.nodes.map(n => ({ id: n.id, x: posOf(n.id).x, y: posOf(n.id).y })), q.answers.map(a => ({ key: a.from + '-' + a.to, from: a.from, to: a.to, label: a.type ? a.type : '', type: a.type || null })));
     for (const a of q.answers) {
       const geo = qRoutes.get(a.from + '-' + a.to);
       edgeLayer.append(sv('g', { class: 'm-edge' + (a.type === '대립' ? ' m-edge-opp' : ''), 'data-answer': a.from + '-' + a.to },
         sv('path', { d: geo.d, class: 'm-edge-line', 'marker-end': isSym(a.type) ? null : 'url(#m-arrow)' }),
-        sv('text', { x: geo.mx, y: geo.my - 4, class: 'm-edge-label', 'text-anchor': 'middle' }, a.type ? a.type : '')));
+        sv('text', { x: geo.mx, y: geo.my - 4, class: 'm-edge-label', 'text-anchor': 'middle' }, geo.noLabel ? '' : (a.type ? a.type : ''))));
     }
     for (const n of q.nodes) {
       const p = posOf(n.id);
