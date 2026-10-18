@@ -1,6 +1,6 @@
 {
-  "version": "0.2",
-  "last_updated": "2026-10-17",
+  "version": "0.3",
+  "last_updated": "2026-10-18",
   "artists": [
     {
       "id": "artist_001",
@@ -60,7 +60,7 @@
         {
           "name": "볼프강 아마데우스 모차르트",
           "reason": "같은 빈 고전주의 음악의 선배 작곡가",
-          "id": null
+          "id": "artist_005"
         },
         {
           "name": "요제프 하이든",
@@ -143,7 +143,7 @@
         {
           "name": "클로드 모네",
           "reason": "후기 인상주의보다 앞선 인상주의 화가",
-          "id": null
+          "id": "artist_003"
         },
         {
           "name": "폴 고갱",
@@ -153,7 +153,7 @@
         {
           "name": "김환기",
           "reason": "색과 점·선의 표현으로 비교해 볼 만한 한국 화가",
-          "id": null
+          "id": "artist_004"
         }
       ],
       "checked": "2026-10-17",
@@ -163,6 +163,345 @@
         "https://en.wikipedia.org/wiki/The_Starry_Night",
         "https://www.thecollector.com/essential-vincent-van-gogh-paintings/",
         "https://www.pbs.org/wnet/secrets/van-goghs-ear-virtual-gallery/3247"
+      ]
+    },
+    {
+      "id": "artist_003",
+      "name": "클로드 모네",
+      "name_original": "Claude Monet",
+      "field": "미술",
+      "birth_year": 1840,
+      "death_year": 1926,
+      "nationality": "프랑스",
+      "one_line": "같은 풍경을 빛의 변화에 따라 되풀이해 그리며 인상주의라는 이름을 낳은 화가",
+      "who": "1840년 파리에서 태어나 노르망디의 르아브르에서 자랐다. 1874년 공식 살롱과 별개로 열린 독립 전시를 함께 꾸몄고, 이 전시에 건 「인상, 해돋이」에서 인상주의라는 이름이 나왔다. 1883년 노르망디의 지베르니로 옮겨 1926년 세상을 떠날 때까지 그곳에서 지냈다.",
+      "life": "1872년 무렵 파리 근교 아르장퇴유에 자리를 잡았고, 그곳은 르누아르·시슬레·마네·피사로 같은 화가들이 모이는 곳이 되었다. 1883년 지베르니로 이사했으며, 1893년 집 맞은편 땅을 사서 연못이 있는 '물의 정원'을 만들었다. 이 정원에는 일본풍의 아치형 다리도 놓였고, 훗날 수련 그림의 소재가 되었다.",
+      "movement": {
+        "name": "인상주의",
+        "text": "빛에 따라 달라지는 순간의 인상을 화면에 옮기려 한 흐름이다. 1874년 독립 전시에 「인상, 해돋이」가 걸렸고, 비평가 루이 르루아의 글에서 '인상주의'라는 말이 나왔다. 원래는 깎아내리려는 뜻이었다. 모네는 프랑스 인상주의를 세운 화가의 한 명으로 꼽힌다."
+      },
+      "featured_works": [
+        {
+          "title": "인상, 해돋이",
+          "year": "1872",
+          "description": "해 뜨는 풍경을 그린 작품으로, 1874년 첫 인상주의 전시에 걸렸다. 처음에는 제목이 없었고, 모네가 '인상'이라는 제목을 제안하자 도록 편집자가 '해돋이'를 덧붙였다고 전해진다. 제작 연도는 1872년으로 보는 쪽이 많지만 1873년으로 적는 자료도 있다.",
+          "interpretation": "이 그림이 비평가 르루아의 글에서 '인상주의'라는 이름이 붙는 계기가 되었고, 그 말이 흐름 전체를 가리키게 되었다. 지금은 인상주의를 상징하는 그림으로 널리 알려져 있다."
+        },
+        {
+          "title": "수련 연작 (오랑주리 미술관)",
+          "year": "1916–1926",
+          "description": "지베르니 연못을 소재로 한 수련 그림은 말년까지 이어졌다. 모네는 1918년 11월 휴전 다음 날 대형 수련 그림을 국가에 기증하겠다고 제안했고, 1916~1926년에 그린 대작들은 그가 세상을 떠난 1927년에 오랑주리 미술관에 설치되었다. 지금은 두 개의 타원형 전시실에 놓여 있다.",
+          "interpretation": "화면을 수면으로 가득 채워 보는 사람을 둘러싸는 느낌을 준다는 점이 자주 거론된다. 수련 연작이 시작된 시기는 자료에 따라 1897년, 1906년 등으로 엇갈린다."
+        }
+      ],
+      "other_works": [
+        {
+          "title": "양산을 쓴 여인",
+          "year": "1875",
+          "note": "아내 카미유와 아들 장을 그린 그림"
+        },
+        {
+          "title": "건초더미",
+          "year": "1890–1891",
+          "note": "지베르니 집 근처 들판을 그린 연작"
+        },
+        {
+          "title": "루앙 대성당 연작",
+          "year": "1892–1894",
+          "note": "빛과 날씨를 달리해 30점 넘게 그렸다"
+        }
+      ],
+      "reputation": {
+        "contemporary": "1874년 전시를 본 비평가 루이 르루아는 '인상주의'라는 말을 비꼬는 뜻으로 썼다. 이 전시는 공식 살롱 바깥에서 열린 독립 전시였다.",
+        "posthumous": "오랑주리 미술관의 수련 연작은 모네가 세상을 떠난 1927년에 설치되어 지금도 대표작으로 꼽힌다. 「인상, 해돋이」는 인상주의의 이름이 된 그림으로 알려져 있다."
+      },
+      "summary": "같은 풍경을 빛에 따라 달리 그리며 인상주의의 이름과 방향을 연 화가로 평가받고, 말년에는 지베르니 연못의 수련 연작으로 나아갔다.",
+      "connected_artists": [
+        {
+          "name": "빈센트 반 고흐",
+          "reason": "후기 인상주의로 분류되는 같은 시대 화가",
+          "id": "artist_002"
+        },
+        {
+          "name": "오귀스트 르누아르",
+          "reason": "아르장퇴유에서 함께 어울린 인상주의 동료",
+          "id": null
+        },
+        {
+          "name": "에두아르 마네",
+          "reason": "아르장퇴유 모임에 이름이 오르는 화가",
+          "id": null
+        }
+      ],
+      "checked": "2026-10-18",
+      "sources": [
+        "https://www.britannica.com/summary/Claude-Monet",
+        "https://www.ebsco.com/research-starters/history/monets-water-lilies-are-shown-musee-de-lorangerie",
+        "https://www.musee-orangerie.fr/en/node/197502",
+        "https://en.wikipedia.org/wiki/Woman_with_a_Parasol_%E2%80%93_Madame_Monet_and_Her_Son",
+        "https://claudemonetgiverny.fr/en/?p=5312",
+        "https://www.dailyartmagazine.com/?p=112734"
+      ]
+    },
+    {
+      "id": "artist_004",
+      "name": "김환기",
+      "name_original": "Kim Whanki",
+      "field": "미술",
+      "birth_year": 1913,
+      "death_year": 1974,
+      "nationality": "대한민국",
+      "one_line": "전통 소재를 추상으로 풀어내다 점으로 화면을 채운 한국 추상미술의 선구자",
+      "who": "1913년 전라남도 신안군 안좌도에서 태어나 일본 니혼대학에서 미술을 공부했다. 호는 수화(樹話)이며 한국 추상미술의 선구자로 불린다. 1944년 변동림과 결혼했고, 그녀는 이후 그의 호를 따 '김향안'이라는 이름을 썼다. 1974년 7월 25일 뉴욕에서 뇌출혈로 세상을 떠났다.",
+      "life": "1956년 파리로 건너가 약 3년을 지냈다. 1963년 상파울루 비엔날레에 한국 대표로 참가해 명예상을 받았고, 그해 록펠러 재단 기금으로 뉴욕에 자리를 마련해 1974년까지 그곳에서 작업했다. 뉴욕행은 1964년으로 적은 자료도 있다. 1992년에는 그의 이름을 딴 환기미술관이 문을 열었다.",
+      "movement": {
+        "name": "한국 추상미술",
+        "text": "1940년대 말 이후 산, 매화, 조선 백자, 특히 달항아리 같은 한국 전통 소재를 화면에 녹이고 이를 추상화해 그렸다. 파리에서도 앵포르멜 같은 새 조류를 따르기보다 한국적 특색을 살린 자기만의 양식을 키웠다고 평가받는다. 1960년대 후반부터 풍경은 선·점·색면으로 바뀌었다."
+      },
+      "featured_works": [
+        {
+          "title": "어디서 무엇이 되어 다시 만나랴",
+          "year": "1970",
+          "description": "1970년 작 점화로, 제1회 한국미술대상전에 출품해 대상을 받았다. 제목은 김광섭의 시 「저녁에」의 마지막 구절에서 가져왔고, 같은 제목의 에세이집도 있다. 그는 1969~1970년 사이에 화면 전체를 점으로 채우는 전면점화의 시기로 들어섰다고 설명된다.",
+          "interpretation": "그리움을 담은 시구를 제목으로 삼았다는 점에서, 점 하나하나를 멀리 있는 사람이나 고향에 대한 그리움으로 읽어 볼 수 있다."
+        },
+        {
+          "title": "우주 (05-IV-71 #200)",
+          "year": "1971",
+          "description": "김환기의 작품 가운데 유일한 두 폭짜리이자 가장 큰 그림으로 알려져 있다. 2019년 홍콩 크리스티 경매에서 낙찰되었고, 금액은 보도마다 기준이 달라 적지 않는다.",
+          "interpretation": "'우주'라는 제목과 점으로 가득한 화면 때문에 밤하늘과 별을 떠올리게 한다는 감상이 많다."
+        }
+      ],
+      "other_works": [
+        {
+          "title": "론도",
+          "year": "1938",
+          "note": "국가등록문화재로 등록된 작품"
+        },
+        {
+          "title": "영원의 노래",
+          "year": "1957",
+          "note": "리움미술관 소장작"
+        },
+        {
+          "title": "여인들과 항아리",
+          "year": "1960",
+          "note": "국립현대미술관 소장작"
+        },
+        {
+          "title": "북서풍 30-VIII-65",
+          "year": "1965",
+          "note": "선·점·색면으로 바뀌어 가던 시기의 작품"
+        }
+      ],
+      "reputation": {
+        "contemporary": "1963년 상파울루 비엔날레에서 명예상을 받았고, 1970년에는 「어디서 무엇이 되어 다시 만나랴」로 제1회 한국미술대상전 대상을 받았다.",
+        "posthumous": "병세가 깊어지자 죽음을 예감한 듯 검은 점화를 시작했고, 이 시기 작품에는 정적이 감돈다고 설명된다. 사후 환기미술관이 문을 열었고, 2019년 「우주」가 경매에서 낙찰되며 가장 비싼 국내 화가로 소개되었다."
+      },
+      "summary": "한국 전통 소재를 추상으로 풀어내다 점으로 화면을 채우는 점화에 이르러, 한국 추상미술의 선구자로 평가받는다.",
+      "connected_artists": [
+        {
+          "name": "빈센트 반 고흐",
+          "reason": "색과 붓질의 표현으로 비교해 볼 만한 서양 화가",
+          "id": "artist_002"
+        },
+        {
+          "name": "김광섭",
+          "reason": "시 「저녁에」의 구절이 작품 제목이 되었다",
+          "id": null
+        },
+        {
+          "name": "김향안",
+          "reason": "아내로, 이름은 김환기의 호에서 따왔다",
+          "id": null
+        }
+      ],
+      "checked": "2026-10-18",
+      "sources": [
+        "https://www.newsis.com/view/NISX20190924_0000777928",
+        "https://seoul.co.kr/news/plan/2018/01/04/20180104500066",
+        "https://www.segye.com/newsView/20190717512303",
+        "https://www.incheon.go.kr/IC010305/1421489",
+        "https://www.vogue.co.kr/2024/12/04/%EB%8B%A4%EC%8B%9C-%EB%AC%B8-%EC%97%AC%EB%8A%94-%ED%99%98%EA%B8%B0%EB%AF%B8%EC%88%A0%EA%B4%80/",
+        "https://kyeonggi.com/article/20230722580004",
+        "https://www.lacma.org/ko/node/41929",
+        "https://mobile.newsis.com/view/NISX20191101_0000816992",
+        "https://www.koreajoongangdaily.com/lifestyle/art-auction-sets-new-records-for-kim-whanki/11608737",
+        "https://medigatenews.com/news/1544799903",
+        "https://www.wikitree.co.kr/articles/262253"
+      ]
+    },
+    {
+      "id": "artist_005",
+      "name": "볼프강 아마데우스 모차르트",
+      "name_original": "Wolfgang Amadeus Mozart",
+      "field": "음악",
+      "birth_year": 1756,
+      "death_year": 1791,
+      "nationality": "잘츠부르크 출신(빈에서 활동)",
+      "one_line": "어릴 때부터 신동으로 이름을 알리고 35년의 삶에 오페라와 교향곡, 협주곡을 남긴 작곡가",
+      "who": "1756년 1월 27일 잘츠부르크에서 태어나 1791년 12월 5일 빈에서 35세로 세상을 떠났다. 어릴 때 아버지 레오폴트, 누나 난네를과 함께 유럽 곳곳을 돌며 연주해 신동으로 이름을 알렸다. 1762년 빈 궁정에서 마리아 테레지아 앞에서 연주했고, 1763년부터 1766년까지 런던과 파리 등을 도는 긴 순회 연주를 했다.",
+      "life": "1781년 3월 오페라 「이도메네오」의 성공을 안고 빈으로 왔고, 6월 9일 격한 면담 끝에 잘츠부르크 대주교 밑에서 물러나는 일이 받아들여졌다. 1782년 8월 콘스탄체 베버와 결혼해 여섯 아이를 두었으나 넷이 어려서 세상을 떠났다. 묘는 따로 표시되지 않았는데, 가난 때문이 아니라 요제프 2세 때부터 이어진 공동묘지 관행에 따른 것이라고 설명된다.",
+      "movement": {
+        "name": "고전주의",
+        "text": "하이든과 모차르트로 대표되는 18세기 후반의 음악 양식으로, 형식의 균형과 또렷한 선율이 특징으로 설명된다. 모차르트는 오페라, 교향곡, 협주곡, 실내악 등 여러 갈래에서 이 양식을 이끈 작곡가로 평가받는다."
+      },
+      "featured_works": [
+        {
+          "title": "교향곡 40번 사단조 K. 550",
+          "year": "1788",
+          "description": "1788년 여름 몇 주 사이에 39번, 41번과 함께 쓴 세 교향곡 가운데 하나다. 모차르트는 이 곡을 7월 25일자로 자신의 작품 목록에 적어 넣었다. 클라리넷이 없는 판과 클라리넷 두 대를 더한 판이 함께 전한다. 날짜가 확실한 빈 연주는 1791년 4월 16·17일 살리에리의 지휘로 열렸다.",
+          "interpretation": "단조의 어두운 색채 때문에 모차르트의 교향곡 가운데 감정이 짙은 곡으로 자주 이야기된다."
+        },
+        {
+          "title": "레퀴엠 K. 626",
+          "year": "1791",
+          "description": "모차르트가 세상을 떠났을 때 끝내지 못한 곡이다. 발제크슈투파흐 백작이 자기 작품처럼 내놓으려고 의뢰했다고 전해진다. 모차르트는 초안까지만 마쳤고, 제자 쥐스마이어가 완성했다.",
+          "interpretation": "죽음을 앞두고 쓰던 미완성 곡이라는 사정 때문에 특별한 무게로 들리는 작품이며, 어디까지가 모차르트의 손길인지가 오래 이야기되어 왔다."
+        }
+      ],
+      "other_works": [
+        {
+          "title": "피가로의 결혼",
+          "year": "1786",
+          "note": "오페라"
+        },
+        {
+          "title": "돈 조반니",
+          "year": "1787",
+          "note": "오페라"
+        },
+        {
+          "title": "마술피리",
+          "year": "1791",
+          "note": "오페라"
+        },
+        {
+          "title": "피아노 협주곡 21번 K. 467",
+          "year": "1785",
+          "note": "빈에서 모차르트가 직접 연주해 초연했다"
+        },
+        {
+          "title": "아이네 클라이네 나흐트무지크 K. 525",
+          "year": "1787",
+          "note": "작품 목록에 8월 10일로 적혀 있다"
+        }
+      ],
+      "reputation": {
+        "contemporary": "어린 시절부터 유럽 여러 궁정에서 연주해 신동으로 이름을 알렸고, 1781년에는 오페라 「이도메네오」의 성공을 안고 빈에 왔다.",
+        "posthumous": "미완으로 남은 레퀴엠은 제자 쥐스마이어가 완성했다. 오늘날 그의 오페라와 교향곡, 협주곡은 대표적인 클래식 레퍼토리로 꼽힌다."
+      },
+      "summary": "신동으로 출발해 빈에서 오페라·교향곡·협주곡의 걸작을 남기고 35세에 세상을 떠난, 고전주의를 대표하는 작곡가로 평가받는다.",
+      "connected_artists": [
+        {
+          "name": "루트비히 판 베토벤",
+          "reason": "같은 빈에서 활동한 고전주의 계열 작곡가",
+          "id": "artist_001"
+        },
+        {
+          "name": "요제프 하이든",
+          "reason": "모차르트와 함께 고전주의로 대표되는 작곡가",
+          "id": null
+        }
+      ],
+      "checked": "2026-10-18",
+      "sources": [
+        "https://simple.wikipedia.com/wiki/Mozart",
+        "https://www.eb.com/biography/Wolfgang-Amadeus-Mozart/Vienna-the-early-years",
+        "https://britannica.com/question/What-are-Mozarts-most-famous-compositions",
+        "https://classicfm.com/composers/mozart/best-pieces-classical-music",
+        "https://www.classicfm.com/composers/mozart/guides/biography-part-2/",
+        "https://en.wikipedia.org/wiki/Symphony_No._40_(Mozart)",
+        "https://www.bso.org/works/mozart-piano-concerto-no-21",
+        "https://www.henle.de/Divertimento-A-Little-Night-Music-K.-525/HN-1006",
+        "https://mediathek.at/en/mozart/wiener-jahre-1781-1791",
+        "https://en.wikipedia.org/wiki/Mozart_family_grand_tour"
+      ]
+    },
+    {
+      "id": "artist_006",
+      "name": "프레데리크 쇼팽",
+      "name_original": "Frédéric Chopin",
+      "field": "음악",
+      "birth_year": 1810,
+      "death_year": 1849,
+      "nationality": "폴란드 출신(프랑스 파리에서 활동)",
+      "one_line": "피아노 한 악기에 집중해 폴란드의 정서를 담은 곡들을 남긴 작곡가",
+      "who": "1810년 3월 1일 바르샤바 근처 젤라조바볼라에서 태어났다(2월 22일로 적은 자료도 있다). 폴란드 출신의 작곡가이자 피아니스트이며, 작품 대부분이 피아노 독주곡이다. 마주르카와 폴로네즈에는 폴란드 민속 춤곡의 리듬과 분위기를 썼다. 1849년 10월 17일 파리에서 39세로 세상을 떠났고 사인은 결핵으로 추정된다.",
+      "life": "1830년 11월 봉기가 일어나기 몇 주 전 바르샤바를 떠나 빈으로 갔고, 1831년 빈에서 파리로 가던 길에 바르샤바 함락 소식을 들었다. 파리에 자리 잡은 뒤 마지막 18년 동안 공개 연주는 30회쯤이었다. 1830년대 후반부터 1847년까지 작가 조르주 상드와 관계를 이어 갔다. 사후 그의 심장은 누이 루드비카가 바르샤바 성십자가 성당으로 옮겼다.",
+      "movement": {
+        "name": "낭만주의",
+        "text": "감정과 개성을 앞세운 19세기 흐름이다. 쇼팽은 소품 중심의 피아노 음악으로 이 흐름에 참여했고, 폴란드 민속 춤곡의 정신을 예술 음악에 끌어들였다. 브리태니커는 그를 폴란드 최고의 작곡가이자 피아노 음악사에서 가장 중요한 작곡가의 한 사람으로 소개한다."
+      },
+      "featured_works": [
+        {
+          "title": "발라드 1번 사단조 Op. 23",
+          "year": "1831–1835",
+          "description": "스케치는 1831년 빈에 머물던 때로 거슬러 올라가고, 1835년 파리로 옮긴 뒤 완성했다. 쇼팽의 발라드는 모두 네 곡이며 이 곡이 첫 번째다.",
+          "interpretation": "이야기를 들려주듯 이어지는 전개 때문에 서사적인 곡으로 자주 설명된다."
+        },
+        {
+          "title": "에튀드 Op. 10 No. 12 「혁명」",
+          "year": "1832",
+          "description": "리스트에게 헌정된 곡이다. 1831년 바르샤바 함락 소식에서 영감을 얻었다는 이야기로 '혁명'이라는 별명이 붙었지만 이는 전설에 가깝다. 완성은 1832년, 출판은 1833년으로 보는 설명이 있으나 자료마다 조금 다르다.",
+          "interpretation": "폴란드 항쟁의 비통함을 담은 곡으로 듣는 감상은 전설에 기대고 있다는 점을 함께 알아 둘 만하다."
+        }
+      ],
+      "other_works": [
+        {
+          "title": "영웅 폴로네즈 Op. 53",
+          "year": "1842",
+          "note": "1843년 출판, 널리 알려진 폴로네즈"
+        },
+        {
+          "title": "환상 즉흥곡 Op. 66",
+          "year": "1834",
+          "note": "쇼팽 사후에 출판되었다"
+        },
+        {
+          "title": "피아노 소나타 2번 Op. 35",
+          "year": "1839",
+          "note": "노앙에서 완성, 이듬해 출판"
+        },
+        {
+          "title": "24개의 전주곡 Op. 28",
+          "year": "1835–1839",
+          "note": "일부를 마요르카에서 썼고 1839년 출판"
+        }
+      ],
+      "reputation": {
+        "contemporary": "파리 데뷔 연주회로 이름이 알려졌고, 슈만은 그의 음악을 '꽃 속에 숨은 대포'에 견주었다고 전해진다.",
+        "posthumous": "폴란드 최고의 작곡가로 꼽히고, 마주르카와 폴로네즈에 민속 춤곡의 정신을 쓴 점은 이후 음악과 민족주의를 잇는 데 영향을 준 것으로 평가받는다."
+      },
+      "summary": "피아노 하나로 폴란드의 정서를 예술 음악에 담아, 낭만주의 피아노 음악을 대표하는 작곡가로 평가받는다.",
+      "connected_artists": [
+        {
+          "name": "루트비히 판 베토벤",
+          "reason": "낭만주의로 넘어가는 흐름과 이어서 볼 작곡가",
+          "id": "artist_001"
+        },
+        {
+          "name": "프란츠 리스트",
+          "reason": "혁명 에튀드를 헌정받은 동시대 음악가",
+          "id": null
+        },
+        {
+          "name": "로베르트 슈만",
+          "reason": "쇼팽의 음악을 평한 글이 전해지는 작곡가",
+          "id": null
+        }
+      ],
+      "checked": "2026-10-18",
+      "sources": [
+        "https://www.Britannica.com/summary/Frederic-Chopin",
+        "https://www.staatsoper.de/en/biographies/chopin-frederic",
+        "https://www.meer.com/en/103649-where-chopins-heart-belongs",
+        "https://en.wikipedia.org/wiki/%C3%89tude_Op._10,_No._12_(Chopin)",
+        "https://en.wikipedia.org/wiki/Polonaises_(Chopin)",
+        "https://www.henle.de/Impromptus/HN-235",
+        "https://aylesburylunchtimemusic.co.uk/works/preludes-op-28-chopin/",
+        "https://www.worldhistory.org/timeline/Frederic_Chopin/",
+        "https://classica.stingray.com/fr/vedette/frederic-chopin-175th-death-anniversary"
       ]
     }
   ]
