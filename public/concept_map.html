@@ -299,19 +299,19 @@
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
 <!-- 283-2: ?v= 값은 public/sw.js 의 CACHE_NAME(metis-v47) 숫자와 같게 두고 배포마다 함께 올린다(옛 캐시 JS가 새 HTML과 섞여 내비가 죽는 일을 막는다. tests/concept_map_cache.test.js 가 검사) -->
-<script src="/js/map/mapCore.js?v=52"></script>
-<script src="/js/cmap/mapGeometry.js?v=52"></script>
-<script src="/js/cmap/layoutOptimize.js?v=52"></script>
-<script src="/js/cmap/edgeRoute.js?v=52"></script>
-<script src="/js/cmap/pairPicker.js?v=52"></script>
-<script src="/js/cmap/markState.js?v=52"></script>
-<script src="/js/cmap/mapPdf.js?v=52"></script>
-<script src="/js/cmap/mapView.js?v=52"></script>
-<script src="/js/cmap/mapStart.js?v=52"></script>
-<script src="/js/cmap/narrateView.js?v=52"></script>
-<script src="/js/cmap/reviewView.js?v=52"></script>
-<script src="/js/cmap/micRecorder.js?v=52"></script>
-<script src="/js/cmap/answerView.js?v=52"></script>
+<script src="/js/map/mapCore.js?v=53"></script>
+<script src="/js/cmap/mapGeometry.js?v=53"></script>
+<script src="/js/cmap/layoutOptimize.js?v=53"></script>
+<script src="/js/cmap/edgeRoute.js?v=53"></script>
+<script src="/js/cmap/pairPicker.js?v=53"></script>
+<script src="/js/cmap/markState.js?v=53"></script>
+<script src="/js/cmap/mapPdf.js?v=53"></script>
+<script src="/js/cmap/mapView.js?v=53"></script>
+<script src="/js/cmap/mapStart.js?v=53"></script>
+<script src="/js/cmap/narrateView.js?v=53"></script>
+<script src="/js/cmap/reviewView.js?v=53"></script>
+<script src="/js/cmap/micRecorder.js?v=53"></script>
+<script src="/js/cmap/answerView.js?v=53"></script>
 
 <div id="loading" role="status"><p>불러오는 중…</p></div>
 
@@ -500,9 +500,10 @@
     <div class="edge-flip-row"><button id="edge-flip" class="btn text" type="button">방향 바꾸기</button></div>
     <div class="field"><label for="edge-label">관계 문구 (선택, 40자 이내)</label><input id="edge-label" type="text" maxlength="40" autocomplete="off" placeholder="예: 때문에" aria-describedby="edge-label-hint"></div>
     <p id="edge-label-hint" class="hint"></p>
-    <div class="field"><label for="edge-type">관계 종류 (선택)</label>
-      <select id="edge-type"><option value="">선택 안 함</option></select></div>
+    <div class="field"><label for="edge-type">관계 종류</label>
+      <select id="edge-type"></select></div>
     <p id="edge-type-hint" class="hint"></p>
+    <p id="edge-legacy" class="hint" hidden></p>
     <p id="edge-msg" class="msg" role="alert"></p>
     <div class="btn-row"><button id="edge-delete" class="btn text" type="button" hidden>연결 삭제</button><button id="edge-cancel" class="btn text" type="button">취소</button><button id="edge-ok" class="btn" type="submit">저장</button></div>
   </form>
@@ -514,7 +515,7 @@
     <p class="edge-pair">시작 개념: <span id="bulk-from"></span></p>
     <div class="bulk-sum"><span class="sec-label">연결할 개념</span><span id="bulk-count" class="hint" style="margin-top:0" aria-live="polite">0개 선택</span><button id="bulk-all" class="btn text" type="button">모두 선택</button></div>
     <div id="bulk-list" class="bulk-list"></div>
-    <div class="field"><label for="bulk-type">관계 종류 (선택)</label><select id="bulk-type"><option value="">선택 안 함</option></select></div>
+    <div class="field"><label for="bulk-type">관계 종류</label><select id="bulk-type"></select></div>
     <p id="bulk-type-hint" class="hint"></p>
     <div class="field"><label for="bulk-label">관계 문구 (선택, 40자 이내)</label><input id="bulk-label" type="text" maxlength="40" autocomplete="off" placeholder="예: 때문에" aria-describedby="bulk-label-hint"></div>
     <p id="bulk-label-hint" class="hint"></p>

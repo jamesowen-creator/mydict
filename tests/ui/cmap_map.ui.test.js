@@ -219,7 +219,7 @@ test('탭-탭 연결: 노드 A 탭(선택 표시) → 노드 B 탭 → 대화상
   assert.equal(await page.eval("document.getElementById('edge-type').value"), '종류', '307-1: 새 연결의 기본 유형은 종류');
   await page.eval("(() => { const s = document.getElementById('edge-type'); s.value = ''; s.dispatchEvent(new Event('change')); })()");
   await page.click('#edge-ok');                                                 // 유형도 문구도 없이 저장(286-1: 문구는 선택이지만 둘 다 없으면 막힘)
-  assert.match(await page.text('#edge-msg'), /유형을 고르거나 문구를 입력해 주세요/);
+  assert.match(await page.text('#edge-msg'), /관계 종류를 골라 주세요/);   // 308-1: 유형은 필수
   await page.type('#edge-label', '때문에');
   await page.eval("(() => { const s = document.getElementById('edge-type'); s.value = '일부'; s.dispatchEvent(new Event('change')); })()");
   assert.match(await page.text('#edge-type-hint'), /일부가 뒤 개념/);
@@ -242,14 +242,13 @@ test('탭-탭 연결: 노드 A 탭(선택 표시) → 노드 B 탭 → 대화상
   noErrors(page);
 });
 
-test('방향 바꾸기 저장, 대립(방향 없음: ↔, 바꾸기 비활성, id 작은 쪽이 from), 종류 없이 문구만도 가능', { skip: SKIP, timeout: 60000 }, async t => {
+test('방향 바꾸기 저장, 대립(방향 없음: ↔, 바꾸기 비활성, id 작은 쪽이 from), 유형을 고르지 않으면 기본 종류로 저장', { skip: SKIP, timeout: 60000 }, async t => {
   const { srv, page } = await open(t);
   const { c } = await world(page);
   await pickAll(page, [c.a.id, c.b.id, c.c.id]);
   await page.click('#map-pick-toggle');
   // 방향 바꿔서 저장: b → a
   await tapNode(page, c.a.id); await tapNode(page, c.b.id); await waitOpen(page, 'edge-dlg');
-  await page.eval("(() => { const s = document.getElementById('edge-type'); s.value = ''; s.dispatchEvent(new Event('change')); })()");                                                    // 307-1: 기본이 종류라 "종류 없이 문구만"은 선택 안 함으로 바꾼다
   await page.type('#edge-label', '쓴다');
   await page.click('#edge-flip');
   await page.click('#edge-ok'); await waitClosed(page, 'edge-dlg');
@@ -262,9 +261,9 @@ test('방향 바꾸기 저장, 대립(방향 없음: ↔, 바꾸기 비활성, i
   await page.click('#edge-ok'); await waitClosed(page, 'edge-dlg');
   await page.waitFor("document.querySelectorAll('#map-svg [data-t=edge]').length === 2", 4000);
   const e = edgesDb(srv);
-  assert.deepEqual(e[0], { from: c.b.id, to: c.a.id, label: '쓴다', type: null });
+  assert.deepEqual(e[0], { from: c.b.id, to: c.a.id, label: '쓴다', type: '종류' });   // 308-1: 유형은 필수(기본 종류)
   assert.deepEqual(e[1], { from: Math.min(c.a.id, c.c.id), to: Math.max(c.a.id, c.c.id), label: '헷갈림', type: '대립' });
-  assert.equal(await page.eval("document.querySelectorAll('#map-svg .m-edge-line[marker-end]').length"), 2, '유형 없는 연결의 끝 화살촉 + 대립의 끝 화살촉(307-1)');
+  assert.equal(await page.eval("document.querySelectorAll('#map-svg .m-edge-line[marker-end]').length"), 1, '종류는 화살촉 없음, 대립만 끝 화살촉(308-1)');
   assert.equal(await page.eval("document.querySelectorAll('#map-svg .m-edge-line[marker-start]').length"), 1, '시작 화살촉은 대립(쌍방향)만');
   noErrors(page);
 });

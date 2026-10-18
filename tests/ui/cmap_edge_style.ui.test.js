@@ -27,9 +27,9 @@ async function world(t) {
   const map = (await seed(page, 'GET', `/api/cmap/topics/${top.id}/map`)).map;
   const at = [[130, 20], [20, 200], [250, 200]];
   for (const [i, id] of ids.entries()) { await seed(page, 'POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: id }); await seed(page, 'PATCH', `/api/cmap/maps/${map.id}/nodes/${id}`, { x: at[i][0], y: at[i][1] }); }
-  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[1], relation_type: '일으킴', label: '방향 있음' });
+  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[1], relation_type: '일부', label: '방향 있음' });
   await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[1], to_concept_id: ids[2], relation_type: '대립', label: '반대' });
-  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[2], relation_type: '유사', label: '닮음' });
+  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[2], relation_type: '종류', label: '닮음' });
   await page.eval('refresh()'); await page.eval(`Nav.enterTopic(${top.id}).then(() => 0)`);
   await page.click('#nav-map'); await page.waitFor("!!document.getElementById('start-list')", 6000);
   await page.click('#map-open'); await page.waitFor("document.getElementById('map-sheet').open", 6000); await sleep(250);
@@ -78,7 +78,7 @@ test('읽기 전용 시트(해설·복습 모드)와 퀴즈 모드도 같은 값
   await page.waitFor("document.querySelectorAll('#map-svg .m-edge').length === 3", 4000, '읽기 전용 지도');
   check(await readStyle(page));
   await page.eval("window.CmapMap.setMode('map'); 0");
-  await page.eval(`window.CmapMap.quizBegin([{ id: ${ids[0]}, term: 'a개념' }, { id: ${ids[1]}, term: 'b개념' }, { id: ${ids[2]}, term: 'c개념' }]); window.CmapMap.setMode('quiz'); window.CmapMap.quizSetAnswers([{ from: ${ids[0]}, to: ${ids[1]}, type: '일으킴' }, { from: ${ids[1]}, to: ${ids[2]}, type: '대립' }, { from: ${ids[0]}, to: ${ids[2]}, type: '유사' }]); 0`);
+  await page.eval(`window.CmapMap.quizBegin([{ id: ${ids[0]}, term: 'a개념' }, { id: ${ids[1]}, term: 'b개념' }, { id: ${ids[2]}, term: 'c개념' }]); window.CmapMap.setMode('quiz'); window.CmapMap.quizSetAnswers([{ from: ${ids[0]}, to: ${ids[1]}, type: '일부' }, { from: ${ids[1]}, to: ${ids[2]}, type: '대립' }, { from: ${ids[0]}, to: ${ids[2]}, type: '종류' }]); 0`);
   await page.waitFor("document.querySelectorAll('#map-svg .m-edge').length === 3 && !!document.querySelector('#map-svg [data-answer]')", 4000, '퀴즈 지도');
   const q = await readStyle(page);
   check(q);

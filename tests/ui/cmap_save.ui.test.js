@@ -38,8 +38,8 @@ async function world(page) {
     await seed(page, 'POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: c[k].id });
     await seed(page, 'PATCH', `/api/cmap/maps/${map.id}/nodes/${c[k].id}`, { x: at[k][0], y: at[k][1] });
   }
-  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: c.a.id, to_concept_id: c.b.id, label: '가 to 나', relation_type: '일으킴' });
-  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: c.c.id, to_concept_id: c.d.id, label: '다 to 라', relation_type: '구별' });
+  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: c.a.id, to_concept_id: c.b.id, label: '가 to 나', relation_type: '종류' });
+  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: c.c.id, to_concept_id: c.d.id, label: '다 to 라', relation_type: '대립' });
   await page.eval('refresh()');
   await page.eval(`selectTopic(${sci.id}); 0`);
   await page.waitFor("!document.getElementById('concepts-sec').hidden", 4000);

@@ -12,27 +12,19 @@
   const ZMIN = 0.05, ZMAX = 3;         // 확대·축소 한도(개념학습의 MAP_MIN_SCALE / MAP_MAX_SCALE 와 같음)
   const zclamp = s => Math.max(ZMIN, Math.min(ZMAX, s));
   const TYPE_HINT = {
-    '': '관계 종류는 선택 사항이에요. 문구만 써도 됩니다.',
-    '사용': '앞 개념이 뒤 개념을 쓰거나, 뒤 개념에 기대는 관계예요.',
-    '일부': '앞 개념의 일부가 뒤 개념이에요. 화살촉이 있는 선으로 그려져요.',   // 307-1: 입력 방향은 앞=상위(저장된 연결 방향은 그대로)
-    '종류': '앞 개념의 한 종류가 뒤 개념이에요. 화살촉 없는 선으로 그려져요.',
-    '일으킴': '앞 개념이 뒤 개념을 일으켜요. 어떻게 일으키는지(작동 방식)를 문구에 적어 주세요. 예: 마찰이 열을 일으킴',
-    '구별': '헷갈리기 쉬운 두 개념이에요. 방향이 없어요.',
-    '선행': 'A 다음에 B가 와요 (순서·단계)',
-    '조건': 'A가 B의 전제·조건이에요',
-    '유사': 'A와 B는 비슷해요 (방향 없음)',
+    '': '관계 종류를 골라 주세요.',   // 308-1: 유형은 필수(옛 "선택 안 함" 없음) — 방어용
+    '종류': '앞 개념의 한 종류가 뒤 개념이에요. 화살촉 없는 선으로 그려져요.',   // 입력 방향은 앞=상위(저장된 연결 방향은 그대로)
+    '일부': '앞 개념의 일부가 뒤 개념이에요. 화살촉이 있는 선으로 그려져요.',
     '대립': 'A와 B는 반대되거나 맞서요 (방향 없음, 굵은 쌍방향 화살표로 그려져요)',
-    '연관': 'A와 B는 관련 있어요 (방향 없음)',
   };
-  // 286-1: 방향 없음 유형은 서버가 내려주는 목록(symmetric_types)을 따른다(열기 전 기본값은 4개)
-  const SYM_DEFAULT = ['구별', '유사', '대립', '연관'];
+  // 286-1: 방향 없음 유형은 서버가 내려주는 목록(symmetric_types)을 따른다(열기 전 기본값은 대립 1개, 308-1)
+  const SYM_DEFAULT = ['대립'];
   const isSym = t => (M.symTypes || SYM_DEFAULT).includes(t);
-  const TYPE_LABEL = { '사용': '사용(의존)' };
-  // 307-1: 화살촉은 "방향 있음/없음"과 따로 정한다. 종류 = 없음(방향은 배치로 읽음, 앞=상위), 일부 = 끝 화살촉, 대립 = 양쪽 화살촉(굵은 쌍방향),
-  //   옛 유형은 지금처럼: 구별·유사·연관은 없음, 사용·일으킴·선행·조건·종류 없음(null)은 끝 화살촉
+  // 308-1: 화살촉은 "방향 있음/없음"과 따로 정한다. 종류 = 없음(방향은 배치로 읽음, 앞=상위), 일부 = 끝 화살촉, 대립 = 양쪽 화살촉(굵은 쌍방향).
+  //   유형이 없거나 모르는 값이 들어와도(옛 서버 응답 등) 화면이 깨지지 않게 끝 화살촉 한 개로 그린다(방어 분기)
   function markersOf(type) {
     if (type === '대립') return { 'marker-start': 'url(#m-arrow-opp)', 'marker-end': 'url(#m-arrow-opp)' };
-    if (type === '종류' || isSym(type)) return {};
+    if (type === '종류') return {};
     return { 'marker-end': 'url(#m-arrow)' };
   }
   // 두 렌더러(render·renderQuiz)가 같은 정의를 쓴다. 대립 화살촉은 userSpaceOnUse 라 선이 굵어져도 크기가 변하지 않는다(약 9px)
@@ -41,15 +33,15 @@
       sv('marker', { id: 'm-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-path' })),
       sv('marker', { id: 'm-arrow-opp', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '9', markerHeight: '9', markerUnits: 'userSpaceOnUse', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'm-arrow-opp-path' })));
   }
-  // 연결 대화상자·퀴즈 대화상자의 유형 select 를 서버 목록으로 채운다(한 곳에서 관리). 방향 없음 유형에는 "(방향 없음)"을 붙이고 묶음으로 나눈다
-  function fillTypeSelects(types, sym, allTypes) {   // 307-1: 편집·일괄 연결 = types(새로 고를 3종), 퀴즈 = allTypes(전체 10종: 저장된 옛 연결을 맞힐 수 있어야 함)
+  // 연결 대화상자·퀴즈 대화상자의 유형 select 를 서버 목록(3종)으로 채운다(한 곳에서 관리). 방향 없음 유형에는 "(방향 없음)"을 붙이고 묶음으로 나눈다.
+  // 308-1: 새 연결·편집·일괄은 유형이 필수라 "선택 안 함"이 없고, 퀴즈 답에는 종류 없이 이은 답이 있을 수 있어 "선택 안 함"을 둔다
+  function fillTypeSelects(types, sym) {
     for (const id of ['edge-type', 'quiz-type', 'bulk-type']) {
-      const list = id === 'quiz-type' ? (allTypes && allTypes.length ? allTypes : types) : types;
       const sel = $(id), keep = sel.value;
       sel.textContent = '';
-      sel.append(h('option', { value: '', text: '선택 안 함' }));
+      if (id === 'quiz-type') sel.append(h('option', { value: '', text: '선택 안 함' }));
       const g1 = h('optgroup', { label: '방향 있음' }), g2 = h('optgroup', { label: '방향 없음' });
-      for (const t of list) (sym.includes(t) ? g2 : g1).append(h('option', { value: t, text: sym.includes(t) ? t + '(방향 없음)' : (TYPE_LABEL[t] || t) }));
+      for (const t of types) (sym.includes(t) ? g2 : g1).append(h('option', { value: t, text: sym.includes(t) ? t + '(방향 없음)' : t }));
       sel.append(g1, g2);
       sel.value = keep;
     }
@@ -286,8 +278,8 @@
     const r = await api('GET', '/api/cmap/topics/' + rootId + '/map');
     if (!okStatus(r)) { $('map-load-msg').textContent = errText(r, '지도를 불러오지 못했습니다.'); return false; }
     const b = r.body;
-    M.rootId = rootId; M.map = b.map; M.types = b.relation_types || []; M.allTypes = b.all_relation_types || M.types; M.symTypes = b.symmetric_types || SYM_DEFAULT;
-    fillTypeSelects(M.types, M.symTypes, M.allTypes);
+    M.rootId = rootId; M.map = b.map; M.types = b.relation_types || []; M.symTypes = b.symmetric_types || SYM_DEFAULT;
+    fillTypeSelects(M.types, M.symTypes);
     M.concepts = new Map(b.concepts.map(c => [c.id, c]));
     M.topics = b.topics;
     M.nodes = new Map(b.nodes.map(n => [n.concept_id, { x: n.x, y: n.y }]));
@@ -427,10 +419,12 @@
     $('edge-heading').textContent = mode === 'create' ? '연결 만들기' : '연결 고치기';
     $('edge-label').value = d.edge && d.edge.label ? d.edge.label : '';
     const sel = $('edge-type');
-    for (const o of [...sel.querySelectorAll('option[data-legacy]')]) o.remove();   // 지난번에 추가한 옛 유형 옵션은 지운다
-    const cur = d.edge && d.edge.relation_type ? d.edge.relation_type : '';
-    if (cur && !M.types.includes(cur)) sel.insertBefore(h('option', { value: cur, text: '(옛 유형) ' + (TYPE_LABEL[cur] || cur), 'data-legacy': '1' }), sel.children[1] || null);   // 307-1
-    sel.value = mode === 'create' ? ((M.types.includes('종류') && '종류') || '') : cur;   // 새 연결의 기본 선택은 종류, 유형이 없던 옛 연결은 '선택 안 함'
+    const cur = d.edge && M.types.includes(d.edge.relation_type) ? d.edge.relation_type : '';
+    sel.value = mode === 'create' || !cur ? (M.types.includes('종류') ? '종류' : '') : cur;   // 새 연결의 기본 선택은 종류(유형은 필수)
+    // 308-1: DB 변환으로 유형이 바뀐 연결은 원래 유형을 한 줄로 보여 준다. 유형을 직접 고쳐 저장하면 서버가 legacy_type 을 비워 이 줄이 사라진다
+    const lg = d.edge && d.edge.legacy_type ? d.edge.legacy_type : '';
+    $('edge-legacy').textContent = lg ? (lg === '없음' ? '원래 유형: 없음(문구만 있었음)' : '원래 유형: ' + lg + '(변환됨)') : '';
+    $('edge-legacy').hidden = !lg;
     $('edge-msg').textContent = '';
     $('edge-delete').hidden = mode !== 'edit';
     refreshEdgeDialog();
@@ -443,7 +437,7 @@
     $('edge-flip').disabled = sym;                       // 방향 없음 유형은 방향을 바꿀 수 없다
     $('edge-type-hint').textContent = TYPE_HINT[type] || TYPE_HINT[''];
     // 문구는 선택: 비우면 유형 이름이 선 위에 표시된다(유형을 고르면 그 이름으로 안내)
-    $('edge-label-hint').textContent = type ? '비우면 ‘' + type + '’처럼 유형 이름이 표시돼요' : '비우면 유형 이름이 표시돼요. 유형을 고르거나 문구를 입력해 주세요';
+    $('edge-label-hint').textContent = type ? '비우면 ‘' + type + '’처럼 유형 이름이 표시돼요' : '비우면 유형 이름이 표시돼요';
   }
   function setupEdgeDialog() {
     $('edge-type').addEventListener('change', refreshEdgeDialog);
@@ -468,7 +462,7 @@
       ev.preventDefault();
       const label = $('edge-label').value.trim();
       const type = $('edge-type').value || null;
-      if (!label && !type) { $('edge-msg').textContent = '유형을 고르거나 문구를 입력해 주세요.'; return; }   // 286-1: 문구는 선택이지만 둘 다 없는 연결은 만들 수 없다
+      if (!type) { $('edge-msg').textContent = '관계 종류를 골라 주세요.'; return; }   // 308-1: 유형은 필수   // 286-1: 문구는 선택이지만 둘 다 없는 연결은 만들 수 없다
       setBusy($('edge-ok'), true);
       let r;
       if (ED.mode === 'create') r = await api('POST', '/api/cmap/maps/' + M.map.id + '/edges', { from_concept_id: ED.from, to_concept_id: ED.to, label: label || null, relation_type: type });
@@ -512,9 +506,9 @@
     $('bulk-count').textContent = n + '개 선택';
     $('bulk-all').disabled = BK.busy;
     $('bulk-type-hint').textContent = TYPE_HINT[type] || TYPE_HINT[''];
-    $('bulk-label-hint').textContent = type ? '비우면 ‘' + type + '’처럼 유형 이름이 표시돼요' : '비우면 유형 이름이 표시돼요. 유형을 고르거나 문구를 입력해 주세요';
+    $('bulk-label-hint').textContent = type ? '비우면 ‘' + type + '’처럼 유형 이름이 표시돼요' : '비우면 유형 이름이 표시돼요';
     $('bulk-dir').textContent = isSym(type) ? '방향 없이 연결돼요' : '‘' + termOf(BK.from) + '’ → 선택한 개념들 방향으로 만들어져요';
-    const needMore = n === 0 ? '연결할 개념을 하나 이상 골라 주세요' : (!type && !label) ? '유형을 고르거나 문구를 입력해 주세요' : '';
+    const needMore = n === 0 ? '연결할 개념을 하나 이상 골라 주세요' : !type ? '관계 종류를 골라 주세요' : '';
     $('bulk-hint').textContent = needMore;
     $('bulk-ok').disabled = BK.busy || !!needMore;
     $('bulk-ok').textContent = BK.busy ? '만드는 중…' : n ? '연결 ' + n + '개 만들기' : '연결 만들기';

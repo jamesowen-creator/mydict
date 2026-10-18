@@ -32,8 +32,8 @@ async function world(page, { wide = false } = {}) {
   const map = (await seed(page, 'GET', `/api/cmap/topics/${sci.id}/map`)).map;
   const at = wide ? [[0, 0], [60, 100], [2000, 0], [2000, 100]] : [[20, 20], [200, 130], [20, 130], [200, 20]];
   for (let i = 0; i < 4; i++) { await seed(page, 'POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: ids[i] }); await seed(page, 'PATCH', `/api/cmap/maps/${map.id}/nodes/${ids[i]}`, { x: at[i][0], y: at[i][1] }); }
-  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[1], label: '만든다', relation_type: '일으킴' });
-  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[2], to_concept_id: ids[3], label: '헷갈림', relation_type: '구별' });
+  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[1], label: '만든다', relation_type: '종류' });
+  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[2], to_concept_id: ids[3], label: '헷갈림', relation_type: '대립' });
   await seed(page, 'POST', `/api/cmap/maps/${map.id}/save`);
   await page.eval('refresh()'); await page.eval(`selectTopic(${sci.id}); 0`);
   await page.waitFor("document.querySelectorAll('#concept-list > *').length >= 4", 6000, '개념 목록');

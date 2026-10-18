@@ -32,8 +32,8 @@ async function world(page, srv, { n = 30 } = {}) {
   const map = (await seed(page, 'GET', `/api/cmap/topics/${sci.id}/map`)).map;
   const at = [[150, 20], [20, 130], [280, 130], [150, 240]];
   for (let i = 0; i < 4; i++) { await seed(page, 'POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: ids[i] }); await seed(page, 'PATCH', `/api/cmap/maps/${map.id}/nodes/${ids[i]}`, { x: at[i][0], y: at[i][1] }); }
-  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[1], label: '만든다', relation_type: '일으킴' });
-  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[2], to_concept_id: ids[0], label: '클수록', relation_type: '사용' });
+  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[1], label: '만든다', relation_type: '종류' });
+  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[2], to_concept_id: ids[0], label: '클수록', relation_type: '일부' });
   await seed(page, 'POST', `/api/cmap/maps/${map.id}/save`);
   srv.anthropic.handler = p => /개념 지도를 읽고/.test(p.system || '')
     ? JSON.stringify({ summary: '요약입니다.', story: [{ text: '개념0 과 개념1 과 개념2 이야기입니다. 개념3 은 따로입니다.', concept_ids: ids.slice(0, 4) }], mnemonic: ['기억'], suggestions: [{ term: '운동량', reason: '이유', near_concept_id: ids[0] }] })

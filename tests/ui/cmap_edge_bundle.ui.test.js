@@ -36,10 +36,10 @@ async function build(t, { title, terms, at, edges }) {
   await page.click('#map-fit');
   return { page, ids, edges: made };
 }
-// 부모 a 가 위, 자식 b·c·d 가 아래(같은 줄). 연결: a→b·c·d 모두 '일으킴'+문구 '열'(한 다발), a→e '사용'(별도 다발), b→c 유사(방향 없음)
+// 부모 a 가 위, 자식 b·c·d 가 아래(같은 줄). 연결: a→b·c·d 모두 '일부'+문구 '열'(한 다발), a→e '종류'(별도 다발, 화살촉 없음), b→c 대립(굵은 쌍방향)
 const world = t => build(t, {
   title: '과학', terms: ['a개념', 'b개념', 'c개념', 'd개념', 'e개념'], at: [[200, 20], [20, 200], [200, 200], [380, 200], [560, 200]],
-  edges: [[0, 1, '일으킴', '열'], [0, 2, '일으킴', '열'], [0, 3, '일으킴', '열'], [0, 4, '사용', '쓴다'], [1, 2, '유사', '닮음']],
+  edges: [[0, 1, '일부', '열'], [0, 2, '일부', '열'], [0, 3, '일부', '열'], [0, 4, '종류', '쓴다'], [1, 2, '대립', '닮음']],
 });
 const rows = page => page.eval(`[...document.querySelectorAll('#map-svg .m-edge')].map(g => ({ id: Number(g.dataset.edge), t: g.dataset.t, role: g.getAttribute('role'), tab: g.getAttribute('tabindex'), aria: g.getAttribute('aria-label'),
   d: g.querySelector('.m-edge-line').getAttribute('d'), hit: g.querySelector('.m-edge-hit').getAttribute('d'), marker: g.querySelector('.m-edge-line').getAttribute('marker-end'), label: g.querySelector('.m-edge-label').textContent, n: g.children.length,
@@ -68,9 +68,9 @@ test('편집 시트: 같은 부모·종류 3개는 곡선 다발(M C, 시작이 
   const sx = bundle.map(b => pts(b.d)[0]);
   assert.equal(sx[1] - sx[0], 6); assert.equal(sx[2] - sx[1], 6);
   assert.equal(bundle.filter(b => b.label === '열').length, 1, '문구가 같으면 다발에 라벨 한 번'); assert.equal(bundle.filter(b => b.label === '').length, 2);
-  assert.ok(isCurve(usage.d) && usage.label === '쓴다' && usage.marker === 'url(#m-arrow)', '종류가 다른 연결은 별도 다발(자식 1개도 다발)');
+  assert.ok(isCurve(usage.d) && usage.label === '쓴다' && usage.marker === null, '종류가 다른 연결은 별도 다발(자식 1개도 다발), 종류는 화살촉 없음');
   assert.equal(pts(usage.d)[0] - sx[2], 16, '종류가 다른 다발과의 간격 BUNDLE_GAP');
-  assert.ok(isCurve(sym.d) && sym.marker === null && sym.label === '닮음', '방향 없음은 지금 방식');
+  assert.ok(isCurve(sym.d) && sym.marker === 'url(#m-arrow-opp)' && sym.label === '닮음', '대립은 다발이 아닌 곡선, 대립용 화살촉');
   noErrors(page);
 });
 
@@ -98,8 +98,8 @@ test('퀴즈 모드도 같은 규칙(같은 부모 + 같은 종류 이름)으로
   const pos = await page.eval(`[...document.querySelectorAll('#map-svg .m-node')].map(g => { const m = g.getAttribute('transform').match(/-?[\\d.]+/g).map(Number); return { id: Number(g.dataset.node), x: m[0], y: m[1] }; })`);
   // 퀴즈 노드는 결정적으로 흩어진다: 다발이 성립하는 부모+자식 2개를 같은 방식으로 찾는다
   const pick = await page.eval(`(() => { const pos = ${JSON.stringify(pos)}; for (const p of pos) { const low = pos.filter(n => n.y >= p.y + 44 + CmapEdgeRoute.MIN_GAP && n.id !== p.id);
-    for (let i = 0; i < low.length; i++) for (let j = i + 1; j < low.length; j++) { const ans = [low[i], low[j]].map(k => ({ from: p.id, to: k.id, type: '선행' }));
-      const r = CmapEdgeRoute.routeAll(pos, ans.map(a => ({ key: a.from + '-' + a.to, from: a.from, to: a.to, label: '선행', type: '선행' })));
+    for (let i = 0; i < low.length; i++) for (let j = i + 1; j < low.length; j++) { const ans = [low[i], low[j]].map(k => ({ from: p.id, to: k.id, type: '일부' }));
+      const r = CmapEdgeRoute.routeAll(pos, ans.map(a => ({ key: a.from + '-' + a.to, from: a.from, to: a.to, label: '일부', type: '일부' })));
       if ([...r.values()].every(v => v.group)) return ans; } } return null; })()`);
   assert.ok(pick, '이 흩어짐에서 다발이 성립하는 부모가 있어야 테스트가 의미 있음');
   const show = async answers => {
@@ -112,9 +112,9 @@ test('퀴즈 모드도 같은 규칙(같은 부모 + 같은 종류 이름)으로
   assert.deepEqual(q.map(x => x.a).sort(), pick.map(a => a.from + '-' + a.to).sort(), 'data-answer 유지');
   for (const [k, d, g] of e1) { assert.equal(q.find(x => x.a === k).d, d, '퀴즈 화면의 선은 routeAll 결과와 같다: ' + k); assert.ok(g, '다발'); }
   for (const x of q) { assert.ok(isCurve(x.d)); assert.equal(x.marker, 'url(#m-arrow)'); assert.equal(x.hit, false, '퀴즈에는 클릭 영역 없음(기존)'); }
-  assert.equal(q.filter(x => x.label === '선행').length, 1, '다발 라벨은 한 번'); assert.equal(q.filter(x => x.label === '').length, 1);
+  assert.equal(q.filter(x => x.label === '일부').length, 1, '다발 라벨은 한 번'); assert.equal(q.filter(x => x.label === '').length, 1);
   // 종류가 다르면 다른 다발(라벨은 각자)
-  const mixed = [{ ...pick[0] }, { ...pick[1], type: '조건' }];
+  const mixed = [{ ...pick[0] }, { ...pick[1], type: '종류' }];
   const q2 = await show(mixed), e2 = await expect(mixed);
   for (const [k, d] of e2) assert.equal(q2.find(x => x.a === k).d, d, '종류가 다른 경우도 routeAll 결과와 같다: ' + k);
   assert.notEqual(e2[0][2], e2[1][2], '종류가 다르면 다른 다발(group)');
@@ -133,8 +133,9 @@ test('PDF: 만든 SVG 에 다발 곡선(한 개의 M C)·선 굵기·화살촉 �
     return { lines: [...d.querySelectorAll('.m-edge-line')].map(el => ({ d: el.getAttribute('d'), style: el.getAttribute('style') || '', marker: el.getAttribute('marker-end') })), labels: [...d.querySelectorAll('.m-edge-label')].map(el => el.textContent), hit: d.querySelectorAll('.m-edge-hit').length, mk: [d.querySelector('marker#m-arrow') && d.querySelector('marker#m-arrow').getAttribute('markerWidth')] }; })()`);
   assert.equal(doc.lines.length, 5);
   assert.ok(doc.lines.every(l => isCurve(l.d)), '모든 선이 M C 한 개');
-  for (const l of doc.lines) assert.match(l.style, /stroke-width:\s*1\.2(px)?(;|$)/);
-  assert.equal(doc.lines.filter(l => l.marker === 'url(#m-arrow)').length, 4, '방향 있는 4개에 화살촉');
+  assert.equal(doc.lines.filter(l => /stroke-width:\s*2\.2(px)?(;|$)/.test(l.style)).length, 1, '대립만 2.2'); assert.equal(doc.lines.filter(l => /stroke-width:\s*1\.2(px)?(;|$)/.test(l.style)).length, 4);
+  assert.equal(doc.lines.filter(l => l.marker === 'url(#m-arrow)').length, 3, '일부 3개에 일반 화살촉(종류는 없음, 대립은 대립용 화살촉)');
+  assert.equal(doc.lines.filter(l => l.marker === 'url(#m-arrow-opp)').length, 1, '대립 1개');
   assert.equal(doc.labels.filter(x => x === '열').length, 1, '다발 라벨 한 번');
   assert.equal(doc.hit, 0); assert.deepEqual(doc.mk, ['7']);
   noErrors(page);

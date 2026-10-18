@@ -37,8 +37,8 @@ async function world(page) {
   const map = (await seed(page, 'GET', `/api/cmap/topics/${sci.id}/map`)).map;
   const at = { force: [150, 20], acc: [20, 140], mass: [280, 140], iso: [150, 260] };
   for (const k of Object.keys(at)) { await seed(page, 'POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: c[k] }); await seed(page, 'PATCH', `/api/cmap/maps/${map.id}/nodes/${c[k]}`, { x: at[k][0], y: at[k][1] }); }
-  const e1 = (await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: c.force, to_concept_id: c.acc, label: '힘이 가속도를 만든다', relation_type: '일으킴' })).edge;
-  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: c.mass, to_concept_id: c.force, label: '질량이 클수록 힘이 필요', relation_type: '사용' });
+  const e1 = (await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: c.force, to_concept_id: c.acc, label: '힘이 가속도를 만든다', relation_type: '종류' })).edge;
+  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: c.mass, to_concept_id: c.force, label: '질량이 클수록 힘이 필요', relation_type: '일부' });
   await page.eval('refresh()');
   await page.eval(`selectTopic(${sci.id}); 0`);
   await page.waitFor("!document.getElementById('concepts-sec').hidden", 4000);

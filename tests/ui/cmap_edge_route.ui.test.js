@@ -41,7 +41,7 @@ const pathPts = d => d.match(/-?\d+(\.\d+)?/g).map(Number);
 
 test('같은 열의 두 노드는 위/아래 면으로 이어진다(오른쪽으로 도는 선이 없고, 조금 어긋난 열도 같다) — 화살촉·클릭 영역 유지', { skip: SKIP, timeout: 60000 }, async t => {
   const { page } = await open(t);
-  const w = await world(page, [[100, 20], [100, 220], [108, 400]], [[0, 1, '선행', null], [1, 2, '조건', '전제']]);
+  const w = await world(page, [[100, 20], [100, 220], [108, 400]], [[0, 1, '일부', null], [1, 2, '일부', '전제']]);
   const rows = await page.eval(`[...document.querySelectorAll('#map-svg .m-edge')].map(g => ({ d: g.querySelector('.m-edge-line').getAttribute('d'), marker: g.querySelector('.m-edge-line').getAttribute('marker-end'), hit: !!g.querySelector('.m-edge-hit') }))`);
   assert.equal(rows.length, 2);
   const nodeY = await page.eval(`Object.fromEntries(window.CmapMap._state().nodes.map(n => [n.id, [n.x, n.y]]))`);
@@ -61,7 +61,7 @@ test('같은 열의 두 노드는 위/아래 면으로 이어진다(오른쪽으
 test('한 노드에서 나가는 선 여러 개는 접속점이 나뉘고(경로 시작점이 모두 다름, 면 안), 라벨 글자끼리 겹치지 않으며, 대립은 굵은 실선·적색·양쪽 화살촉, 종류·방향 없음은 화살촉 없음', { skip: SKIP, timeout: 60000 }, async t => {
   const { page } = await open(t);
   const pos = [[150, 20], [0, 220], [150, 220], [300, 220], [150, 420]];
-  const w = await world(page, pos, [[0, 1, '일부', '일부'], [0, 2, '종류', '종류'], [0, 3, '대립', '반대'], [0, 4, '유사', null]]);
+  const w = await world(page, pos, [[0, 1, '일부', '일부'], [0, 2, '종류', '종류'], [0, 3, '대립', '반대'], [0, 4, '종류', null]]);
   const rows = await page.eval(`[...document.querySelectorAll('#map-svg .m-edge')].map(g => ({ d: g.querySelector('.m-edge-line').getAttribute('d'), marker: g.querySelector('.m-edge-line').getAttribute('marker-end'), opp: g.classList.contains('m-edge-opp'), dash: getComputedStyle(g.querySelector('.m-edge-line')).strokeDasharray }))`);
   assert.equal(rows.length, 4);
   const starts = rows.map(r => pathPts(r.d).slice(0, 2));
@@ -79,13 +79,13 @@ test('한 노드에서 나가는 선 여러 개는 접속점이 나뉘고(경로
   // 307-1: 대립 = 굵은 실선 + 양쪽 화살촉(대립용 marker), 종류·옛 유사 = 화살촉 없음, 일부 = 끝 화살촉
   assert.equal(opp.length, 1); assert.equal(opp[0].dash, 'none', '점선 폐지'); assert.equal(opp[0].marker, 'url(#m-arrow-opp)', '대립은 끝 화살촉(대립용 marker)');
   assert.equal(sym.length, 2, '종류·유사 = 화살촉 없음 2개'); assert.equal(rows.filter(r => r.marker === 'url(#m-arrow)').length, 1, '일부만 일반 화살촉');
-  assert.equal(await page.eval("[...document.querySelectorAll('#map-svg .m-edge-label')].map(t => t.textContent).sort().join(',')"), ['반대', '유사', '일부', '종류'].sort().join(','), '문구가 없으면 유형 이름');
+  assert.equal(await page.eval("[...document.querySelectorAll('#map-svg .m-edge-label')].map(t => t.textContent).sort().join(',')"), ['반대', '종류', '일부', '종류'].sort().join(','), '문구가 없으면 유형 이름');
   noErrors(page);
 });
 
 test('가로로 멀리 놓인 노드는 오른쪽 → 왼쪽 면으로 이어지고, 배치 최적화 미리보기에서도 선이 계속 그려지며 좌표는 적용 전까지 저장되지 않는다', { skip: SKIP, timeout: 60000 }, async t => {
   const { srv, page } = await open(t);
-  const w = await world(page, [[100, 20], [500, 40], [100, 300]], [[0, 1, '사용', '쓴다'], [0, 2, '일부', '일부']]);
+  const w = await world(page, [[100, 20], [500, 40], [100, 300]], [[0, 1, '일부', '쓴다'], [0, 2, '일부', '일부']]);
   const before = JSON.stringify(srv.db.nodes.map(n => [n.concept_id, n.x, n.y]));
   const d = await page.eval("[...document.querySelectorAll('.m-edge-line')].map(l => l.getAttribute('d'))");
   const horiz = pathPts(d[0]);

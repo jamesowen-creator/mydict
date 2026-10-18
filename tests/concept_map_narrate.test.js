@@ -3,7 +3,7 @@
 // 서버는 t.after 로 종료한다. 실행: node --test tests/concept_map_narrate.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createCmapDb, legacyEdgeCall } = require('./helpers/cmap_db');
+const { createCmapDb } = require('./helpers/cmap_db');
 
 process.env.ADMIN_EMAILS = 'u7@example.com';
 const { startApp, createAnthropicMock } = require('./helpers/app');
@@ -17,7 +17,7 @@ async function setup({ cap } = {}) {
   db.addUser(7, { perm_concept_map: true, role: 'admin' });
   const anthropic = createAnthropicMock();
   const t = await startApp(['routes/concept_map.js', 'routes/admin.js'], { db, anthropic });
-  const call = legacyEdgeCall(db, (method, url, body, user = 1) => t.call(method, url, body, { user }));   // 307-1: 옛 유형 연결은 "이미 저장된" 상태로 직접 넣는다
+  const call = (method, url, body, user = 1) => t.call(method, url, body, { user });
   const topic = async (title, parent_id, user = 1) => (await call('POST', '/api/cmap/topics', parent_id === undefined ? { title } : { title, parent_id }, user)).body.topic;
   const concept = async (topicId, body, user = 1) => (await call('POST', `/api/cmap/topics/${topicId}/concepts`, typeof body === 'string' ? { term: body } : body, user)).body.concept;
   const events = name => db.tables.api_usage.filter(r => r.event_type === name);
@@ -29,8 +29,8 @@ async function setup({ cap } = {}) {
     const mass = await concept(sci.id, '질량'); const iso = await concept(phys.id, '에너지'); const vel = await concept(phys.id, '속도');
     const map = (await call('GET', `/api/cmap/topics/${sci.id}/map`)).body.map;
     for (const c of [force, acc, mass, iso]) await call('POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: c.id });
-    const e1 = (await call('POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: force.id, to_concept_id: acc.id, label: '힘이 가속도를 만든다', relation_type: '일으킴' })).body.edge;
-    await call('POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: mass.id, to_concept_id: force.id, label: '질량이 클수록 힘이 더 필요', relation_type: '사용' });
+    const e1 = (await call('POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: force.id, to_concept_id: acc.id, label: '힘이 가속도를 만든다', relation_type: '종류' })).body.edge;
+    await call('POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: mass.id, to_concept_id: force.id, label: '질량이 클수록 힘이 더 필요', relation_type: '일부' });
     if (save) await call('POST', `/api/cmap/maps/${map.id}/save`);
     const ids = { force: force.id, acc: acc.id, mass: mass.id, iso: iso.id, vel: vel.id };
     return { sci, phys, map, ids, e1, nar: () => call('POST', `/api/cmap/maps/${map.id}/narrate`), get: () => call('GET', `/api/cmap/maps/${map.id}/narration`) };
@@ -82,7 +82,7 @@ test('성공: 입력은 서버가 DB 에서 만든 JSON(개념 id·설명·연�
   assert.equal(data['지도 개념'].find(c => c['용어'] === '가속도')['영문'], 'acceleration');
   assert.equal(data['지도 개념'].find(c => c['용어'] === '에너지')['저장된 설명'], null);
   assert.equal(data['연결'].length, 2);
-  assert.deepEqual(data['연결'].find(e => e.from === '힘'), { from: '힘', to: '가속도', '종류': '일으킴', '문구': '힘이 가속도를 만든다' });
+  assert.deepEqual(data['연결'].find(e => e.from === '힘'), { from: '힘', to: '가속도', '종류': '종류', '문구': '힘이 가속도를 만든다' });
   assert.deepEqual(data['지도에 없는 저장 개념'], ['속도']);
   assert.equal(data['목표 본문 길이(자)'], 400, '개념당 약 100자');
   assert.equal(r.body.narration.content.summary, good(w).summary);

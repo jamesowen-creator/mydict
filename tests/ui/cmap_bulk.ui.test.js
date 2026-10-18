@@ -33,7 +33,7 @@ async function world(page) {
   const map = (await seed(page, 'GET', `/api/cmap/topics/${top.id}/map`)).map;
   const at = [[130, 20], [20, 150], [250, 150], [130, 280]];
   for (const [i, id] of ids.entries()) { await seed(page, 'POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: id }); await seed(page, 'PATCH', `/api/cmap/maps/${map.id}/nodes/${id}`, { x: at[i][0], y: at[i][1] }); }
-  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[1], relation_type: '사용', label: '기존' });
+  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[1], relation_type: '종류', label: '기존' });   // 308-1: 기존 연결은 종류(화살촉 없음) — 일괄로 만드는 일부와 다른 다발이라 라벨·화살촉이 따로 센다
   await seed(page, 'POST', `/api/cmap/maps/${map.id}/save`);
   await page.eval('refresh()');
   await page.eval(`Nav.enterTopic(${top.id}).then(() => 0)`);
@@ -89,11 +89,11 @@ test('대화상자(390px): 시작 개념 고정, 이미 연결된 노드는 비�
   assert.equal(await page.eval("document.getElementById('bulk-type').value"), '종류', '307-1: 새 연결의 기본 유형은 종류');
   await setSel(page, 'bulk-type', '');
   assert.equal(await page.eval("document.getElementById('bulk-ok').disabled"), true, '유형도 문구도 없음');
-  assert.equal(await page.text('#bulk-hint'), '유형을 고르거나 문구를 입력해 주세요');
+  assert.equal(await page.text('#bulk-hint'), '관계 종류를 골라 주세요');   // 308-1: 유형은 필수
   // 유형 select: 서버가 내려준 새로 고를 3종(307-1)
   const opts = await page.eval("[...document.querySelectorAll('#bulk-type option')].map(o => [o.value, o.parentElement.label || ''])");
-  assert.deepEqual(opts.map(o => o[0]), ['', '종류', '일부', '대립']);
-  assert.deepEqual([...new Set(opts.map(o => o[1]))], ['', '방향 있음', '방향 없음']);
+  assert.deepEqual(opts.map(o => o[0]), ['종류', '일부', '대립']);
+  assert.deepEqual([...new Set(opts.map(o => o[1]))], ['방향 있음', '방향 없음']);
   // 방향 안내
   await setSel(page, 'bulk-type', '일부');
   assert.equal(await page.text('#bulk-type-hint'), '앞 개념의 일부가 뒤 개념이에요. 화살촉이 있는 선으로 그려져요.');
@@ -104,8 +104,10 @@ test('대화상자(390px): 시작 개념 고정, 이미 연결된 노드는 비�
   assert.equal(await page.text('#bulk-dir'), '방향 없이 연결돼요');
   await setSel(page, 'bulk-type', '');
   assert.equal(await page.eval("document.getElementById('bulk-ok').disabled"), true);
-  await page.type('#bulk-label', '문구만');                                                 // 문구만으로도 가능
-  assert.equal(await page.eval("document.getElementById('bulk-ok').disabled"), false);
+  await page.type('#bulk-label', '문구만');                                                 // 308-1: 유형은 필수라 문구만으로는 만들 수 없다
+  assert.equal(await page.eval("document.getElementById('bulk-ok').disabled"), true, '문구만으로는 비활성');
+  await setSel(page, 'bulk-type', '종류');
+  assert.equal(await page.eval("document.getElementById('bulk-ok').disabled"), false, '유형을 고르면 활성');
   // 체크 해제 → 0개이면 다시 비활성, [모두 선택]은 이미 연결됨을 건너뜀
   await page.click('#bulk-pick-' + w.ids[2]); await page.click('#bulk-pick-' + w.ids[3]);
   assert.equal(await page.eval("document.getElementById('bulk-ok').disabled"), true);
@@ -128,10 +130,10 @@ test('성공: 선 n개가 그려지고(방향 있음은 화살촉), 상태가 "�
   await page.waitFor("!document.getElementById('bulk-dlg').open", 6000, '대화상자 닫힘');
   await page.waitFor("document.querySelectorAll('#map-svg .m-edge').length === 3", 4000, '선 3개');
   assert.deepEqual(srv.db.edges.map(e => [e.from_concept_id, e.to_concept_id, e.relation_type, e.label]).slice(1), [[w.ids[0], w.ids[2], '일부', null], [w.ids[0], w.ids[3], '일부', null]]);
-  assert.equal(await page.eval("document.querySelectorAll('#map-svg .m-edge .m-edge-line[marker-end]').length"), 3, '방향 있음은 화살촉');
+  assert.equal(await page.eval("document.querySelectorAll('#map-svg .m-edge .m-edge-line[marker-end]').length"), 2, '308-1: 일부 2개만 끝 화살촉(기존 종류는 화살촉 없음)');
   // 302-1: 같은 부모(a개념)에서 나가는 같은 종류('일부')·같은 문구(문구가 없어 유형 이름) 연결 2개는 한 줄기로 묶여 라벨이 한 번만 나온다(문구가 없으면 유형 이름 — 묶이지 않았다면 2개)
   assert.equal(await page.eval("[...document.querySelectorAll('#map-svg .m-edge-label')].filter(e => e.textContent === '일부').length"), 1, '문구가 없으면 유형 이름, 다발에는 한 번만');
-  // 304-1: 방향 있는 선 3개(기존 사용 1 + 일부 2)는 모두 곡선 한 개(M C)이고, 같은 부모의 같은 종류(일부) 2개는 부모 아래 면에서 6px(STRAND_GAP) 간격으로 나란히 출발한다
+  // 304-1: 방향 있는 선 3개(기존 종류 1 + 일부 2)는 모두 곡선 한 개(M C)이고, 같은 부모의 같은 종류(일부) 2개는 부모 아래 면에서 6px(STRAND_GAP) 간격으로 나란히 출발한다
   const ds = await page.eval("[...document.querySelectorAll('#map-svg .m-edge-line')].map(p => p.getAttribute('d'))");
   assert.equal(ds.filter(d => /^M[-\d.]+,[-\d.]+ C[-\d.]+,[-\d.]+ [-\d.]+,[-\d.]+ [-\d.]+,[-\d.]+$/.test(d)).length, 3, '곡선 한 개(M C) 3개');
   const sx = ds.slice(1).map(d => Number(d.match(/^M([-\d.]+),/)[1])), sy = ds.slice(1).map(d => Number(d.match(/^M[-\d.]+,([-\d.]+)/)[1]));
@@ -167,7 +169,7 @@ test('건너뜀 안내: 그 사이 다른 곳에서 이미 연결된 쌍은 서�
   await openBulk(page, w.ids[0]);
   await page.click('#bulk-pick-' + w.ids[2]); await page.click('#bulk-pick-' + w.ids[3]);
   await setSel(page, 'bulk-type', '종류');
-  await seed(page, 'POST', `/api/cmap/maps/${w.map.id}/edges`, { from_concept_id: w.ids[3], to_concept_id: w.ids[0], relation_type: '사용' });   // 화면이 모르는 새 연결(d → a)
+  await seed(page, 'POST', `/api/cmap/maps/${w.map.id}/edges`, { from_concept_id: w.ids[3], to_concept_id: w.ids[0], relation_type: '일부' });   // 화면이 모르는 새 연결(d → a)
   await page.click('#bulk-ok');
   await page.waitFor("!document.getElementById('bulk-dlg').open", 6000);
   assert.equal(await page.text('#map-note'), '연결 1개를 만들었어요. 1개는 이미 연결돼 있어 건너뛰었어요');

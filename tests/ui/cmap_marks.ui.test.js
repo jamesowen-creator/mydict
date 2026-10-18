@@ -44,7 +44,7 @@ async function world(page) {
   const map = (await seed(page, 'GET', `/api/cmap/topics/${sci.id}/map`)).map;
   const at = { force: [150, 20], mass: [20, 130], fric: [280, 130], long: [150, 240] };
   for (const k of Object.keys(ids)) { await seed(page, 'POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: ids[k] }); await seed(page, 'PATCH', `/api/cmap/maps/${map.id}/nodes/${ids[k]}`, { x: at[k][0], y: at[k][1] }); }
-  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids.force, to_concept_id: ids.mass, label: '만든다', relation_type: '일으킴' });
+  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids.force, to_concept_id: ids.mass, label: '만든다', relation_type: '종류' });
   await seed(page, 'POST', `/api/cmap/maps/${map.id}/save`);
   await gotoMap(page, sci.id);
   return { sci, ids, map };

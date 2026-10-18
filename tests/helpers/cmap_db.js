@@ -7,7 +7,7 @@ const { createMockDb } = require('./mock_db');
 function dbError(code, message) { const e = new Error(message); e.code = code; return e; }
 const lower = s => String(s).toLowerCase();
 const len = s => Array.from(String(s)).length;
-const REL = ['사용', '일부', '종류', '일으킴', '선행', '조건', '구별', '유사', '대립', '연관'];   // 286-1: DB CHECK 와 같은 10값
+const REL = ['종류', '일부', '대립'];   // 308-1: DB 37번 단계 이후의 CHECK 와 같은 3값(relation_type 은 NOT NULL)
 const TABLES = ['cmap_topics', 'cmap_concepts', 'cmap_maps', 'cmap_map_nodes', 'cmap_edges', 'cmap_narrations', 'cmap_quiz_attempts', 'cmap_concept_marks', 'cmap_answer_attempts'];
 
 function createCmapDb() {
@@ -44,7 +44,8 @@ function createCmapDb() {
     // 286-1: 문구는 NULL 허용(값이 있으면 1~40자·공백만 아님), 유형도 문구도 없으면 거부
     if (row.label !== null && row.label !== undefined && (typeof row.label !== 'string' || len(row.label) < 1 || len(row.label) > 40 || row.label.trim() === '')) throw dbError('23514', 'cmap_edges label check');
     if ((row.label === null || row.label === undefined) && (row.relation_type === null || row.relation_type === undefined)) throw dbError('23514', 'cmap_edges has_content check');
-    if (row.relation_type !== null && row.relation_type !== undefined && !REL.includes(row.relation_type)) throw dbError('23514', 'cmap_edges relation_type check');
+    if (row.relation_type === null || row.relation_type === undefined) throw dbError('23502', 'cmap_edges relation_type NOT NULL');
+    if (!REL.includes(row.relation_type)) throw dbError('23514', 'cmap_edges relation_type check');
     if (row.from_concept_id === row.to_concept_id) throw dbError('23514', 'cmap_edges from<>to check');
     const others = db.edges.filter(o => o !== self && o.id !== row.id && o.map_id === row.map_id);
     if (others.some(o => o.from_concept_id === row.from_concept_id && o.to_concept_id === row.to_concept_id)) throw dbError('23505', 'duplicate key (cmap_edges map,from,to)');
@@ -125,7 +126,7 @@ function createCmapDb() {
     cmap_concepts: () => ({ id: db.seq.c++, created_at: new Date(), updated_at: new Date(), sort_order: 0, content_source: 'manual', english: null, memo: null, explanation: null, explanation_source: null, explained_at: null }),
     cmap_maps: () => ({ id: db.seq.m++, created_at: new Date(), updated_at: new Date(), semantic_hash: null, saved_at: null }),
     cmap_map_nodes: () => ({ x: null, y: null }),
-    cmap_edges: () => ({ id: db.seq.e++, created_at: new Date(), relation_type: null }),
+    cmap_edges: () => ({ id: db.seq.e++, created_at: new Date(), relation_type: null, legacy_type: null }),
     cmap_narrations: () => ({ id: db.seq.n++, created_at: new Date() }),
     cmap_quiz_attempts: () => ({ id: db.seq.q++, created_at: new Date() }),
     cmap_concept_marks: () => ({ marked_at: new Date() }),
@@ -205,22 +206,4 @@ function createCmapDb() {
   return db;
 }
 
-// 307-1: 옛 7종(사용·일으킴·선행·조건·구별·유사·연관)은 이제 API 로 새로 만들 수 없다. "이미 저장된 옛 유형 연결"이 있는 상태를 만들려고, 옛 유형으로 연결을 만드는 POST 만
-// 가짜 DB 에 행을 직접 넣는다(서버 검증을 거치지 않음. 방향 없음 정규화·같은 쌍 한 번만은 옛 서버와 같게). 그 밖의 호출은 그대로 서버로 보낸다.
-const LEGACY_ONLY_TYPES = ['사용', '일으킴', '선행', '조건', '구별', '유사', '연관'];
-function legacyEdgeCall(db, call) {
-  const M = require('../../lib/cmap_map');
-  return (method, url, body, user = 1) => {
-    const m = method === 'POST' && /^\/api\/cmap\/maps\/(\d+)\/edges$/.exec(url);
-    if (!m || !body || typeof body.relation_type !== 'string' || !LEGACY_ONLY_TYPES.includes(body.relation_type)) return call(method, url, body, user);
-    const mapId = Number(m[1]);
-    const dir = M.normalizeDirection(body.from_concept_id, body.to_concept_id, body.relation_type);
-    const label = typeof body.label === 'string' && body.label.trim() !== '' ? body.label.trim() : null;
-    if (db.edges.some(e => e.map_id === mapId && ((e.from_concept_id === dir.from && e.to_concept_id === dir.to) || (e.from_concept_id === dir.to && e.to_concept_id === dir.from)))) return Promise.resolve({ status: 409, body: { ok: false, error: '이미 이어진 두 개념입니다.' } });
-    const row = { id: db.seq.e++, map_id: mapId, from_concept_id: dir.from, to_concept_id: dir.to, relation_type: body.relation_type, label, created_at: new Date() };
-    db.edges.push(row);
-    return Promise.resolve({ status: 201, body: { edge: M.withDisplay(row) } });
-  };
-}
-
-module.exports = { legacyEdgeCall, LEGACY_ONLY_TYPES, createCmapDb };
+module.exports = { createCmapDb };

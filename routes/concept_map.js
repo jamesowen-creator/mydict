@@ -508,7 +508,7 @@ router.delete('/api/cmap/concepts/:id', guard, handle(async req => {
 // 규칙은 서버가 강제한다: 노드는 그 지도의 최상위 주제 트리에 속한 개념만, 간선의 양 끝은 그 지도의 노드여야 하며 같은 쌍은 방향과 상관없이 한 번만,
 // 문구 필수(≤40자)·종류 선택(5종)·'구별'은 방향 없음(id 작은 쪽이 from), 좌표는 유한한 숫자 범위. 모든 간선·노드는 사용자가 직접 만든다(AI 제안 없음).
 const MAP_COLS = 'id, root_topic_id, title, semantic_hash, saved_at, created_at, updated_at';
-const EDGE_COLS = 'id, map_id, from_concept_id, to_concept_id, relation_type, label, created_at';
+const EDGE_COLS = 'id, map_id, from_concept_id, to_concept_id, relation_type, label, legacy_type, created_at';   // 308-1: legacy_type = 3종으로 바뀌기 전의 원래 유형(화면이 "원래 유형" 한 줄로 보여 줌, 해시에는 넣지 않음)
 
 // 지도에 쓰이는 노드 중 topicIds 에 속한 개념의 수(사용자의 모든 지도 합계)
 async function usedInMaps(db, userId, topicIds) {
@@ -580,7 +580,7 @@ router.get('/api/cmap/topics/:rootId/map', guard, handle(async req => {
       map, nodes: nodes.map(n => ({ concept_id: n.concept_id, x: n.x, y: n.y })), edges: edges.map(M.withDisplay),
       marked_concept_ids: markRows.map(r => r.concept_id).filter(id => inTree.has(id)).sort((a, b) => a - b),
       concepts: tree.concepts.map(x => ({ id: x.id, topic_id: x.topic_id, term: x.term, english: x.english, brief: briefOf(x.explanation) })), topics: tree.topics.map(t => ({ id: t.id, parent_id: t.parent_id, title: t.title, sort_order: t.sort_order })),
-      relation_types: M.SELECTABLE_RELATION_TYPES, all_relation_types: M.ALL_RELATION_TYPES, symmetric_types: M.SYMMETRIC_TYPES,   // 307-1: relation_types = 새로 고를 3종, all_relation_types = 저장된 옛 연결까지 포함한 10종
+      relation_types: M.RELATION_TYPES, symmetric_types: M.SYMMETRIC_TYPES,   // 308-1: 관계 유형 3종(종류·일부·대립), 방향 없음은 대립뿐. // relation_types = 새로 고를 3종, all_relation_types = 저장된 옛 연결까지 포함한 10종
     } };
   });
 }));
@@ -638,15 +638,14 @@ router.patch('/api/cmap/maps/:id/nodes/:conceptId', guard, handle(async req => {
 }));
 
 // 287-1: 간선 만들기 입력(유형·문구)의 읽기·검증과 한 줄 저장은 단건과 일괄이 같은 함수를 쓴다(규칙을 복제하지 않는다).
-// 문구는 선택(생략·빈 문자열·공백만은 NULL), 유형도 문구도 없으면 400. 저장은 방향 없음 유형을 정규화(작은 id 가 from)하고 방향 있음은 from → to 그대로.
+// 문구는 선택(생략·빈 문자열·공백만은 NULL), 유형을 보내지 않으면 기본 '종류'(308-1), 3종 밖이면 400. 저장은 방향 없음 유형을 정규화(작은 id 가 from)하고 방향 있음은 from → to 그대로.
 function readEdgeInput(body) {
   const label = M.readOptionalLabel(body.label);
   if (label.error) throw bad(label.error);
   const type = M.readRelationType(body.relation_type);
   if (type.error) throw bad(type.error);
   const labelValue = label.value === undefined ? null : label.value;
-  const typeValue = type.value === undefined ? null : type.value;
-  if (labelValue === null && typeValue === null) throw bad('연결 유형을 고르거나 문구를 입력해 주세요.');
+  const typeValue = type.value === undefined || type.value === null ? M.DEFAULT_RELATION_TYPE : type.value;
   return { labelValue, typeValue };
 }
 async function insertEdge(c, mapId, a, b, typeValue, labelValue) {
@@ -715,15 +714,16 @@ router.post('/api/cmap/maps/:id/edges/bulk', guard, handle(async req => {
   });
 }));
 
-// 간선 수정: 문구·종류·방향 바꾸기(reverse: true). 방향 없음 유형(구별·유사·대립·연관)은 방향이 없다
+// 간선 수정: 문구·종류·방향 바꾸기(reverse: true). 방향 없음 유형(대립)은 방향이 없다
 router.patch('/api/cmap/edges/:id', guard, handle(async req => {
   const id = parseId(req.params.id);
   if (id === null) throw notFound('연결을 찾을 수 없습니다.');
   const body = bodyOf(req);
   let label;
   if (has(body, 'label')) { const l = M.readOptionalLabel(body.label); if (l.error) throw bad(l.error); label = l.value; }   // 286-1: null = 문구 지우기
-  const type = has(body, 'relation_type') ? M.readRelationType(body.relation_type, M.ALL_RELATION_TYPES) : { value: undefined };   // 307-1: 옛 7종은 아래에서 "이미 저장된 값과 같을 때만" 허용
+  const type = has(body, 'relation_type') ? M.readRelationType(body.relation_type) : { value: undefined };   // 308-1: 3종만(옛 호환 규칙 없음)
   if (type.error) throw bad(type.error);
+  if (type.value === null) throw bad(`관계 종류는 비울 수 없습니다. ${M.RELATION_TYPES.join(', ')} 중 하나를 골라 주세요.`);   // 308-1: 유형은 필수
   const reverse = body.reverse === true;
   if (has(body, 'reverse') && typeof body.reverse !== 'boolean') throw bad('reverse는 true/false여야 합니다.');
   if (label === undefined && type.value === undefined && !reverse) throw bad('변경할 항목이 없습니다.');
@@ -732,8 +732,7 @@ router.patch('/api/cmap/edges/:id', guard, handle(async req => {
     if (!found.length) throw notFound('연결을 찾을 수 없습니다.');
     const cur = found[0];
     await ownMap(c, cur.map_id, req.user.id, { lock: true });
-    const nextType = type.value === undefined ? cur.relation_type : type.value;
-    if (type.value && !M.SELECTABLE_RELATION_TYPES.includes(type.value) && type.value !== cur.relation_type) throw bad(`관계 종류는 ${M.SELECTABLE_RELATION_TYPES.join(', ')} 중 하나이거나 비워 두어야 합니다. (이미 저장된 옛 유형은 그대로 둘 수 있어요)`);
+    const nextType = type.value === undefined ? (cur.relation_type || M.DEFAULT_RELATION_TYPE) : type.value;
     let from = cur.from_concept_id, to = cur.to_concept_id;
     if (reverse) {
       if (M.isSymmetric(nextType)) throw bad(`'${nextType}'은 방향이 없어 바꿀 수 없습니다.`);
@@ -742,9 +741,10 @@ router.patch('/api/cmap/edges/:id', guard, handle(async req => {
     // 유형이 방향 없음으로 바뀌면 정규화(작은 id 가 from), 방향 있음으로 바뀌면 저장된 방향을 그대로 둔다
     const dir = M.normalizeDirection(from, to, nextType);
     const nextLabel = label === undefined ? cur.label : label;
-    if ((nextLabel === null || nextLabel === undefined) && (nextType === null || nextType === undefined)) throw bad('연결 유형을 고르거나 문구를 입력해 주세요.');
-    const { rows } = await c.query(`UPDATE cmap_edges SET from_concept_id = $1, to_concept_id = $2, relation_type = $3, label = $4 WHERE id = $5 RETURNING ${EDGE_COLS}`,
-      [dir.from, dir.to, nextType === undefined ? null : nextType, nextLabel === undefined ? null : nextLabel, id]);
+    // 308-1: 유형을 저장된 값과 다르게 바꾸면 사용자가 직접 고친 것이라 원래 유형(legacy_type)을 비운다. 유형이 같거나 문구·방향만 고치면 유지한다
+    const nextLegacy = type.value !== undefined && type.value !== cur.relation_type ? null : (cur.legacy_type === undefined ? null : cur.legacy_type);
+    const { rows } = await c.query(`UPDATE cmap_edges SET from_concept_id = $1, to_concept_id = $2, relation_type = $3, label = $4, legacy_type = $5 WHERE id = $6 RETURNING ${EDGE_COLS}`,
+      [dir.from, dir.to, nextType, nextLabel === undefined ? null : nextLabel, nextLegacy, id]);
     return { body: { edge: M.withDisplay(rows[0]), status: await statusOf(c, cur.map_id, req.user.id) } };
   });
 }));

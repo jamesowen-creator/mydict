@@ -34,7 +34,7 @@ async function world(page, withEdge = true) {
   {
     const at = [[130, 20], [20, 150], [250, 150]];
     for (const [i, id] of ids.entries()) { await seed(page, 'POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: id }); await seed(page, 'PATCH', `/api/cmap/maps/${map.id}/nodes/${id}`, { x: at[i][0], y: at[i][1] }); }
-    if (withEdge) await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[1], relation_type: '사용', label: '기존' });
+    if (withEdge) await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[1], relation_type: '일부', label: '기존' });
     await seed(page, 'POST', `/api/cmap/maps/${map.id}/save`);
   }
   await page.eval('refresh()');

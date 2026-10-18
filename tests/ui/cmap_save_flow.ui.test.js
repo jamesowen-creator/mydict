@@ -34,7 +34,7 @@ async function world(page, { nodes = true } = {}) {
   const map = (await seed(page, 'GET', `/api/cmap/topics/${top.id}/map`)).map;
   if (nodes) {
     for (const id of ids) await seed(page, 'POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: id });
-    await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[1], label: '만든다', relation_type: '일으킴' });
+    await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[0], to_concept_id: ids[1], label: '만든다', relation_type: '종류' });
   }
   await page.eval('refresh()');
   await page.eval(`Nav.enterTopic(${top.id}).then(() => 0)`);

@@ -2,7 +2,7 @@
 // 서버는 t.after 로 종료한다. 실행: node --test tests/concept_map_save.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createCmapDb, legacyEdgeCall } = require('./helpers/cmap_db');
+const { createCmapDb } = require('./helpers/cmap_db');
 const { startApp } = require('./helpers/app');
 const H = require('../lib/cmap_hash');
 
@@ -12,7 +12,7 @@ async function setup() {
   db.addUser(2, { perm_concept_map: true });
   db.addUser(3, { perm_concept_map: false });
   const t = await startApp(['routes/concept_map.js'], { db });
-  const call = legacyEdgeCall(db, (method, url, body, user = 1) => t.call(method, url, body, { user }));   // 307-1: 옛 유형 연결은 "이미 저장된" 상태로 직접 넣는다
+  const call = (method, url, body, user = 1) => t.call(method, url, body, { user });
   const world = async () => {
     const sci = (await call('POST', '/api/cmap/topics', { title: '과학' })).body.topic;
     const ids = {};
@@ -21,7 +21,7 @@ async function setup() {
     ids.x = (await call('POST', `/api/cmap/topics/${other.id}/concepts`, { term: 'x' }, 2)).body.concept.id;
     const map = (await call('GET', `/api/cmap/topics/${sci.id}/map`)).body.map;
     for (const n of ['a', 'b', 'c']) await call('POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: ids[n] });
-    const e1 = (await call('POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids.a, to_concept_id: ids.b, label: '때문에', relation_type: '일으킴' })).body.edge;
+    const e1 = (await call('POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids.a, to_concept_id: ids.b, label: '때문에', relation_type: '종류' })).body.edge;
     const get = async () => (await call('GET', `/api/cmap/topics/${sci.id}/map`)).body;
     return { sci, ids, map, e1, get };
   };
@@ -31,7 +31,7 @@ async function setup() {
 const fail = (r, status) => { assert.equal(r.status, status, JSON.stringify(r.body)); assert.equal(r.body.ok, false); };
 
 test('해시: 입력 순서가 달라도 같고, 좌표는 포함하지 않으며, 노드·간선의 모든 의미 요소가 바뀌면 달라진다', () => {
-  const edges = [{ from_concept_id: 1, to_concept_id: 2, relation_type: '일으킴', label: '가' }, { from_concept_id: 2, to_concept_id: 3, relation_type: null, label: '나' }];
+  const edges = [{ from_concept_id: 1, to_concept_id: 2, relation_type: '종류', label: '가' }, { from_concept_id: 2, to_concept_id: 3, relation_type: null, label: '나' }];
   const base = H.computeSemanticHash([1, 2, 3], edges);
   assert.match(base, /^[0-9a-f]{64}$/);
   assert.equal(H.computeSemanticHash([3, 1, 2], [edges[1], edges[0]]), base, '순서 무관');
@@ -41,8 +41,8 @@ test('해시: 입력 순서가 달라도 같고, 좌표는 포함하지 않으�
     '노드 제거': H.computeSemanticHash([1, 2], edges.slice(0, 1)),
     '간선 제거': H.computeSemanticHash([1, 2, 3], edges.slice(0, 1)),
     '문구': H.computeSemanticHash([1, 2, 3], [{ ...edges[0], label: '다' }, edges[1]]),
-    '종류': H.computeSemanticHash([1, 2, 3], [{ ...edges[0], relation_type: '사용' }, edges[1]]),
-    '종류 없음→있음': H.computeSemanticHash([1, 2, 3], [edges[0], { ...edges[1], relation_type: '사용' }]),
+    '종류': H.computeSemanticHash([1, 2, 3], [{ ...edges[0], relation_type: '일부' }, edges[1]]),
+    '종류 없음→있음': H.computeSemanticHash([1, 2, 3], [edges[0], { ...edges[1], relation_type: '일부' }]),
     '방향': H.computeSemanticHash([1, 2, 3], [{ ...edges[0], from_concept_id: 2, to_concept_id: 1 }, edges[1]]),
   };
   for (const [k, v] of Object.entries(variants)) assert.notEqual(v, base, k);

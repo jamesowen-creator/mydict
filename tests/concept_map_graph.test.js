@@ -3,11 +3,11 @@
 // 서버는 t.after 로 종료한다. 실행: node --test tests/concept_map_graph.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createCmapDb, legacyEdgeCall } = require('./helpers/cmap_db');
+const { createCmapDb } = require('./helpers/cmap_db');
 const { startApp } = require('./helpers/app');
 const M = require('../lib/cmap_map');
 // 275-1: 개념학습 모듈을 불러오지 않는다. 관계 5종은 개념 지도 기준 고정값(값·순서)
-const PREDICATES = ['사용', '일부', '종류', '일으킴', '선행', '조건', '구별', '유사', '대립', '연관'];   // 286-1: 10개(기존 5개 포함)
+const PREDICATES = ['종류', '일부', '대립'];   // 308-1: 관계 유형은 3종뿐(DB 37번 단계가 옛 7종을 종류로 통일)
 
 async function setup() {
   const db = createCmapDb();
@@ -15,7 +15,7 @@ async function setup() {
   db.addUser(2, { perm_concept_map: true });
   db.addUser(3, { perm_concept_map: false });
   const t = await startApp(['routes/concept_map.js'], { db });
-  const call = legacyEdgeCall(db, (method, url, body, user = 1) => t.call(method, url, body, { user }));   // 307-1: 옛 유형 연결은 "이미 저장된" 상태로 직접 넣는다
+  const call = (method, url, body, user = 1) => t.call(method, url, body, { user });
   const topic = async (title, parent_id, user = 1) => (await call('POST', '/api/cmap/topics', parent_id === undefined ? { title } : { title, parent_id }, user)).body.topic;
   const concept = async (topicId, term, user = 1) => (await call('POST', `/api/cmap/topics/${topicId}/concepts`, { term }, user)).body.concept;
   // 최상위 과학 > 물리, 개념 a b c (과학) d (물리), 다른 트리 e
@@ -31,9 +31,10 @@ async function setup() {
 }
 const fail = (r, status) => { assert.equal(r.status, status, JSON.stringify(r.body)); assert.equal(r.body.ok, false); };
 
-test('관계 종류 10개는 개념 지도 상수와 고정값이 같다(값·순서, 기존 5개 포함)', () => {
+test('관계 종류 3개는 개념 지도 상수와 고정값이 같다(값·순서), 대칭은 대립뿐, 기본값은 종류', () => {
   assert.deepEqual(M.RELATION_TYPES, PREDICATES);
-  assert.deepEqual(M.RELATION_TYPES, ['사용', '일부', '종류', '일으킴', '선행', '조건', '구별', '유사', '대립', '연관']);
+  assert.deepEqual(M.RELATION_TYPES, ['종류', '일부', '대립']);
+  assert.deepEqual(M.SYMMETRIC_TYPES, ['대립']); assert.equal(M.DEFAULT_RELATION_TYPE, '종류');
 });
 
 test('권한·소유: 비인증 401, 권한 없음 403, 타인 지도·노드·간선은 404 이고 데이터는 그대로', async t => {
@@ -60,8 +61,8 @@ test('지도 조회: 최상위 주제만, 없으면 한 번 만들고 다시 조
   assert.deepEqual(w.g.nodes, []); assert.deepEqual(w.g.edges, []);
   assert.deepEqual(w.g.concepts.map(c => c.term).sort(), ['a', 'b', 'c', 'd'], '다른 트리(수학)의 e 는 없음');
   assert.deepEqual(w.g.topics.map(x => x.title).sort(), ['과학', '물리']);
-  assert.deepEqual(w.g.relation_types, ['종류', '일부', '대립'], '307-1: 새로 고를 수 있는 3종');
-  assert.ok(PREDICATES.every(p => w.g.all_relation_types.includes(p)), '전체 목록에는 기존 5개 값이 모두 있다(옛 연결 호환)');
+  assert.deepEqual(w.g.relation_types, ['종류', '일부', '대립'], '308-1: 관계 유형 3종');
+  assert.deepEqual(w.g.symmetric_types, ['대립']); assert.ok(!('all_relation_types' in w.g), '308-1: 전체(옛 10종) 목록은 더 내려주지 않는다');
   const again = (await s.call('GET', `/api/cmap/topics/${w.sci.id}/map`)).body;
   assert.equal(again.map.id, w.map.id); assert.equal(s.db.maps.length, 1, '같은 지도');
   fail(await s.call('GET', `/api/cmap/topics/${w.phys.id}/map`), 400);   // 하위 주제
@@ -101,24 +102,24 @@ test('노드 위치 저장: 유한한 숫자 범위(±10000)만, 지도에 없�
   assert.equal((await s.call('GET', `/api/cmap/topics/${w.sci.id}/map`)).body.nodes[0].x, 10000);
 });
 
-test('간선 생성: 양 끝이 지도 노드여야 하고, 문구 필수(≤40)·종류 선택(5종)·자기 자신 불가, 같은 쌍은 방향과 상관없이 한 번만(409)', async t => {
+test('간선 생성: 양 끝이 지도 노드여야 하고, 문구 필수(≤40)·종류 3종(생략하면 종류)·자기 자신 불가, 같은 쌍은 방향과 상관없이 한 번만(409)', async t => {
   const s = await setup(); t.after(() => s.t.close());
   const w = await s.world();
   await s.addNode(w.map.id, w.a.id); await s.addNode(w.map.id, w.b.id); await s.addNode(w.map.id, w.d.id);
   let r = await s.addEdge(w.map.id, w.a.id, w.b.id);
-  assert.equal(r.status, 201); assert.equal(r.body.edge.from_concept_id, w.a.id); assert.equal(r.body.edge.to_concept_id, w.b.id); assert.equal(r.body.edge.relation_type, null); assert.equal(r.body.edge.label, '때문에');
+  assert.equal(r.status, 201); assert.equal(r.body.edge.from_concept_id, w.a.id); assert.equal(r.body.edge.to_concept_id, w.b.id); assert.equal(r.body.edge.relation_type, '종류', '308-1: 유형을 보내지 않으면 기본 종류'); assert.equal(r.body.edge.label, '때문에'); assert.equal(r.body.edge.legacy_type, null);
   fail(await s.addEdge(w.map.id, w.a.id, w.b.id), 409);                    // 같은 방향
   fail(await s.addEdge(w.map.id, w.b.id, w.a.id), 409);                    // 반대 방향도 같은 쌍
-  fail(await s.addEdge(w.map.id, w.b.id, w.a.id, { relation_type: '구별' }), 409);
+  fail(await s.addEdge(w.map.id, w.b.id, w.a.id, { relation_type: '대립' }), 409);
   fail(await s.addEdge(w.map.id, w.a.id, w.c.id), 400);                    // c 는 노드가 아님
   fail(await s.addEdge(w.map.id, w.a.id, w.e.id), 400);                    // 다른 트리
   fail(await s.addEdge(w.map.id, w.a.id, w.a.id), 400);                    // 자기 자신
-  for (const label of [undefined, '', '   ', 5, null, '가'.repeat(41), '두\n줄']) fail(await s.call('POST', `/api/cmap/maps/${w.map.id}/edges`, { from_concept_id: w.a.id, to_concept_id: w.d.id, label }), 400);
-  for (const relation_type of ['없는종류', 5, '', '포함', '원인→결과']) fail(await s.addEdge(w.map.id, w.a.id, w.d.id, { relation_type }), 400);   // 옛 6종의 코드도 5종 밖
+  for (const label of [5, '가'.repeat(41), '두\n줄'])   /* 308-1: 문구 생략·빈 문자열·공백은 이제 400 이 아니라 NULL 문구 + 기본 유형(종류)이라 잘못된 문구만 거부 */ fail(await s.call('POST', `/api/cmap/maps/${w.map.id}/edges`, { from_concept_id: w.a.id, to_concept_id: w.d.id, label }), 400);
+  for (const relation_type of ['없는종류', 5, '', '포함', '원인→결과', '사용', '일으킴', '선행', '조건', '구별', '유사', '연관']) fail(await s.addEdge(w.map.id, w.a.id, w.d.id, { relation_type }), 400);   // 3종 밖(옛 7종 포함)
   for (const body of [{ from_concept_id: 'a', to_concept_id: w.d.id, label: 'x' }, { to_concept_id: w.d.id, label: 'x' }, { from_concept_id: w.a.id, label: 'x' }]) fail(await s.call('POST', `/api/cmap/maps/${w.map.id}/edges`, body), 400);
   assert.equal((await s.addEdge(w.map.id, w.a.id, w.d.id, { label: '가'.repeat(40), relation_type: '일부' })).status, 201, '40자·일부 허용');
   assert.equal(s.db.edges.length, 2);
-  // 5종 모두 저장 가능
+  // 3종 모두 저장 가능
   const x = await s.concept(w.sci.id, 'x1'); const y = await s.concept(w.sci.id, 'y1');
   await s.addNode(w.map.id, x.id); await s.addNode(w.map.id, y.id);
   for (let i = 0; i < PREDICATES.length; i++) {
@@ -149,17 +150,18 @@ test('간선 수정·삭제: 문구·종류·방향 바꾸기(reverse), 종류 �
   const s = await setup(); t.after(() => s.t.close());
   const w = await s.world();
   await s.addNode(w.map.id, w.a.id); await s.addNode(w.map.id, w.b.id);
-  const e = (await s.addEdge(w.map.id, w.a.id, w.b.id, { relation_type: '일으킴', label: '마찰이 열을 일으킴' })).body.edge;
+  const e = (await s.addEdge(w.map.id, w.a.id, w.b.id, { relation_type: '일부', label: '마찰이 열을 일으킴' })).body.edge;
   let r = await s.call('PATCH', `/api/cmap/edges/${e.id}`, { label: '  새 문구  ' });
-  assert.equal(r.body.edge.label, '새 문구'); assert.equal(r.body.edge.relation_type, '일으킴'); assert.equal(r.body.edge.from_concept_id, w.a.id);
+  assert.equal(r.body.edge.label, '새 문구'); assert.equal(r.body.edge.relation_type, '일부'); assert.equal(r.body.edge.from_concept_id, w.a.id);
   r = await s.call('PATCH', `/api/cmap/edges/${e.id}`, { reverse: true });
   assert.equal(r.body.edge.from_concept_id, w.b.id); assert.equal(r.body.edge.to_concept_id, w.a.id); assert.equal(r.body.edge.label, '새 문구');
   r = await s.call('PATCH', `/api/cmap/edges/${e.id}`, { relation_type: null });
-  assert.equal(r.body.edge.relation_type, null);
+  fail(r, 400);                                                               // 308-1: 유형은 지울 수 없다(필수)
+  assert.equal(s.db.edges.find(x => x.id === e.id).relation_type, '일부');
   r = await s.call('PATCH', `/api/cmap/edges/${e.id}`, { relation_type: '종류', reverse: true, label: '종류다' });
   assert.deepEqual([r.body.edge.from_concept_id, r.body.edge.to_concept_id, r.body.edge.relation_type, r.body.edge.label], [w.a.id, w.b.id, '종류', '종류다']);
   const before = s.db.snapshot();
-  for (const b of [{}, { label: '가'.repeat(41) }, { relation_type: '없는' }, { reverse: 'yes' }, { label: 5 }])   // 286-1: 빈 문자열은 이제 문구 지우기(유형이 있으면 허용) — concept_map_types.test.js fail(await s.call('PATCH', `/api/cmap/edges/${e.id}`, b), 400);
+  for (const b of [{}, { label: '가'.repeat(41) }, { relation_type: '없는' }, { relation_type: '사용' }, { reverse: 'yes' }, { label: 5 }])   // 286-1: 빈 문자열은 이제 문구 지우기(유형이 있으면 허용) — concept_map_types.test.js fail(await s.call('PATCH', `/api/cmap/edges/${e.id}`, b), 400);
   assert.equal(s.db.snapshot(), before);
   assert.equal((await s.call('PATCH', '/api/cmap/edges/99999', { label: 'x' })).status, 404);
   assert.equal((await s.call('PATCH', '/api/cmap/edges/abc', { label: 'x' })).status, 404);

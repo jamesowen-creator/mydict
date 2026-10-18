@@ -35,8 +35,8 @@ async function world(page) {
   const map = (await seed(page, 'GET', `/api/cmap/topics/${sci.id}/map`)).map;
   const at = { force: [150, 20], acc: [20, 140], mass: [280, 140], iso: [150, 260] };
   for (const k of Object.keys(at)) { await seed(page, 'POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: c[k] }); await seed(page, 'PATCH', `/api/cmap/maps/${map.id}/nodes/${c[k]}`, { x: at[k][0], y: at[k][1] }); }
-  const e1 = (await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: c.force, to_concept_id: c.acc, label: '힘이 가속도를 만든다', relation_type: '일으킴' })).edge;
-  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: c.mass, to_concept_id: c.force, label: '질량이 클수록 힘이 필요', relation_type: '사용' });
+  const e1 = (await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: c.force, to_concept_id: c.acc, label: '힘이 가속도를 만든다', relation_type: '종류' })).edge;
+  await seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: c.mass, to_concept_id: c.force, label: '질량이 클수록 힘이 필요', relation_type: '일부' });
   await page.eval('refresh()'); await page.eval(`selectTopic(${sci.id}); 0`);
   await page.waitFor("!document.getElementById('concepts-sec').hidden", 4000);
   await page.click('#nav-map');
@@ -109,9 +109,9 @@ test('퀴즈 흐름: 정답 간선·문구가 화면에 없고, 탭-탭으로 �
   assert.ok(!/만든다|클수록|일으킴|사용/.test(body), '정답 문구·종류가 화면에 없음');
   // 노드는 서버 위치가 아니라 흩어 놓은 위치(지도의 저장 위치와 다름)
   // 1) 가속도 → 힘 (쌍은 맞지만 방향 반대, 종류 일으킴)
-  await pairTap(page, w.c.acc, w.c.force, '일으킴');
+  await pairTap(page, w.c.acc, w.c.force, '종류');
   assert.equal(await page.eval("document.querySelectorAll('#quiz-answers li').length"), 1);
-  assert.match(await text(page, '#quiz-answers li'), /가속도 → 힘 · 일으킴/);
+  assert.match(await text(page, '#quiz-answers li'), /가속도 → 힘 · 종류/);
   assert.equal(await page.eval("document.querySelectorAll('.m-edge').length"), 1);
   // 같은 쌍을 반대로 다시 이으면 거부
   await page.click(`[data-node="${w.c.force}"] rect`); await page.click(`[data-node="${w.c.acc}"] rect`);
@@ -129,8 +129,8 @@ test('퀴즈 흐름: 정답 간선·문구가 화면에 없고, 탭-탭으로 �
   assert.equal(await text(page, '#res-pair b'), '1/2 (50%)');
   assert.equal(await text(page, '#res-type b'), '1/2 (50%)');
   assert.equal(await text(page, '#res-direction b'), '0/2 (0%)');
-  assert.match(await text(page, '#res-wrong'), /정답: 힘 → 가속도 · 일으킴[\s\S]*내 답: 가속도 → 힘 · 일으킴[\s\S]*방향이 반대예요/);
-  assert.match(await text(page, '#res-missed'), /질량 → 힘 · 사용 · 질량이 클수록 힘이 필요/);
+  assert.match(await text(page, '#res-wrong'), /정답: 힘 → 가속도 · 종류[\s\S]*내 답: 가속도 → 힘 · 종류[\s\S]*방향이 반대예요/);
+  assert.match(await text(page, '#res-missed'), /질량 → 힘 · 일부 · 질량이 클수록 힘이 필요/);
   assert.match(await text(page, '#res-extras'), /힘 → 에너지 · 일부/);
   assert.match(await page.eval("document.getElementById('quiz-panel').innerText"), /지도에 없는 연결[\s\S]*틀린 것으로 세지 않아요/);
   assert.equal(srv.db.attempts.length, 1);
@@ -150,7 +150,7 @@ test('퀴즈 도중 지도가 바뀌면 채점하지 않고 안내 + [다시 시
   await saveMap(page); await reviewTab(page);
   await page.click('#quiz-start');
   await page.waitFor("document.getElementById('map-view').classList.contains('quiz-mode')", 6000);
-  await pairTap(page, w.c.force, w.c.acc, '일으킴');
+  await pairTap(page, w.c.force, w.c.acc, '종류');
   await seed(page, 'PATCH', `/api/cmap/edges/${w.e1.id}`, { label: '문구를 바꿈' });
   await page.click('#quiz-submit');
   await page.waitFor("!!document.getElementById('quiz-error') && !!document.getElementById('quiz-restart')", 6000, '지도가 바뀜 안내');
@@ -180,7 +180,7 @@ test('390px: 하단 내비·퀴즈 버튼 44px 이상, 가로 스크롤 없음, 
   await saveMap(page); await reviewTab(page);
   assert.ok(await page.eval("document.getElementById('quiz-start').getBoundingClientRect().height") >= 44);
   await page.click('#quiz-start'); await page.waitFor("document.getElementById('map-view').classList.contains('quiz-mode')", 6000);
-  await pairTap(page, w.c.force, w.c.acc, '일으킴');
+  await pairTap(page, w.c.force, w.c.acc, '종류');
   for (const sel of ['#quiz-submit', '#quiz-quit', '#quiz-answers [data-del]']) assert.ok(await page.eval(`document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect().height`) >= 44, sel);
   assert.equal(await page.hasHorizontalScroll(), false);
   await page.click('#quiz-submit'); await page.waitFor("!!document.getElementById('quiz-result')", 6000);

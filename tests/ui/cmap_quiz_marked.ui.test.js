@@ -30,7 +30,7 @@ async function world(page, { marks = [] } = {}) {
   const at = { a: [20, 20], b: [200, 20], c: [20, 120], d: [200, 120], e: [20, 220], f: [200, 220] };
   for (const k of Object.keys(ids)) { await seed(page, 'POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: ids[k] }); await seed(page, 'PATCH', `/api/cmap/maps/${map.id}/nodes/${ids[k]}`, { x: at[k][0], y: at[k][1] }); }
   const edge = (f, to, label, relation_type) => seed(page, 'POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[f], to_concept_id: ids[to], label, relation_type });
-  await edge('a', 'b', '가나', '일으킴'); await edge('b', 'c', '나다', '사용'); await edge('c', 'd', '다라', '구별'); await edge('d', 'e', '라마', '일부'); await edge('a', 'c', '가다', '종류');
+  await edge('a', 'b', '가나', '종류'); await edge('b', 'c', '나다', '일부'); await edge('c', 'd', '다라', '대립'); await edge('d', 'e', '라마', '일부'); await edge('a', 'c', '가다', '종류');
   await seed(page, 'POST', `/api/cmap/maps/${map.id}/save`);
   for (const k of marks) await seed(page, 'PUT', `/api/cmap/concepts/${ids[k]}/mark`, { marked: true });
   await gotoMap(page, sci.id);
@@ -110,8 +110,8 @@ test('표시한 개념 퀴즈: 표시 개념 + 이웃만 제시하고 표시한 
   assert.ok(!/가나|나다|가다|일으킴|사용|종류/.test(body.replace(/관계 종류|종류 없음|선택 안 함/g, '')), '정답 문구·종류가 화면에 없음');
   assert.match(await text(page, '#quiz-hint'), /물음표 배지/);
   assert.equal(await text(page, '#quiz-panel .sec-label'), '표시한 개념 퀴즈');
-  await pairTap(page, w.ids.a, w.ids.b, '일으킴');
-  await pairTap(page, w.ids.b, w.ids.c, '사용');
+  await pairTap(page, w.ids.a, w.ids.b, '종류');
+  await pairTap(page, w.ids.b, w.ids.c, '일부');
   await pairTap(page, w.ids.a, w.ids.c, '종류');                                    // 범위 밖(표시 개념과 무관한 연결)
   await page.click('#quiz-submit'); await page.waitFor("!!document.getElementById('quiz-result')", 6000, '결과');
   assert.equal(await text(page, '#res-pair b'), '2/2 (100%)'); assert.equal(await text(page, '#res-type b'), '2/2 (100%)'); assert.equal(await text(page, '#res-direction b'), '2/2 (100%)');
@@ -139,7 +139,7 @@ test('일부만 맞히면 모두 맞힌 개념이 없다고 안내하고 해제 
   await page.click(`[data-node="${w.ids.b}"] rect`); await page.click(`[data-node="${w.ids.b}"] rect`);   // 같은 개념 두 번(퀴즈 선택 취소) — 표시·팝업 변화 없음
   assert.equal(await page.eval("document.getElementById('map-popup').hidden"), true);
   assert.deepEqual(serverMarks(srv), [w.ids.b]);
-  await pairTap(page, w.ids.a, w.ids.b, '일으킴');                                  // b→c 는 안 이음
+  await pairTap(page, w.ids.a, w.ids.b, '종류');                                  // b→c 는 안 이음
   await page.click('#quiz-submit'); await page.waitFor("!!document.getElementById('quiz-result')", 6000);
   assert.equal(await text(page, '#res-pair b'), '1/2 (50%)');
   assert.equal(await page.eval("!!document.getElementById('res-mastered-empty') && document.querySelectorAll('#res-mastered [data-act=unmark]').length === 0"), true, '해제 제안 없음');
@@ -153,7 +153,7 @@ test('시작 뒤 표시가 바뀌면 채점하지 않고 안내 + [다시 시작
   await reviewTab(page);
   await page.waitFor("document.getElementById('quiz-marked-count').textContent === '표시한 개념 1개'", 4000);
   await page.click('#quiz-start-marked'); await sheetQuiz(page);
-  await pairTap(page, w.ids.a, w.ids.b, '일으킴');
+  await pairTap(page, w.ids.a, w.ids.b, '종류');
   await seed(page, 'PUT', `/api/cmap/concepts/${w.ids.c}/mark`, { marked: true });          // 다른 기기에서 표시가 늘어남
   await page.click('#quiz-submit');
   await page.waitFor("!!document.getElementById('quiz-error') && !!document.getElementById('quiz-restart')", 6000, '범위가 바뀜 안내');
@@ -172,7 +172,7 @@ test('기존 전체 퀴즈: 표시가 있어도 전체 노드·배지 없음·�
   assert.deepEqual(await nodeIds(page), Object.values(w.ids).sort((a, b) => a - b));
   assert.equal(await page.eval("document.querySelectorAll('.m-node.marked, .m-mark').length"), 0);
   assert.equal(await text(page, '#quiz-panel .sec-label'), '연결 퀴즈');
-  await pairTap(page, w.ids.a, w.ids.b, '일으킴');
+  await pairTap(page, w.ids.a, w.ids.b, '종류');
   await page.click('#quiz-submit'); await page.waitFor("!!document.getElementById('quiz-result')", 6000);
   assert.equal(await text(page, '#res-pair b'), '1/5 (20%)', '전체 연결 5개 기준');
   assert.equal(await page.eval("!!document.getElementById('res-mastered') || !!document.getElementById('res-mastered-empty')"), false, '전체 퀴즈에는 표시 해제 제안이 없음');

@@ -1,9 +1,9 @@
 // 작업275-5: "표시한 개념" 퀴즈 서버 규칙 — 출제 범위(표시 개념의 연결만 + 이웃 노드)는 서버가 DB 의 표시로 계산하고 클라이언트가 보낸 범위는 쓰지 않는다. 정답 연결은 start 응답에 없다.
-// 채점은 기존 규칙(연결·유형·방향 따로, '구별' 방향 무시, 범위 밖 연결은 추가 연결로 표시·감점 없음)이고, 기존 전체 퀴즈 결과는 그대로다(회귀).
+// 채점은 기존 규칙(연결·유형·방향 따로, '대립' 방향 무시, 범위 밖 연결은 추가 연결로 표시·감점 없음)이고, 기존 전체 퀴즈 결과는 그대로다(회귀).
 // AI 없음. 가짜 DB 는 실제 PG 제약을 흉내 낸 것이다(한계). 서버는 t.after 로 종료한다. 실행: node --test tests/concept_map_quiz_marked.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createCmapDb, legacyEdgeCall } = require('./helpers/cmap_db');
+const { createCmapDb } = require('./helpers/cmap_db');
 const { startApp } = require('./helpers/app');
 const Q = require('../lib/cmap_quiz');
 
@@ -13,8 +13,8 @@ async function setup() {
   db.addUser(2, { perm_concept_map: true });
   db.addUser(3, { perm_concept_map: false });
   const t = await startApp(['routes/concept_map.js'], { db });
-  const call = legacyEdgeCall(db, (method, url, body, user = 1) => t.call(method, url, body, { user }));   // 307-1: 옛 유형 연결은 "이미 저장된" 상태로 직접 넣는다
-  // 개념 a b c d e f 와 지도 밖 개념 x. 연결: a→b(일으킴) b→c(사용) c→d(구별) d→e(일부) a→c(종류). f 는 연결 없음(고립)
+  const call = (method, url, body, user = 1) => t.call(method, url, body, { user });
+  // 개념 a b c d e f 와 지도 밖 개념 x. 연결: a→b(일으킴) b→c(사용) c→d(대립) d→e(일부) a→c(종류). f 는 연결 없음(고립)
   const world = async (user = 1) => {
     const sci = (await call('POST', '/api/cmap/topics', { title: '과학' }, user)).body.topic;
     const ids = {};
@@ -22,7 +22,7 @@ async function setup() {
     const map = (await call('GET', `/api/cmap/topics/${sci.id}/map`, undefined, user)).body.map;
     for (const k of ['a', 'b', 'c', 'd', 'e', 'f']) await call('POST', `/api/cmap/maps/${map.id}/nodes`, { concept_id: ids[k] }, user);
     const edge = (f, to, label, relation_type) => call('POST', `/api/cmap/maps/${map.id}/edges`, { from_concept_id: ids[f], to_concept_id: ids[to], label, relation_type }, user);
-    await edge('a', 'b', '가나', '일으킴'); await edge('b', 'c', '나다', '사용'); await edge('c', 'd', '다라', '구별'); await edge('d', 'e', '라마', '일부'); await edge('a', 'c', '가다', '종류');
+    await edge('a', 'b', '가나', '종류'); await edge('b', 'c', '나다', '일부'); await edge('c', 'd', '다라', '대립'); await edge('d', 'e', '라마', '일부'); await edge('a', 'c', '가다', '종류');
     await call('POST', `/api/cmap/maps/${map.id}/save`, undefined, user);
     const mark = (ks, u = user) => Promise.all(ks.map(k => call('PUT', `/api/cmap/concepts/${ids[k]}/mark`, { marked: true }, u)));
     const start = (body = { mode: 'marked' }, u = user) => call('POST', `/api/cmap/maps/${map.id}/quiz/start`, body, u);
@@ -99,7 +99,7 @@ test('클라이언트가 보낸 범위·표시·노드 목록은 무시하고 �
   const forged = (await w.start({ mode: 'marked', marked: [w.ids.d, w.ids.e], marked_concept_ids: [w.ids.f], nodes: [w.ids.f], edges: [1, 2, 3], scope_edges: [1], concept_ids: [w.ids.e] })).body;
   assert.deepEqual(forged, plain);
   // 제출도 서버 범위로 검증: 범위 밖 노드(d)를 답에 쓰면 거부
-  const bad = await w.submit({ mode: 'marked', source_hash: plain.source_hash, scope_key: plain.scope_key, marked: [w.ids.d], answers: [w.A('c', 'd', '구별')] });
+  const bad = await w.submit({ mode: 'marked', source_hash: plain.source_hash, scope_key: plain.scope_key, marked: [w.ids.d], answers: [w.A('c', 'd', '대립')] });
   fail(bad, 400);
   assert.equal(s.db.attempts.length, 0);
 });
@@ -110,7 +110,7 @@ test('채점(표시 범위): 범위 안 연결만 정답 기준 — 연결·유�
   await w.mark(['b']);
   const st = (await w.start()).body;
   const base = { mode: 'marked', source_hash: st.source_hash, scope_key: st.scope_key };
-  const good = [w.A('a', 'b', '일으킴'), w.A('b', 'c', '사용')];
+  const good = [w.A('a', 'b', '종류'), w.A('b', 'c', '일부')];
   const r1 = await w.submit({ ...base, answers: good });
   assert.equal(r1.status, 201, JSON.stringify(r1.body));
   assert.deepEqual(r1.body.scores.pair, { hit: 2, total: 2, ratio: 1 });
@@ -127,7 +127,7 @@ test('채점(표시 범위): 범위 안 연결만 정답 기준 — 연결·유�
   const row = s.db.attempts[0];
   assert.deepEqual([row.user_id, row.map_id, row.source_hash, row.pair_score, row.type_score, row.direction_score], [1, w.map.id, st.source_hash, 1, 1, 1], '기존 열만으로 같은 방식 저장');
   // 틀린 답: 방향 반대 + 종류 틀림 + 하나 못 찾음
-  const r3 = await w.submit({ ...base, answers: [w.A('b', 'a', '사용')] });
+  const r3 = await w.submit({ ...base, answers: [w.A('b', 'a', '일부')] });
   assert.deepEqual(r3.body.scores.pair, { hit: 1, total: 2, ratio: 0.5 });
   assert.deepEqual(r3.body.scores.type, { hit: 0, total: 2, ratio: 0 });
   assert.deepEqual(r3.body.scores.direction, { hit: 0, total: 2, ratio: 0 });
@@ -135,18 +135,18 @@ test('채점(표시 범위): 범위 안 연결만 정답 기준 — 연결·유�
   assert.deepEqual(r3.body.mastered, [], '틀리면 모두 맞힌 개념이 아님');
 });
 
-test("채점('구별' 방향 무시)·mastered 는 이어진 출제 연결을 모두 맞힌 표시 개념만", async t => {
+test("채점('대립' 방향 무시)·mastered 는 이어진 출제 연결을 모두 맞힌 표시 개념만", async t => {
   const s = await setup(); t.after(() => s.t.close());
   const w = await s.world();
-  await w.mark(['b', 'c']);                                                    // 범위: a→b, b→c, c→d(구별), a→c
+  await w.mark(['b', 'c']);                                                    // 범위: a→b, b→c, c→d(대립), a→c
   const st = (await w.start()).body;
   assert.deepEqual(st.nodes.map(n => n.id).sort((a, b) => a - b), idsOf(w, ['a', 'b', 'c', 'd']));
   const base = { mode: 'marked', source_hash: st.source_hash, scope_key: st.scope_key };
-  const r = await s.call('POST', `/api/cmap/maps/${w.map.id}/quiz/submit`, { ...base, answers: [w.A('a', 'b', '일으킴'), w.A('b', 'c', '사용'), w.A('d', 'c', '구별'), w.A('a', 'c', '일으킴')] });
+  const r = await s.call('POST', `/api/cmap/maps/${w.map.id}/quiz/submit`, { ...base, answers: [w.A('a', 'b', '종류'), w.A('b', 'c', '일부'), w.A('d', 'c', '대립'), w.A('a', 'c', '일부')] });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   assert.deepEqual(r.body.scores.pair, { hit: 4, total: 4, ratio: 1 });
-  assert.deepEqual(r.body.scores.type, { hit: 3, total: 4, ratio: 0.75 }, 'a→c 종류를 일으킴으로 답해 틀림');
-  assert.deepEqual(r.body.scores.direction, { hit: 3, total: 3, ratio: 1 }, "구별(c-d)은 방향 분모에서 제외·반대로 그려도 정답");
+  assert.deepEqual(r.body.scores.type, { hit: 3, total: 4, ratio: 0.75 }, 'a→c 종류를 일부로 답해 틀림');
+  assert.deepEqual(r.body.scores.direction, { hit: 3, total: 3, ratio: 1 }, "대립(c-d)은 방향 분모에서 제외·반대로 그려도 정답");
   assert.deepEqual(r.body.mastered.map(m => m.id), [w.ids.b], 'b 만 모두 맞힘(c 는 a→c 유형 오답)');
 });
 
@@ -155,7 +155,7 @@ test('시작 뒤 표시가 바뀌었거나 scope_key 가 없거나 지도가 바
   const w = await s.world();
   await w.mark(['b']);
   const st = (await w.start()).body;
-  const ans = [w.A('a', 'b', '일으킴')];
+  const ans = [w.A('a', 'b', '종류')];
   fail(await w.submit({ mode: 'marked', source_hash: st.source_hash, answers: ans }), 409);
   fail(await w.submit({ mode: 'marked', source_hash: st.source_hash, scope_key: 'f'.repeat(64), answers: ans }), 409);
   await w.mark(['c']);                                                         // 시작 뒤 표시가 늘어남 → 범위가 달라짐
@@ -183,7 +183,7 @@ test('회귀: 기존 전체 퀴즈(mode 없음·all)의 start/submit 응답과 �
     assert.ok(r.body.nodes.every(n => Object.keys(n).sort().join() === 'english,id,term'), '표시 정보 없음');
   }
   const st = (await s.call('POST', `/api/cmap/maps/${w.map.id}/quiz/start`, {})).body;
-  const answers = [w.A('b', 'a', '일으킴'), w.A('b', 'c', '사용'), w.A('d', 'c', '구별'), w.A('a', 'e', '일부')];
+  const answers = [w.A('b', 'a', '종류'), w.A('b', 'c', '일부'), w.A('d', 'c', '대립'), w.A('a', 'e', '일부')];
   const r = await w.submit({ source_hash: st.source_hash, answers });
   assert.equal(r.status, 201);
   assert.ok(!('mode' in r.body) && !('mastered' in r.body), '전체 퀴즈 응답에는 표시 퀴즈 필드가 없음');
