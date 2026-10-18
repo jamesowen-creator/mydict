@@ -134,6 +134,15 @@ test('훑기 science_reading: 과목 선택·캐러셀·개념 상세(정복 전
   await done(page);
 });
 
+test('훑기 artist_notes: 퀴즈(4지선다·OX, 채점 후)·결과 (작업 AN-2)', { skip: SKIP }, async () => {
+  const page = await openPage('artist_notes');
+  await step(page, `quizState = { questions: ${MCQ}, currentIdx: 0, score: 0, wrong: [], answered: false }; showView('view-quiz'); renderQuestion();`); await sweep(page, '4지선다');
+  await page.click('.mcq-option', { index: 0 }); await page.waitFor("!!document.querySelector('.mcq-option.wrong')"); await sweep(page, '4지선다(오답)');
+  await step(page, `quizState = { questions: ${OX}, currentIdx: 0, score: 0, wrong: [], answered: false }; showView('view-quiz'); renderQuestion();`); await sweep(page, 'OX');
+  await page.click('#ox-x'); await page.waitFor("document.getElementById('ox-x').classList.contains('wrong')"); await sweep(page, 'OX(오답)');
+  await step(page, "quizState = { questions: [{}, {}, {}, {}], currentIdx: 0, score: 1, wrong: [{ q: '첫 문항', a: '정답 하나' }], answered: false }; showResult()"); await sweep(page, '결과');
+  await done(page);
+});
 test('훑기 digest_reading: 목록(캐러셀)·작품 상세(정복 전/후)·퀴즈(4지선다·OX, 채점 후)·결과', { skip: SKIP }, async () => {
   const page = await openPage('digest_reading');
   await page.waitFor("!!document.querySelector('.carousel-card.is-center')", 6000); await settle(page);

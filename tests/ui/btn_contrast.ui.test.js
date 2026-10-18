@@ -24,6 +24,7 @@ const SCREENS = [
   { name: 'literature_compass', sel: ['.briefing-cta', '.quiz-start-btn', '.quiz-next-btn', '.result-btn-primary'] },
   { name: 'digest_reading', sel: ['.quiz-next-btn', '.result-btn-primary'] },
   { name: 'science_reading', sel: ['.quiz-next-btn', '.result-btn-primary'] },
+  { name: 'artist_notes', sel: ['.quiz-next-btn', '.result-btn-primary'] },   // 작업 AN-2
   { name: 'voice_study', sel: ['#new-rec-btn'] },
   { name: 'concept_study', sel: ['#start-open'] },
 ];

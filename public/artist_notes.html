@@ -27,6 +27,9 @@
     --genre-music: var(--color-accent-ink);
     --genre-art: var(--color-ok-ink);
     --navbar-h: 78px;
+    --primary-light: var(--color-surface-2);
+    --success-dark: var(--color-ok-ink);
+    --error-dark: var(--color-danger);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -284,6 +287,84 @@
   .conq-row:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
   .empty-note { padding: 24px 0; font-size: 14px; color: var(--text2); }
 
+  /* ── 퀴즈·결과 (작업 AN-2): 한입 독서(digest_reading.html)의 퀴즈 서식을 복제.
+     정오 표시는 이모지·✕ 대신 글자(○ 정답 / × 오답)로 한다 ── */
+  .quiz-progress-bar-wrap { height: 6px; background: var(--primary-light); border-radius: 0; margin-bottom: 20px; overflow: hidden; }
+  .quiz-progress-bar { height: 100%; background: var(--primary); border-radius: 0; transition: width 0.3s ease; }
+  .quiz-round-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--primary-dark); margin-bottom: 6px; }
+  .quiz-question-counter { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
+  .quiz-card { background: var(--card); border: none; border-radius: 0; box-shadow: none; padding: 20px 16px; margin: 0 -16px; }
+  .quiz-question { font-size: 18px; font-weight: 700; line-height: 1.6; margin-bottom: 20px; color: var(--text1); }
+  .mcq-options { display: flex; flex-direction: column; gap: 0; }
+  .mcq-option {
+    display: flex; align-items: flex-start; gap: 8px; width: 100%; min-height: var(--ctl-min-h); text-align: left;
+    padding: 12px 0; background: transparent; border: none; border-bottom: 1px solid var(--border); border-radius: 0; cursor: pointer;
+    font-family: var(--font-sans); color: var(--text1);
+  }
+  .mcq-option:last-child { border-bottom: none; }
+  .mcq-option::before { content: ''; flex: none; width: 16px; text-align: center; font-size: 14px; font-weight: 700; line-height: 1.5; }
+  .mcq-option:hover:not(.answered) .mcq-text { text-decoration: underline; text-underline-offset: 3px; }
+  .mcq-option:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
+  .mcq-option.answered { cursor: default; }
+  .mcq-num { flex: none; width: 20px; text-align: right; font-size: 13px; font-weight: 500; line-height: 1.5; color: var(--text2); }
+  .mcq-option.correct, .mcq-option.correct-hint { color: var(--success-dark); }
+  .mcq-option.wrong { color: var(--error-dark); }
+  .mcq-option.correct::before, .mcq-option.correct-hint::before { content: '○'; }
+  .mcq-option.wrong::before { content: '×'; }
+  .mcq-option.correct .mcq-num, .mcq-option.correct-hint .mcq-num, .mcq-option.wrong .mcq-num { color: inherit; font-weight: 700; }
+  .mcq-option.correct .mcq-text, .mcq-option.correct-hint .mcq-text { color: var(--success-dark); font-weight: 700; }
+  .mcq-option.wrong .mcq-text { color: var(--error-dark); font-weight: 700; }
+  .mcq-option.correct .mcq-text, .mcq-option.wrong .mcq-text { text-decoration: underline; text-underline-offset: 3px; }
+  .mcq-text { flex: 1; min-width: 0; font-size: 15px; line-height: 1.5; color: var(--text1); word-break: keep-all; }
+  .ox-buttons { display: flex; gap: 12px; margin-top: 4px; }
+  .ox-btn {
+    position: relative; flex: 1; height: 80px; padding: 0 0 14px; border: none; border-radius: 0; background: transparent; color: var(--text1); cursor: pointer;
+    font-family: var(--font-sans); font-size: 32px; font-weight: 700; line-height: 1.1; display: flex; align-items: center; justify-content: center;
+  }
+  .ox-btn::after { content: ''; position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 13px; font-weight: 700; line-height: 1.4; }
+  .ox-btn:hover:not(:disabled) { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
+  .ox-btn:focus-visible { outline: 2px solid var(--text1); outline-offset: -2px; }
+  .ox-btn:disabled { cursor: default; }
+  .ox-btn.picked { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
+  .ox-btn.correct { color: var(--success-dark); }
+  .ox-btn.correct::after { content: '○ 정답'; }
+  .ox-btn.wrong { color: var(--error-dark); }
+  .ox-btn.wrong::after { content: '× 오답'; }
+  .ox-feedback { position: relative; margin-top: 12px; padding: 10px 0 10px 24px; font-size: 13px; font-weight: 500; line-height: 1.6; display: none; color: var(--text1); }
+  .ox-feedback.show { display: block; }
+  .ox-feedback .fb-line { font-weight: 700; }
+  .ox-feedback.correct-fb .fb-line { color: var(--success-dark); }
+  .ox-feedback.wrong-fb .fb-line { color: var(--error-dark); }
+  .ox-feedback::before { position: absolute; left: 2px; top: 10px; width: 16px; text-align: center; font-weight: 800; }
+  .ox-feedback.correct-fb::before { content: '○'; color: var(--success-dark); }
+  .ox-feedback.wrong-fb::before { content: '×'; color: var(--error-dark); }
+  .quiz-next-btn {
+    min-height: var(--ctl-min-h); margin-top: 20px; background: var(--btn-primary-bg); color: var(--color-surface); border: none; border-radius: var(--btn-radius);
+    padding: 10px 20px; width: 100%; font-size: 15px; font-weight: 600; cursor: pointer; display: none; font-family: var(--font-sans); transition: background 0.15s;
+  }
+  .quiz-next-btn.visible { display: block; }
+  .quiz-next-btn:hover { background: var(--btn-primary-bg-hover); }
+  #view-result .content { padding: 24px 16px; }
+  .result-score-wrap { text-align: center; padding-bottom: 20px; margin-bottom: 28px; border-bottom: 1px solid var(--border); }
+  .result-score { font-size: 48px; font-weight: 700; color: var(--primary-dark); font-family: var(--font-num); }
+  .result-score span { font-size: 18px; color: var(--text2); }
+  .result-msg { font-size: 16px; font-weight: 600; color: var(--text1); margin-top: 8px; }
+  .result-submsg { font-size: 13px; color: var(--text2); margin-top: 4px; }
+  .result-section-label { font-size: 12px; font-weight: 700; color: var(--primary-dark); margin-bottom: 12px; letter-spacing: 0.04em; padding-bottom: 4px; border-bottom: 2px solid var(--primary); }
+  .result-wrong-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .result-wrong-item { background: transparent; border: none; border-radius: 0; border-bottom: 1px solid var(--border); padding: 12px 0; }
+  .result-wrong-list .result-wrong-item:last-child { border-bottom: none; }
+  .result-wrong-q { font-size: 13px; color: var(--text2); margin-bottom: 4px; }
+  .result-wrong-a { font-size: 14px; font-weight: 600; color: var(--success-dark); }
+  .result-wrong-a::before { content: '정답: '; color: var(--text2); font-weight: 400; }
+  .result-actions { display: flex; flex-direction: column; gap: 10px; }
+  .result-btn { min-height: var(--ctl-min-h); border-radius: var(--btn-radius); padding: 10px 20px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; font-family: var(--font-sans); }
+  .result-btn-primary { background: var(--btn-primary-bg); color: var(--color-surface); }
+  .result-btn-primary:hover { background: var(--btn-primary-bg-hover); }
+  .result-btn-secondary { background: transparent; color: var(--text2); border: none; padding: 0 8px; min-height: var(--ctl-min-h); min-width: var(--ctl-min-h); font-size: 15px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+  .result-btn-secondary:hover { background: transparent; color: var(--text1); }
+  .result-btn-secondary:focus-visible { outline: 2px solid var(--text1); outline-offset: 2px; }
+
   /* ── Misc ── */
   .error-msg { text-align: center; padding: 40px 24px; color: var(--color-danger); font-size: 14px; }
 </style>
@@ -292,6 +373,8 @@
 
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
+<script src="/js/common/dialog.js"></script>
+<script>if (!window.metisConfirm) { window.metisConfirm = function (m) { return Promise.resolve(confirm(m)); }; window.metisAlert = function (m) { alert(m); return Promise.resolve(); }; }   // dialog.js를 못 불렀을 때 기본 대화상자로 대체</script>
 
 <!-- Loading -->
 <div id="loading">
@@ -329,11 +412,19 @@
   </div>
 </div>
 
-<!-- 퀴즈 탭: 구조만. 문제는 내용 검증 뒤 QUIZ_BANK 에 채운다 -->
+<!-- 퀴즈 탭: 문항은 데이터(artist_notes_db.json의 quiz)에서 읽는다. 비어 있으면 "준비 중" -->
 <div id="view-quiz" class="view">
   <div class="content">
     <div class="tab-title">퀴즈</div>
     <div id="quiz-body"></div>
+  </div>
+</div>
+
+<!-- 퀴즈 결과 -->
+<div id="view-result" class="view">
+  <div class="content">
+    <div class="tab-title">퀴즈 결과</div>
+    <div id="result-content"></div>
   </div>
 </div>
 
@@ -342,7 +433,7 @@
   <div class="bottom-nav-tabs">
     <button type="button" class="bottom-nav-tab" id="nav-home" data-tab="home">홈</button>
     <button type="button" class="bottom-nav-tab" id="nav-conq" data-tab="conq">정복</button>
-    <button type="button" class="bottom-nav-tab" id="nav-quiz" data-tab="quiz">퀴즈</button>
+    <button type="button" class="bottom-nav-tab" id="nav-quiz" data-tab="quiz" aria-disabled="true">퀴즈</button>
   </div>
 </nav>
 
@@ -350,6 +441,7 @@
 // ── State ──
 let DB = null;
 let currentArtistId = null;
+let quizState = { questions: [], currentIdx: 0, score: 0, wrong: [], answered: false };   // 퀴즈 상태는 메모리에만 둔다(저장하지 않음)
 
 // 범례 필터 (전체=null / 음악 / 미술). 다른 메뉴의 키와 겹치지 않는 'artist_notes_' 접두사
 const FILTER_STORAGE_KEY = 'artist_notes_field_filter';
@@ -381,7 +473,7 @@ function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   // 홈 = 목록·상세 / 정복 / 퀴즈
-  const tab = id === 'view-quiz' ? 'quiz' : id === 'view-conq' ? 'conq' : 'home';
+  const tab = (id === 'view-quiz' || id === 'view-result') ? 'quiz' : id === 'view-conq' ? 'conq' : 'home';
   for (const b of document.querySelectorAll('#bottom-nav [data-tab]')) {
     const on = b.dataset.tab === tab;
     b.classList.toggle('active', on);
@@ -415,8 +507,14 @@ window.addEventListener('popstate', e => {
       showArtist(st.id);
     } else if (st.view === 'conq') {
       renderAndShowConq();
-    } else if (st.view === 'quiz') {
-      renderAndShowQuiz();
+    } else if (st.view === 'quiz' && quizState.questions.length && quizState.currentIdx < quizState.questions.length) {
+      showView('view-quiz');
+      renderQuestion();
+      window.scrollTo(0, 0);
+    } else if (st.view === 'quiz' && !quizData().length) {
+      renderAndShowQuiz();   // 문항 데이터가 없으면 "준비 중" 화면
+    } else if (st.view === 'result' && quizState.questions.length) {
+      showResult();
     } else {
       if ('filter' in st) fieldFilter = st.filter;
       showListView();
@@ -799,6 +897,7 @@ const Carousel = (() => {
 })();
 
 function renderList() {
+  updateTabQuizState();
   // setList 가 중앙 카드를 첫 카드로 되돌리므로, 호출 전에 원래 가려던 id 를 먼저 떼어 둔다
   const wantId = Carousel.getCenterId() || currentArtistId;
   const filtered = getFilteredArtists();
@@ -887,21 +986,24 @@ function updateConquestBtn() {
 function toggleConquest() {
   setConquered(currentArtistId, !isConquered(currentArtistId));
   updateConquestBtn();
+  updateTabQuizState();
 }
 
 // ── 하단 내비 / 정복 탭 / 퀴즈 탭 ──
-function onTab(tab) {
+// 퀴즈 풀이 중: 한 문제라도 답했고 결과 화면 전
+const quizInProgress = () => document.getElementById('view-quiz').classList.contains('active')
+  && (quizState.score + quizState.wrong.length > 0 || quizState.currentIdx > 0);
+async function onTab(tab) {
   const active = document.querySelector('.view.active').id;
-  if (active === (tab === 'home' ? 'view-list' : tab === 'conq' ? 'view-conq' : 'view-quiz')) { window.scrollTo(0, 0); return; }
+  if (tab === 'quiz') { if (active === 'view-quiz' || active === 'view-result') return; startQuizFlow(); return; }
+  if (active === (tab === 'home' ? 'view-list' : 'view-conq')) { window.scrollTo(0, 0); return; }
+  if (quizInProgress() && !(await metisConfirm('퀴즈를 그만할까요? 지금까지의 답은 저장되지 않습니다.'))) return;
   if (tab === 'home') {
     showListView();
     if (history.state && history.state.view !== 'list') history.replaceState({ view: 'list', filter: fieldFilter }, '');
-  } else if (tab === 'conq') {
+  } else {
     renderAndShowConq();
     navState({ view: 'conq' });
-  } else {
-    renderAndShowQuiz();
-    navState({ view: 'quiz' });
   }
 }
 for (const b of document.querySelectorAll('#bottom-nav [data-tab]')) b.addEventListener('click', () => onTab(b.dataset.tab));
@@ -921,12 +1023,195 @@ function renderConq() {
 }
 function renderAndShowConq() { renderConq(); showView('view-conq'); window.scrollTo(0, 0); }
 
-// 퀴즈: 문제는 내용 검증 뒤에 QUIZ_BANK 에 채운다. 비어 있으면 준비 중 안내만 보인다
-const QUIZ_BANK = [];
-function renderQuiz() {
-  document.getElementById('quiz-body').innerHTML = QUIZ_BANK.length ? '' : '<div class="empty-note">퀴즈는 준비 중이에요</div>';
+// ── 퀴즈 (작업 AN-2) ──
+// 문항은 artist_notes_db.json 의 quiz[] 에 따로 쓰여 있고(근거 참조 basis 는 검증 스크립트 전용이라 화면에 쓰지 않는다),
+// 정복한 작가의 문항만 출제한다(4지선다 최대 4 + OX 최대 4). 점수·틀린 문항은 저장하지 않는다.
+const quizData = () => (DB && Array.isArray(DB.quiz) ? DB.quiz : []);
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function updateTabQuizState() {
+  // 0명이어도 눌러 안내를 볼 수 있음(흐림 대신 aria-disabled)
+  document.getElementById('nav-quiz').setAttribute('aria-disabled', String(getConqueredArtists().length === 0));
+}
+// 문항을 섞은 뒤 작가별로 돌아가며 하나씩 뽑아 정복한 작가가 고르게 나오게 한다
+function pickBalanced(pool, n) {
+  const by = {};
+  shuffle(pool).forEach(q => (by[q.artist_id] = by[q.artist_id] || []).push(q));
+  const ids = shuffle(Object.keys(by));
+  const out = [];
+  while (out.length < n && ids.some(id => by[id].length)) {
+    for (const id of ids) {
+      if (out.length >= n) break;
+      const q = by[id].shift();
+      if (q) out.push(q);
+    }
+  }
+  return out;
+}
+function buildQuestions(conquered) {
+  const ids = new Set(conquered.map(a => a.id));
+  const pool = quizData().filter(q => ids.has(q.artist_id));
+  const mcq = pickBalanced(pool.filter(q => q.type === 'mcq'), 4)
+    .map(q => ({ type: 'mcq', roundLabel: '작품 맞추기 퀴즈', question: q.question, options: shuffle(q.options), answer: q.answer }));
+  const ox = pickBalanced(pool.filter(q => q.type === 'ox'), 4)
+    .map(q => ({ type: 'ox', roundLabel: 'OX 퀴즈', statement: q.statement, answer: q.answer, explanation: q.explanation }));
+  return shuffle([...mcq, ...ox]);
+}
+function renderQuiz() {   // 문항 데이터가 없을 때의 "준비 중" 화면
+  document.getElementById('quiz-body').innerHTML = '<div class="empty-note">퀴즈는 준비 중이에요</div>';
 }
 function renderAndShowQuiz() { renderQuiz(); showView('view-quiz'); window.scrollTo(0, 0); }
+
+function startQuizFlow() {
+  if (!quizData().length) { renderAndShowQuiz(); navState({ view: 'quiz' }); return; }
+  const conquered = getConqueredArtists();
+  if (conquered.length === 0) {
+    metisAlert('먼저 작가를 읽어보세요! 작가 상세에서 정복하기를 누르면 퀴즈에 나와요.');
+    return;
+  }
+  const questions = buildQuestions(conquered);
+  if (questions.length === 0) {
+    metisAlert('퀴즈를 생성할 수 없습니다. 더 많은 작가를 정복해보세요!');
+    return;
+  }
+  quizState = { questions, currentIdx: 0, score: 0, wrong: [], answered: false };
+  showView('view-quiz');
+  renderQuestion();
+  window.scrollTo(0, 0);
+  navState({ view: 'quiz' });
+}
+
+function renderQuestion() {
+  const q = quizState.questions[quizState.currentIdx];
+  if (!q) { showResult(); return; }
+  quizState.answered = false;
+  const pct = (quizState.currentIdx / quizState.questions.length) * 100;
+  const head = `
+      <div class="quiz-progress-bar-wrap"><div class="quiz-progress-bar" id="qpb" style="width:${pct}%"></div></div>
+      <div class="quiz-round-label">${escHtml(q.roundLabel)}</div>
+      <div class="quiz-question-counter">${quizState.currentIdx + 1} / ${quizState.questions.length}</div>`;
+  const body = document.getElementById('quiz-body');
+  if (q.type === 'mcq') {
+    body.innerHTML = `${head}
+      <div class="quiz-card">
+        <div class="quiz-question">${escHtml(q.question)}</div>
+        <div class="mcq-options">
+          ${q.options.map((opt, i) => `
+            <button type="button" class="mcq-option" data-opt="${escHtml(opt)}">
+              <span class="mcq-num">${i + 1}</span>
+              <span class="mcq-text">${escHtml(opt)}</span>
+            </button>`).join('')}
+        </div>
+      </div>
+      <button type="button" class="quiz-next-btn" id="quiz-next">다음</button>`;
+    body.querySelectorAll('.mcq-option').forEach(b => b.addEventListener('click', () => answerMCQ(b)));
+  } else {
+    body.innerHTML = `${head}
+      <div class="quiz-card">
+        <div class="quiz-question">${escHtml(q.statement)}</div>
+        <div class="ox-buttons">
+          <button type="button" class="ox-btn" id="ox-o">O</button>
+          <button type="button" class="ox-btn" id="ox-x">X</button>
+        </div>
+        <div class="ox-feedback" id="ox-fb"></div>
+      </div>
+      <button type="button" class="quiz-next-btn" id="quiz-next">다음</button>`;
+    document.getElementById('ox-o').addEventListener('click', () => answerOX(true));
+    document.getElementById('ox-x').addEventListener('click', () => answerOX(false));
+  }
+  document.getElementById('quiz-next').addEventListener('click', nextQuestion);
+}
+
+function answerMCQ(el) {
+  if (quizState.answered) return;
+  quizState.answered = true;
+  const q = quizState.questions[quizState.currentIdx];
+  const chosen = el.dataset.opt;
+  document.querySelectorAll('.mcq-option').forEach(opt => opt.classList.add('answered'));
+  if (chosen === q.answer) {
+    el.classList.add('correct'); quizState.score++;
+  } else {
+    el.classList.add('wrong');
+    document.querySelectorAll('.mcq-option').forEach(opt => { if (opt.dataset.opt === q.answer) opt.classList.add('correct-hint'); });
+    quizState.wrong.push({ q: q.question, a: q.answer });
+  }
+  document.getElementById('quiz-next').classList.add('visible');
+}
+
+function answerOX(answer) {
+  if (quizState.answered) return;
+  quizState.answered = true;
+  const q = quizState.questions[quizState.currentIdx];
+  const oBtn = document.getElementById('ox-o'), xBtn = document.getElementById('ox-x'), fb = document.getElementById('ox-fb');
+  oBtn.disabled = true; xBtn.disabled = true;
+  (answer ? oBtn : xBtn).classList.add('picked');
+  const isCorrect = answer === q.answer;
+  const line = document.createElement('b'); line.className = 'fb-line';
+  if (isCorrect) {
+    (answer ? oBtn : xBtn).classList.add('correct');
+    quizState.score++;
+    line.textContent = '정답!'; fb.className = 'ox-feedback show correct-fb';
+  } else {
+    (answer ? oBtn : xBtn).classList.add('wrong');
+    (!answer ? oBtn : xBtn).classList.add('correct');
+    line.textContent = '오답.'; fb.className = 'ox-feedback show wrong-fb';
+    quizState.wrong.push({ q: q.statement, a: q.answer ? 'O (참)' : 'X (거짓)' });
+  }
+  fb.textContent = '';
+  fb.appendChild(line); fb.appendChild(document.createTextNode(' ' + q.explanation));
+  document.getElementById('quiz-next').classList.add('visible');
+}
+
+function nextQuestion() {
+  quizState.currentIdx++;
+  renderQuestion();
+  window.scrollTo(0, 0);
+}
+
+function showResult() {
+  const total = quizState.questions.length;
+  const score = quizState.score;
+  const pct = total > 0 ? Math.round((score / total) * 100) : 0;
+  let msg = '완벽해요!', sub = '모든 문항을 맞혔습니다.';
+  if (pct < 100) { msg = '잘했어요!'; sub = '조금만 더 연습하면 완벽합니다.'; }
+  if (pct < 60) { msg = '다시 도전해봐요!'; sub = '작가 노트를 다시 읽고 퀴즈에 도전하세요.'; }
+  const wrongHtml = quizState.wrong.length ? `
+      <div class="result-section-label">틀린 문항</div>
+      <div class="result-wrong-list">
+        ${quizState.wrong.map(w => `
+          <div class="result-wrong-item">
+            <div class="result-wrong-q">${escHtml(w.q)}</div>
+            <div class="result-wrong-a">${escHtml(w.a)}</div>
+          </div>`).join('')}
+      </div>` : '';
+  const box = document.getElementById('result-content');
+  box.innerHTML = `
+    <div class="result-score-wrap">
+      <div class="result-score">${score}<span> / ${total}</span></div>
+      <div class="result-msg">${msg}</div>
+      <div class="result-submsg">${sub}</div>
+    </div>
+    ${wrongHtml}
+    <div class="result-actions">
+      <button type="button" class="result-btn result-btn-primary" id="result-again">다시 풀기</button>
+      <button type="button" class="result-btn result-btn-secondary" id="result-list">목록으로</button>
+    </div>`;
+  document.getElementById('result-again').addEventListener('click', startQuizFlow);
+  document.getElementById('result-list').addEventListener('click', goList);
+  showView('view-result');
+  window.scrollTo(0, 0);
+  // 결과는 풀이 칸을 교체해 한 칸으로 둔다(한입 독서와 같은 방식: 뒤로 가기는 풀이가 아니라 이전 화면으로)
+  if (!_navFromPop) {
+    if (history.state && history.state.view === 'quiz') history.replaceState({ view: 'result' }, '');
+    else navState({ view: 'result' });
+  }
+}
 
 // ── Boot ──
 loadDB();

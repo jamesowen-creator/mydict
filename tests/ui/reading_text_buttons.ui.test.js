@@ -69,11 +69,12 @@ function assertTextBtn(m, label) {
 const done = async page => { assert.deepEqual(page.errors, [], '스크립트 오류 없음'); assert.equal(await page.hasHorizontalScroll(), false, '가로 스크롤 없음'); await page.close(); };
 const PICK = `(() => { const ms = DB.eras.flatMap(e => e.movements); return (ms.find(x => x.works && x.works.length >= 2) || ms[0]).id; })()`;
 
-test('217-2 .result-btn-secondary (literature·science·digest): 박스·배경 없는 밑줄 텍스트, 44px, 대비 4.5:1, 호버는 글자만 진해짐, 주요 채움 버튼은 그대로', { skip: SKIP }, async () => {
+test('217-2 .result-btn-secondary (literature·science·digest·artist_notes): 박스·배경 없는 밑줄 텍스트, 44px, 대비 4.5:1, 호버는 글자만 진해짐, 주요 채움 버튼은 그대로', { skip: SKIP }, async () => {
   const setups = [
     ['literature_compass', "quizData = { rounds: [], currentRound: 0, currentQ: 0, score: 1, totalQ: 4, wrong: [{ q: '문항', a: '정답' }] }; showResult()"],
     ['science_reading', "quizState = { questions: [{}, {}, {}, {}], currentIdx: 0, score: 1, wrong: [{ q: '문항', a: '정답' }], answered: false }; showResult()"],
     ['digest_reading', "quizState = { questions: [{}, {}, {}, {}], currentIdx: 0, score: 1, wrong: [{ q: '문항', a: '정답' }], answered: false }; showResult()"],
+    ['artist_notes', "quizState = { questions: [{}, {}, {}, {}], currentIdx: 0, score: 1, wrong: [{ q: '문항', a: '정답' }], answered: false }; showResult()"],   // 작업 AN-2
   ];
   for (const [file, js] of setups) {
     const page = await open(file);

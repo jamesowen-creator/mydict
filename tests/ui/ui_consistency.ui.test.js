@@ -113,7 +113,7 @@ test('220 (a) 주 버튼: 음성·개념·문학·과학·한입의 코랄 채�
   await step(page, LIT_RESULT);
   assertPrimary(await m(page, '.result-btn-primary'), '문학 .result-btn-primary');
   await done(page);
-  for (const file of ['science_reading', 'digest_reading']) {
+  for (const file of ['science_reading', 'digest_reading', 'artist_notes']) {   // 작업 AN-2: 작가 노트 포함
     page = await openReading(file);
     await step(page, READ_QUIZ(MCQ_Q)); await page.click('.mcq-option', { index: 0 }); await page.waitFor("!!document.querySelector('.quiz-next-btn.visible')");
     assertPrimary(await m(page, '.quiz-next-btn.visible'), file + ' .quiz-next-btn');
@@ -150,7 +150,7 @@ test('220 (b) 텍스트 버튼: 15px/600, 보조색, padding 0 8px, 최소 44×4
   await step(page, LIT_RESULT);
   assertTextBtn(await m(page, '.result-btn-secondary'), '문학 .result-btn-secondary', GRAY.sub);
   await done(page);
-  for (const file of ['science_reading', 'digest_reading']) {
+  for (const file of ['science_reading', 'digest_reading', 'artist_notes']) {   // 작업 AN-2: 작가 노트 포함
     page = await openReading(file); await step(page, RESULT_Q);
     assertTextBtn(await m(page, '.result-btn-secondary'), file + ' .result-btn-secondary', GRAY.sub);
     await done(page);
@@ -267,7 +267,7 @@ test('221 (e)(f)(g) 퀴즈 풀이: 보기 15px/400 + 번호(폭 20) + 구분선,
   await step(page, LIT_MCQ); await page.click('.mcq-option', { index: 0 }); await page.waitFor("!!document.querySelector('.quiz-next-btn.visible')");
   assertFullWidth(await m(page, '.quiz-next-btn.visible'), '문학'); assert.ok(await m(page, '.quiz-progress-bar'), '문학 진행 막대');
   await done(page);
-  for (const file of ['science_reading', 'digest_reading']) {
+  for (const file of ['science_reading', 'digest_reading', 'artist_notes']) {   // 작업 AN-2: 작가 노트 포함
     page = await openReading(file); await step(page, READ_QUIZ(MCQ_Q));
     assertOption(await m(page, '.mcq-text'), await m(page, '.mcq-num'), file + ' 보기', GRAY.main); assertQuestion(await m(page, '.quiz-question'), file + ' 질문', GRAY.main);
     await page.click('.mcq-option', { index: 0 }); await page.waitFor("!!document.querySelector('.quiz-next-btn.visible')");
@@ -316,7 +316,7 @@ test('221 (h) 결과 화면: 큰 점수 48px/700/#b8442e(사전은 글꼴 유지
   check(await m(page, '.result-score'), '문학'); assert.ok(!EMOJI.test(await page.text('#view-result')), '문학 이모지 없음'); assert.equal(await page.count('.result-emoji'), 0);
   assert.equal((await page.eval("getComputedStyle(document.querySelector('.result-score-wrap')).marginBottom")), '28px', '문학 점수 아래 간격 28px');
   await done(page);
-  for (const file of ['science_reading', 'digest_reading']) {
+  for (const file of ['science_reading', 'digest_reading', 'artist_notes']) {   // 작업 AN-2: 작가 노트 포함
     page = await openReading(file); await step(page, RESULT_Q);
     check(await m(page, '.result-score'), file); assert.ok(!EMOJI.test(await page.text('#view-result')), file + ' 이모지 없음'); assert.equal(await page.count('.result-emoji'), 0);
     assert.equal((await page.eval("getComputedStyle(document.querySelector('.result-score-wrap')).marginBottom")), '28px', file + ' 점수 아래 간격 28px');
@@ -341,7 +341,7 @@ test('222 (i) 하단 내비(작업226-2 갱신): 문학 홈/퀴즈/사전, 과�
   await step(page, LIT_RESULT);
   assert.equal((await tabs(page))[1].active, true, '문학 결과 화면에서도 퀴즈 탭 활성');
   await done(page);
-  for (const file of ['science_reading', 'digest_reading']) {
+  for (const file of ['science_reading', 'digest_reading', 'artist_notes']) {   // 작업 AN-2: 작가 노트 포함
     page = await openReading(file);
     assert.deepEqual((await tabs(page)).map(t => t.text), ['홈', '정복', '퀴즈'], file);
     await step(page, READ_QUIZ(MCQ_Q));

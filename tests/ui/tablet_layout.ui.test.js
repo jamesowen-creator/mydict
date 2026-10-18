@@ -22,6 +22,8 @@ const MCQ = "[{ type: 'mcq', question: '문제 하나', options: ['가', '나', 
 const READ_QUIZ = `quizState = { questions: ${MCQ}, currentIdx: 0, score: 0, wrong: [], answered: false }; showView('view-quiz'); renderQuestion();`;
 const READ_RESULT = "quizState = { questions: [{}, {}], currentIdx: 0, score: 1, wrong: [{ q: 'a', a: 'b' }], answered: false }; showResult()";
 const VQ = "quizData = [{ question: '문제?', choices: ['호흡', '증산', '광합성', '발효'], answer_index: 2, explanation: '설명', quote: '근거' }]; quizState = { i: 0, score: 0, answers: [], answered: false, saved: true }; showView('quiz'); $('quiz-result').style.display = 'none'; $('quiz-run').style.display = ''; renderQuizQuestion();";
+const ART_QUIZ = "quizState = { questions: [{ type: 'mcq', roundLabel: '작품 맞추기 퀴즈', question: '문제?', options: ['가', '나', '다', '라'], answer: '다' }, { type: 'ox', roundLabel: 'OX 퀴즈', statement: '진술', answer: true, explanation: '해설' }], currentIdx: 0, score: 0, wrong: [], answered: false }; showView('view-quiz'); renderQuestion();";   // 작업 AN-2: 작가 노트 퀴즈 풀이
+const ART_RESULT = "quizState = { questions: [{}, {}], currentIdx: 0, score: 1, wrong: [{ q: '문항', a: '정답' }], answered: false }; showResult()";   // 작가 노트 퀴즈 결과
 // 화면별 대표 상태: [이름, 이동 스크립트(없으면 첫 화면), 클릭할 선택자(있으면)]
 const SCREENS = {
   concept: { file: '/concept_study.html', ready: "!document.getElementById('app').hidden && !document.getElementById('study-rows').hidden", states: [['목록'], ['상세', null, '[data-t="open-study"]'], ['퀴즈', null, '#quiz-open']] },
@@ -29,7 +31,7 @@ const SCREENS = {
   digest: { file: '/digest_reading.html', ready: DB_READY + HDR, states: [['목록'], ['상세', 'showDigest(DB.works[0].id)'], ['퀴즈', READ_QUIZ], ['결과', READ_RESULT]] },
   lit: { file: '/literature_compass.html', ready: DB_READY + HDR, states: [['목록'], ['퀴즈', "quizData = { rounds: [{ type: 'mcq', questions: [{ question: '문제 하나', options: ['가', '나', '다', '라'], answer: '다' }] }], currentRound: 0, currentQ: 0, score: 0, wrong: [], totalQ: 1 }; showView('view-quiz'); renderQuizRound();"], ['결과', "quizData = { rounds: [], currentRound: 0, currentQ: 0, score: 1, totalQ: 2, wrong: [{ q: 'a', a: 'b' }] }; showResult()"]] },
   sci: { file: '/science_reading.html', ready: DB_READY + HDR, states: [['목록'], ['상세', 'showScience(DB.concepts[0].id)'], ['퀴즈', READ_QUIZ], ['결과', READ_RESULT]] },
-  artist: { file: '/artist_notes.html', ready: DB_READY + HDR, states: [['목록'], ['상세', 'showArtist(DB.artists[0].id)'], ['정복', 'renderAndShowConq()'], ['퀴즈', 'renderAndShowQuiz()']] },   // 작업131: 작가 노트
+  artist: { file: '/artist_notes.html', ready: DB_READY + HDR, states: [['목록'], ['상세', 'showArtist(DB.artists[0].id)'], ['정복', 'renderAndShowConq()'], ['퀴즈', ART_QUIZ], ['결과', ART_RESULT]] },   // 작업131: 작가 노트
   dict: { file: '/english_dictionary.html', ready: "!!document.querySelector('.metis-app-header-logo') && !!document.querySelector('nav')", token: true, states: [['홈'], ['플레이어', "document.getElementById('podcast-player').classList.add('show')"]] },
 };
 // 한 상태에서 잰 값: 헤더(바깥·안쪽 로고), 제목 바, body, 본문 컨테이너, fixed/sticky 요소 전부

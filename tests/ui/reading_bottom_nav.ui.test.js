@@ -205,13 +205,14 @@ test('문학 활성 탭 다시 누르기: 홈 첫 화면 = 맨 위로(요청 없
 const SPEC = {
   sci: { detail: 'showScience(DB.concepts[0].id)', first: 'DB.concepts[0].id', second: 'DB.concepts[3].id', baseView: 'view-subjects', title: 'DB.concepts[0].title', note: 'science_conquest_', rowAttr: 'data-concept-id' },
   dig: { detail: 'showDigest(DB.works[0].id)', first: 'DB.works[0].id', second: 'DB.works[3].id', baseView: 'view-list', title: '"「" + DB.works[0].title + "」"', note: 'digest_conquest_', rowAttr: 'data-work-id' },
+  art: { detail: 'showArtist(DB.artists[0].id)', first: 'DB.artists[0].id', second: 'DB.artists[3].id', baseView: 'view-list', title: 'DB.artists[0].name', note: 'artist_notes_conquest_', rowAttr: 'data-artist-id' },   // 작업 AN-2: 퀴즈 탭 두 테스트만 적용(정복 토글·정복 탭은 표기가 달라 건너뜀)
 };
-for (const key of ['sci', 'dig']) {
+for (const key of ['sci', 'dig', 'art']) {
   const S = SPEC[key];
   test(`${key}: 활성 규칙(홈=${key === 'sci' ? '과목 선택·목록·상세' : '목록·상세'} / 정복=정복 탭 / 퀴즈=풀이·결과)`, { skip: SKIP }, async () => {
     const page = await open(key);
     assert.deepEqual(await currentTab(page), ['홈']);
-    await page.eval(S.detail); await sleep(200); assert.equal(await activeView(page), key === 'sci' ? 'view-science' : 'view-digest'); assert.deepEqual(await currentTab(page), ['홈'], '상세');
+    await page.eval(S.detail); await sleep(200); assert.equal(await activeView(page), key === 'sci' ? 'view-science' : key === 'art' ? 'view-artist' : 'view-digest'); assert.deepEqual(await currentTab(page), ['홈'], '상세');
     await tap(page, 'conq'); assert.equal(await activeView(page), 'view-conq'); assert.deepEqual(await currentTab(page), ['정복']);
     await page.eval(READ_QUIZ); assert.deepEqual(await currentTab(page), ['퀴즈'], '퀴즈 풀이');
     await page.eval("quizState.score = 1; showResult()"); assert.deepEqual(await currentTab(page), ['퀴즈'], '결과');
@@ -220,7 +221,7 @@ for (const key of ['sci', 'dig']) {
     await page.close();
   });
 
-  test(`${key} 정복 토글: 상세 화면 제목 줄 오른쪽(.screen-bar-end), 하단 고정 바 없음, 라벨(정복하기 ↔ ✓ 정복함)·aria-pressed·localStorage 저장 그대로`, { skip: SKIP }, async () => {
+  test(`${key} 정복 토글: 상세 화면 제목 줄 오른쪽(.screen-bar-end), 하단 고정 바 없음, 라벨(정복하기 ↔ ✓ 정복함)·aria-pressed·localStorage 저장 그대로`, { skip: SKIP || (key === 'art' && '작가 노트는 표기가 달라 artist_quiz.ui.test.js·구조 테스트에서 확인') }, async () => {
     const page = await open(key);
     await page.eval(S.detail); await sleep(250); await settle(page);
     const m = await page.eval(`(() => { const b = document.getElementById('conquest-btn'), bar = document.querySelector('.view.active .screen-bar'), r = b.getBoundingClientRect(), br = bar.getBoundingClientRect(), t = bar.querySelector('.screen-bar-title').getBoundingClientRect();
@@ -240,7 +241,7 @@ for (const key of ['sci', 'dig']) {
     await page.close();
   });
 
-  test(`${key} 정복 탭: 0개면 "아직 정복한 항목이 없어요", 정복하면 묶음별 텍스트 행(구분선)이 생기고 행을 누르면 상세로, ‹ / 뒤로가기는 정복 탭으로(history 복원)`, { skip: SKIP }, async () => {
+  test(`${key} 정복 탭: 0개면 "아직 정복한 항목이 없어요", 정복하면 묶음별 텍스트 행(구분선)이 생기고 행을 누르면 상세로, ‹ / 뒤로가기는 정복 탭으로(history 복원)`, { skip: SKIP || (key === 'art' && '작가 노트는 표기가 달라 artist_quiz.ui.test.js·구조 테스트에서 확인') }, async () => {
     const page = await open(key);
     srv.state.log.length = 0;
     await tap(page, 'conq');
@@ -272,7 +273,7 @@ for (const key of ['sci', 'dig']) {
     assert.equal(await page.eval("getComputedStyle(document.getElementById('nav-quiz')).color"), 'rgb(74, 80, 112)', '보조색');
     await page.click('#bottom-nav [data-tab="quiz"]');
     await page.waitFor("!!document.querySelector('[data-t=dialog-msg]')");
-    assert.match(await page.text('[data-t="dialog-msg"]'), key === 'sci' ? /먼저 개념을 정복해 주세요/ : /먼저 작품을 읽어보세요/);
+    assert.match(await page.text('[data-t="dialog-msg"]'), key === 'sci' ? /먼저 개념을 정복해 주세요/ : key === 'art' ? /먼저 작가를 읽어보세요/ : /먼저 작품을 읽어보세요/);
     await page.click('[data-t="dialog-ok"]'); await sleep(250);
     assert.equal(await activeView(page), S.baseView, '화면 그대로');
     // 풀이 중 탭 이동 확인
