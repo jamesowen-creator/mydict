@@ -1,5 +1,5 @@
 {
-  "version": "0.4",
+  "version": "0.5",
   "last_updated": "2026-10-18",
   "artists": [
     {
@@ -492,6 +492,744 @@
         "https://www.britannica.com/summary/Franz-Liszt",
         "https://www.britannica.com/EBchecked/topic/528446"
       ]
+    }
+  ],
+  "quiz": [
+    {
+      "id": "m01",
+      "type": "mcq",
+      "artist_id": "artist_001",
+      "question": "교향곡 3번 「영웅」의 작곡가는?",
+      "options": [
+        "모차르트",
+        "쇼팽",
+        "고흐",
+        "베토벤"
+      ],
+      "answer": "베토벤",
+      "basis": [
+        {
+          "artist_id": "artist_001",
+          "path": "featured_works[0].title",
+          "includes": "영웅"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "m02",
+      "type": "mcq",
+      "artist_id": "artist_001",
+      "question": "교향곡 9번의 작곡가는?",
+      "options": [
+        "쇼팽",
+        "김환기",
+        "베토벤",
+        "모차르트"
+      ],
+      "answer": "베토벤",
+      "basis": [
+        {
+          "artist_id": "artist_001",
+          "path": "featured_works[1].title",
+          "includes": "9번"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "m03",
+      "type": "mcq",
+      "artist_id": "artist_002",
+      "question": "「해바라기」(아를 연작)의 화가는?",
+      "options": [
+        "쇼팽",
+        "고흐",
+        "모네",
+        "김환기"
+      ],
+      "answer": "고흐",
+      "basis": [
+        {
+          "artist_id": "artist_002",
+          "path": "featured_works[0].title",
+          "includes": "해바라기"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "m04",
+      "type": "mcq",
+      "artist_id": "artist_002",
+      "question": "「별이 빛나는 밤」의 화가는?",
+      "options": [
+        "고흐",
+        "모네",
+        "김환기",
+        "베토벤"
+      ],
+      "answer": "고흐",
+      "basis": [
+        {
+          "artist_id": "artist_002",
+          "path": "featured_works[1].title",
+          "includes": "별이 빛나는 밤"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "m05",
+      "type": "mcq",
+      "artist_id": "artist_003",
+      "question": "「인상, 해돋이」의 화가는?",
+      "options": [
+        "고흐",
+        "김환기",
+        "모차르트",
+        "모네"
+      ],
+      "answer": "모네",
+      "basis": [
+        {
+          "artist_id": "artist_003",
+          "path": "featured_works[0].title",
+          "includes": "해돋이"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "m06",
+      "type": "mcq",
+      "artist_id": "artist_003",
+      "question": "「수련」 연작(오랑주리 미술관)의 화가는?",
+      "options": [
+        "김환기",
+        "쇼팽",
+        "모네",
+        "고흐"
+      ],
+      "answer": "모네",
+      "basis": [
+        {
+          "artist_id": "artist_003",
+          "path": "featured_works[1].title",
+          "includes": "수련"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "m07",
+      "type": "mcq",
+      "artist_id": "artist_004",
+      "question": "「어디서 무엇이 되어 다시 만나랴」의 화가는?",
+      "options": [
+        "베토벤",
+        "김환기",
+        "고흐",
+        "모네"
+      ],
+      "answer": "김환기",
+      "basis": [
+        {
+          "artist_id": "artist_004",
+          "path": "featured_works[0].title",
+          "includes": "다시 만나랴"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "m08",
+      "type": "mcq",
+      "artist_id": "artist_004",
+      "question": "「우주 05-IV-71 #200」의 화가는?",
+      "options": [
+        "김환기",
+        "고흐",
+        "모네",
+        "모차르트"
+      ],
+      "answer": "김환기",
+      "basis": [
+        {
+          "artist_id": "artist_004",
+          "path": "featured_works[1].title",
+          "includes": "우주"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "m09",
+      "type": "mcq",
+      "artist_id": "artist_005",
+      "question": "교향곡 40번의 작곡가는?",
+      "options": [
+        "베토벤",
+        "쇼팽",
+        "모네",
+        "모차르트"
+      ],
+      "answer": "모차르트",
+      "basis": [
+        {
+          "artist_id": "artist_005",
+          "path": "featured_works[0].title",
+          "includes": "40번"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "m10",
+      "type": "mcq",
+      "artist_id": "artist_005",
+      "question": "레퀴엠 K. 626의 작곡가는?",
+      "options": [
+        "쇼팽",
+        "김환기",
+        "모차르트",
+        "베토벤"
+      ],
+      "answer": "모차르트",
+      "basis": [
+        {
+          "artist_id": "artist_005",
+          "path": "featured_works[1].title",
+          "includes": "레퀴엠"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "m11",
+      "type": "mcq",
+      "artist_id": "artist_006",
+      "question": "발라드 1번 Op. 23의 작곡가는?",
+      "options": [
+        "고흐",
+        "쇼팽",
+        "베토벤",
+        "모차르트"
+      ],
+      "answer": "쇼팽",
+      "basis": [
+        {
+          "artist_id": "artist_006",
+          "path": "featured_works[0].title",
+          "includes": "발라드"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "m12",
+      "type": "mcq",
+      "artist_id": "artist_006",
+      "question": "에튀드 Op. 10-12 「혁명」의 작곡가는?",
+      "options": [
+        "쇼팽",
+        "베토벤",
+        "모차르트",
+        "모네"
+      ],
+      "answer": "쇼팽",
+      "basis": [
+        {
+          "artist_id": "artist_006",
+          "path": "featured_works[1].title",
+          "includes": "혁명"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o01",
+      "type": "ox",
+      "artist_id": "artist_001",
+      "statement": "베토벤은 1827년에 세상을 떠났다.",
+      "answer": true,
+      "explanation": "베토벤(1770–1827)은 1827년 3월 26일 빈에서 세상을 떠났다.",
+      "basis": [
+        {
+          "artist_id": "artist_001",
+          "path": "death_year",
+          "equals": 1827
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o02",
+      "type": "ox",
+      "artist_id": "artist_001",
+      "statement": "교향곡 9번은 1805년에 초연되었다.",
+      "answer": false,
+      "explanation": "교향곡 9번은 1824년 5월 7일 빈에서 초연되었다. 1805년은 「영웅」의 공개 초연 해다.",
+      "basis": [
+        {
+          "artist_id": "artist_001",
+          "path": "featured_works[1].description",
+          "includes": "1824년 5월 7일"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o03",
+      "type": "ox",
+      "artist_id": "artist_001",
+      "statement": "교향곡 9번은 오케스트라만으로 연주되는 곡이다.",
+      "answer": false,
+      "explanation": "교향곡 9번은 마지막 악장에 합창과 독창을 넣은 교향곡이다.",
+      "basis": [
+        {
+          "artist_id": "artist_001",
+          "path": "featured_works[1].description",
+          "includes": "합창"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o04",
+      "type": "ox",
+      "artist_id": "artist_001",
+      "statement": "「영웅」의 공개 초연은 1805년에 열렸다.",
+      "answer": true,
+      "explanation": "1804년 후원자의 궁에서 비공개로 연주한 뒤, 공개 초연은 1805년 4월 7일 빈의 안 데어 빈 극장에서 열렸다.",
+      "basis": [
+        {
+          "artist_id": "artist_001",
+          "path": "featured_works[0].description",
+          "includes": "1805년 4월 7일"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o05",
+      "type": "ox",
+      "artist_id": "artist_001",
+      "statement": "베토벤은 바로크 시대의 작곡가다.",
+      "answer": false,
+      "explanation": "베토벤은 고전주의에서 낭만주의로 넘어가는 전환기의 작곡가로 꼽힌다.",
+      "basis": [
+        {
+          "artist_id": "artist_001",
+          "path": "movement.tags",
+          "includes": "고전·낭만 전환기"
+        }
+      ],
+      "verified_on": "2026-10-18",
+      "claim_tag": "바로크"
+    },
+    {
+      "id": "o06",
+      "type": "ox",
+      "artist_id": "artist_002",
+      "statement": "고흐는 1890년에 세상을 떠났다.",
+      "answer": true,
+      "explanation": "고흐(1853–1890)는 1890년 7월 29일 오베르쉬르우아즈에서 세상을 떠났다.",
+      "basis": [
+        {
+          "artist_id": "artist_002",
+          "path": "death_year",
+          "equals": 1890
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o07",
+      "type": "ox",
+      "artist_id": "artist_002",
+      "statement": "고흐는 후기 인상주의 화가로 분류된다.",
+      "answer": true,
+      "explanation": "고흐는 세잔, 고갱 등과 함께 후기 인상주의의 대표 화가로 꼽힌다.",
+      "basis": [
+        {
+          "artist_id": "artist_002",
+          "path": "movement.tags",
+          "includes": "후기 인상주의"
+        }
+      ],
+      "verified_on": "2026-10-18",
+      "claim_tag": "후기 인상주의"
+    },
+    {
+      "id": "o08",
+      "type": "ox",
+      "artist_id": "artist_002",
+      "statement": "「별이 빛나는 밤」은 아를에서 그린 작품이다.",
+      "answer": false,
+      "explanation": "「별이 빛나는 밤」은 1889년 6월 중순 생레미의 생폴 드 모졸 병원에 머물 때 그렸다. 아를에서 그린 것은 「해바라기」 연작이다.",
+      "basis": [
+        {
+          "artist_id": "artist_002",
+          "path": "featured_works[1].description",
+          "includes": "생레미"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o09",
+      "type": "ox",
+      "artist_id": "artist_002",
+      "statement": "「별이 빛나는 밤」은 1941년부터 뉴욕 현대미술관이 소장하고 있다.",
+      "answer": true,
+      "explanation": "「별이 빛나는 밤」은 1941년 뉴욕 현대미술관(MoMA)의 소장품이 되었다.",
+      "basis": [
+        {
+          "artist_id": "artist_002",
+          "path": "featured_works[1].description",
+          "includes": "1941년"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o10",
+      "type": "ox",
+      "artist_id": "artist_002",
+      "statement": "해바라기 아를 연작은 모두 세 점이다.",
+      "answer": false,
+      "explanation": "고흐가 1888~89년 아를에서 그린 해바라기 정물화는 모두 일곱 점이다.",
+      "basis": [
+        {
+          "artist_id": "artist_002",
+          "path": "featured_works[0].description",
+          "includes": "일곱 점"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o11",
+      "type": "ox",
+      "artist_id": "artist_003",
+      "statement": "모네는 1926년에 세상을 떠났다.",
+      "answer": true,
+      "explanation": "모네(1840–1926)는 1926년 12월 5일 지베르니에서 세상을 떠났다.",
+      "basis": [
+        {
+          "artist_id": "artist_003",
+          "path": "death_year",
+          "equals": 1926
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o12",
+      "type": "ox",
+      "artist_id": "artist_003",
+      "statement": "「인상, 해돋이」는 1890년에 그려졌다.",
+      "answer": false,
+      "explanation": "「인상, 해돋이」는 1872년 작품이다. 1890~91년은 건초더미 연작을 그린 때다.",
+      "basis": [
+        {
+          "artist_id": "artist_003",
+          "path": "featured_works[0].year",
+          "includes": "1872"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o13",
+      "type": "ox",
+      "artist_id": "artist_003",
+      "statement": "인상주의라는 이름은 고흐의 작품에서 유래했다.",
+      "answer": false,
+      "explanation": "인상주의라는 이름은 모네의 「인상, 해돋이」에서 유래했다. 비평가 루이 르루아의 글에서 이름이 붙었다.",
+      "basis": [
+        {
+          "artist_id": "artist_003",
+          "path": "featured_works[0].interpretation",
+          "includes": "르루아"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o14",
+      "type": "ox",
+      "artist_id": "artist_003",
+      "statement": "모네는 1918년 휴전 다음 날 수련 그림을 국가에 기증하겠다고 제안했다.",
+      "answer": true,
+      "explanation": "1918년 11월 휴전 다음 날 대형 수련 그림을 국가에 기증하겠다고 제안했다.",
+      "basis": [
+        {
+          "artist_id": "artist_003",
+          "path": "featured_works[1].description",
+          "includes": "1918년 11월 휴전 다음 날"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o15",
+      "type": "ox",
+      "artist_id": "artist_003",
+      "statement": "오랑주리 미술관의 수련 연작은 모네가 세상을 떠나기 전에 설치되었다.",
+      "answer": false,
+      "explanation": "수련 연작은 모네가 세상을 떠난 이듬해인 1927년에 오랑주리 미술관에 설치되었다.",
+      "basis": [
+        {
+          "artist_id": "artist_003",
+          "path": "reputation.posthumous",
+          "includes": "이듬해인 1927년"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o16",
+      "type": "ox",
+      "artist_id": "artist_004",
+      "statement": "김환기는 1974년에 세상을 떠났다.",
+      "answer": true,
+      "explanation": "김환기(1913–1974)는 1974년 뉴욕에서 세상을 떠났다.",
+      "basis": [
+        {
+          "artist_id": "artist_004",
+          "path": "death_year",
+          "equals": 1974
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o17",
+      "type": "ox",
+      "artist_id": "artist_004",
+      "statement": "「어디서 무엇이 되어 다시 만나랴」의 제목은 김광섭의 시 「저녁에」의 구절에서 가져왔다.",
+      "answer": true,
+      "explanation": "김광섭의 시 「저녁에」의 구절에서 가져온 제목이다.",
+      "basis": [
+        {
+          "artist_id": "artist_004",
+          "path": "featured_works[0].description",
+          "includes": "「저녁에」"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o18",
+      "type": "ox",
+      "artist_id": "artist_004",
+      "statement": "「우주 05-IV-71 #200」은 1990년대에 그려진 작품이다.",
+      "answer": false,
+      "explanation": "「우주 05-IV-71 #200」은 1971년 작품이다. 김환기는 1974년에 세상을 떠났다.",
+      "basis": [
+        {
+          "artist_id": "artist_004",
+          "path": "featured_works[1].year",
+          "includes": "1971"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o19",
+      "type": "ox",
+      "artist_id": "artist_004",
+      "statement": "김환기는 1963년 상파울루 비엔날레에 한국 대표로 참가했다.",
+      "answer": true,
+      "explanation": "1963년 상파울루 비엔날레에 한국 대표로 참가해 명예상을 받았다.",
+      "basis": [
+        {
+          "artist_id": "artist_004",
+          "path": "life",
+          "includes": "1963년 상파울루 비엔날레"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o20",
+      "type": "ox",
+      "artist_id": "artist_004",
+      "statement": "「우주 05-IV-71 #200」은 2019년 서울 경매에서 낙찰되었다.",
+      "answer": false,
+      "explanation": "2019년 홍콩 크리스티 경매에서 낙찰되어 당시 한국 미술품 경매 최고가를 기록했다.",
+      "basis": [
+        {
+          "artist_id": "artist_004",
+          "path": "featured_works[1].description",
+          "includes": "홍콩 크리스티"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o21",
+      "type": "ox",
+      "artist_id": "artist_005",
+      "statement": "모차르트는 1791년에 세상을 떠났다.",
+      "answer": true,
+      "explanation": "모차르트(1756–1791)는 1791년 12월 5일 빈에서 세상을 떠났다.",
+      "basis": [
+        {
+          "artist_id": "artist_005",
+          "path": "death_year",
+          "equals": 1791
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o22",
+      "type": "ox",
+      "artist_id": "artist_005",
+      "statement": "모차르트의 레퀴엠은 모차르트가 직접 완성했다.",
+      "answer": false,
+      "explanation": "미완성으로 남은 곡을 제자 쥐스마이어가 완성했다.",
+      "basis": [
+        {
+          "artist_id": "artist_005",
+          "path": "featured_works[1].description",
+          "includes": "쥐스마이어"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o23",
+      "type": "ox",
+      "artist_id": "artist_005",
+      "statement": "교향곡 40번은 1791년에 작곡되었다.",
+      "answer": false,
+      "explanation": "교향곡 40번은 1788년 여름에 작곡되었다.",
+      "basis": [
+        {
+          "artist_id": "artist_005",
+          "path": "featured_works[0].year",
+          "includes": "1788"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o24",
+      "type": "ox",
+      "artist_id": "artist_005",
+      "statement": "모차르트는 고전주의 작곡가다.",
+      "answer": true,
+      "explanation": "모차르트는 하이든, 베토벤과 함께 빈 고전파를 대표하는 작곡가로 꼽힌다.",
+      "basis": [
+        {
+          "artist_id": "artist_005",
+          "path": "movement.tags",
+          "includes": "고전주의"
+        }
+      ],
+      "verified_on": "2026-10-18",
+      "claim_tag": "고전주의"
+    },
+    {
+      "id": "o25",
+      "type": "ox",
+      "artist_id": "artist_005",
+      "statement": "교향곡 40번의 초연 날짜는 확실히 알려져 있다.",
+      "answer": false,
+      "explanation": "교향곡 40번의 초연 날짜는 확실히 알려져 있지 않다.",
+      "basis": [
+        {
+          "artist_id": "artist_005",
+          "path": "featured_works[0].description",
+          "includes": "초연 날짜는 확실히 알려져 있지 않다"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o26",
+      "type": "ox",
+      "artist_id": "artist_006",
+      "statement": "쇼팽은 1849년에 세상을 떠났다.",
+      "answer": true,
+      "explanation": "쇼팽(1810–1849)은 1849년 10월 17일 파리에서 세상을 떠났다.",
+      "basis": [
+        {
+          "artist_id": "artist_006",
+          "path": "death_year",
+          "equals": 1849
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o27",
+      "type": "ox",
+      "artist_id": "artist_006",
+      "statement": "쇼팽은 고전주의 작곡가다.",
+      "answer": false,
+      "explanation": "쇼팽은 낭만주의 시기의 작곡가다.",
+      "basis": [
+        {
+          "artist_id": "artist_006",
+          "path": "movement.tags",
+          "includes": "낭만주의"
+        }
+      ],
+      "verified_on": "2026-10-18",
+      "claim_tag": "고전주의"
+    },
+    {
+      "id": "o28",
+      "type": "ox",
+      "artist_id": "artist_006",
+      "statement": "발라드 1번은 쇼팽이 피아노 독주곡 장르로 만든 발라드의 첫 작품이다.",
+      "answer": true,
+      "explanation": "쇼팽은 발라드를 피아노 독주곡 장르로 만든 작곡가로 소개되며, 이 곡은 그 첫 작품이다.",
+      "basis": [
+        {
+          "artist_id": "artist_006",
+          "path": "featured_works[0].interpretation",
+          "includes": "첫 작품"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o29",
+      "type": "ox",
+      "artist_id": "artist_006",
+      "statement": "발라드 1번은 1831년에 시작해 1835년에 완성되었다.",
+      "answer": true,
+      "explanation": "1831년에 시작해 1835년에 완성했다.",
+      "basis": [
+        {
+          "artist_id": "artist_006",
+          "path": "featured_works[0].description",
+          "includes": "1835년"
+        }
+      ],
+      "verified_on": "2026-10-18"
+    },
+    {
+      "id": "o30",
+      "type": "ox",
+      "artist_id": "artist_006",
+      "statement": "쇼팽은 파리에서 태어났다.",
+      "answer": false,
+      "explanation": "쇼팽은 폴란드 젤라조바볼라에서 태어나 1831년 파리로 이주했다.",
+      "basis": [
+        {
+          "artist_id": "artist_006",
+          "path": "who",
+          "includes": "젤라조바볼라"
+        }
+      ],
+      "verified_on": "2026-10-18"
     }
   ]
 }

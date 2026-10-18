@@ -16,6 +16,11 @@
  *   6. 카드 한 장의 본문은 400자 이하 (who, life, movement.text, 대표작 1건=description+interpretation,
  *      reputation=contemporary+posthumous, summary)
  *   7. 작품·가사 원문용 필드(full_text, lyrics, text_original 등)가 있으면 오류
+ *   8. (작업 AN-2) 최상위 quiz[]: id 중복 금지, type은 mcq|ox, artist_id는 실제 작가, verified_on은 날짜.
+ *      mcq = question·options(4개, 정규화 후 서로 다른 실제 작가 name)·answer(보기 중 정확히 1개, artist_id 작가의 name).
+ *      ox = statement·answer(boolean)·explanation 필수, claim_tag가 있으면 answer가 그 작가 movement.tags 포함 여부와 일치.
+ *      basis[](artist_id, path, equals|includes)는 현재 JSON에서 풀리고 값이 일치해야 함(정답과 데이터의 어긋남을 잡음).
+ *      글자 수 상한: 문항·진술 60자, 보기 20자, 해설 120자. 원문·미디어 금지 필드는 문항에도 적용
  *
  * 한입 독서의 저작권 사망연도 검증과 장르별 편수 상수는 쓰지 않음(데이터가 서로 독립).
  *
@@ -114,6 +119,82 @@ for (const a of db.artists || []) {
   card('summary', a.summary || '');
 }
 
+// ── 퀴즈 (작업 AN-2) ──
+// 문항은 JSON의 최상위 quiz[]에 따로 쓰고, 모든 문항이 basis[](근거 참조)로 현재 데이터와 대조된다.
+const QUIZ_LIMIT = { question: 60, statement: 60, option: 20, explanation: 120 };
+const norm = s => String(s).normalize('NFC').replace(/\s+/g, '');
+function resolvePath(obj, p) {
+  let cur = obj;
+  for (const t of String(p).match(/[^.[\]]+/g) || []) {
+    if (cur == null) return undefined;
+    cur = cur[/^\d+$/.test(t) ? Number(t) : t];
+  }
+  return cur;
+}
+const quizStat = { mcq: 0, ox: 0, o: 0, x: 0, byArtist: {} };
+const quiz = db.quiz;
+if (!Array.isArray(quiz)) errors.push('최상위 quiz[]가 없거나 배열이 아님');
+else {
+  const byId = new Map((db.artists || []).map(a => [a.id, a]));
+  const quizIds = new Set();
+  quiz.forEach((q, i) => {
+    const label = `quiz[${i}] ${q && q.id || '(id 없음)'}`;
+    const err = m => errors.push(`${label}: ${m}`);
+    if (!q || typeof q !== 'object') { err('객체가 아님'); return; }
+    if (!isStr(q.id)) err('id 없음'); else { if (quizIds.has(q.id)) err('id 중복'); quizIds.add(q.id); }
+    if (q.type !== 'mcq' && q.type !== 'ox') err(`type은 mcq 또는 ox여야 함 (현재 "${q.type}")`);
+    for (const k of FORBIDDEN_KEYS) if (k in q) err(`금지 필드 "${k}"`);
+    const owner = byId.get(q.artist_id);
+    if (!owner) err(`artist_id "${q.artist_id}"가 실제 작가 id가 아님`);
+    if (!isDate(q.verified_on)) err('verified_on이 YYYY-MM-DD 형식의 실제 날짜가 아님');
+    if (q.type === 'mcq') {
+      if (!isStr(q.question)) err('question 없음'); else if (len(q.question) > QUIZ_LIMIT.question) err(`question ${len(q.question)}자 - ${QUIZ_LIMIT.question}자 이하`);
+      if (!Array.isArray(q.options) || q.options.length !== 4) err('options는 4개여야 함');
+      else {
+        if (!q.options.every(isStr)) err('options에 빈 값이 있음');
+        else {
+          if (new Set(q.options.map(norm)).size !== 4) err('options가 정규화한 뒤 서로 같은 값을 포함');
+          const names = new Set((db.artists || []).map(a => a.name));
+          q.options.forEach(o => { if (!names.has(o)) err(`보기 "${o}"가 실제 작가 name이 아님`); if (len(o) > QUIZ_LIMIT.option) err(`보기 "${o}" ${len(o)}자 - ${QUIZ_LIMIT.option}자 이하`); });
+          if (q.options.filter(o => o === q.answer).length !== 1) err('answer가 options 중 정확히 1개와 같아야 함');
+        }
+      }
+      if (owner && q.answer !== owner.name) err(`answer "${q.answer}"가 artist_id 작가의 name("${owner.name}")과 다름`);
+      if ('statement' in q || 'explanation' in q) err('mcq에 ox 전용 필드(statement/explanation)가 있음');
+      quizStat.mcq++;
+    } else if (q.type === 'ox') {
+      if (!isStr(q.statement)) err('statement 없음'); else if (len(q.statement) > QUIZ_LIMIT.statement) err(`statement ${len(q.statement)}자 - ${QUIZ_LIMIT.statement}자 이하`);
+      if (typeof q.answer !== 'boolean') err('answer는 boolean이어야 함'); else { if (q.answer) quizStat.o++; else quizStat.x++; }
+      if (!isStr(q.explanation)) err('explanation 없음'); else if (len(q.explanation) > QUIZ_LIMIT.explanation) err(`explanation ${len(q.explanation)}자 - ${QUIZ_LIMIT.explanation}자 이하`);
+      if ('claim_tag' in q) {
+        if (!isStr(q.claim_tag)) err('claim_tag가 빈 값');
+        else if (owner && typeof q.answer === 'boolean') {
+          const has = ((owner.movement && owner.movement.tags) || []).includes(q.claim_tag);
+          if (q.answer !== has) err(`claim_tag "${q.claim_tag}"는 ${owner.name}의 movement.tags에 ${has ? '있으므로 answer=true' : '없으므로 answer=false'}여야 함`);
+        }
+      }
+      if ('options' in q || 'question' in q) err('ox에 mcq 전용 필드(options/question)가 있음');
+      quizStat.ox++;
+    }
+    if (!Array.isArray(q.basis) || q.basis.length === 0) err('basis[](근거 참조)가 없음');
+    else q.basis.forEach((b, j) => {
+      const bl = `basis[${j}]`;
+      const a = b && byId.get(b.artist_id);
+      if (!a) { err(`${bl}: artist_id "${b && b.artist_id}"가 실제 작가 id가 아님`); return; }
+      if (!isStr(b.path)) { err(`${bl}: path 없음`); return; }
+      const hasEq = 'equals' in b, hasInc = 'includes' in b;
+      if (hasEq === hasInc) { err(`${bl}: equals와 includes 중 하나만 있어야 함`); return; }
+      const v = resolvePath(a, b.path);
+      if (v === undefined) { err(`${bl}: path "${b.path}"가 ${a.name} 데이터에서 풀리지 않음`); return; }
+      if (hasEq) { if (v !== b.equals) err(`${bl}: ${a.name}.${b.path} = ${JSON.stringify(v)} ≠ equals ${JSON.stringify(b.equals)}`); }
+      else if (Array.isArray(v)) { if (!v.includes(b.includes)) err(`${bl}: ${a.name}.${b.path}에 ${JSON.stringify(b.includes)} 없음`); }
+      else if (typeof v === 'string') { if (!v.includes(b.includes)) err(`${bl}: ${a.name}.${b.path}에 문구 ${JSON.stringify(b.includes)}가 들어 있지 않음`); }
+      else err(`${bl}: ${a.name}.${b.path}가 includes를 쓸 수 없는 값(문자열·배열 아님)`);
+    });
+    if (owner) quizStat.byArtist[owner.name] = (quizStat.byArtist[owner.name] || 0) + 1;
+  });
+}
+
 warnings.forEach(w => console.warn('경고: ' + w));
 if (errors.length) {
   console.error(`artist_notes 검증 실패 (${errors.length}건)`);
@@ -121,3 +202,4 @@ if (errors.length) {
   process.exit(1);
 }
 console.log(`artist_notes 검증 통과: 작가 ${db.artists.length}명 (${FIELDS.map(f => f + ' ' + db.artists.filter(a => a.field === f).length).join(', ')}), 미검증 작가 ${unverified}명`);
+console.log(`퀴즈 문항 ${quizStat.mcq + quizStat.ox}개 (4지선다 ${quizStat.mcq}, OX ${quizStat.ox}: O ${quizStat.o} / X ${quizStat.x}), 작가별 ${Object.entries(quizStat.byArtist).map(([n, c]) => n + ' ' + c).join(', ')}`);
