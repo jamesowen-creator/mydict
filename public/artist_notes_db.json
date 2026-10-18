@@ -738,6 +738,83 @@
         "https://musiclib-exhibits.library.yale.edu/exhibits/liszt/abbe_liszt.html",
         "https://www.themorgan.org/exhibitions/liszt-in-paris"
       ]
+    },
+    {
+      "id": "artist_010",
+      "name": "르누아르",
+      "full_name": "피에르오귀스트 르누아르",
+      "name_original": "Pierre-Auguste Renoir",
+      "field": "미술",
+      "birth_year": 1841,
+      "death_year": 1919,
+      "nationality": "프랑스",
+      "one_line": "인물과 여가의 장면을 밝은 빛과 색으로 그린 인상주의 화가",
+      "who": "1841년 2월 25일 프랑스 리모주에서 태어났다. 재단사와 재봉사의 아들로 가난한 집안에서 자라 4세에 파리로 이주했다.\n\n1854년부터 도자기 공방에서 견습했다.",
+      "life": "1860년대 초 글레르의 화실에서 모네, 시슬레, 바지유를 만났고, 1869년 라 그르누예르에서 모네와 나란히 그려 초기 인상주의 풍경화를 남겼다.\n\n1874년 첫 인상주의전에 여섯 점을 출품했고, 1876년 몽마르트르에 작업실을 얻어 「물랭 드 라 갈레트의 무도회」를 그렸다.\n\n1879년 살롱에서 「샤르팡티에 부인과 아이들」이 호평을 받아 처음으로 경제적 안정을 얻었다.\n\n1881~82년 이탈리아 여행에서 라파엘로의 프레스코에 감명받고 '인상주의의 위기'를 겪은 뒤 선과 구조를 강조한 '고전적 인상주의'로 나아갔다.\n\n류머티즘 관절염이 깊어져 남프랑스 카뉴쉬르메르로 옮겼고, 손이 굳어 붓을 손에 묶고 그렸다고 전해진다. 1919년 12월 3일 카뉴에서 78세로 세상을 떠났다.",
+      "movement": {
+        "name": "인상주의",
+        "tags": [
+          "인상주의"
+        ],
+        "text": "1874년 독립 전시를 계기로 이름이 나온 흐름이다. 르누아르는 인상주의 가운데서도 사람, 특히 여성을 그린 화가이고, 1880년대 중반 인상주의에서 벗어나 더 절제된 기법으로 인물화를 그렸다."
+      },
+      "featured_works": [
+        {
+          "title": "물랭 드 라 갈레트의 무도회",
+          "year": "1876",
+          "description": "몽마르트르 야외 무도장의 일요일 오후를 그렸다. 친구 리비에르의 증언으로는 현장에서 그렸고 친구들이 캔버스를 날랐다고 전해진다. 131×175cm이며 파리 오르세 미술관이 소장하고 있다.",
+          "interpretation": "졸라 등 당대 비평가가 호평했고, 인상주의를 대표하는 작품으로 꼽힌다."
+        },
+        {
+          "title": "뱃놀이 일행의 점심",
+          "year": "1880–1881",
+          "description": "센 강변 샤투의 레스토랑 메종 푸르네즈 발코니에서 르누아르의 친구들이 음식과 술, 대화를 나누는 장면이다. 오른쪽 앞에 화가 카유보트, 왼쪽 앞에 훗날 아내가 될 알린 샤리고가 강아지를 안고 있다.",
+          "interpretation": "1923년 던컨 필립스가 구입해 지금은 워싱턴 필립스 컬렉션이 소장하며, 이 미술관에서 가장 유명하고 인기 있는 작품이다. 르누아르 경력의 정점이라는 평가를 받으며, 햇빛이 차양 사이로 들어와 앞쪽 인물의 흰 셔츠와 식탁보에 반사되며 화면 전체로 퍼진다."
+        }
+      ],
+      "other_works": [
+        {
+          "title": "양산을 든 리즈",
+          "year": "1867",
+          "note": "햇빛과 색을 야외에서 연구한 초기작"
+        },
+        {
+          "title": "라 그르누예르",
+          "year": "1869",
+          "note": "모네와 나란히 그린 초기 인상주의 풍경"
+        },
+        {
+          "title": "샤르팡티에 부인과 아이들",
+          "year": "1878",
+          "note": "1879년 살롱에서 호평을 받은 초상화"
+        },
+        {
+          "title": "큰 목욕하는 여인들",
+          "year": "1884–1887",
+          "note": "이탈리아 여행 뒤 선과 구조를 강조한 시기의 결산"
+        }
+      ],
+      "reputation": {
+        "contemporary": "1870년대 후반 인물화로 인기를 얻고 살롱 성공으로 경제적 안정을 찾았다. 1880년대 이탈리아 여행 뒤의 양식 변화는 화상, 동료 화가와의 불화를 불렀다.",
+        "posthumous": "「갈레트의 무도회」와 「뱃놀이 일행의 점심」은 가장 널리 알려진 인상주의 이미지로 꼽힌다. 생전에 자신의 초상화가 루브르에 걸린 것을 보았고, 마지막 거처는 르누아르 미술관이 되었다."
+      },
+      "summary": "인상주의 화가로 시작해 이탈리아 여행 뒤 선과 구조를 강조하는 양식으로 나아갔고, 병이 깊어진 말년까지 붓을 놓지 않았다.",
+      "connected_artists": [
+        {
+          "name": "클로드 모네",
+          "reason": "같은 인상주의 화가",
+          "id": null
+        }
+      ],
+      "checked": "2026-10-18",
+      "sources": [
+        "https://www.britannica.com/print/article/498200",
+        "https://www.frick.org/exhibitions/renoir/chronology",
+        "https://www.clarkart.edu/microsites/renoir/about/classical-impressionism",
+        "https://www.metmuseum.org/art/collection/search/437436",
+        "https://www.polamuseum.or.jp/en/collection/artist/pickup/renoir/",
+        "https://www.larousse.fr/encyclopedie/oeuvre/Moulin_de_la_Galette/126778"
+      ]
     }
   ],
   "quiz": [
