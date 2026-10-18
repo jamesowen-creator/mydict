@@ -166,3 +166,33 @@ test('304-1 종류별 다발: 종류 3개(문구가 서로 다름)는 나란히 
   assert.match(await page.eval("document.getElementById('edge-dlg').innerText"), /회사채/);
   noErrors(page);
 });
+
+// 305-1: 종류가 좌우로 끼어 있는 저장 위치(주식 289, 회사채 493, 국공채 697, 조건환매부채권 901 — 주식·회사채·조건환매 = 종류, 국공채 = 일부)
+const world3 = t => build(t, {
+  title: '증권3', terms: ['유가 증권', '주식', '회사채', '국공채', '조건환매'], at: [[595, 0], [289, 96], [493, 96], [697, 96], [901, 96]],
+  edges: [[0, 1, '종류', '종류'], [0, 2, '종류', '종류'], [0, 3, '일부', '일부'], [0, 4, '종류', '종류']],
+});
+
+test('305-1 저장 위치(종류가 끼어 있음): 부모 아래 출발 순서 = 자식 좌우 순서(교차 없음), 다발 3개의 라벨이 각각 한 번, 종류 사이 BUNDLE_GAP, PDF용 SVG 에서도 같은 M C 경로', { skip: SKIP, timeout: 90000 }, async t => {
+  const { page } = await world3(t);
+  const r = await rows(page);
+  assert.equal(r.length, 4);
+  assert.ok(r.every(x => isCurve(x.d)), '모두 M C 한 개');
+  const sx = r.map(x => pts(x.d)[0]), ex = r.map(x => pts(x.d)[6]);
+  // DOM 순서 = 연결 생성 순서 = 자식 x 순서(주식, 회사채, 국공채, 조건환매부채권)
+  assert.ok(ex[0] < ex[1] && ex[1] < ex[2] && ex[2] < ex[3], '도착 x 순서: ' + ex);
+  assert.ok(sx[0] < sx[1] && sx[1] < sx[2] && sx[2] < sx[3], '출발 x 순서가 도착 순서와 같음(교차 없음): ' + sx);
+  assert.deepEqual([sx[1] - sx[0], sx[2] - sx[1], sx[3] - sx[2]], [6, 16, 16], '같은 종류 6px, 종류가 바뀌는 곳 16px');
+  assert.deepEqual(r.map(x => x.label), ['종류', '', '일부', '종류'].map((l, i) => (i === 1 ? '' : l)), '다발마다 라벨 한 번(종류 다발은 첫 선만, 나뉜 두 번째 종류 다발도 하나)');
+  // 곡선 샘플링으로도 서로 가로지르지 않는다
+  const samples = await page.eval(`[...document.querySelectorAll('#map-svg .m-edge-line')].map(p => Array.from({ length: 41 }, (_, i) => p.getPointAtLength(p.getTotalLength() * i / 40).x))`);
+  for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) assert.ok(samples[a].every((x, i) => x - samples[b][i] < 1.5), `선 ${a} 와 ${b} 가 교차`);
+  // PDF 용 SVG 의 경로가 화면의 경로와 같다
+  await page.eval(`(() => { window.__svg = ''; window.CmapPdf.deliverImpl = async () => 'stub'; const o = XMLSerializer.prototype.serializeToString; XMLSerializer.prototype.serializeToString = function (n) { const s = o.call(this, n); if (n && n.querySelector && n.querySelector('.m-edge-line')) window.__svg = s; return s; }; })()`);
+  await page.eval("document.getElementById('map-pdf').click()");
+  await page.waitFor("window.__svg.length > 0", 20000, 'PDF 용 SVG');
+  await page.waitFor("!document.getElementById('map-pdf').disabled", 20000);
+  const pdf = await page.eval(`[...new DOMParser().parseFromString(window.__svg, 'image/svg+xml').querySelectorAll('.m-edge-line')].map(el => el.getAttribute('d'))`);
+  assert.deepEqual(pdf, r.map(x => x.d), 'PDF 경로 = 화면 경로(M C 한 개)');
+  noErrors(page);
+});

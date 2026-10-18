@@ -10,7 +10,7 @@
 //  1) 접속면: 같은 열(가로 어긋남 ≤ COLUMN_TOL)이거나 세로 간격이 노드 높이 이상이면서 세로 성분이 우세하면 위쪽 노드의 아래 면 → 아래쪽 노드의 위 면, 그 밖에는 오른쪽 → 왼쪽(또는 반대).
 //  2) 제3의 노드를 가로지르면 접속면 후보 6가지(기본 · 다른 축의 기본 · 섞은 2가지 · 같은 쪽 면으로 바깥을 돌아가는 2가지) 중 가로지름이 가장 적은 것(동점은 앞선 후보).
 //  3) 같은 노드의 같은 면에 연결이 여럿이면 접속점을 면을 따라 균등하게 나눈다(상대 노드의 위치 순으로 정렬해 교차를 줄임).
-//  3b) 304-1: 같은 부모·같은 종류의 방향 있는 연결은 곡선 다발(부모 아래 면의 가까운 점에서 나란히 출발해 자식 쪽에서 갈라짐). 선 단위 폴백은 기존 곡선(M 줄기 L 막대 L 갈래 L 자식 위)로 그린다. 자식이 부모보다 MIN_GAP 이상 아래에 있고 선이 다른 노드를 지나지 않을 때만, 아니면 묶음 전체를 곡선으로
+//  3b) 304-1·305-1: 같은 부모의 방향 있는 연결은 곡선 다발(부모 아래 면에서 자식 접속점 x 순으로 출발하고, 그 순서에서 종류가 같은 연속 구간이 한 다발). 선 단위 폴백은 기존 곡선(M 줄기 L 막대 L 갈래 L 자식 위)로 그린다. 자식이 부모보다 MIN_GAP 이상 아래에 있고 선이 다른 노드를 지나지 않을 때만, 아니면 묶음 전체를 곡선으로
 //  4) 라벨은 곡선 위 t = 0.5 를 먼저 보고, 노드나 이미 놓인 라벨과 겹치면 0.3~0.7 사이에서 옮긴다(최선 노력, 완전 보장 아님).
 // 클래식 스크립트(window.CmapEdgeRoute)이면서 Node 테스트에서는 require 로 불러올 수 있다.
 (function (root) {
@@ -85,6 +85,7 @@
   //   나란히 출발해 한 다발처럼 달리다가 자식 쪽에서 부드럽게 갈라진다(3차 베지어 한 개, 시작·끝 접선 모두 아래). 종류가 다른 다발 사이는 BUNDLE_GAP.
   //   선 단위 폴백: 자식이 부모 아래보다 MIN_GAP 이상 아래가 아니거나(ㄱ) 곡선이 다른 노드를 지나면(ㄴ) 그 선만 기존 곡선 규칙으로 그린다.
   const BUNDLE_TYPES = ['사용', '일부', '종류', '일으킴', '선행', '조건'];
+  const directedType = t => BUNDLE_TYPES.includes(t) || t === null;   // 305-1: 종류가 없는(null) 연결도 한 개짜리 다발로 같은 정렬에 참여한다(type 필드가 없는 예전 호출은 대상 아님)
   const MIN_GAP = 32;                  // 자식 위 가장자리가 부모 아래 가장자리보다 이만큼 이상 아래여야 다발로 그린다
   const STRAND_GAP = 6, MIN_STRAND_GAP = 3, BUNDLE_GAP = 16;   // 한 다발 안 선 간격(부모 폭이 모자라면 MIN_STRAND_GAP 까지 줄임)과 다발 사이 간격
   const FACE_MARGIN = PORT_MARGIN.b;   // 부모 아래 면에서 둥근 모서리를 피하는 여백(다발이 쓸 수 있는 폭 = W - 2 × FACE_MARGIN)
@@ -124,32 +125,21 @@
     // 1.5) 다발 후보 선: 방향 있는 6종이고 자식이 부모 아래 가장자리보다 MIN_GAP 이상 아래에 있는 선(ㄱ). 못 지키는 선은 처음부터 폴백
     const active = new Set();
     for (const e of edges) {
-      if (!BUNDLE_TYPES.includes(e.type) || e.from === e.to) continue;
+      if (!directedType(e.type) || e.from === e.to) continue;
       if (byId.get(e.to).y >= byId.get(e.from).y + H + MIN_GAP) active.add(e.key);
     }
 
     // 2) 접속점 나누기(기존 규칙) + 다발의 부모 쪽 자리. 한 부모의 다발 전체가 부모 아래 면에서 "덩어리 1개"로 센다(덩어리 안 선 위치는 아래에서 따로 정함)
     const bundleOf = new Map(), blocks = new Map();
     function assignPorts() {
-      bundleOf.clear(); blocks.clear();
-      const bundles = new Map();
+      blocks.clear();
       for (const e of edges) {
         if (!active.has(e.key)) continue;
-        const id = e.from + '|' + e.type;
-        if (!bundles.has(id)) bundles.set(id, { id, from: e.from, lines: [] });
-        bundles.get(id).lines.push(e);
-        bundleOf.set(e.key, bundles.get(id));
-      }
-      for (const b of bundles.values()) {
-        b.firstKey = b.lines[0].key;                                  // edges 가 key 순이라 첫 선이 가장 앞선 key
-        b.lines.sort((p, q) => cmp(byId.get(p.to).x, byId.get(q.to).x) || cmp(byId.get(p.to).y, byId.get(q.to).y) || cmp(p.key, q.key));   // 다발 안: 자식 x 순
-        b.mean = b.lines.reduce((s, e) => s + byId.get(e.to).x, 0) / b.lines.length;
-        if (!blocks.has(b.from)) blocks.set(b.from, { from: b.from, bundles: [] });
-        blocks.get(b.from).bundles.push(b);
+        if (!blocks.has(e.from)) blocks.set(e.from, { from: e.from, lines: [], bundles: [] });
+        blocks.get(e.from).lines.push(e);
       }
       for (const bl of blocks.values()) {
-        bl.bundles.sort((p, q) => cmp(p.mean, q.mean) || cmpK(p.firstKey, q.firstKey));    // 평균 x 작은 다발이 왼쪽
-        const kids = bl.bundles.flatMap(b => b.lines.map(e => byId.get(e.to)));
+        const kids = bl.lines.map(e => byId.get(e.to));
         bl.center = { x: kids.reduce((s, k) => s + k.x, 0) / kids.length, y: kids.reduce((s, k) => s + k.y, 0) / kids.length };
         bl.key = 'blk:' + bl.from;
       }
@@ -174,7 +164,23 @@
       }
       return fr;
     }
-    // 부모 아래 면의 선 시작 x: 덩어리(다발들)를 덩어리 자리 중심으로 놓고 다발 안 STRAND_GAP, 다발 사이 BUNDLE_GAP. 폭이 넘치면 STRAND_GAP 을 MIN_STRAND_GAP 까지 줄이고, 그래도 넘치면 면 균등 분할로 되돌린다
+    // 305-1: 한 부모의 선을 모두 자식 위 접속점 x 순(같으면 key 순)으로 정렬한다 — 이 순서가 부모 아래 면의 출발 순서라 같은 부모의 선끼리 꼬이지 않는다.
+    //   다발 = 이 순서에서 종류가 같은 선이 연속한 구간(같은 종류라도 연속이 끊기면 다른 다발). 자식 위 접속점은 부모·다발과 무관하게 정해지므로 먼저 계산한 frac 을 쓴다
+    function buildBundles(fr) {
+      bundleOf.clear();
+      for (const bl of blocks.values()) {
+        const endX = e => portPoint(byId.get(e.to), 't', fr.get(e.key)[1]).x;
+        bl.lines.sort((p, q) => cmp(endX(p), endX(q)) || cmpK(p.key, q.key));
+        bl.bundles = [];
+        let cur = null;
+        for (const e of bl.lines) {
+          if (!cur || cur.type !== e.type) { cur = { id: bl.from + '|' + e.type + '|' + bl.bundles.length, from: bl.from, type: e.type, lines: [] }; bl.bundles.push(cur); }
+          cur.lines.push(e); bundleOf.set(e.key, cur);
+        }
+        for (const bu of bl.bundles) bu.firstKey = bu.lines.reduce((m, e) => (cmpK(e.key, m) < 0 ? e.key : m), bu.lines[0].key);   // 라벨을 맡는 선 = key 가 가장 앞선 선
+      }
+    }
+    // 부모 아래 면의 선 시작 x: 덩어리(다발들)를 덩어리 자리 중심으로 놓고 이웃한 두 선이 같은 종류면 STRAND_GAP, 다르면 BUNDLE_GAP. 폭이 넘치면 STRAND_GAP 을 MIN_STRAND_GAP 까지 줄이고, 그래도 넘치면 면 균등 분할로 되돌린다
     function placeStarts(fr) {
       const startX = new Map(), uniform = new Set();
       for (const bl of blocks.values()) {
@@ -196,6 +202,7 @@
     let frac, starts, curves;
     for (;;) {
       frac = assignPorts();
+      buildBundles(frac);
       starts = placeStarts(frac);
       curves = new Map();
       const bad = [];
@@ -261,7 +268,7 @@
         if (cost === 0) break;
       }
       placed.push(best.box);
-      out.set(e.key, { d: pathD(b), mx: r1(best.q.x), my: r1(best.q.y), sides, p0: b.p0, p3: b.p3, hits: hitCount(b, nodes, e.from, e.to), candidateHits, labelBox: best.box, labelCost: best.cost, t: best.t, group: null, hitD: null, noLabel: false, fallback: BUNDLE_TYPES.includes(e.type) && e.from !== e.to, labelMode: null });
+      out.set(e.key, { d: pathD(b), mx: r1(best.q.x), my: r1(best.q.y), sides, p0: b.p0, p3: b.p3, hits: hitCount(b, nodes, e.from, e.to), candidateHits, labelBox: best.box, labelCost: best.cost, t: best.t, group: null, hitD: null, noLabel: false, fallback: directedType(e.type) && e.from !== e.to, labelMode: null });
     }
     return out;
   }
