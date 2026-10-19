@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>일본어 문법</title>
+<link rel="icon" type="image/png" href="/icons/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/common/appHeader.css">
+<link rel="stylesheet" href="/css/common/tokens.css">
+<link rel="stylesheet" href="/css/common/screenBar.css">
+<style>
+  /* 작업JG-1: 일본어 문법 해설. 독립 화면(다른 메뉴와 코드·데이터를 공유하지 않음).
+     docs/design/design-principles.md: 박스 없이 텍스트 중심, 문법 항목은 문단과 구분선으로만 나눈다. 색은 tokens.css 의 --color-* 만 쓴다. */
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-size: var(--body-font-size); font-family: var(--font-sans); background: var(--color-bg); color: var(--color-text); line-height: 1.5; }
+  .content { max-width: var(--content-max); margin: 0 auto; padding: var(--sp-16) var(--gutter) var(--sp-24); }
+
+  .lead { font-size: var(--fs-13); color: var(--color-text-sub); margin-bottom: var(--sp-12); }
+  textarea {
+    display: block; width: 100%; min-height: 96px; resize: vertical;
+    padding: var(--sp-12); font: inherit; font-size: var(--fs-16); line-height: 1.6;
+    color: var(--color-text); background: var(--color-surface);
+    border: 1px solid var(--color-line); border-radius: var(--input-radius); outline: none;
+  }
+  textarea:focus { box-shadow: var(--ring-focus); }
+  .input-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); margin-top: var(--sp-8); }
+  .count { font-size: var(--fs-12); color: var(--color-text-sub); }
+  .btn {
+    min-height: var(--ctl-min-h); padding: var(--sp-12) var(--sp-20); font: inherit; font-size: var(--fs-14); font-weight: var(--btn-weight);
+    color: var(--color-surface); background: var(--btn-primary-bg); border: 0; border-radius: var(--btn-radius); cursor: pointer;
+  }
+  .btn:hover { background: var(--btn-primary-bg-hover); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+
+  .msg { margin-top: var(--sp-16); font-size: var(--fs-14); color: var(--color-text-sub); }
+  .msg.error { color: var(--color-danger); }
+
+  #result { margin-top: var(--sp-24); }
+  .translation { font-size: var(--fs-18); font-weight: 600; line-height: 1.6; padding-bottom: var(--sp-16); }
+  .g-item { padding: var(--sp-16) 0; border-top: 1px solid var(--color-line); }
+  .g-head { display: flex; align-items: baseline; gap: var(--sp-8); flex-wrap: wrap; }
+  .g-name { font-size: var(--fs-18); font-weight: 700; }
+  .g-level { font-size: var(--fs-12); font-weight: 600; color: var(--color-text-sub); }
+  .g-meaning { margin-top: var(--sp-4); font-size: var(--fs-15); }
+  .g-label { margin-top: var(--sp-12); font-size: var(--fs-12); font-weight: 700; color: var(--color-text-sub); }
+  .g-text { font-size: var(--fs-14); line-height: 1.6; }
+  .disclaimer { padding-top: var(--sp-16); border-top: 1px solid var(--color-line); font-size: var(--fs-11); color: var(--color-text-sub); }
+</style>
+</head>
+<body>
+
+<script src="/js/common/appHeader.js"></script>
+<script>MetisAppHeader.inject();</script>
+
+<div class="screen-bar">
+  <a class="screen-bar-back" href="/" aria-label="홈으로">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <h1 class="screen-bar-title">일본어 문법</h1>
+</div>
+
+<main class="content">
+  <p class="lead">일본어 문장을 입력하면 그 문장을 이해하는 데 필요한 문법을 골라 설명해 드립니다.</p>
+  <textarea id="sentence" aria-label="일본어 문장" maxlength="200" lang="ja" placeholder="例: 私は毎日学校に行きます。" autocomplete="off"></textarea>
+  <div class="input-foot">
+    <span class="count" id="count">0 / 200</span>
+    <button type="button" class="btn" id="go">문법 설명</button>
+  </div>
+  <p class="msg" id="msg" role="status" aria-live="polite"></p>
+  <section id="result" hidden></section>
+</main>
+
+<script>
+(function () {
+  var MAX = 200;
+  var KANA_KANJI = /[぀-ゟ゠-ヿ㐀-䶿一-鿿\u{20000}-\u{2FA1F}]/u;
+  var $ = function (id) { return document.getElementById(id); };
+  var input = $('sentence'), go = $('go'), msg = $('msg'), result = $('result'), count = $('count');
+
+  function token() { try { return localStorage.getItem('mydict_token'); } catch (e) { return null; } }
+  function setMsg(text, isError) { msg.textContent = text || ''; msg.className = 'msg' + (isError ? ' error' : ''); }
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+
+  input.addEventListener('input', function () { count.textContent = Array.from(input.value).length + ' / ' + MAX; });
+
+  function render(r) {
+    result.textContent = '';
+    result.appendChild(el('p', 'translation', r.translation));
+    r.grammar.forEach(function (g) {
+      var item = el('article', 'g-item');
+      var head = el('div', 'g-head');
+      head.appendChild(el('h2', 'g-name', g.name));
+      if (g.jlpt) head.appendChild(el('span', 'g-level', 'JLPT ' + g.jlpt));   // 확실하지 않은 레벨(null)은 표시하지 않는다
+      item.appendChild(head);
+      item.appendChild(el('p', 'g-meaning', g.meaning));
+      item.appendChild(el('p', 'g-label', '이 문장에서'));
+      item.appendChild(el('p', 'g-text', g.form));
+      item.appendChild(el('p', 'g-label', '비슷한 표현과의 차이'));
+      item.appendChild(el('p', 'g-text', g.contrast));
+      result.appendChild(item);
+    });
+    result.appendChild(el('p', 'disclaimer', 'AI가 생성한 설명이라 틀릴 수 있습니다'));
+    result.hidden = false;
+  }
+
+  async function submit() {
+    var sentence = input.value.trim();
+    result.hidden = true;
+    if (!sentence) { setMsg('일본어 문장을 입력해 주세요.', true); return; }
+    if (Array.from(sentence).length > MAX) { setMsg('문장은 ' + MAX + '자까지 입력할 수 있습니다.', true); return; }
+    if (!KANA_KANJI.test(sentence)) { setMsg('일본어 문장(히라가나·가타카나·한자)을 입력해 주세요.', true); return; }   // AI 를 부르지 않는다
+    var t = token();
+    if (!t) { setMsg('로그인 후 이용할 수 있습니다. 홈에서 로그인해 주세요.', true); return; }
+    go.disabled = true; setMsg('설명을 만들고 있습니다…');
+    try {
+      var res = await fetch('/api/jgrammar/explain', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + t },
+        body: JSON.stringify({ sentence: sentence }),
+      });
+      var data = null;
+      try { data = await res.json(); } catch (e) { /* 본문 없음 */ }
+      if (res.ok && data && data.ok && data.result) { setMsg(''); render(data.result); }
+      else setMsg((data && data.error) || '설명을 가져오지 못했습니다. 잠시 후 다시 시도해주세요.', true);
+    } catch (e) {
+      setMsg('설명을 가져오지 못했습니다. 잠시 후 다시 시도해주세요.', true);
+    } finally { go.disabled = false; }
+  }
+  go.addEventListener('click', submit);
+})();
+</script>
+</body>
+</html>
