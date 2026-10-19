@@ -43,6 +43,11 @@
   .picks-title { font-size: var(--fs-12); font-weight: 700; color: var(--color-text-sub); padding-bottom: var(--sp-8); }
   .pick { display: block; width: 100%; min-height: var(--ctl-min-h); padding: var(--sp-12) var(--sp-0); text-align: left; font: inherit; font-size: var(--fs-16); line-height: 1.6; color: var(--color-text); background: none; border: 0; border-top: 1px solid var(--color-line); cursor: pointer; }
   .pick:hover { font-weight: 600; }
+  #saved { margin-top: var(--sp-24); }
+  .saved-item { display: flex; align-items: center; gap: var(--sp-8); border-top: 1px solid var(--color-line); }
+  .saved-item .pick { flex: 1; min-width: 0; border-top: 0; }
+  .saved-date { display: block; font-size: var(--fs-12); color: var(--color-text-sub); }
+  .saved-empty { padding-top: var(--sp-12); border-top: 1px solid var(--color-line); font-size: var(--fs-14); color: var(--color-text-sub); }
   .msg { margin-top: var(--sp-16); font-size: var(--fs-14); color: var(--color-text-sub); }
   .msg.error { color: var(--color-danger); }
 
@@ -62,6 +67,9 @@
 
 <script src="/js/common/appHeader.js"></script>
 <script>MetisAppHeader.inject();</script>
+
+<script src="/js/common/dialog.js"></script>
+<script>if (!window.metisConfirm) { window.metisConfirm = function (m) { return Promise.resolve(confirm(m)); }; }   // dialog.js를 못 불렀을 때 기본 확인창으로 대체</script>
 
 <div class="screen-bar">
   <a class="screen-bar-back" href="/" aria-label="홈으로">
@@ -90,6 +98,7 @@
   <p class="msg" id="msg" role="status" aria-live="polite"></p>
   <section id="picks" hidden></section>
   <section id="result" hidden></section>
+  <section id="saved" aria-label="저장한 문장"></section>
   </div>
 </main>
 
@@ -116,11 +125,55 @@
       } catch (e) { ok = false; }
     }
     $(ok ? 'main' : 'denied').hidden = false;
+    if (ok) loadSaved();   // 권한이 없으면 저장 목록은 요청도 하지 않는다
   }
   checkAccess();
 
   function updateCount() { count.textContent = Array.from(input.value).length + ' / ' + MAX; }
   input.addEventListener('input', updateCount);
+
+  // ── 작업JG-6: 저장한 문장. 설명이 정상 반환되면 서버가 본인 목록에 저장한다. 목록 조회·열기는 AI 를 부르지 않는다(저장된 결과를 그대로 표시). ──
+  var savedBox = $('saved');
+  function validResult(r) { return r && typeof r.translation === 'string' && Array.isArray(r.grammar); }
+  function dateText(v) { var d = new Date(v); return isNaN(d) ? '' : d.getFullYear() + '. ' + (d.getMonth() + 1) + '. ' + d.getDate() + '.'; }
+  function authHeaders() { return { 'Authorization': 'Bearer ' + (token() || '') }; }
+
+  function renderSaved(items) {
+    savedBox.textContent = '';
+    savedBox.appendChild(el('p', 'picks-title', '저장한 문장'));
+    if (!items.length) { savedBox.appendChild(el('p', 'saved-empty', '저장한 문장이 없습니다.')); return; }
+    items.forEach(function (it) {
+      var row = el('div', 'saved-item');
+      var open = el('button', 'pick'); open.type = 'button';
+      open.appendChild(document.createTextNode(it.sentence));
+      open.appendChild(el('span', 'saved-date', dateText(it.last_used_at)));
+      open.addEventListener('click', function () {
+        if (!validResult(it.result)) return;
+        setMsg(''); fillInput(it.sentence); render(it.result);   // 저장된 결과를 바로 표시(AI 호출 없음)
+      });
+      var del = el('button', 'btn text', '삭제'); del.type = 'button';
+      del.setAttribute('aria-label', '삭제: ' + it.sentence);
+      del.addEventListener('click', async function () {
+        if (!(await window.metisConfirm('저장한 문장을 삭제할까요?', { danger: true, okText: '삭제' }))) return;
+        del.disabled = true;
+        try {
+          var res = await fetch('/api/jgrammar/saved/' + encodeURIComponent(it.id), { method: 'DELETE', headers: authHeaders() });
+          if (res.ok || res.status === 404) loadSaved(); else { del.disabled = false; setMsg('삭제하지 못했습니다. 잠시 후 다시 시도해주세요.', true); }
+        } catch (e) { del.disabled = false; setMsg('삭제하지 못했습니다. 잠시 후 다시 시도해주세요.', true); }
+      });
+      row.appendChild(open); row.appendChild(del);
+      savedBox.appendChild(row);
+    });
+  }
+
+  async function loadSaved() {
+    try {
+      var res = await fetch('/api/jgrammar/saved', { headers: authHeaders() });
+      var data = await res.json();
+      if (res.ok && data && data.ok && Array.isArray(data.items)) renderSaved(data.items);
+      else { savedBox.textContent = ''; savedBox.appendChild(el('p', 'saved-empty', '저장한 문장을 불러오지 못했습니다.')); }
+    } catch (e) { savedBox.textContent = ''; savedBox.appendChild(el('p', 'saved-empty', '저장한 문장을 불러오지 못했습니다.')); }
+  }
 
   // ── 작업JG-3: 사진 입력. 이미지는 서버에 저장되지 않고, 인식 결과로 바로 분석하지 않는다(입력창에 채워 확인·수정한 뒤 "문법 설명"). ──
   function fillInput(text) { input.value = text; updateCount(); picks.hidden = true; picks.textContent = ''; result.hidden = true; input.focus(); }
@@ -221,7 +274,7 @@
       });
       var data = null;
       try { data = await res.json(); } catch (e) { /* 본문 없음 */ }
-      if (res.ok && data && data.ok && data.result) { setMsg(''); render(data.result); }
+      if (res.ok && data && data.ok && data.result) { setMsg(''); render(data.result); loadSaved(); }
       else setMsg((data && data.error) || '설명을 가져오지 못했습니다. 잠시 후 다시 시도해주세요.', true);
     } catch (e) {
       setMsg('설명을 가져오지 못했습니다. 잠시 후 다시 시도해주세요.', true);

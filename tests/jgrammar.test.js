@@ -20,7 +20,7 @@ const GOOD = {
 
 // users: 기본으로 1·2번은 권한 있음, 3번은 권한 없음(false), 4번은 DB 관리자(권한 열 false), 9번은 권한 있지만 차단. 그 밖의 id 는 행 없음
 function createJgDb({ blocked = [], failCacheRead = false, failUsers = false } = {}) {
-  const db = { cache: new Map(), usage: [], queries: [], failUsers,
+  const db = { cache: new Map(), usage: [], queries: [], failUsers, saved: new Map(), failSaved: false, clock: 0, nextId: 1,
     users: new Map([[1, { role: 'user', is_blocked: false, perm_jgrammar: true }], [2, { role: 'user', is_blocked: false, perm_jgrammar: true }],
       [3, { role: 'user', is_blocked: false, perm_jgrammar: false }], [4, { role: 'admin', is_blocked: false, perm_jgrammar: false }],
       [9, { role: 'user', is_blocked: true, perm_jgrammar: true }]]) };
@@ -39,6 +39,33 @@ function createJgDb({ blocked = [], failCacheRead = false, failUsers = false } =
       if (/INSERT INTO jgrammar_cache/.test(sql)) {
         if (!db.cache.has(params[0])) db.cache.set(params[0], { sentence: params[1], result: JSON.parse(params[2]), model: params[3] });
         return { rows: [] };
+      }
+      if (/jgrammar_saved/.test(sql)) {   // 작업JG-6
+        if (db.failSaved) throw Object.assign(new Error('saved down'), { code: 'XX000' });
+        const mine = uid => [...db.saved.values()].filter(r => r.user_id === uid).sort((a, b) => b.last_used_at - a.last_used_at || b.id - a.id);
+        if (/^INSERT INTO jgrammar_saved/.test(sql.trim())) {
+          const [user_id, sentence_hash, sentence, result] = params;
+          if (!db.users.has(user_id)) throw Object.assign(new Error('fk'), { code: '23503' });   // users 행이 없으면 외래 키 위반
+          const key = user_id + ':' + sentence_hash;
+          if (db.saved.has(key)) db.saved.get(key).last_used_at = ++db.clock;   // ON CONFLICT DO UPDATE SET last_used_at = now() (다른 열은 그대로)
+          else { const t = ++db.clock; db.saved.set(key, { id: db.nextId++, user_id, sentence_hash, sentence, result: JSON.parse(result), created_at: t, last_used_at: t }); }
+          return { rows: [] };
+        }
+        if (/^DELETE FROM jgrammar_saved WHERE user_id = \$1 AND id IN/.test(sql.trim())) {   // 상한 정리: 최신 100건 밖을 삭제
+          const m = sql.match(/OFFSET (\d+)/);
+          for (const r of mine(params[0]).slice(Number(m[1]))) db.saved.delete(r.user_id + ':' + r.sentence_hash);
+          return { rows: [] };
+        }
+        if (/^DELETE FROM jgrammar_saved WHERE id = \$1 AND user_id = \$2/.test(sql.trim())) {
+          const hit = [...db.saved.entries()].find(([, r]) => r.id === params[0] && r.user_id === params[1]);
+          if (!hit) return { rows: [] };
+          db.saved.delete(hit[0]); return { rows: [{ id: params[0] }] };
+        }
+        if (/^SELECT id, sentence, result, created_at, last_used_at FROM jgrammar_saved WHERE user_id = \$1/.test(sql.trim())) {
+          const m = sql.match(/LIMIT (\d+)/);
+          return { rows: mine(params[0]).slice(0, Number(m[1])).map(r => ({ id: r.id, sentence: r.sentence, result: r.result, created_at: r.created_at, last_used_at: r.last_used_at })) };
+        }
+        throw new Error('지원하지 않는 SQL: ' + sql);
       }
       if (/FROM api_usage/.test(sql)) return { rows: [{ n: db.usage.filter(u => u.user_id === params[0] && params[1].includes(u.event_type)).length }] };
       throw new Error('지원하지 않는 SQL: ' + sql);
@@ -483,4 +510,211 @@ test('인식 먼저 한도에 닿으면 분석 429 (분석 건수만 세던 JG-1
   t.after(() => a.t.close());
   await a.sendImage(JPEG); await a.sendImage(JPEG);
   assert.equal((await a.post('猫が好き')).status, 429);
+});
+
+// ───── 작업JG-6: 사용자별 저장 목록(jgrammar_saved) ─────
+// 가짜 DB 는 이 기능의 SQL 네 가지(저장 UPSERT / 상한 정리 / 목록 / 본인 항목 삭제)를 의미대로 흉내 낸다(실제 PostgreSQL 이 아님). last_used_at 은 증가하는 논리 시계.
+const savedOf = (db, user) => [...db.saved.values()].filter(r => r.user_id === user).sort((a, b) => b.last_used_at - a.last_used_at || b.id - a.id);
+const savedQueries = db => db.queries.filter(q => /jgrammar_saved/.test(q));
+const seedCache = (db, sentence) => db.cache.set(J.hashSentence(sentence), { sentence, result: { translation: '번역', grammar: GOOD.grammar }, model: 'x' });
+
+test('저장: AI 로 새로 만든 설명이 본인 목록에 문장 원문(공백 제거)과 결과로 저장된다. 응답 형태는 그대로', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  const r = await a.post('  猫が好き ');
+  assert.equal(r.status, 200); assert.deepEqual(Object.keys(r.body).sort(), ['cached', 'ok', 'result']);
+  const rows = savedOf(a.db, 1);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].sentence, '猫が好き');
+  assert.equal(rows[0].sentence_hash, J.hashSentence('猫が好き'));
+  assert.deepEqual(rows[0].result, r.body.result);
+  assert.deepEqual(Object.keys(rows[0]).sort(), ['created_at', 'id', 'last_used_at', 'result', 'sentence', 'sentence_hash', 'user_id'], '저장 항목은 문장과 결과만(이미지·인식 목록 없음)');
+});
+
+test('저장: 캐시 적중(다른 사용자가 먼저 만든 문장)도 본인 목록에 저장된다. AI 는 부르지 않는다', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  await a.post('猫が好き', 1);
+  const r = await a.post('猫が好き', 2);
+  assert.equal(r.body.cached, true);
+  assert.equal(a.anthropic.calls.length, 1);
+  assert.equal(savedOf(a.db, 2).length, 1);
+  assert.equal(savedOf(a.db, 1).length, 1, '다른 사용자 것과 별개로 각자 1건');
+  assert.notEqual(savedOf(a.db, 1)[0].id, savedOf(a.db, 2)[0].id);
+});
+
+test('저장: 같은 사용자의 같은 문장은 1건만 유지하고 last_used_at 만 갱신한다(결과·created_at 은 그대로)', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  await a.post('猫が好き');
+  const first = { ...savedOf(a.db, 1)[0] };
+  await a.post('犬が好き');
+  await a.post(' 猫が好き ');
+  const rows = savedOf(a.db, 1);
+  assert.equal(rows.length, 2);
+  const again = rows.find(r => r.sentence === '猫が好き');
+  assert.equal(again.id, first.id);
+  assert.equal(again.created_at, first.created_at);
+  assert.ok(again.last_used_at > first.last_used_at, 'last_used_at 갱신');
+  assert.deepEqual(again.result, first.result);
+  assert.equal(rows[0].sentence, '猫が好き', '다시 쓴 문장이 맨 위');
+});
+
+test('저장 안 함: 입력 검증 실패·권한 없음·한도 초과·형식 오류·거절·API 오류', async t => {
+  process.env.JGRAMMAR_DAILY_CAP = '1';
+  t.after(() => { delete process.env.JGRAMMAR_DAILY_CAP; });
+  const a = await setup();
+  t.after(() => a.t.close());
+  assert.equal((await a.post('')).status, 400);
+  assert.equal((await a.post('English')).status, 400);
+  assert.equal((await a.post('あ'.repeat(201))).status, 400);
+  assert.equal((await a.post('猫が好き', 3)).status, 403);
+  assert.equal((await a.post('猫が好き', null)).status, 401);
+  assert.equal(a.db.saved.size, 0);
+  a.anthropic.handler = () => '깨진 응답';
+  assert.equal((await a.post('犬が好き', 2)).status, 502);   // 형식 오류(재시도 포함, 호출 2건이라 사용자 2 의 한도 1 소진)
+  assert.equal((await a.post('鳥が好き', 2)).status, 429);   // 한도 초과
+  a.anthropic.handler = () => JSON.stringify({ ok: false, reason: '문장이 아닙니다.' });
+  assert.equal((await a.post('魚が好き', 1)).status, 422);   // 거절
+  a.anthropic.handler = () => { throw new Error('down'); };
+  assert.equal((await a.post('馬が好き', 4)).status, 502);   // API 오류
+  assert.equal(a.db.saved.size, 0, '실패·거절은 어느 것도 저장되지 않음');
+});
+
+test('저장 오류가 나도 설명은 정상 반환하고, 오류 로그에는 문장·결과가 남지 않는다', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  a.db.failSaved = true;
+  const logs = [];
+  const orig = console.error; console.error = (...x) => logs.push(x.join(' '));
+  let r;
+  try { r = await a.post('猫が好き'); } finally { console.error = orig; }
+  assert.equal(r.status, 200); assert.equal(r.body.ok, true);
+  assert.equal(r.body.result.grammar.length, 2);
+  assert.ok(logs.some(l => /jgrammar save error/.test(l)), '서버 로그에는 남김');
+  for (const l of logs) { assert.ok(!l.includes('猫が好き'), '입력 문장 비노출'); assert.ok(!l.includes('学校'), '결과 비노출'); }
+  assert.equal(a.db.cache.size, 1, '캐시는 정상 저장');
+});
+
+test('저장: 이메일 관리자처럼 users 행이 없어 저장이 막혀도(FK) 설명은 정상 반환', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  assert.equal((await a.post('猫が好き', 5)).status, 200);
+  assert.equal(a.db.saved.size, 0);
+});
+
+test('100건 상한: 새 문장으로 101번째가 되면 last_used_at 이 가장 오래된 것부터 지워 100건으로 맞춘다', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  const sentences = Array.from({ length: 101 }, (_, i) => '猫' + i + 'が好き');
+  for (const s of sentences) seedCache(a.db, s);   // 캐시 적중으로 저장(AI·한도 무관)
+  for (let i = 0; i < 100; i++) assert.equal((await a.post(sentences[i])).status, 200);
+  assert.equal(savedOf(a.db, 1).length, 100);
+  await a.post(sentences[0]);                       // 가장 오래된 것을 다시 쓰면 최신이 되고 건수는 그대로
+  assert.equal(savedOf(a.db, 1).length, 100);
+  await a.post(sentences[100]);                     // 101번째 새 문장 → 이제 가장 오래된 것은 sentences[1]
+  const rows = savedOf(a.db, 1);
+  assert.equal(rows.length, 100);
+  assert.ok(!rows.some(r => r.sentence === sentences[1]), '가장 오래된 것 삭제');
+  assert.ok(rows.some(r => r.sentence === sentences[0]), '다시 쓴 것은 남음');
+  assert.equal(rows[0].sentence, sentences[100], '방금 저장한 것이 맨 위');
+  assert.equal(a.anthropic.calls.length, 0);
+  assert.equal(savedOf(a.db, 2).length, 0, '다른 사용자 목록은 영향 없음');
+});
+
+test('조회: 본인 목록만 last_used_at 최신순으로 반환하고, AI 호출·한도·last_used_at 에 영향이 없다', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  await a.post('猫が好き'); await a.post('犬が好き'); await a.post('鳥が好き', 2);
+  const before = JSON.stringify(savedOf(a.db, 1));
+  const calls = a.anthropic.calls.length, usage = a.db.usage.length;
+  const r = await a.t.call('GET', '/api/jgrammar/saved', undefined, { user: 1 });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.items.map(i => i.sentence), ['犬が好き', '猫が好き']);
+  assert.deepEqual(Object.keys(r.body.items[0]).sort(), ['created_at', 'id', 'last_used_at', 'result', 'sentence']);
+  assert.equal(r.body.items[0].result.grammar.length, 2, '결과가 들어 있어 탭해서 AI 없이 바로 표시할 수 있음');
+  await a.t.call('GET', '/api/jgrammar/saved', undefined, { user: 1 });
+  assert.equal(a.anthropic.calls.length, calls); assert.equal(a.db.usage.length, usage, '사용량 기록 없음');
+  assert.equal(JSON.stringify(savedOf(a.db, 1)), before, 'last_used_at 불변');
+  assert.deepEqual((await a.t.call('GET', '/api/jgrammar/saved', undefined, { user: 2 })).body.items.map(i => i.sentence), ['鳥が好き']);
+  assert.deepEqual((await a.t.call('GET', '/api/jgrammar/saved', undefined, { user: 4 })).body.items, [], '빈 목록');
+});
+
+test('조회는 하루 한도에 포함되지 않는다: 한도를 다 쓴 뒤에도 목록은 열린다', async t => {
+  process.env.JGRAMMAR_DAILY_CAP = '1';
+  t.after(() => { delete process.env.JGRAMMAR_DAILY_CAP; });
+  const a = await setup();
+  t.after(() => a.t.close());
+  assert.equal((await a.post('猫が好き')).status, 200);
+  assert.equal((await a.post('犬が好き')).status, 429);
+  for (let i = 0; i < 3; i++) assert.equal((await a.t.call('GET', '/api/jgrammar/saved', undefined, { user: 1 })).status, 200);
+  assert.equal(a.db.usage.length, 1);
+});
+
+test('삭제: 본인 항목은 지워지고 200, 남의 항목·없는 id·잘못된 id 는 모두 같은 404(존재 여부 비노출)', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  await a.post('猫が好き', 1); await a.post('猫が好き', 2);
+  const mine = savedOf(a.db, 1)[0], theirs = savedOf(a.db, 2)[0];
+  const del = id => a.t.call('DELETE', '/api/jgrammar/saved/' + id, undefined, { user: 1 });
+  const other = await del(theirs.id), missing = await del(99999);
+  assert.equal(other.status, 404); assert.deepEqual(other.body, missing.body, '남의 것과 없는 것의 응답이 같다');
+  for (const bad of ['abc', '0', '-1', '1.5', '99999999999', '1;DROP']) assert.equal((await del(bad)).status, 404, bad);
+  assert.equal(savedOf(a.db, 2).length, 1, '남의 항목은 그대로');
+  const ok = await del(mine.id);
+  assert.equal(ok.status, 200); assert.deepEqual(ok.body, { ok: true });
+  assert.equal(savedOf(a.db, 1).length, 0);
+  assert.equal((await del(mine.id)).status, 404, '두 번째 삭제는 404');
+  assert.equal(a.db.cache.size, 1, '서버 캐시(jgrammar_cache)는 지우지 않는다');
+});
+
+test('저장 API 권한: 비로그인 401, 권한 없음·행 없음·차단·조회 오류는 403 이고 jgrammar_saved 에 어떤 쿼리도 가지 않는다. 관리자는 허용', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  const f = await setup({ failUsers: true });
+  t.after(() => f.t.close());
+  assert.equal((await a.t.call('GET', '/api/jgrammar/saved', undefined, { user: null })).status, 401);
+  for (const user of [3, 77, 9]) {
+    assert.equal((await a.t.call('GET', '/api/jgrammar/saved', undefined, { user })).status, 403, 'GET ' + user);
+    assert.equal((await a.t.call('DELETE', '/api/jgrammar/saved/1', undefined, { user })).status, 403, 'DELETE ' + user);
+  }
+  assert.equal((await f.t.call('GET', '/api/jgrammar/saved', undefined, { user: 1 })).status, 403, '권한 조회 오류는 차단');
+  assert.equal((await f.t.call('DELETE', '/api/jgrammar/saved/1', undefined, { user: 1 })).status, 403);
+  assert.deepEqual(savedQueries(a.db), []); assert.deepEqual(savedQueries(f.db), []);
+  assert.equal((await a.t.call('GET', '/api/jgrammar/saved', undefined, { user: 4 })).status, 200, 'DB 관리자');
+  assert.equal((await a.t.call('GET', '/api/jgrammar/saved', undefined, { user: 5 })).status, 200, '이메일 관리자');
+});
+
+test('권한 없는 설명 요청은 저장 쿼리도 만들지 않는다', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  assert.equal((await a.post('猫が好き', 3)).status, 403);
+  assert.deepEqual(savedQueries(a.db), []);
+});
+
+test('OCR(사진 인식)은 이미지도 인식된 문장 목록도 저장하지 않는다 — 사용자가 골라 분석한 문장만 저장된다', async t => {
+  const a = await ocrSetup();
+  t.after(() => a.t.close());
+  const r = await a.sendImage(PNG, 'image/png');
+  assert.deepEqual(r.body.sentences, OCR_GOOD.sentences);
+  assert.equal(a.db.saved.size, 0);
+  assert.deepEqual(savedQueries(a.db), [], 'OCR 은 jgrammar_saved 를 건드리지 않음');
+  await a.post(OCR_GOOD.sentences[1]);
+  assert.deepEqual(savedOf(a.db, 1).map(r => r.sentence), [OCR_GOOD.sentences[1]], '고른 한 문장만');
+  const b64 = PNG.toString('base64');
+  assert.ok(!JSON.stringify([...a.db.saved.values()]).includes(b64));
+});
+
+test('DB 단계: jgrammar_saved 는 (user_id, sentence_hash) 유일, users 삭제 연쇄, IF NOT EXISTS', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'lib', 'db.js'), 'utf8');
+  const m = src.match(/CREATE TABLE IF NOT EXISTS jgrammar_saved \(([\s\S]*?)\n      \)/);
+  assert.ok(m, '테이블 생성 문장');
+  assert.match(m[1], /user_id\s+INTEGER NOT NULL REFERENCES users\(id\) ON DELETE CASCADE/);
+  assert.match(m[1], /sentence_hash\s+TEXT NOT NULL/);
+  assert.match(m[1], /sentence\s+TEXT NOT NULL/);
+  assert.match(m[1], /result\s+JSONB NOT NULL/);
+  assert.match(m[1], /created_at\s+TIMESTAMPTZ/);
+  assert.match(m[1], /last_used_at\s+TIMESTAMPTZ/);
+  assert.match(m[1], /UNIQUE \(user_id, sentence_hash\)/);
+  assert.match(src, /CREATE INDEX IF NOT EXISTS idx_jgrammar_saved_user_used ON jgrammar_saved\(user_id, last_used_at DESC\)/);
 });

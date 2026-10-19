@@ -59,4 +59,26 @@ router.post('/api/jgrammar/explain', requireAuth, requireJgrammarPerm, async (re
   }
 });
 
+// 작업JG-6: 사용자별 저장 목록. 권한 검사(JG-2)가 가장 앞이라 권한이 없으면 DB 조회·저장·삭제가 일어나지 않는다. 본인 항목만 다룬다.
+router.get('/api/jgrammar/saved', requireAuth, requireJgrammarPerm, async (req, res) => {
+  try {
+    res.json({ ok: true, items: await J.listSaved(req.user.id) });
+  } catch (err) {
+    console.error('jgrammar saved list error:', (err && (err.code || err.name)) || 'unknown');
+    res.status(500).json({ ok: false, error: '서버 오류가 발생했습니다.' });
+  }
+});
+
+router.delete('/api/jgrammar/saved/:id', requireAuth, requireJgrammarPerm, async (req, res) => {
+  const NOT_FOUND = { ok: false, error: '저장한 문장을 찾을 수 없습니다.' };
+  if (!/^\d{1,10}$/.test(req.params.id) || Number(req.params.id) < 1 || Number(req.params.id) > 2147483647) return res.status(404).json(NOT_FOUND);
+  try {
+    if (!(await J.deleteSaved(req.user.id, Number(req.params.id)))) return res.status(404).json(NOT_FOUND);   // 없는 id 와 남의 id 를 같은 응답으로
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('jgrammar saved delete error:', (err && (err.code || err.name)) || 'unknown');
+    res.status(500).json({ ok: false, error: '서버 오류가 발생했습니다.' });
+  }
+});
+
 module.exports = router;
