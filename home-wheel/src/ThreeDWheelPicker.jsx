@@ -63,10 +63,11 @@ function useViewportMetrics() {
   return size;
 }
 
+// 작업N: 가운데 카드와 이웃 카드가 겹치지 않도록 step(항목 사이 각도)만 조정했다 — 측정(390px 폰 기준): 모바일 23° → 25° (겹침 5px → 0), 태블릿 21° → 22° (4px → 0), 데스크톱은 20°에서 이미 0px 이라 그대로.
 const METRICS = {
   desktop: { radius: 260, step: 20, cardW: 380, cardH: 92, viewportH: 420, drag: 62, showDesc: true },
-  tablet: { radius: 210, step: 21, cardW: 320, cardH: 84, viewportH: 360, drag: 56, showDesc: true },
-  mobile: { radius: 165, step: 23, cardW: 280, cardH: 74, viewportH: 300, drag: 48, showDesc: false },
+  tablet: { radius: 210, step: 22, cardW: 320, cardH: 84, viewportH: 360, drag: 56, showDesc: true },
+  mobile: { radius: 165, step: 25, cardW: 280, cardH: 74, viewportH: 300, drag: 48, showDesc: false },
 };
 
 /* ------------------------------------------------------------------ *
@@ -186,8 +187,13 @@ export function ThreeDWheelPicker({ options, value, onChange, onCenterTap }) {
   // 짧은 화면(주소창이 계속 떠 있는 실기기, 가로모드 등)에서만 줄어들어서
   // 하단이 잘리는 일을 막음.
   const viewportH = Math.min(base.viewportH, Math.max(160, Math.round((h - 170) * 0.9)));
-  const metrics = { ...base, viewportH };
   const reduced = usePrefersReducedMotion();
+  // 작업N: 카드 폭 상한. 카드는 translateZ(radius) 로 앞으로 나와 원근 배율(persp / (persp - z))만큼 커 보이므로, 보이는 폭이 화면 폭에서 양쪽 8px 을 뺀 값을 넘지 않게 한다.
+  // 320px 폰에서 카드(보이는 폭 330px)가 화면 밖으로 5px씩 잘리던 것을 막는 용도라 360px 이상 화면에서는 값이 그대로다.
+  const persp = reduced ? 2400 : 1100;
+  const zoom = persp / (persp - base.radius * (reduced ? 0.35 : 1));
+  const cardW = Math.min(base.cardW, Math.floor((w - 16) / zoom));
+  const metrics = { ...base, viewportH, cardW };
 
   const onCenterTapRef = useRef(onCenterTap);
   onCenterTapRef.current = onCenterTap;

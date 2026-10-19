@@ -18,12 +18,24 @@ const OPTIONS = [
 // 권한이 없거나 로그인 전이면 OPTIONS 배열 그대로라서 기존 휠(항목 수·순서·위치)은 달라지지 않는다.
 const CMAP_OPTION = { id: 'cmap', name: '개념 지도', description: '주제별 개념을 직접 연결해 지도로 만들기 (개발 중)', url: '/concept_map.html' };
 
+// 작업N: 일본어 문법 정식 항목(예전 휠 아래 "일본어 문법 (임시)" 링크를 대체). perm_jgrammar 가 true 인 계정과 관리자(role=admin — ADMIN_EMAILS 계정은 /api/me 가 admin 으로 돌려줌)에게만 보인다.
+// 위치는 언어 사전 바로 다음: 언어를 다루는 항목끼리 이웃하게 하고, 기존 항목의 순서는 그대로 둔 채 사이에만 끼운다. 라벨·설명은 다른 항목과 같은 방식이다.
+const JGRAMMAR_OPTION = { id: 'jgrammar', name: '일본어 문법', description: '일본어 문장 속 문법을 AI가 풀어주기', url: '/jgrammar.html' };
+
+// 로그인한 사용자 기준 휠 항목: 기본 6개 + (권한자) 일본어 문법(언어 사전 다음) + (권한자) 개념 지도(맨 끝). 로그인 전·권한 없음이면 기본 6개 그대로.
+function buildOptions(user) {
+  const list = [...OPTIONS];
+  if (user && (user.perm_jgrammar === true || user.role === 'admin')) list.splice(list.findIndex((o) => o.id === 'dictionary') + 1, 0, JGRAMMAR_OPTION);
+  if (user && user.perm_concept_map === true) list.push(CMAP_OPTION);
+  return list;
+}
+
 export default function HomeWheelApp() {
   const [selected, setSelected] = useState(OPTIONS[0].id);
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [pendingApproval, setPendingApproval] = useState(false);
-  const options = useMemo(() => (user && user.perm_concept_map === true ? [...OPTIONS, CMAP_OPTION] : OPTIONS), [user]);
+  const options = useMemo(() => buildOptions(user), [user]);
 
   useEffect(() => {
     // 9-a: unapproved signups never get a JWT (see routes/auth.js's OAuth
@@ -98,8 +110,8 @@ export default function HomeWheelApp() {
       ) : (
         <div className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-xl">
-            {/* key: 항목 수가 바뀌는 경우(권한자)에만 휠을 다시 만들어 회전 위치가 어긋나지 않게 함. 일반 사용자는 key 가 그대로(6) */}
-            <ThreeDWheelPicker key={options.length} options={options} value={selected} onChange={setSelected} onCenterTap={goTo} />
+            {/* key: 항목 구성이 바뀌는 경우(권한자)에만 휠을 다시 만들어 회전 위치가 어긋나지 않게 함. 작업N: 항목 수가 같아도 구성이 다를 수 있어(예: 일본어 문법만 / 개념 지도만) id 목록을 쓴다. 일반 사용자는 key 가 그대로 */}
+            <ThreeDWheelPicker key={options.map((o) => o.id).join('|')} options={options} value={selected} onChange={setSelected} onCenterTap={goTo} />
           </div>
         </div>
       )}
@@ -116,12 +128,6 @@ export default function HomeWheelApp() {
         // env(safe-area-inset-bottom)와 비교해 더 큰 쪽을 여백으로 사용.
         style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
       >
-        {/* 작업JG-1: 일본어 문법 해설 임시 진입점. 휠 항목이 아니라 휠 아래 텍스트 링크라(작업JG-2: perm_jgrammar 가 true 인 계정과 관리자에게만 보임) 휠의 항목 수·순서·위치는 그대로다(휠 재배치는 별도 작업). */}
-        {!pendingApproval && user && (user.perm_jgrammar === true || user.role === 'admin') && (
-          <a href="/jgrammar.html" className="text-xs font-bold underline" style={{ color: 'rgba(30,41,59,.6)' }}>
-            일본어 문법 (임시)
-          </a>
-        )}
         {!pendingApproval && authChecked && (
           user ? (
             <div className="flex items-center gap-3">

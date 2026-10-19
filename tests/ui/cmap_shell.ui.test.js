@@ -12,7 +12,7 @@ test.after(async () => { if (browser) await browser.close(); if (srv) await srv.
 
 const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
 const userToken = (role = 'user') => `${b64({ alg: 'none' })}.${b64({ id: 7, role, exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`;
-const OLD6 = ['언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '개념학습'];
+const BASE6 = ['언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '작가 노트'];   // 작업N: 현재 기본 휠(개념학습 삭제, 작가 노트 포함). 개념 지도는 그 뒤에 붙는다
 const labels = page => page.eval("[...document.querySelectorAll('[role=option]')].map(o => o.getAttribute('aria-label').split(' — ')[0])");
 
 async function openMap(me, { token = userToken() } = {}) {
@@ -64,18 +64,18 @@ async function openHome(me, token) {
   return page;
 }
 
-test('홈 휠: 권한 없는 계정·권한 false·값 없음·로그인 전은 기존 6개와 순서·개수가 같다', { skip: SKIP }, async () => {
+test('홈 휠: 권한 없는 계정·권한 false·값 없음·로그인 전은 기본 6개와 순서·개수가 같다', { skip: SKIP }, async () => {
   for (const [name, me, token] of [['로그인 전', null, null], ['값 없음', {}, userToken()], ['false', { perm_concept_map: false }, userToken()], ['문자열 "true"', { perm_concept_map: 'true' }, userToken()]]) {
     const page = await openHome(me, token);
-    assert.deepEqual(await labels(page), OLD6, name);
+    assert.deepEqual(await labels(page), BASE6, name);
     assert.equal(await page.count('[role=option]'), 6, name + ': 항목 수');
     await page.close();
   }
 });
 
-test('홈 휠: 권한자(perm_concept_map=true)에게만 "개념 지도"가 개념학습 다음에 보이고, 돌려서 누르면 /concept_map.html', { skip: SKIP }, async () => {
+test('홈 휠: 권한자(perm_concept_map=true)에게만 "개념 지도"가 맨 끝(작가 노트 다음)에 보이고, 돌려서 누르면 /concept_map.html', { skip: SKIP }, async () => {
   const page = await openHome({ perm_concept_map: true }, userToken());
-  assert.deepEqual(await labels(page), [...OLD6, '개념 지도']);
+  assert.deepEqual(await labels(page), [...BASE6, '개념 지도']);
   assert.match(await page.eval("document.querySelectorAll('[role=option]')[6].getAttribute('aria-label')"), /개발 중/);
   await page.eval("document.querySelector('[role=listbox]').focus()");
   for (let i = 0; i < 6; i++) {
