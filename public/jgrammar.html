@@ -35,6 +35,14 @@
   .btn:hover { background: var(--btn-primary-bg-hover); }
   .btn:disabled { opacity: 0.4; cursor: default; }
 
+  .btn.text { padding: var(--sp-0) var(--sp-8); color: var(--color-text-sub); background: none; text-decoration: underline; font-weight: 500; }
+  .btn.text:hover { background: none; color: var(--color-text); }
+  .photo-links { display: flex; align-items: center; gap: var(--sp-8); }
+  .photo-links input[type=file] { display: none; }
+  #picks { margin-top: var(--sp-16); }
+  .picks-title { font-size: var(--fs-12); font-weight: 700; color: var(--color-text-sub); padding-bottom: var(--sp-8); }
+  .pick { display: block; width: 100%; min-height: var(--ctl-min-h); padding: var(--sp-12) var(--sp-0); text-align: left; font: inherit; font-size: var(--fs-16); line-height: 1.6; color: var(--color-text); background: none; border: 0; border-top: 1px solid var(--color-line); cursor: pointer; }
+  .pick:hover { font-weight: 600; }
   .msg { margin-top: var(--sp-16); font-size: var(--fs-14); color: var(--color-text-sub); }
   .msg.error { color: var(--color-danger); }
 
@@ -70,10 +78,17 @@
   <p class="lead">일본어 문장을 입력하면 그 문장을 이해하는 데 필요한 문법을 골라 설명해 드립니다.</p>
   <textarea id="sentence" aria-label="일본어 문장" maxlength="200" lang="ja" placeholder="例: 私は毎日学校に行きます。" autocomplete="off"></textarea>
   <div class="input-foot">
+    <span class="photo-links">
+      <button type="button" class="btn text" id="shoot">사진 찍기</button>
+      <button type="button" class="btn text" id="pick">사진 선택</button>
+      <input type="file" id="file-camera" accept="image/*" capture="environment" aria-label="사진 찍기">
+      <input type="file" id="file-gallery" accept="image/*" aria-label="사진 선택">
+    </span>
     <span class="count" id="count">0 / 200</span>
     <button type="button" class="btn" id="go">문법 설명</button>
   </div>
   <p class="msg" id="msg" role="status" aria-live="polite"></p>
+  <section id="picks" hidden></section>
   <section id="result" hidden></section>
   </div>
 </main>
@@ -83,7 +98,9 @@
   var MAX = 200;
   var KANA_KANJI = /[぀-ゟ゠-ヿ㐀-䶿一-鿿\u{20000}-\u{2FA1F}]/u;
   var $ = function (id) { return document.getElementById(id); };
-  var input = $('sentence'), go = $('go'), msg = $('msg'), result = $('result'), count = $('count');
+  var input = $('sentence'), go = $('go'), msg = $('msg'), result = $('result'), count = $('count'), picks = $('picks');
+  var OCR_MAX_BYTES = 5 * 1024 * 1024, OCR_MAX_SIDE = 1600;   // 서버 상한과 같은 값(5MB). 휴대폰 사진은 크므로 올리기 전에 긴 변 1600px 로 줄인다
+  var OCR_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
   function token() { try { return localStorage.getItem('mydict_token'); } catch (e) { return null; } }
   function setMsg(text, isError) { msg.textContent = text || ''; msg.className = 'msg' + (isError ? ' error' : ''); }
@@ -102,7 +119,69 @@
   }
   checkAccess();
 
-  input.addEventListener('input', function () { count.textContent = Array.from(input.value).length + ' / ' + MAX; });
+  function updateCount() { count.textContent = Array.from(input.value).length + ' / ' + MAX; }
+  input.addEventListener('input', updateCount);
+
+  // ── 작업JG-3: 사진 입력. 이미지는 서버에 저장되지 않고, 인식 결과로 바로 분석하지 않는다(입력창에 채워 확인·수정한 뒤 "문법 설명"). ──
+  function fillInput(text) { input.value = text; updateCount(); picks.hidden = true; picks.textContent = ''; result.hidden = true; input.focus(); }
+
+  function showPicks(sentences) {
+    picks.textContent = '';
+    picks.appendChild(el('p', 'picks-title', '분석할 문장을 눌러 주세요'));
+    sentences.forEach(function (sn) {
+      var b = el('button', 'pick', sn); b.type = 'button';
+      b.addEventListener('click', function () { setMsg(''); fillInput(sn); });
+      picks.appendChild(b);
+    });
+    picks.hidden = false;
+  }
+
+  // 사진을 긴 변 OCR_MAX_SIDE 이하의 JPEG 로 줄인다. 브라우저가 디코딩하지 못하면(예: HEIC) null
+  function shrink(file) {
+    return new Promise(function (resolve) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var k = Math.min(1, OCR_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob(function (blob) { resolve(blob); }, 'image/jpeg', 0.85);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    });
+  }
+
+  async function recognize(file) {
+    if (!file) return;
+    result.hidden = true; picks.hidden = true;
+    if (!file.type || file.type.indexOf('image/') !== 0) { setMsg('이미지 파일만 올릴 수 있습니다.', true); return; }   // AI 를 부르지 않는다
+    var t = token();
+    if (!t) { setMsg('로그인 후 이용할 수 있습니다. 홈에서 로그인해 주세요.', true); return; }
+    setBusy(true); setMsg('사진에서 글자를 읽고 있습니다…');
+    try {
+      var blob = await shrink(file);
+      if (!blob) blob = file;                                            // 디코딩 못 하면 원본 그대로(형식·용량은 아래에서 검사)
+      if (OCR_TYPES.indexOf(blob.type) < 0) { setMsg('지원하지 않는 이미지 형식입니다. JPEG·PNG·WebP·GIF 사진을 사용해 주세요.', true); return; }
+      if (blob.size > OCR_MAX_BYTES) { setMsg('이미지가 너무 큽니다(5MB 이하).', true); return; }
+      var res = await fetch('/api/jgrammar/ocr', { method: 'POST', headers: { 'Content-Type': blob.type, 'Authorization': 'Bearer ' + t }, body: blob });
+      var data = null;
+      try { data = await res.json(); } catch (e) { /* 본문 없음 */ }
+      if (!(res.ok && data && data.ok && Array.isArray(data.sentences))) { setMsg((data && data.error) || '사진에서 글자를 읽지 못했습니다. 잠시 후 다시 시도해주세요.', true); return; }
+      if (data.sentences.length === 0) { setMsg('일본어 문장을 찾지 못했습니다.', true); return; }
+      if (data.sentences.length === 1) { setMsg('인식한 문장입니다. 확인하고 고친 뒤 "문법 설명"을 눌러 주세요.'); fillInput(data.sentences[0]); return; }
+      setMsg(''); showPicks(data.sentences);
+    } catch (e) {
+      setMsg('사진에서 글자를 읽지 못했습니다. 잠시 후 다시 시도해주세요.', true);
+    } finally { setBusy(false); }
+  }
+
+  var fileCamera = $('file-camera'), fileGallery = $('file-gallery');
+  $('shoot').addEventListener('click', function () { fileCamera.click(); });
+  $('pick').addEventListener('click', function () { fileGallery.click(); });
+  [fileCamera, fileGallery].forEach(function (f) {
+    f.addEventListener('change', function () { var file = f.files && f.files[0]; f.value = ''; recognize(file); });   // 같은 사진을 다시 골라도 동작하도록 비운다
+  });
 
   function render(r) {
     result.textContent = '';
@@ -124,15 +203,17 @@
     result.hidden = false;
   }
 
+  function setBusy(on) { go.disabled = on; $('shoot').disabled = on; $('pick').disabled = on; }
+
   async function submit() {
     var sentence = input.value.trim();
-    result.hidden = true;
+    result.hidden = true; picks.hidden = true;
     if (!sentence) { setMsg('일본어 문장을 입력해 주세요.', true); return; }
     if (Array.from(sentence).length > MAX) { setMsg('문장은 ' + MAX + '자까지 입력할 수 있습니다.', true); return; }
     if (!KANA_KANJI.test(sentence)) { setMsg('일본어 문장(히라가나·가타카나·한자)을 입력해 주세요.', true); return; }   // AI 를 부르지 않는다
     var t = token();
     if (!t) { setMsg('로그인 후 이용할 수 있습니다. 홈에서 로그인해 주세요.', true); return; }
-    go.disabled = true; setMsg('설명을 만들고 있습니다…');
+    setBusy(true); setMsg('설명을 만들고 있습니다…');
     try {
       var res = await fetch('/api/jgrammar/explain', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + t },
@@ -144,7 +225,7 @@
       else setMsg((data && data.error) || '설명을 가져오지 못했습니다. 잠시 후 다시 시도해주세요.', true);
     } catch (e) {
       setMsg('설명을 가져오지 못했습니다. 잠시 후 다시 시도해주세요.', true);
-    } finally { go.disabled = false; }
+    } finally { setBusy(false); }
   }
   go.addEventListener('click', submit);
 })();

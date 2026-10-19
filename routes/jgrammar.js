@@ -23,6 +23,31 @@ async function requireJgrammarPerm(req, res, next) {
   }
 }
 
+// 작업JG-3: 사진 → 일본어 문장 인식. 원본 이미지 바이너리를 Content-Type(image/*)으로 받는다(개념학습 음성 변환과 같은 방식).
+// 순서: 로그인 → 권한 → 형식(415) → 본문 읽기·용량(413) → 하루 한도 → AI. 권한이 없으면 본문을 읽지도 않는다. 이미지는 메모리에서만 쓰고 저장하지 않는다.
+function imageBody(req, res, next) {
+  express.raw({ type: 'image/*', limit: J.OCR_MAX_BYTES })(req, res, err => {
+    if (!err) return next();
+    const tooBig = err.status === 413 || err.type === 'entity.too.large';
+    res.status(tooBig ? 413 : 400).json({ ok: false, error: tooBig ? J.MSG.imageTooLarge : J.MSG.imageEmpty });
+  });
+}
+function baseType(req) { return String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase(); }
+function requireImageType(req, res, next) {
+  if (!J.OCR_TYPES[baseType(req)]) return res.status(415).json({ ok: false, error: J.MSG.badImageType });
+  next();
+}
+
+router.post('/api/jgrammar/ocr', requireAuth, requireJgrammarPerm, requireImageType, imageBody, async (req, res) => {
+  try {
+    const out = await J.ocr(req.user.id, req.body, baseType(req));
+    res.status(out.status).json(out.body);
+  } catch (err) {
+    console.error('jgrammar ocr error:', err && err.message);
+    res.status(500).json({ ok: false, error: '서버 오류가 발생했습니다.' });
+  }
+});
+
 router.post('/api/jgrammar/explain', requireAuth, requireJgrammarPerm, async (req, res) => {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};

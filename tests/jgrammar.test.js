@@ -40,7 +40,7 @@ function createJgDb({ blocked = [], failCacheRead = false, failUsers = false } =
         if (!db.cache.has(params[0])) db.cache.set(params[0], { sentence: params[1], result: JSON.parse(params[2]), model: params[3] });
         return { rows: [] };
       }
-      if (/FROM api_usage/.test(sql)) return { rows: [{ n: db.usage.filter(u => u.user_id === params[0] && u.event_type === params[1]).length }] };
+      if (/FROM api_usage/.test(sql)) return { rows: [{ n: db.usage.filter(u => u.user_id === params[0] && params[1].includes(u.event_type)).length }] };
       throw new Error('지원하지 않는 SQL: ' + sql);
     },
   };
@@ -325,4 +325,162 @@ test('관리자 API·/api/me 가 perm_jgrammar 를 다룬다(목록·저장 허�
   assert.match(admin, /RETURNING[^`]*perm_jgrammar/);
   assert.match(auth, /perm_concept_map, perm_jgrammar\s/);
   assert.match(auth, /perm_jgrammar: false/);
+});
+
+// ───── 작업JG-3: 사진 인식(POST /api/jgrammar/ocr) ─────
+const jwt = require('jsonwebtoken');
+const JPEG = Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]), Buffer.from('fake-jpeg-body')]);
+const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]), Buffer.from('fake-png-body')]);
+const WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.from([1, 2, 3, 4]), Buffer.from('WEBPVP8 ')]);
+const GIF = Buffer.from('GIF89a-fake-body');
+const OCR_GOOD = { sentences: ['私は毎日学校に行きます。', '猫が好きです。'] };
+
+async function ocrSetup(opts) {
+  const base = await setup(opts);
+  const secret = process.env.JWT_SECRET || 'mydict-jwt-secret';
+  base.sendImage = async (body, type = 'image/jpeg', user = 1) => {
+    const headers = { 'Content-Type': type };
+    if (user !== null) headers.Authorization = 'Bearer ' + jwt.sign({ id: user, email: 'u' + user + '@example.com' }, secret);
+    const r = await fetch(base.t.base + '/api/jgrammar/ocr', { method: 'POST', headers, body });
+    let json = null; try { json = await r.json(); } catch (e) { /* 본문 없음 */ }
+    return { status: r.status, body: json };
+  };
+  // 경로(ocr/explain)에 따라 다른 응답: 이미지가 들어 있는 호출은 인식, 아니면 문법 분석
+  base.anthropic.handler = params => (Array.isArray(params.messages[0].content) ? JSON.stringify(OCR_GOOD) : JSON.stringify(GOOD));
+  return base;
+}
+
+test('OCR 권한: 로그인 없으면 401, 권한 없음·행 없음·차단은 403 이고 이미지 처리·AI·한도 계산·사용량 기록이 모두 일어나지 않는다', async t => {
+  const a = await ocrSetup();
+  t.after(() => a.t.close());
+  assert.equal((await a.sendImage(JPEG, 'image/jpeg', null)).status, 401);
+  for (const user of [3, 77, 9]) assert.equal((await a.sendImage(JPEG, 'image/jpeg', user)).status, 403, 'user ' + user);
+  assert.equal((await a.sendImage('text', 'text/plain', 3)).status, 403, '권한 없으면 형식 오류보다 403 이 먼저');
+  assert.equal((await a.sendImage(Buffer.concat([JPEG, Buffer.alloc(J.OCR_MAX_BYTES)]), 'image/jpeg', 3)).status, 403, '권한 없으면 용량 검사(본문 읽기)보다 403 이 먼저');
+  assert.equal(a.anthropic.calls.length, 0);
+  assert.equal(a.db.usage.length, 0);
+  assert.deepEqual(a.db.queries.filter(q => /api_usage|jgrammar_cache/.test(q)), []);
+  const f = await ocrSetup({ failUsers: true });
+  t.after(() => f.t.close());
+  assert.equal((await f.sendImage(JPEG)).status, 403, '권한 조회 오류는 차단');
+  assert.equal(f.anthropic.calls.length, 0);
+});
+
+test('OCR 관리자(DB role·이메일)는 항상 허용', async t => {
+  const a = await ocrSetup();
+  t.after(() => a.t.close());
+  assert.equal((await a.sendImage(JPEG, 'image/jpeg', 4)).status, 200);
+  assert.equal((await a.sendImage(JPEG, 'image/jpeg', 5)).status, 200);
+});
+
+test('OCR 정상: 문장 배열을 돌려주고, 이미지를 base64 로 Haiku 에 보내며, 이벤트 jgrammar_ocr 로 기록하고, 결과·이미지를 저장하지 않는다', async t => {
+  const a = await ocrSetup();
+  t.after(() => a.t.close());
+  const r = await a.sendImage(PNG, 'image/png');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body, { ok: true, sentences: OCR_GOOD.sentences });
+  assert.equal(a.anthropic.calls.length, 1);
+  const call = a.anthropic.calls[0];
+  assert.equal(call.model, 'claude-haiku-4-5-20251001');
+  const img = call.messages[0].content.find(c => c.type === 'image');
+  assert.equal(img.source.media_type, 'image/png');
+  assert.equal(img.source.data, PNG.toString('base64'));
+  assert.deepEqual(a.db.usage.map(u => u.event_type), ['jgrammar_ocr']);
+  assert.equal(a.db.cache.size, 0, '문법 캐시에도 인식 결과 없음');
+  const b64 = PNG.toString('base64');
+  for (const q of a.db.queries) assert.ok(!q.includes(b64), '쿼리에 이미지 없음');
+  assert.ok(!JSON.stringify(a.db.usage).includes(b64));
+  assert.ok(!JSON.stringify([...a.db.cache.values()]).includes(b64));
+});
+
+test('OCR 같은 이미지를 다시 보내면 다시 호출한다(인식 결과는 캐시하지 않음)', async t => {
+  const a = await ocrSetup();
+  t.after(() => a.t.close());
+  await a.sendImage(JPEG); await a.sendImage(JPEG);
+  assert.equal(a.anthropic.calls.length, 2);
+  assert.equal(a.db.queries.filter(q => /jgrammar_cache/.test(q)).length, 0);
+});
+
+test('OCR 이미지 검증: 형식 아님 415, 빈 본문·서명 불일치 400, 5MB 초과 413 — 모두 AI 호출 없음', async t => {
+  const a = await ocrSetup();
+  t.after(() => a.t.close());
+  for (const type of ['text/plain', 'application/pdf', 'image/svg+xml', 'image/heic']) assert.equal((await a.sendImage('x', type)).status, 415, type);
+  assert.equal((await a.sendImage(Buffer.alloc(0))).status, 400, '빈 본문');
+  assert.equal((await a.sendImage(Buffer.from('not an image'), 'image/jpeg')).status, 400, 'jpeg 라고 했지만 서명이 다름');
+  assert.equal((await a.sendImage(PNG, 'image/jpeg')).status, 400, '서명이 선언 형식과 다름');
+  const r = await a.sendImage(Buffer.concat([JPEG, Buffer.alloc(J.OCR_MAX_BYTES)]));
+  assert.equal(r.status, 413); assert.equal(r.body.error, J.MSG.imageTooLarge);
+  assert.equal(a.anthropic.calls.length, 0);
+  assert.equal(a.db.usage.length, 0);
+  for (const [buf, type] of [[JPEG, 'image/jpeg'], [PNG, 'image/png'], [WEBP, 'image/webp'], [GIF, 'image/gif']]) assert.equal((await a.sendImage(buf, type)).status, 200, type);
+});
+
+test('OCR 상한 값: 정확히 5MB 는 통과(순수 검증), 1바이트 넘으면 거부', () => {
+  assert.equal(J.OCR_MAX_BYTES, 5 * 1024 * 1024);
+  const at = Buffer.concat([JPEG, Buffer.alloc(J.OCR_MAX_BYTES - JPEG.length)]);
+  assert.equal(J.validateImage(at, 'image/jpeg'), null);
+  assert.equal(J.validateImage(Buffer.concat([at, Buffer.alloc(1)]), 'image/jpeg').status, 413);
+});
+
+test('OCR 빈 배열은 정상 응답(문장 없음), 일본어 글자가 없는 항목·빈 문자열은 빼고 공백은 다듬는다', async t => {
+  const a = await ocrSetup();
+  t.after(() => a.t.close());
+  a.anthropic.handler = () => '{"sentences":[]}';
+  assert.deepEqual((await a.sendImage(JPEG)).body, { ok: true, sentences: [] });
+  a.anthropic.handler = () => JSON.stringify({ sentences: ['  猫が好き  ', '', 'Hello', '12345', 'ネコ'] });
+  assert.deepEqual((await a.sendImage(JPEG)).body.sentences, ['猫が好き', 'ネコ']);
+  assert.equal(a.anthropic.calls.length, 2, '빈 배열은 형식 오류가 아니므로 재시도 없음');
+});
+
+test('OCR 응답 검증: sentences 가 배열이 아님·문자열 아닌 항목·31개 초과는 invalid', () => {
+  for (const b of [null, [], 'x', {}, { sentences: 'x' }, { sentences: [1] }, { sentences: [null] }, { sentences: Array(31).fill('猫') }]) assert.deepEqual(J.validateOcrResult(b), { invalid: true }, JSON.stringify(b));
+  assert.equal(J.validateOcrResult({ sentences: Array(30).fill('猫') }).sentences.length, 30);
+});
+
+test('OCR 형식 오류 후 재시도 성공(2회 호출, 사용량 2건), 두 번 모두 틀리면 실패 안내(재시도 1회만)', async t => {
+  const a = await ocrSetup();
+  t.after(() => a.t.close());
+  a.anthropic.handler = (p, n) => (n === 1 ? '깨진 응답' : JSON.stringify(OCR_GOOD));
+  assert.equal((await a.sendImage(JPEG)).status, 200);
+  assert.equal(a.anthropic.calls.length, 2);
+  assert.equal(a.db.usage.length, 2);
+  a.anthropic.calls.length = 0;
+  a.anthropic.handler = (p, n) => (n === 1 ? '{"sentences":"x"}' : '{깨진');
+  const bad = await a.sendImage(JPEG);
+  assert.equal(bad.status, 502); assert.deepEqual(bad.body, { ok: false, error: J.MSG.ocrFail });
+  assert.equal(a.anthropic.calls.length, 2);
+});
+
+test('OCR API 오류는 재시도 없이 실패 안내', async t => {
+  const a = await ocrSetup();
+  t.after(() => a.t.close());
+  a.anthropic.handler = () => { throw new Error('down'); };
+  const r = await a.sendImage(JPEG);
+  assert.equal(r.status, 502);
+  assert.equal(a.anthropic.calls.length, 1);
+});
+
+test('하루 한도 합산: 인식 1회=1건, 문법 분석 1회=1건이며 합이 한도면 인식도 분석도 거부(분석 캐시 적중은 예외)', async t => {
+  process.env.JGRAMMAR_DAILY_CAP = '3';
+  t.after(() => { delete process.env.JGRAMMAR_DAILY_CAP; });
+  const a = await ocrSetup();
+  t.after(() => a.t.close());
+  assert.equal((await a.sendImage(JPEG)).status, 200);               // 1건
+  assert.equal((await a.post('猫が好き')).status, 200);               // 2건
+  assert.equal((await a.sendImage(JPEG)).status, 200);               // 3건
+  const ocr4 = await a.sendImage(JPEG);
+  assert.equal(ocr4.status, 429); assert.equal(ocr4.body.error, J.MSG.cap);
+  assert.equal((await a.post('犬が好き')).status, 429, '분석도 거부');
+  assert.equal((await a.post('猫が好き')).body.cached, true, '저장된 분석은 한도 뒤에도 열림');
+  assert.equal(a.anthropic.calls.length, 3);
+  assert.equal((await a.sendImage(JPEG, 'image/jpeg', 2)).status, 200, '다른 사용자는 자기 한도');
+});
+
+test('인식 먼저 한도에 닿으면 분석 429 (분석 건수만 세던 JG-1 동작은 분석만 쓸 때 그대로)', async t => {
+  process.env.JGRAMMAR_DAILY_CAP = '2';
+  t.after(() => { delete process.env.JGRAMMAR_DAILY_CAP; });
+  const a = await ocrSetup();
+  t.after(() => a.t.close());
+  await a.sendImage(JPEG); await a.sendImage(JPEG);
+  assert.equal((await a.post('猫が好き')).status, 429);
 });
