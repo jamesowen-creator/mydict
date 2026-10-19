@@ -53,7 +53,11 @@
 
   #result { margin-top: var(--sp-24); }
   .translation { font-size: var(--fs-18); font-weight: 600; line-height: 1.6; padding-bottom: var(--sp-16); }
-  .result-tools { display: flex; justify-content: flex-end; }
+  .result-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .speak-area { display: flex; align-items: center; }
+  .speak-area .btn.text { min-width: var(--ctl-min-h); }   /* 짧은 글자(듣기)도 터치 가로 44px 이상 */
+  .speak-note { font-size: var(--fs-12); color: var(--color-text-sub); }
+  .furi-toggle { margin-left: auto; }
   .source { padding-bottom: var(--sp-8); font-size: var(--fs-22); line-height: 1.6; }
   .source rt { font-size: var(--fs-11); font-weight: 400; color: var(--color-text-sub); }
   #result.no-furigana .source rt { display: none; }
@@ -180,7 +184,7 @@
   }
 
   // ── 작업JG-3: 사진 입력. 이미지는 서버에 저장되지 않고, 인식 결과로 바로 분석하지 않는다(입력창에 채워 확인·수정한 뒤 "문법 설명"). ──
-  function fillInput(text) { input.value = text; updateCount(); picks.hidden = true; picks.textContent = ''; result.hidden = true; input.focus(); }
+  function fillInput(text) { stopSpeech(); input.value = text; updateCount(); picks.hidden = true; picks.textContent = ''; result.hidden = true; input.focus(); }
 
   function showPicks(sentences) {
     picks.textContent = '';
@@ -211,6 +215,7 @@
 
   async function recognize(file) {
     if (!file) return;
+    stopSpeech();
     result.hidden = true; picks.hidden = true;
     if (!file.type || file.type.indexOf('image/') !== 0) { setMsg('이미지 파일만 올릴 수 있습니다.', true); return; }   // AI 를 부르지 않는다
     var t = token();
@@ -245,6 +250,9 @@
   var FURIGANA_KEY = 'jgrammar_furigana';
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 저장이 안 돼도 동작한다 */ } }
+  // ── 읽어주기(듣기): 브라우저 내장 speechSynthesis 만 쓴다. 읽을 텍스트는 서버로 보내지 않고, 사용자가 링크를 눌렀을 때만 읽는다(자동 재생 없음). ──
+  // <speech-pure>  테스트(tests/jgrammar_speech.test.js)가 이 구간을 그대로 꺼내 Node 에서 실행한다. DOM·window 를 쓰지 않는다.
+  // 화면에 후리가나를 보여 줄 수 있는 ruby 인지(조각을 이어 붙이면 입력 문장과 정확히 같고 형식이 올바름). 아니면 null
   function usableRuby(ruby, sentence) {
     if (!Array.isArray(ruby) || !ruby.length || ruby.length > 100) return null;
     var joined = '';
@@ -255,6 +263,37 @@
     }
     return joined === sentence ? ruby : null;
   }
+  // 읽을 텍스트: ruby 가 유효하면 reading 이 있는 조각은 reading 으로, 없는 조각은 text 로 이어 붙인 것. 아니면 원문 그대로. 후리가나 표시 켜기/끄기와 무관하다
+  function speechText(result, sentence) {
+    var ruby = usableRuby(result && result.ruby, sentence);
+    if (!ruby) return sentence;
+    return ruby.map(function (p) { return p.reading ? p.reading : p.text; }).join('');
+  }
+  function normLang(l) { return String(l || '').toLowerCase().replace('_', '-'); }
+  // 일본어(ja 로 시작) 음성 중 ja-JP 를 우선해 고른다. 없으면 null
+  function pickJapaneseVoice(voices) {
+    var ja = (voices || []).filter(function (v) { return v && normLang(v.lang).indexOf('ja') === 0; });
+    return ja.filter(function (v) { return normLang(v.lang) === 'ja-jp'; })[0] || ja[0] || null;
+  }
+  // 긴 문장은 일부 브라우저가 15초 안팎에서 읽기를 끊으므로 문장(。！？) 단위, 너무 길면 쉼표 단위로 max 글자 이하 조각으로 나눈다. 이어 붙이면 (공백·줄바꿈을 뺀) 원래 텍스트와 같다
+  function splitForSpeech(text, max) {
+    var chars = Array.from(String(text)), out = [], cur = [];
+    var flush = function () { var t = cur.join('').trim(); if (t) out.push(t); cur = []; };
+    for (var i = 0; i < chars.length; i++) {
+      var c = chars[i];
+      cur.push(c);
+      if (/[。！？!?\n]/.test(c) && !/[」』）)”]/.test(chars[i + 1] || '')) flush();
+      else if (cur.length >= max) {
+        var k = -1;
+        for (var j = cur.length - 1; j > cur.length / 3; j--) if (/[、,，]/.test(cur[j])) { k = j; break; }
+        if (k >= 0) { var rest = cur.slice(k + 1); cur = cur.slice(0, k + 1); flush(); cur = rest; } else flush();
+      }
+    }
+    flush();
+    return out;
+  }
+  // </speech-pure>
+
   function renderSource(sentence, ruby) {
     var p = el('p', 'source'); p.lang = 'ja';
     if (!ruby) { p.textContent = sentence; return p; }
@@ -265,18 +304,118 @@
     return p;
   }
 
+  var SPEAK_RATE = { normal: 1.0, slow: 0.7 }, SPEAK_LABEL = { normal: '듣기', slow: '천천히' }, SPEAK_CHUNK_MAX = 80;
+  var speakRun = 0, speakMode = null, speakCtx = null;   // speakRun: 이미 예약된 콜백(취소 때 오는 end/error 포함)을 무효화하는 번호
+
+  function speechSupported() { return !!window.speechSynthesis && typeof window.SpeechSynthesisUtterance === 'function'; }
+  function listVoices() { var l = []; try { l = Array.prototype.slice.call(speechSynthesis.getVoices() || []); } catch (e) { l = []; } return l; }
+  // ok: 일본어 음성 있음 / none: 음성 목록은 채워졌는데 일본어가 없음 / unknown: 목록이 아직 비어 있음(일부 브라우저는 voiceschanged 뒤에 채운다)
+  function voiceStatus() { var l = listVoices(); return !l.length ? 'unknown' : (pickJapaneseVoice(l) ? 'ok' : 'none'); }
+
+  function syncSpeakUi() {
+    if (!speakCtx) return;
+    ['normal', 'slow'].forEach(function (m) {
+      var b = speakCtx.buttons[m];
+      if (!b) return;
+      b.textContent = speakMode === m ? '멈춤' : SPEAK_LABEL[m];   // 읽는 중인 링크만 "멈춤"
+      b.setAttribute('aria-pressed', speakMode === m ? 'true' : 'false');
+    });
+  }
+  function stopSpeech() {
+    speakRun++;
+    var was = speakMode !== null;
+    speakMode = null;
+    if (was && speechSupported()) { try { speechSynthesis.cancel(); } catch (e) { /* 무시 */ } }
+    syncSpeakUi();
+  }
+  // 음성 목록이 비어 있으면 voiceschanged 를 최대 1초 기다린 뒤 cb 를 한 번만 부른다
+  function waitForVoices(cb) {
+    var done = false, finish = function () { if (done) return; done = true; cb(); };
+    try { speechSynthesis.addEventListener('voiceschanged', finish, { once: true }); } catch (e) { /* 무시 */ }
+    setTimeout(finish, 1000);
+  }
+  function startSpeech(mode, text) {
+    var run = ++speakRun, replacing = speakMode !== null;
+    try { speechSynthesis.cancel(); } catch (e) { /* 무시 */ }   // 읽던 것이 있으면 멈추고 새로 읽는다
+    speakMode = mode;
+    syncSpeakUi();
+    var begin = function () {
+      if (run !== speakRun) return;
+      var list = listVoices(), voice = pickJapaneseVoice(list);
+      if (list.length && !voice) { stopSpeech(); renderSpeakArea(); return; }   // 일본어 음성이 없으면 읽지 않고 안내만
+      var chunks = splitForSpeech(text, SPEAK_CHUNK_MAX);
+      if (!chunks.length) { stopSpeech(); return; }
+      var next = function (i) {
+        if (run !== speakRun) return;
+        if (i >= chunks.length) { speakMode = null; syncSpeakUi(); return; }
+        var u = new SpeechSynthesisUtterance(chunks[i]);
+        u.lang = voice ? voice.lang : 'ja-JP';
+        if (voice) u.voice = voice;
+        u.rate = SPEAK_RATE[mode];
+        u.onend = function () { next(i + 1); };
+        u.onerror = function (ev) {
+          if (run !== speakRun) return;
+          var err = ev && ev.error;
+          if (err === 'canceled' || err === 'interrupted') return;
+          stopSpeech();
+          setMsg('읽는 중 문제가 발생했습니다. 다시 시도해 주세요.', true);
+        };
+        try { speechSynthesis.speak(u); } catch (e) { stopSpeech(); setMsg('읽어주기를 시작하지 못했습니다.', true); }
+      };
+      next(0);
+    };
+    // 탭 직후 같은 흐름에서 읽기 시작(일부 모바일 브라우저는 사용자 동작 안에서만 허용). 음성 목록이 비어 있을 때만 잠깐 기다린다.
+    // 읽던 것을 취소한 직후에 바로 speak 하면 새 발화가 사라지는 브라우저가 있어 교체할 때는 짧게 뒤로 미룬다.
+    if (!listVoices().length) waitForVoices(begin);
+    else if (replacing) setTimeout(begin, 60);
+    else begin();
+  }
+  function onSpeakClick(mode) {
+    if (!speakCtx) return;
+    if (speakMode === mode) { stopSpeech(); return; }   // 읽는 중 같은 링크를 다시 누르면 중지
+    startSpeech(mode, speakCtx.text);                    // 다른 링크면 지금 읽는 것을 멈추고 새로 읽는다
+  }
+  // "듣기"·"천천히" 링크(또는 일본어 음성이 없을 때 안내 문구)를 그린다. speechSynthesis 가 없는 브라우저에서는 아무것도 그리지 않는다
+  function renderSpeakArea() {
+    var c = speakCtx;
+    if (!c || !c.area) return;
+    c.area.textContent = ''; c.buttons = {};
+    if (!speechSupported()) return;
+    if (voiceStatus() === 'none') {
+      var note = el('span', 'speak-note', '이 기기에서는 일본어 음성을 지원하지 않습니다');
+      note.setAttribute('role', 'status');
+      c.area.appendChild(note);
+      return;
+    }
+    ['normal', 'slow'].forEach(function (m) {
+      var b = el('button', 'btn text', SPEAK_LABEL[m]); b.type = 'button'; b.setAttribute('data-speak', m);
+      b.addEventListener('click', function () { onSpeakClick(m); });
+      c.buttons[m] = b; c.area.appendChild(b);
+    });
+    syncSpeakUi();
+  }
+  if (speechSupported()) { try { speechSynthesis.addEventListener('voiceschanged', renderSpeakArea); } catch (e) { /* 무시 */ } }
+  window.addEventListener('pagehide', stopSpeech);
+  window.addEventListener('beforeunload', stopSpeech);
+
   function render(r, sentence) {
+    stopSpeech();   // 새 분석·저장 항목 열기 등으로 결과를 다시 그리면 읽던 것을 멈춘다
     result.textContent = '';
     var ruby = usableRuby(r.ruby, sentence);
     var hasReading = !!ruby && ruby.some(function (p) { return !!p.reading; });
     result.classList.toggle('no-furigana', lsGet(FURIGANA_KEY) === 'off');
+    var tools = el('div', 'result-tools');
+    var area = el('span', 'speak-area');
+    tools.appendChild(area);
+    speakCtx = { text: speechText(r, sentence), area: area, buttons: {} };   // 읽을 텍스트는 후리가나 표시 켜기/끄기와 무관
+    renderSpeakArea();
     if (hasReading) {   // 읽기가 없는 결과(옛 형식·null·한자 없음)에서는 토글 링크를 숨긴다
-      var tools = el('div', 'result-tools');
-      var tg = el('button', 'btn text'); tg.type = 'button';
+      var tg = el('button', 'btn text furi-toggle'); tg.type = 'button';
       var sync = function () { var off = result.classList.contains('no-furigana'); tg.textContent = off ? '후리가나 켜기' : '후리가나 끄기'; tg.setAttribute('aria-pressed', off ? 'false' : 'true'); };
       tg.addEventListener('click', function () { var off = !result.classList.contains('no-furigana'); result.classList.toggle('no-furigana', off); lsSet(FURIGANA_KEY, off ? 'off' : 'on'); sync(); });
-      sync(); tools.appendChild(tg); result.appendChild(tools);
+      sync(); tools.appendChild(tg);
     }
+    if (tools.firstChild.firstChild || hasReading) result.appendChild(tools);
     if (sentence) result.appendChild(renderSource(sentence, ruby));
     result.appendChild(el('p', 'translation', r.translation));
     r.grammar.forEach(function (g) {
@@ -300,6 +439,7 @@
 
   async function submit() {
     var sentence = input.value.trim();
+    stopSpeech();
     result.hidden = true; picks.hidden = true;
     if (!sentence) { setMsg('일본어 문장을 입력해 주세요.', true); return; }
     if (Array.from(sentence).length > MAX) { setMsg('문장은 ' + MAX + '자까지 입력할 수 있습니다.', true); return; }
