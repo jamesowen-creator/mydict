@@ -53,6 +53,10 @@
 
   #result { margin-top: var(--sp-24); }
   .translation { font-size: var(--fs-18); font-weight: 600; line-height: 1.6; padding-bottom: var(--sp-16); }
+  .result-tools { display: flex; justify-content: flex-end; }
+  .source { padding-bottom: var(--sp-8); font-size: var(--fs-22); line-height: 1.6; }
+  .source rt { font-size: var(--fs-11); font-weight: 400; color: var(--color-text-sub); }
+  #result.no-furigana .source rt { display: none; }
   .g-item { padding: var(--sp-16) 0; border-top: 1px solid var(--color-line); }
   .g-head { display: flex; align-items: baseline; gap: var(--sp-8); flex-wrap: wrap; }
   .g-name { font-size: var(--fs-18); font-weight: 700; }
@@ -149,7 +153,7 @@
       open.appendChild(el('span', 'saved-date', dateText(it.last_used_at)));
       open.addEventListener('click', function () {
         if (!validResult(it.result)) return;
-        setMsg(''); fillInput(it.sentence); render(it.result);   // 저장된 결과를 바로 표시(AI 호출 없음)
+        setMsg(''); fillInput(it.sentence); render(it.result, it.sentence);   // 저장된 결과를 바로 표시(AI 호출 없음)
       });
       var del = el('button', 'btn text', '삭제'); del.type = 'button';
       del.setAttribute('aria-label', '삭제: ' + it.sentence);
@@ -236,8 +240,44 @@
     f.addEventListener('change', function () { var file = f.files && f.files[0]; f.value = ''; recognize(file); });   // 같은 사진을 다시 골라도 동작하도록 비운다
   });
 
-  function render(r) {
+  // 작업JG-7: 원문 위에 후리가나. ruby(조각 배열)가 입력 문장과 정확히 맞고 형식이 올바를 때만 쓰고, 아니면(없음·null·옛 형식·어긋남) 원문만 보여 준다.
+  // AI 응답은 innerHTML 없이 요소를 만들어 textContent 로만 넣는다.
+  var FURIGANA_KEY = 'jgrammar_furigana';
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 저장이 안 돼도 동작한다 */ } }
+  function usableRuby(ruby, sentence) {
+    if (!Array.isArray(ruby) || !ruby.length || ruby.length > 100) return null;
+    var joined = '';
+    for (var i = 0; i < ruby.length; i++) {
+      var p = ruby[i];
+      if (!p || typeof p.text !== 'string' || !p.text || (p.reading != null && typeof p.reading !== 'string')) return null;
+      joined += p.text;
+    }
+    return joined === sentence ? ruby : null;
+  }
+  function renderSource(sentence, ruby) {
+    var p = el('p', 'source'); p.lang = 'ja';
+    if (!ruby) { p.textContent = sentence; return p; }
+    ruby.forEach(function (piece) {
+      if (piece.reading) { var r = document.createElement('ruby'); r.appendChild(document.createTextNode(piece.text)); r.appendChild(el('rt', null, piece.reading)); p.appendChild(r); }
+      else p.appendChild(document.createTextNode(piece.text));
+    });
+    return p;
+  }
+
+  function render(r, sentence) {
     result.textContent = '';
+    var ruby = usableRuby(r.ruby, sentence);
+    var hasReading = !!ruby && ruby.some(function (p) { return !!p.reading; });
+    result.classList.toggle('no-furigana', lsGet(FURIGANA_KEY) === 'off');
+    if (hasReading) {   // 읽기가 없는 결과(옛 형식·null·한자 없음)에서는 토글 링크를 숨긴다
+      var tools = el('div', 'result-tools');
+      var tg = el('button', 'btn text'); tg.type = 'button';
+      var sync = function () { var off = result.classList.contains('no-furigana'); tg.textContent = off ? '후리가나 켜기' : '후리가나 끄기'; tg.setAttribute('aria-pressed', off ? 'false' : 'true'); };
+      tg.addEventListener('click', function () { var off = !result.classList.contains('no-furigana'); result.classList.toggle('no-furigana', off); lsSet(FURIGANA_KEY, off ? 'off' : 'on'); sync(); });
+      sync(); tools.appendChild(tg); result.appendChild(tools);
+    }
+    if (sentence) result.appendChild(renderSource(sentence, ruby));
     result.appendChild(el('p', 'translation', r.translation));
     r.grammar.forEach(function (g) {
       var item = el('article', 'g-item');
@@ -252,7 +292,7 @@
       item.appendChild(el('p', 'g-text', g.contrast));
       result.appendChild(item);
     });
-    result.appendChild(el('p', 'disclaimer', 'AI가 생성한 설명이라 틀릴 수 있습니다'));
+    result.appendChild(el('p', 'disclaimer', 'AI가 생성한 설명과 읽기라 틀릴 수 있습니다'));
     result.hidden = false;
   }
 
@@ -274,7 +314,7 @@
       });
       var data = null;
       try { data = await res.json(); } catch (e) { /* 본문 없음 */ }
-      if (res.ok && data && data.ok && data.result) { setMsg(''); render(data.result); loadSaved(); }
+      if (res.ok && data && data.ok && data.result) { setMsg(''); render(data.result, sentence); loadSaved(); }
       else setMsg((data && data.error) || '설명을 가져오지 못했습니다. 잠시 후 다시 시도해주세요.', true);
     } catch (e) {
       setMsg('설명을 가져오지 못했습니다. 잠시 후 다시 시도해주세요.', true);

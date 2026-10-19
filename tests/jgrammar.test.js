@@ -40,6 +40,10 @@ function createJgDb({ blocked = [], failCacheRead = false, failUsers = false } =
         if (!db.cache.has(params[0])) db.cache.set(params[0], { sentence: params[1], result: JSON.parse(params[2]), model: params[3] });
         return { rows: [] };
       }
+      if (/^UPDATE jgrammar_cache SET result = \$2, model = \$3 WHERE sentence_hash = \$1/.test(sql.trim())) {   // 작업JG-7
+        if (db.cache.has(params[0])) Object.assign(db.cache.get(params[0]), { result: JSON.parse(params[1]), model: params[2] });
+        return { rows: [] };
+      }
       if (/jgrammar_saved/.test(sql)) {   // 작업JG-6
         if (db.failSaved) throw Object.assign(new Error('saved down'), { code: 'XX000' });
         const mine = uid => [...db.saved.values()].filter(r => r.user_id === uid).sort((a, b) => b.last_used_at - a.last_used_at || b.id - a.id);
@@ -47,7 +51,11 @@ function createJgDb({ blocked = [], failCacheRead = false, failUsers = false } =
           const [user_id, sentence_hash, sentence, result] = params;
           if (!db.users.has(user_id)) throw Object.assign(new Error('fk'), { code: '23503' });   // users 행이 없으면 외래 키 위반
           const key = user_id + ':' + sentence_hash;
-          if (db.saved.has(key)) db.saved.get(key).last_used_at = ++db.clock;   // ON CONFLICT DO UPDATE SET last_used_at = now() (다른 열은 그대로)
+          if (db.saved.has(key)) {   // ON CONFLICT DO UPDATE SET last_used_at = now(), result = CASE WHEN (저장본에 ruby 키 없음) AND (새 결과에 ruby 키 있음) THEN 새 결과 ELSE 저장본 END
+            const row = db.saved.get(key), next = JSON.parse(result);
+            row.last_used_at = ++db.clock;
+            if (!Object.prototype.hasOwnProperty.call(row.result, 'ruby') && Object.prototype.hasOwnProperty.call(next, 'ruby')) row.result = next;
+          }
           else { const t = ++db.clock; db.saved.set(key, { id: db.nextId++, user_id, sentence_hash, sentence, result: JSON.parse(result), created_at: t, last_used_at: t }); }
           return { rows: [] };
         }
@@ -516,7 +524,7 @@ test('인식 먼저 한도에 닿으면 분석 429 (분석 건수만 세던 JG-1
 // 가짜 DB 는 이 기능의 SQL 네 가지(저장 UPSERT / 상한 정리 / 목록 / 본인 항목 삭제)를 의미대로 흉내 낸다(실제 PostgreSQL 이 아님). last_used_at 은 증가하는 논리 시계.
 const savedOf = (db, user) => [...db.saved.values()].filter(r => r.user_id === user).sort((a, b) => b.last_used_at - a.last_used_at || b.id - a.id);
 const savedQueries = db => db.queries.filter(q => /jgrammar_saved/.test(q));
-const seedCache = (db, sentence) => db.cache.set(J.hashSentence(sentence), { sentence, result: { translation: '번역', grammar: GOOD.grammar }, model: 'x' });
+const seedCache = (db, sentence) => db.cache.set(J.hashSentence(sentence), { sentence, result: { translation: '번역', grammar: GOOD.grammar, ruby: null }, model: 'x' });   // 작업JG-7: 새 형식(ruby 키 있음)
 
 test('저장: AI 로 새로 만든 설명이 본인 목록에 문장 원문(공백 제거)과 결과로 저장된다. 응답 형태는 그대로', async t => {
   const a = await setup();
@@ -717,4 +725,273 @@ test('DB 단계: jgrammar_saved 는 (user_id, sentence_hash) 유일, users 삭�
   assert.match(m[1], /last_used_at\s+TIMESTAMPTZ/);
   assert.match(m[1], /UNIQUE \(user_id, sentence_hash\)/);
   assert.match(src, /CREATE INDEX IF NOT EXISTS idx_jgrammar_saved_user_used ON jgrammar_saved\(user_id, last_used_at DESC\)/);
+});
+
+// ───── 작업JG-7: 후리가나(ruby) ─────
+const RUBY_GOOD = [{ text: '私', reading: 'わたし' }, { text: 'は' }, { text: '毎朝', reading: 'まいあさ' }, { text: 'コーヒー' }, { text: 'を' }, { text: '飲', reading: 'の' }, { text: 'みます。' }];
+const RUBY_SENTENCE = '私は毎朝コーヒーを飲みます。';
+const withRubyAi = ruby => JSON.stringify({ ...GOOD, ruby });
+const OLD_RESULT = { translation: '옛 번역', grammar: GOOD.grammar };   // ruby 키가 없는 옛 형식
+const seedOld = (db, sentence, extra = {}) => db.cache.set(J.hashSentence(sentence), { sentence, result: { ...OLD_RESULT, ...extra }, model: 'x' });
+const cachedResult = (db, sentence) => db.cache.get(J.hashSentence(sentence)).result;
+const explainCalls = a => a.anthropic.calls.filter(c => !Array.isArray(c.messages[0].content));
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+test('ruby 검증: 이어 붙인 값이 입력과 같으면 통과(reading 없는 조각은 text 만, 장음 ー 허용)', () => {
+  const v = J.validateRuby(RUBY_GOOD, RUBY_SENTENCE);
+  assert.deepEqual(v.ruby, RUBY_GOOD);
+  assert.deepEqual(J.validateRuby([{ text: '飲', reading: 'の' }, { text: 'みます', reading: '' }, { text: '。', reading: null }], '飲みます。').ruby,
+    [{ text: '飲', reading: 'の' }, { text: 'みます' }, { text: '。' }], '빈 reading·null 은 조각에서 뺀다');
+  assert.ok(J.validateRuby([{ text: '東京', reading: 'とうきょう' }, { text: '駅', reading: 'えき' }], '東京駅').ruby);
+  assert.ok(J.validateRuby([{ text: '々', reading: 'ー' }], '々').ruby, '장음 ー 허용');
+});
+
+test('ruby 검증: 이어 붙인 값이 입력과 다르면 실패(빠진 글자·바뀐 글자·순서·공백·보정)', () => {
+  const bad = [
+    RUBY_GOOD.slice(0, -1),
+    RUBY_GOOD.map((p, i) => (i === 3 ? { text: 'コーヒ' } : p)),
+    [...RUBY_GOOD].reverse(),
+    [...RUBY_GOOD, { text: ' ' }],
+    RUBY_GOOD.map((p, i) => (i === 6 ? { text: 'ます。' } : p)),
+  ];
+  for (const b of bad) assert.deepEqual(J.validateRuby(b, RUBY_SENTENCE), { invalid: true });
+});
+
+test('ruby 검증: 한자 없는 조각에 reading 이 있으면 실패, reading 은 히라가나·ー 만(가타카나·한자·영문·숫자·공백 불가)', () => {
+  assert.deepEqual(J.validateRuby([{ text: 'みます', reading: 'みます' }], 'みます'), { invalid: true });
+  assert.deepEqual(J.validateRuby([{ text: 'コーヒー', reading: 'こーひー' }], 'コーヒー'), { invalid: true });
+  for (const reading of ['ノ', '飲', 'no', '1', 'の み', 'の。', 'の\n']) assert.deepEqual(J.validateRuby([{ text: '飲', reading }], '飲'), { invalid: true }, JSON.stringify(reading));
+  assert.deepEqual(J.validateRuby([{ text: '飲', reading: 5 }], '飲'), { invalid: true });
+});
+
+test('ruby 검증: reading 30자 초과·조각 100개 초과·빈 배열·배열 아님·잘못된 조각은 실패(경계값은 통과)', () => {
+  assert.ok(J.validateRuby([{ text: '飲', reading: 'の'.repeat(30) }], '飲').ruby, '30자 통과');
+  assert.deepEqual(J.validateRuby([{ text: '飲', reading: 'の'.repeat(31) }], '飲'), { invalid: true });
+  assert.ok(J.validateRuby(Array(100).fill({ text: 'あ' }), 'あ'.repeat(100)).ruby, '100조각 통과');
+  assert.deepEqual(J.validateRuby(Array(101).fill({ text: 'あ' }), 'あ'.repeat(101)), { invalid: true });
+  for (const b of [[], null, undefined, 'x', {}, [null], [{}], [{ text: '' }], [{ text: 5 }], [['飲']], [{ text: 'あ' }, 'x']]) assert.deepEqual(J.validateRuby(b, 'あ'), { invalid: true }, JSON.stringify(b));
+});
+
+test('한자 판별: 한자(확장 B·々 포함)가 있으면 true, 가나·영문·기호만이면 false', () => {
+  for (const s of ['飲む', 'abc 学', '𠮷', '人々']) assert.equal(J.hasKanji(s), true, s);
+  for (const s of ['ねこ', 'ネコ', 'コーヒー。', 'abc', '']) assert.equal(J.hasKanji(s), false, s);
+});
+
+test('한자 있는 문장: 같은 1회 호출에서 읽기를 함께 받아 ruby 를 돌려주고 캐시·저장 목록에도 담긴다. 호출 1회, max_tokens 3000', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  a.anthropic.handler = () => withRubyAi(RUBY_GOOD);
+  const r = await a.post(RUBY_SENTENCE);
+  assert.equal(r.status, 200); assert.equal(r.body.cached, false);
+  assert.deepEqual(r.body.result.ruby, RUBY_GOOD);
+  assert.equal(r.body.result.translation, GOOD.translation);
+  assert.equal(a.anthropic.calls.length, 1, '별도 호출 없음');
+  const p = a.anthropic.calls[0];
+  assert.equal(p.model, 'claude-haiku-4-5-20251001');
+  assert.equal(p.max_tokens, 3000); assert.equal(J.MAX_TOKENS, 3000);
+  assert.match(p.system, /ruby/); assert.match(p.system, /飲みます/); assert.match(p.system, /문맥에 맞는 읽기/); assert.match(p.system, /확실하지 않은 조각은 reading 을 빈 문자열/);
+  assert.match(p.system, /"ruby":\[\{"text":"","reading":""\}\]/, 'JSON 틀에 ruby');
+  assert.equal(JSON.parse(p.messages[0].content.slice(p.messages[0].content.indexOf('\n') + 1))['문장'], RUBY_SENTENCE, '입력은 그대로(바꾸거나 보정하지 않음)');
+  assert.deepEqual(cachedResult(a.db, RUBY_SENTENCE).ruby, RUBY_GOOD);
+  assert.deepEqual(savedOf(a.db, 1)[0].result.ruby, RUBY_GOOD);
+  const again = await a.post(RUBY_SENTENCE, 2);
+  assert.equal(again.body.cached, true); assert.deepEqual(again.body.result.ruby, RUBY_GOOD, '캐시 적중도 ruby 포함');
+  assert.equal(a.anthropic.calls.length, 1);
+});
+
+test('ruby 검증이 실패해도 재시도 없이 ruby 만 null, 번역·문법 항목은 정상 반환·저장', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  for (const [i, bad] of [[0, RUBY_GOOD.slice(1)], [1, [{ text: 'ねこ', reading: 'ねこ' }]], [2, 'x'], [3, [{ text: '飲', reading: 'ノ' }]]].entries()) {
+    const sentence = RUBY_SENTENCE + i;   // 문장마다 다르게(캐시 구분)
+    a.anthropic.handler = () => withRubyAi(bad[1]);
+    const before = a.anthropic.calls.length;
+    const r = await a.post(sentence);
+    assert.equal(r.status, 200, 'case ' + i);
+    assert.equal(r.body.result.ruby, null);
+    assert.equal(r.body.result.translation, GOOD.translation); assert.equal(r.body.result.grammar.length, 2);
+    assert.equal(a.anthropic.calls.length - before, 1, '재시도 없음');
+    assert.ok(hasOwn(cachedResult(a.db, sentence), 'ruby') && cachedResult(a.db, sentence).ruby === null, 'null 로 저장(키는 있음)');
+  }
+});
+
+test('응답에 ruby 키가 아예 없으면(새로 만드는 경우) ruby 는 null 로 저장하고 재시도하지 않는다', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  const r = await a.post(RUBY_SENTENCE);   // 기본 모의 응답 GOOD 에는 ruby 가 없다
+  assert.equal(r.status, 200); assert.equal(r.body.result.ruby, null);
+  assert.equal(a.anthropic.calls.length, 1);
+});
+
+test('translation·grammar 형식 오류는 기존대로 1회 재시도(재시도에서 ruby 까지 맞으면 정상)', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  a.anthropic.handler = (p, n) => (n === 1 ? '{"ok":true,"translation":"","grammar":[]}' : withRubyAi(RUBY_GOOD));
+  const r = await a.post(RUBY_SENTENCE);
+  assert.equal(r.status, 200); assert.deepEqual(r.body.result.ruby, RUBY_GOOD);
+  assert.equal(a.anthropic.calls.length, 2);
+});
+
+test('한자 없는 문장: 읽기를 요청하지 않고(프롬프트에 ruby 없음) ruby 는 빈 배열, AI 가 ruby 를 보내도 무시', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  a.anthropic.handler = () => withRubyAi([{ text: 'ねこ', reading: 'ねこ' }]);
+  const r = await a.post('ねこがすき。');
+  assert.equal(r.status, 200); assert.deepEqual(r.body.result.ruby, []);
+  assert.ok(!/ruby/.test(a.anthropic.calls[0].system), '읽기 요청 없음');
+  assert.equal(a.anthropic.calls[0].system, J.SYSTEM_PROMPT, '한자 없으면 기존 프롬프트 그대로');
+  assert.deepEqual(cachedResult(a.db, 'ねこがすき。').ruby, []);
+});
+
+test('옛 형식 캐시 + 한자 있는 문장 → AI 1회 재호출로 캐시를 새 형식으로 갱신하고 한도·사용량(jgrammar)에 포함', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  seedOld(a.db, RUBY_SENTENCE);
+  a.anthropic.handler = () => withRubyAi(RUBY_GOOD);
+  const r = await a.post(RUBY_SENTENCE);
+  assert.equal(r.status, 200); assert.equal(r.body.cached, false, 'AI 를 불렀으므로 cached:false');
+  assert.deepEqual(r.body.result.ruby, RUBY_GOOD);
+  assert.equal(explainCalls(a).length, 1); assert.equal(a.anthropic.calls.length, 1);
+  assert.deepEqual(a.db.usage.map(u => u.event_type), ['jgrammar'], '사용량 기록');
+  assert.deepEqual(cachedResult(a.db, RUBY_SENTENCE).ruby, RUBY_GOOD, '캐시 갱신');
+  assert.equal(cachedResult(a.db, RUBY_SENTENCE).translation, GOOD.translation);
+  const again = await a.post(RUBY_SENTENCE, 2);
+  assert.equal(again.body.cached, true); assert.equal(a.anthropic.calls.length, 1, '갱신 뒤에는 재호출 없음');
+});
+
+test('옛 형식 갱신 호출은 하루 한도에 포함된다: 한도에 닿아 있으면 호출하지 않고 옛 결과를 그대로 반환(429 아님)', async t => {
+  process.env.JGRAMMAR_DAILY_CAP = '1';
+  t.after(() => { delete process.env.JGRAMMAR_DAILY_CAP; });
+  const a = await setup();
+  t.after(() => a.t.close());
+  seedOld(a.db, RUBY_SENTENCE); seedOld(a.db, '犬が好き');
+  a.anthropic.handler = () => withRubyAi([{ text: '犬', reading: 'いぬ' }, { text: 'が好き' }]);
+  assert.equal((await a.post('犬が好き')).body.cached, false, '첫 갱신이 한도 1건을 사용');
+  const r = await a.post(RUBY_SENTENCE);
+  assert.equal(r.status, 200); assert.equal(r.body.cached, true); assert.ok(!hasOwn(r.body.result, 'ruby'), '옛 결과 그대로');
+  assert.equal(a.anthropic.calls.length, 1);
+  assert.ok(!hasOwn(cachedResult(a.db, RUBY_SENTENCE), 'ruby'), '캐시도 그대로');
+});
+
+test('옛 형식 캐시 + 한자 없는 문장 → 재호출 없음(옛 결과 그대로)', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  seedOld(a.db, 'ねこがすき');
+  const r = await a.post('ねこがすき');
+  assert.equal(r.status, 200); assert.equal(r.body.cached, true); assert.ok(!hasOwn(r.body.result, 'ruby'));
+  assert.equal(a.anthropic.calls.length, 0); assert.equal(a.db.usage.length, 0);
+  assert.ok(!hasOwn(cachedResult(a.db, 'ねこがすき'), 'ruby'), '갱신하지 않음');
+});
+
+test('옛 형식 재호출이 실패하면(API 오류·JSON 깨짐·형식 오류·거절·ruby 키 없음) 옛 결과를 그대로 반환하고 캐시는 바뀌지 않으며 재시도하지 않는다', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  const failures = {
+    api: () => { throw new Error('down'); },
+    json: () => '깨진 응답',
+    shape: () => JSON.stringify({ ok: true, translation: '', grammar: [], ruby: RUBY_GOOD }),
+    reject: () => JSON.stringify({ ok: false, reason: '문장이 아닙니다.' }),
+    nokey: () => JSON.stringify(GOOD),   // ruby 키가 없는 응답은 정상으로 취급하지 않는다
+  };
+  for (const [name, handler] of Object.entries(failures)) {
+    seedOld(a.db, RUBY_SENTENCE);
+    a.anthropic.handler = handler;
+    const before = a.anthropic.calls.length;
+    const r = await a.post(RUBY_SENTENCE);
+    assert.equal(r.status, 200, name); assert.equal(r.body.cached, true, name);
+    assert.equal(r.body.result.translation, '옛 번역', name); assert.ok(!hasOwn(r.body.result, 'ruby'), name);
+    assert.equal(a.anthropic.calls.length - before, 1, name + ': 재시도 없음');
+    assert.deepEqual(cachedResult(a.db, RUBY_SENTENCE), OLD_RESULT, name + ': 캐시 그대로');
+  }
+});
+
+test('옛 형식 재호출에서 ruby 가 있지만 검증에 실패하면 null 로 갱신(재시도 없음) — 이후에는 다시 부르지 않는다', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  seedOld(a.db, RUBY_SENTENCE);
+  a.anthropic.handler = () => withRubyAi([{ text: '틀림' }]);
+  const r = await a.post(RUBY_SENTENCE);
+  assert.equal(r.body.result.ruby, null); assert.equal(a.anthropic.calls.length, 1);
+  assert.equal(cachedResult(a.db, RUBY_SENTENCE).ruby, null);
+  await a.post(RUBY_SENTENCE, 2);
+  assert.equal(a.anthropic.calls.length, 1);
+});
+
+test('ruby 가 null 이거나 빈 배열인 캐시는 옛 형식이 아니므로 재호출하지 않는다', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  seedOld(a.db, RUBY_SENTENCE, { ruby: null });
+  seedOld(a.db, '飲む', { ruby: [] });   // 한자가 있는데 빈 배열이어도 "한자 없음"으로 단정하지 않고 null 처럼 읽힌다
+  const r1 = await a.post(RUBY_SENTENCE); const r2 = await a.post('飲む');
+  assert.equal(r1.body.cached, true); assert.equal(r1.body.result.ruby, null);
+  assert.equal(r2.body.cached, true); assert.equal(r2.body.result.ruby, null, '한자 문장의 [] 는 문장과 맞지 않아 null 로 읽음');
+  seedOld(a.db, 'ねこ', { ruby: [] });
+  assert.deepEqual((await a.post('ねこ')).body.result.ruby, []);
+  assert.equal(a.anthropic.calls.length, 0);
+});
+
+test('저장 목록: 옛 형식 저장 항목은 새 결과(ruby 키 있음)로 갱신되고, 새 형식 항목은 갱신되지 않으며, 나머지 열은 그대로', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  const put = (sentence, result) => { const t0 = ++a.db.clock; a.db.saved.set('1:' + J.hashSentence(sentence), { id: a.db.nextId++, user_id: 1, sentence_hash: J.hashSentence(sentence), sentence, result, created_at: t0, last_used_at: t0 }); };
+  put(RUBY_SENTENCE, OLD_RESULT);                                                         // 옛 형식 저장 + 옛 형식 캐시 → 갱신 호출로 새 결과
+  put('犬が好き', { ...OLD_RESULT, ruby: null });                                         // 새 형식(ruby null) 저장 + 새 캐시
+  seedOld(a.db, RUBY_SENTENCE);
+  a.db.cache.set(J.hashSentence('犬が好き'), { sentence: '犬が好き', result: { translation: '새 번역', grammar: GOOD.grammar, ruby: [{ text: '犬', reading: 'いぬ' }, { text: 'が好き' }] }, model: 'x' });
+  const createdBefore = savedOf(a.db, 1).map(r => r.created_at);
+  a.anthropic.handler = () => withRubyAi(RUBY_GOOD);
+  await a.post(RUBY_SENTENCE);
+  const old = savedOf(a.db, 1).find(r => r.sentence === RUBY_SENTENCE);
+  assert.deepEqual(old.result.ruby, RUBY_GOOD, '옛 형식 항목 갱신');
+  assert.equal(old.result.translation, GOOD.translation);
+  await a.post('犬が好き');
+  const kept = savedOf(a.db, 1).find(r => r.sentence === '犬が好き');
+  assert.equal(kept.result.translation, '옛 번역', '새 형식 항목은 결과를 바꾸지 않는다(JG-6 동작 유지)');
+  assert.equal(kept.result.ruby, null);
+  assert.deepEqual(savedOf(a.db, 1).map(r => r.created_at).sort(), createdBefore.sort(), 'created_at 불변');
+  assert.equal(savedOf(a.db, 1).length, 2, '새 행을 만들지 않음');
+});
+
+test('저장 목록: 옛 형식 항목이 있는 사용자가 이미 새 형식이 된 캐시로 같은 문장을 다시 쓰면 그 항목이 새 결과로 갱신된다. 재호출이 실패하면 옛 항목은 그대로', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  const sentence = RUBY_SENTENCE, h = J.hashSentence(sentence);
+  const t0 = ++a.db.clock;
+  a.db.saved.set('2:' + h, { id: a.db.nextId++, user_id: 2, sentence_hash: h, sentence, result: OLD_RESULT, created_at: t0, last_used_at: t0 });
+  seedOld(a.db, sentence);
+  a.anthropic.handler = () => { throw new Error('down'); };
+  await a.post(sentence, 2);
+  assert.ok(!hasOwn(savedOf(a.db, 2)[0].result, 'ruby'), '재호출 실패 → 옛 항목 그대로');
+  a.db.cache.set(h, { sentence, result: { ...GOOD, ruby: RUBY_GOOD, translation: GOOD.translation, grammar: GOOD.grammar }, model: 'x' });   // 다른 사용자가 이미 갱신한 새 캐시
+  const calls = a.anthropic.calls.length;
+  await a.post(sentence, 2);
+  assert.deepEqual(savedOf(a.db, 2)[0].result.ruby, RUBY_GOOD, '캐시 적중으로도 옛 항목이 새 결과로 갱신');
+  assert.equal(a.anthropic.calls.length, calls);
+});
+
+test('저장 목록 열람은 AI 를 호출하지 않는다 — 옛 형식 항목도 그대로(ruby 키 없이) 돌려준다', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  const h = J.hashSentence(RUBY_SENTENCE), t0 = ++a.db.clock;
+  a.db.saved.set('1:' + h, { id: a.db.nextId++, user_id: 1, sentence_hash: h, sentence: RUBY_SENTENCE, result: OLD_RESULT, created_at: t0, last_used_at: t0 });
+  const r = await a.t.call('GET', '/api/jgrammar/saved', undefined, { user: 1 });
+  assert.equal(r.status, 200); assert.ok(!hasOwn(r.body.items[0].result, 'ruby'));
+  assert.equal(a.anthropic.calls.length, 0); assert.equal(a.db.usage.length, 0);
+  assert.ok(!hasOwn(savedOf(a.db, 1)[0].result, 'ruby'), '열람만으로 갱신되지 않음');
+});
+
+test('권한 없음은 기존 순서대로 403 — 옛 형식 캐시가 있어도 AI·캐시·저장 쿼리가 모두 일어나지 않는다', async t => {
+  const a = await setup();
+  t.after(() => a.t.close());
+  seedOld(a.db, RUBY_SENTENCE);
+  assert.equal((await a.post(RUBY_SENTENCE, 3)).status, 403);
+  assert.equal((await a.post(RUBY_SENTENCE, null)).status, 401);
+  assert.equal(a.anthropic.calls.length, 0);
+  assert.deepEqual(a.db.queries.filter(q => /jgrammar_cache|jgrammar_saved|api_usage/.test(q)), []);
+});
+
+test('저장 SQL: 저장 항목 결과는 "옛 형식이고 새 결과에 ruby 키가 있을 때만" 바뀌도록 조건이 걸려 있다', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'lib', 'jgrammar.js'), 'utf8');
+  assert.match(src, /result = CASE WHEN NOT \(jgrammar_saved\.result \? 'ruby'\) AND \(EXCLUDED\.result \? 'ruby'\) THEN EXCLUDED\.result ELSE jgrammar_saved\.result END/);
+  assert.match(src, /UPDATE jgrammar_cache SET result = \$2, model = \$3 WHERE sentence_hash = \$1/);
 });
