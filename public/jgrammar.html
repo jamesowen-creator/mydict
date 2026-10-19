@@ -65,6 +65,8 @@
 </div>
 
 <main class="content">
+  <p class="msg" id="denied" hidden>사용 권한이 없습니다. 관리자에게 문의해 주세요.</p>
+  <div id="main" hidden>
   <p class="lead">일본어 문장을 입력하면 그 문장을 이해하는 데 필요한 문법을 골라 설명해 드립니다.</p>
   <textarea id="sentence" aria-label="일본어 문장" maxlength="200" lang="ja" placeholder="例: 私は毎日学校に行きます。" autocomplete="off"></textarea>
   <div class="input-foot">
@@ -73,6 +75,7 @@
   </div>
   <p class="msg" id="msg" role="status" aria-live="polite"></p>
   <section id="result" hidden></section>
+  </div>
 </main>
 
 <script>
@@ -85,6 +88,19 @@
   function token() { try { return localStorage.getItem('mydict_token'); } catch (e) { return null; } }
   function setMsg(text, isError) { msg.textContent = text || ''; msg.className = 'msg' + (isError ? ' error' : ''); }
   function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+
+  // 작업JG-2: /api/me 에서 perm_jgrammar 가 true 이거나 관리자일 때만 입력창을 보여 준다(fail-closed). 서버도 같은 기준으로 다시 검사한다.
+  async function checkAccess() {
+    var t = token(), ok = false;
+    if (t) {
+      try {
+        var r = await fetch('/api/me', { headers: { Authorization: 'Bearer ' + t } });
+        if (r.ok) { var me = await r.json(); ok = me.perm_jgrammar === true || me.role === 'admin'; }
+      } catch (e) { ok = false; }
+    }
+    $(ok ? 'main' : 'denied').hidden = false;
+  }
+  checkAccess();
 
   input.addEventListener('input', function () { count.textContent = Array.from(input.value).length + ' / ' + MAX; });
 

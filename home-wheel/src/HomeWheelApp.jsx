@@ -117,8 +117,8 @@ export default function HomeWheelApp() {
         // env(safe-area-inset-bottom)와 비교해 더 큰 쪽을 여백으로 사용.
         style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
       >
-        {/* 작업JG-1: 일본어 문법 해설 임시 진입점. 휠 항목이 아니라 휠 아래 텍스트 링크라 휠의 항목 수·순서·위치는 그대로다(휠 재배치는 별도 작업). */}
-        {!pendingApproval && (
+        {/* 작업JG-1: 일본어 문법 해설 임시 진입점. 휠 항목이 아니라 휠 아래 텍스트 링크라(작업JG-2: perm_jgrammar 가 true 인 계정과 관리자에게만 보임) 휠의 항목 수·순서·위치는 그대로다(휠 재배치는 별도 작업). */}
+        {!pendingApproval && user && (user.perm_jgrammar === true || user.role === 'admin') && (
           <a href="/jgrammar.html" className="text-xs font-bold underline" style={{ color: 'rgba(30,41,59,.6)' }}>
             일본어 문법 (임시)
           </a>

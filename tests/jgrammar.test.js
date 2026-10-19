@@ -5,6 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 delete process.env.JGRAMMAR_DAILY_CAP;
+process.env.ADMIN_EMAILS = 'u5@example.com';   // 작업JG-2: 이메일로 관리자가 되는 계정(테스트 토큰의 이메일은 u<id>@example.com)
 const { startApp, createAnthropicMock } = require('./helpers/app');
 const J = require('../lib/jgrammar');   // 순수 함수만 쓴다(모듈 로드 시 실제 DB 연결은 만들어지지 않음)
 
@@ -17,12 +18,20 @@ const GOOD = {
   ],
 };
 
-function createJgDb({ blocked = [], failCacheRead = false } = {}) {
-  const db = { cache: new Map(), usage: [], blocked: new Set(blocked), queries: [] };
+// users: 기본으로 1·2번은 권한 있음, 3번은 권한 없음(false), 4번은 DB 관리자(권한 열 false), 9번은 권한 있지만 차단. 그 밖의 id 는 행 없음
+function createJgDb({ blocked = [], failCacheRead = false, failUsers = false } = {}) {
+  const db = { cache: new Map(), usage: [], queries: [], failUsers,
+    users: new Map([[1, { role: 'user', is_blocked: false, perm_jgrammar: true }], [2, { role: 'user', is_blocked: false, perm_jgrammar: true }],
+      [3, { role: 'user', is_blocked: false, perm_jgrammar: false }], [4, { role: 'admin', is_blocked: false, perm_jgrammar: false }],
+      [9, { role: 'user', is_blocked: true, perm_jgrammar: true }]]) };
+  for (const id of blocked) db.users.set(id, { role: 'user', is_blocked: true, perm_jgrammar: true });
   db.pool = {
     query: async (sql, params = []) => {
       db.queries.push(sql.replace(/\s+/g, ' ').trim());
-      if (/FROM users/.test(sql)) return { rows: [{ is_blocked: db.blocked.has(params[0]) }] };
+      if (/FROM users/.test(sql)) {
+        if (db.failUsers) throw new Error('users down');
+        return db.users.has(params[0]) ? { rows: [db.users.get(params[0])] } : { rows: [] };
+      }
       if (/FROM jgrammar_cache/.test(sql)) {
         if (failCacheRead) throw new Error('cache read down');
         return db.cache.has(params[0]) ? { rows: [{ result: db.cache.get(params[0]).result }] } : { rows: [] };
@@ -107,8 +116,8 @@ test('JSON 파싱: 코드 블록은 벗기고, 깨진 JSON·객체가 아닌 값
 });
 
 // ───── 라우트: 인증·권한·입력 ─────
-test('로그인 없으면 401, 차단된 계정은 403, 일반 계정은 통과', async t => {
-  const { post, anthropic, t: app } = await setup({ blocked: [9] });
+test('로그인 없으면 401, 차단된 계정은 403, 권한 있는 계정은 통과', async t => {
+  const { post, anthropic, t: app } = await setup();
   t.after(() => app.close());
   assert.equal((await post('猫が好き', null)).status, 401);
   assert.equal((await post('猫が好き', 9)).status, 403);
@@ -246,4 +255,74 @@ test('하루 한도: AI 호출 건수만 세어 한도에 닿으면 429, 캐시 
   assert.equal(anthropic.calls.length, 2);
   assert.equal((await post('猫が好き')).body.cached, true, '저장된 문장은 한도 뒤에도 열림');
   assert.equal((await post('猫が好き', 2)).status, 200, '다른 사용자는 자기 한도');
+});
+
+// ───── 작업JG-2: 사용자별 권한(perm_jgrammar) ─────
+test('권한 없음(false)·사용자 행 없음은 403 이고, 캐시 조회·AI 호출·한도 계산·사용량 기록이 모두 일어나지 않는다', async t => {
+  const { post, anthropic, db, t: app } = await setup();
+  t.after(() => app.close());
+  db.cache.set(J.hashSentence('猫が好き'), { sentence: '猫が好き', result: { translation: '고양이를 좋아한다', grammar: GOOD.grammar }, model: 'x' });   // 저장본이 있어도 열리지 않아야 한다
+  for (const user of [3, 77]) {
+    const r = await post('猫が好き', user);
+    assert.equal(r.status, 403, 'user ' + user);
+    assert.equal(r.body.ok, false);
+  }
+  assert.equal(anthropic.calls.length, 0);
+  assert.equal(db.usage.length, 0);
+  assert.deepEqual(db.queries.filter(q => /jgrammar_cache|api_usage/.test(q)), [], '캐시·사용량 테이블을 건드리지 않음');
+  assert.equal((await post('猫が好き', 1)).body.cached, true, '권한이 있으면 같은 저장본이 열림');
+});
+
+test('권한 조회 중 오류가 나면 차단(fail-closed) — 캐시·AI 도 일어나지 않는다', async t => {
+  const { post, anthropic, db, t: app } = await setup({ failUsers: true });
+  t.after(() => app.close());
+  const r = await post('猫が好き', 1);
+  assert.equal(r.status, 403);
+  assert.equal(anthropic.calls.length, 0);
+  assert.deepEqual(db.queries.filter(q => /jgrammar_cache|api_usage/.test(q)), []);
+});
+
+test('DATABASE_URL 이 없으면 차단(fail-closed), 단 ADMIN_EMAILS 관리자는 허용', async t => {
+  const saved = process.env.DATABASE_URL;
+  const { post, anthropic, t: app } = await setup();
+  t.after(() => { process.env.DATABASE_URL = saved; return app.close(); });
+  delete process.env.DATABASE_URL;
+  assert.equal((await post('猫が好き', 1)).status, 403);
+  assert.equal(anthropic.calls.length, 0);
+});
+
+test('관리자는 항상 허용: DB 의 role=admin 은 권한 열이 false 여도, ADMIN_EMAILS 이메일은 사용자 행이 없어도 통과', async t => {
+  const { post, anthropic, t: app } = await setup();
+  t.after(() => app.close());
+  assert.equal((await post('猫が好き', 4)).status, 200, 'DB 관리자(perm false)');
+  assert.equal((await post('犬が好き', 5)).status, 200, '이메일 관리자(행 없음)');
+  assert.equal(anthropic.calls.length, 2);
+});
+
+test('차단된 계정은 권한 열이 true 여도 403 (관리자가 아닌 경우)', async t => {
+  const { post, t: app } = await setup();
+  t.after(() => app.close());
+  assert.equal((await post('猫が好き', 9)).status, 403);
+});
+
+test('입력 오류 응답보다 권한 검사가 먼저다: 권한 없는 계정은 빈 입력에도 400 이 아니라 403', async t => {
+  const { post, t: app } = await setup();
+  t.after(() => app.close());
+  assert.equal((await post('', 3)).status, 403);
+});
+
+test('컬럼 기본값은 차단: users.perm_jgrammar 는 BOOLEAN NOT NULL DEFAULT false 이고 여러 번 실행해도 안전한 IF NOT EXISTS 문장이다', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'lib', 'db.js'), 'utf8');
+  assert.ok(src.includes('ALTER TABLE users ADD COLUMN IF NOT EXISTS perm_jgrammar BOOLEAN NOT NULL DEFAULT false'));
+});
+
+test('관리자 API·/api/me 가 perm_jgrammar 를 다룬다(목록·저장 허용 목록·내 정보 조회)', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const admin = fs.readFileSync(path.join(__dirname, '..', 'routes', 'admin.js'), 'utf8');
+  const auth = fs.readFileSync(path.join(__dirname, '..', 'routes', 'auth.js'), 'utf8');
+  assert.match(admin, /u\.perm_jgrammar/);
+  assert.match(admin, /allowed = \[[^\]]*'perm_jgrammar'/);
+  assert.match(admin, /RETURNING[^`]*perm_jgrammar/);
+  assert.match(auth, /perm_concept_map, perm_jgrammar\s/);
+  assert.match(auth, /perm_jgrammar: false/);
 });
