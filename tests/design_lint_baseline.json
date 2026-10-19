@@ -3,11 +3,11 @@
  "total": {
   "hex_direct": 97,
   "hex_direct_nonprinciple": 52,
-  "hex_fallback_nonprinciple": 15,
+  "hex_fallback_nonprinciple": 13,
   "var_def_nonprinciple": 3,
-  "font_size_out": 12,
-  "radius_out": 50,
-  "emoji": 103
+  "font_size_out": 7,
+  "radius_out": 47,
+  "emoji": 99
  },
  "files": {
   "admin.html": {
@@ -19,14 +19,23 @@
    "radius_out": 0,
    "emoji": 0
   },
-  "concept_study.html": {
+  "artist_notes.html": {
    "hex_direct": 0,
    "hex_direct_nonprinciple": 0,
-   "hex_fallback_nonprinciple": 2,
+   "hex_fallback_nonprinciple": 0,
    "var_def_nonprinciple": 0,
-   "font_size_out": 5,
-   "radius_out": 3,
-   "emoji": 4
+   "font_size_out": 0,
+   "radius_out": 0,
+   "emoji": 0
+  },
+  "concept_map.html": {
+   "hex_direct": 0,
+   "hex_direct_nonprinciple": 0,
+   "hex_fallback_nonprinciple": 0,
+   "var_def_nonprinciple": 0,
+   "font_size_out": 0,
+   "radius_out": 0,
+   "emoji": 0
   },
   "css/common/appHeader.css": {
    "hex_direct": 13,
@@ -72,6 +81,15 @@
    "font_size_out": 3,
    "radius_out": 18,
    "emoji": 70
+  },
+  "jgrammar.html": {
+   "hex_direct": 0,
+   "hex_direct_nonprinciple": 0,
+   "hex_fallback_nonprinciple": 0,
+   "var_def_nonprinciple": 0,
+   "font_size_out": 0,
+   "radius_out": 0,
+   "emoji": 0
   },
   "literature_compass.html": {
    "hex_direct": 11,

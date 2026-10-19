@@ -26,7 +26,6 @@ const SCREENS = [
   { name: 'science_reading', sel: ['.quiz-next-btn', '.result-btn-primary'] },
   { name: 'artist_notes', sel: ['.quiz-next-btn', '.result-btn-primary'] },   // 작업 AN-2
   { name: 'voice_study', sel: ['#new-rec-btn'] },
-  { name: 'concept_study', sel: ['#start-open'] },
 ];
 
 for (const sc of SCREENS) {
@@ -34,11 +33,9 @@ for (const sc of SCREENS) {
     srv.reset();
     srv.state.me = { id: 7, email: 'u@example.com', name: '테스터', role: 'user', perm_voice_study: true, perm_concept_study: true, perm_literature_compass: true, perm_digest_reading: true, perm_science_reading: true };
     srv.state.voiceNotes = [];
-    if (sc.name === 'concept_study') srv.seed({ topic: 'x', items: [{ term: '가' }] });
     const page = await browser.newPage({ width: 390, height: 844, token: sc.name === 'english_dictionary' ? jwt() : 'test-token' });
     await page.goto(srv.url + '/' + sc.name + '.html');
     await new Promise(r => setTimeout(r, 1200));
-    if (sc.name === 'concept_study') await page.waitFor("!document.getElementById('study-rows').hidden", 8000);
     const vars = await page.eval("(() => { const c = getComputedStyle(document.documentElement); return ['--btn-primary-bg', '--btn-primary-bg-hover', '--btn-primary-bg-active'].map(k => c.getPropertyValue(k).trim()); })()");
     const [base, hov, act] = vars.map(hexRgb);
     const white = [255, 255, 255];

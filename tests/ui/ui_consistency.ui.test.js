@@ -1,5 +1,5 @@
 // 작업220~222: 화면 사이 UI 통일감(주 버튼·텍스트 버튼·섹션 제목·중립 글자색·퀴즈 틀·결과·하단 탭·사전 5탭·대비·글자 시작 x).
-// 6개 화면(음성 학습, 개념 학습, 문학 나침반, 과학 읽기, 한입 독서, 언어 사전)을 헤드리스 Chrome(390px, 모의 서버)에서 실제로 그려 계산된 스타일로 확인한다.
+// 5개 화면(음성 학습, 문학 나침반, 과학 읽기, 한입 독서, 언어 사전. 작업CL-1: 개념학습 화면은 삭제됨)을 헤드리스 Chrome(390px, 모의 서버)에서 실제로 그려 계산된 스타일로 확인한다.
 // 이 파일의 원칙(작업216-3의 교훈): 테스트 쪽에서 transition·animation을 끄고(NO_MOTION) 레이아웃이 안정된 뒤(settle) 잰다.
 // 실행: node --test "tests/ui/*.test.js"   (Chrome이 없으면 건너뜀)
 const test = require('node:test');
@@ -25,15 +25,6 @@ async function openVoice(width = 390) {
   const page = await browser.newPage({ width, height: 844 });
   await page.goto(srv.url + '/voice_study.html');
   await page.waitFor("document.getElementById('list-count').textContent === '4건'", 8000);
-  await page.eval(NO_MOTION); await settle(page);
-  return page;
-}
-async function openConcept(width = 390) {
-  srv.reset(); srv.state.me = me();
-  srv.seed({ topic: '통일감', items: [{ term: '가', set: { review_state: 'new' } }, { term: '나', set: { review_state: 'confused' } }, { term: '다', set: { review_state: 'new' } }, { term: '라', set: { review_state: 'understood' } }, { term: '마', set: { review_state: 'new' } }] });
-  const page = await browser.newPage({ width, height: 844 });
-  await page.goto(srv.url + '/concept_study.html');
-  await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('study-rows').hidden", 8000);
   await page.eval(NO_MOTION); await settle(page);
   return page;
 }
@@ -87,20 +78,13 @@ function assertPrimary(b, label) {
   assert.equal(b.padL, 20, label + ': 왼쪽 padding 20px'); assert.equal(b.padR, 20, label + ': 오른쪽 padding 20px');
   assert.equal(b.radius, '10px', label + ': radius var(--btn-radius) 10px');
 }
-test('220 (a) 주 버튼: 음성·개념·문학·과학·한입의 코랄 채움 버튼은 높이 ≥44, 15px/600, 좌우 padding 20px', { skip: SKIP }, async () => {
+test('220 (a) 주 버튼: 음성·문학·과학·한입의 코랄 채움 버튼은 높이 ≥44, 15px/600, 좌우 padding 20px', { skip: SKIP }, async () => {
   let page = await openVoice();
   assertPrimary(await m(page, '#new-rec-btn'), '음성 #new-rec-btn');
   await step(page, 'openDetail(2)'); await page.waitFor("currentView === 'edit'"); await settle(page);
   assertPrimary(await m(page, '#sum-make'), '음성 #sum-make(.btn.small)');
   await step(page, VOICE_QUIZ); await page.click('.mcq-option', { index: 0 }); await page.waitFor("!!document.querySelector('.mcq-option.wrong, .mcq-option.correct')");
   assertPrimary(await m(page, '#quiz-next'), '음성 #quiz-next');
-  await done(page);
-  page = await openConcept();
-  assertPrimary(await m(page, '#start-open'), '개념 #start-open');
-  await page.click('[data-t="open-study"]'); await page.waitFor("!!document.querySelector('[data-t=term]')"); await settle(page);
-  await page.click('#quiz-open'); await page.waitFor("!!document.querySelector('[data-t=quiz-question]')"); await settle(page);
-  await page.click('[data-t="quiz-opt"][data-i="0"]'); await page.waitFor("!!document.querySelector('[data-t=quiz-next]')");
-  assertPrimary(await m(page, '[data-t=quiz-next]'), '개념 퀴즈 다음');
   await done(page);
   page = await openReading('literature_compass');
   const id = await page.eval("(() => { const ms = DB.eras.flatMap(e => e.movements); return (ms.find(x => x.works && x.works.length >= 2) || ms[0]).id; })()");
@@ -132,19 +116,11 @@ function assertTextBtn(b, label, color) {
   assert.equal(b.underline, true, label + ': 밑줄'); assert.ok(b.ratio >= 4.5, `${label}: 대비 ${b.ratio.toFixed(2)}`);
   assert.equal(b.bg, 'rgba(0, 0, 0, 0)', label + ': 배경 투명'); assert.deepEqual(b.bw, ['0px', '0px', '0px', '0px'], label + ': 테두리 없음');
 }
-test('220 (b) 텍스트 버튼: 15px/600, 보조색, padding 0 8px, 최소 44×44px, 밑줄, 대비 4.5:1 (음성·개념·문학·과학·한입)', { skip: SKIP }, async () => {
+test('220 (b) 텍스트 버튼: 15px/600, 보조색, padding 0 8px, 최소 44×44px, 밑줄, 대비 4.5:1 (음성·문학·과학·한입)', { skip: SKIP }, async () => {
   let page = await openVoice();
   assertTextBtn(await m(page, '#wrong-btn'), '음성 #wrong-btn', BLUE.sub);
   await step(page, 'openDetail(2)'); await page.waitFor("currentView === 'edit'"); await settle(page);
   assertTextBtn(await m(page, '#edit-cancel'), '음성 #edit-cancel', BLUE.sub);
-  await done(page);
-  page = await openConcept();
-  await page.click('#start-open'); await settle(page);
-  assertTextBtn(await m(page, '#start-cancel'), '개념 #start-cancel', BLUE.sub);
-  await page.click('#start-cancel'); await page.waitFor("!!document.querySelector('[data-t=open-study]')"); await settle(page);
-  await page.click('[data-t="open-study"]'); await page.waitFor("!!document.querySelector('[data-t=term]')"); await settle(page);
-  await page.click('#quiz-open'); await page.waitFor("!!document.querySelector('[data-t=quiz-question]')"); await settle(page);
-  assertTextBtn(await m(page, '[data-t=quiz-exit]'), '개념 [그만하기]', BLUE.sub);
   await done(page);
   page = await openReading('literature_compass');
   await step(page, LIT_RESULT);
@@ -164,15 +140,11 @@ function assertSection(s, label, { line = true } = {}) {
   assert.ok(s.ratio >= 4.5, `${label}: 대비 ${s.ratio.toFixed(2)}`);
   if (line) assert.equal(s.bw[2], '2px', label + ': 아래 2px 선');
 }
-test('220 (c) 섹션 제목: 12px/700/#b8442e + 아래 2px 코랄 선 (음성·개념·문학·과학·한입), 사전은 글자색만', { skip: SKIP }, async () => {
+test('220 (c) 섹션 제목: 12px/700/#b8442e + 아래 2px 코랄 선 (음성·문학·과학·한입), 사전은 글자색만', { skip: SKIP }, async () => {
   let page = await openVoice();
   assertSection(await m(page, '.list-head h2'), '음성 .list-head h2');
   await step(page, 'openDetail(2)'); await page.waitFor("currentView === 'edit'"); await settle(page);
   assertSection(await m(page, '.field-label'), '음성 .field-label');
-  await done(page);
-  page = await openConcept();
-  await page.click('[data-t="open-study"]'); await page.waitFor("!!document.querySelector('[data-t=term]')"); await settle(page);
-  assertSection(await m(page, '.sec > .label'), '개념 .sec > .label');
   await done(page);
   page = await openReading('literature_compass');
   const id = await page.eval("(() => { const ms = DB.eras.flatMap(e => e.movements); return (ms.find(x => x.works && x.works.length >= 2) || ms[0]).id; })()");
@@ -212,11 +184,6 @@ test('220 (d) 한 화면 안의 중립 글자색(채도 낮은 색, 흰색·공�
   await page.click('.mcq-option', { index: 0 }); await page.waitFor("!!document.querySelector('.mcq-option.wrong, .mcq-option.correct')"); await addTo(acc, page);
   await step(page, "chatMessages = [{ role: 'user', content: '질문' }, { role: 'bot', content: '답', grounded: false, quotes: ['근거'] }]; showView('chat'); renderChat();"); await addTo(acc, page);
   await done(page); check('음성', acc, ['#1a1f3c', '#4a5070']);
-  acc = new Set(); page = await openConcept(); await addTo(acc, page);
-  await page.click('[data-t="open-study"]'); await page.waitFor("!!document.querySelector('[data-t=term]')"); await settle(page); await addTo(acc, page);
-  await page.click('#quiz-open'); await page.waitFor("!!document.querySelector('[data-t=quiz-question]')"); await settle(page); await addTo(acc, page);
-  await page.click('[data-t="quiz-opt"][data-i="0"]'); await page.waitFor("!!document.querySelector('[data-t=quiz-feedback]')"); await addTo(acc, page);
-  await done(page); check('개념', acc, ['#1a1f3c', '#4a5070']);
   acc = new Set(); page = await openReading('literature_compass'); await addTo(acc, page);
   const id = await page.eval("(() => { const ms = DB.eras.flatMap(e => e.movements); return (ms.find(x => x.works && x.works.length >= 2) || ms[0]).id; })()");
   await step(page, `showBriefing(${JSON.stringify(id)})`); await addTo(acc, page);
@@ -244,22 +211,13 @@ function assertOption(o, num, label, main) {
 }
 function assertQuestion(q, label, main) { assert.ok(q, label + ': 요소 없음'); assert.equal(q.size, 18, label + ': 질문 18px'); assert.equal(q.weight, '700', label + ': 700'); assert.equal(q.color, main, label + ': 주 글자색'); }
 function assertFullWidth(b, label) { assert.ok(b.w >= b.parentInnerW - 1, `${label}: 다음 버튼 전체 폭 (${b.w} vs 부모 ${b.parentInnerW})`); }
-test('221 (e)(f)(g) 퀴즈 풀이: 보기 15px/400 + 번호(폭 20) + 구분선, 질문 18px/700, 다음 버튼 전체 폭 (음성·개념·문학·과학·한입·사전)', { skip: SKIP }, async () => {
+test('221 (e)(f)(g) 퀴즈 풀이: 보기 15px/400 + 번호(폭 20) + 구분선, 질문 18px/700, 다음 버튼 전체 폭 (음성·문학·과학·한입·사전)', { skip: SKIP }, async () => {
   let page = await openVoice(); await step(page, VOICE_QUIZ);
   assertOption(await m(page, '.mcq-text'), await m(page, '.mcq-num'), '음성 보기', BLUE.main); assert.equal((await m(page, '.mcq-option')).bw[2], '1px', '음성 보기 구분선');
   assertQuestion(await m(page, '.quiz-question'), '음성 질문', BLUE.main);
   await page.click('.mcq-option', { index: 0 }); await page.waitFor("!!document.querySelector('.mcq-option.wrong, .mcq-option.correct')");
   assertFullWidth(await m(page, '#quiz-next'), '음성');
   assert.ok((await m(page, '#quiz-progress-bar')) && (await m(page, '.quiz-progress-bar-wrap')), '음성 진행 막대');
-  await done(page);
-  page = await openConcept();
-  await page.click('[data-t="open-study"]'); await page.waitFor("!!document.querySelector('[data-t=term]')"); await settle(page);
-  await page.click('#quiz-open'); await page.waitFor("!!document.querySelector('[data-t=quiz-question]')"); await settle(page);
-  assertOption(await m(page, '.qz-opt > span:last-child'), await m(page, '.qz-num'), '개념 보기', BLUE.main); assert.equal((await m(page, '.qz-opt')).bw[2], '1px', '개념 보기 구분선');
-  assertQuestion(await m(page, '[data-t=quiz-prompt]'), '개념 질문', BLUE.main);
-  assert.ok(await m(page, '.quiz-progress-bar'), '개념 진행 막대'); assert.ok(await page.eval("/문제 1 \\/ /.test(document.querySelector('[data-t=quiz-progress]').textContent)"), '개념 "문제 n / N" 글자');
-  await page.click('[data-t="quiz-opt"][data-i="0"]'); await page.waitFor("!!document.querySelector('[data-t=quiz-next]')");
-  assertFullWidth(await m(page, '[data-t=quiz-next]'), '개념');
   await done(page);
   page = await openReading('literature_compass'); await step(page, LIT_MCQ);
   assertOption(await m(page, '.mcq-text'), await m(page, '.mcq-num'), '문학 보기', GRAY.main); assertQuestion(await m(page, '.mcq-question'), '문학 질문', GRAY.main);
@@ -285,7 +243,7 @@ test('221 (e)(f)(g) 퀴즈 풀이: 보기 15px/400 + 번호(폭 20) + 구분선,
   await done(page);
 });
 
-test('221 (d)(h) 해설 색: 정오 한 줄만 초록/빨강+기호, 해설·근거는 주 글자색 (음성·개념·OX)', { skip: SKIP }, async () => {
+test('221 (d)(h) 해설 색: 정오 한 줄만 초록/빨강+기호, 해설·근거는 주 글자색 (음성·OX)', { skip: SKIP }, async () => {
   let page = await openVoice(); await step(page, VOICE_QUIZ);
   await page.click('.mcq-option', { index: 0 }); await page.waitFor("!!document.querySelector('.mcq-option.wrong')");
   assert.equal((await m(page, '#quiz-feedback .fb-line')).color, 'rgb(220, 38, 38)', '음성 정오 줄 빨강'); assert.equal((await m(page, '#quiz-feedback .fb-sub')).color, BLUE.main, '음성 해설은 주 글자색');
@@ -296,21 +254,13 @@ test('221 (d)(h) 해설 색: 정오 한 줄만 초록/빨강+기호, 해설·근
   await done(page);
 });
 
-test('221 (h) 결과 화면: 큰 점수 48px/700/#b8442e(사전은 글꼴 유지), 점수 아래 간격 28px, 이모지 없음 (음성·개념·문학·과학·한입·사전)', { skip: SKIP }, async () => {
+test('221 (h) 결과 화면: 큰 점수 48px/700/#b8442e(사전은 글꼴 유지), 점수 아래 간격 28px, 이모지 없음 (음성·문학·과학·한입·사전)', { skip: SKIP }, async () => {
   const EMOJI = /\p{Extended_Pictographic}/u;
   const check = (s, label) => { assert.equal(s.size, 48, label + ': 점수 48px'); assert.equal(s.weight, '700', label + ': 700'); assert.equal(s.color, CORAL_DARK, label + ': --primary-dark'); };
   let page = await openVoice(); await step(page, VOICE_QUIZ);
   await step(page, "quizState.answers = [{ q: 0, chosen: 0 }]; $('quiz-run').style.display = 'none'; $('quiz-score-num').textContent = '1'; $('quiz-score-total').textContent = '2'; $('quiz-result').style.display = ''; renderQuizWrong();");
   check(await m(page, '#quiz-score-num'), '음성'); assert.equal(await page.count('#quiz-wrong .result-wrong-item'), 1, '음성 결과에 틀린 문항 목록'); assert.ok(!EMOJI.test(await page.text('#quiz-result')), '음성 이모지 없음');
   assert.equal((await page.eval("getComputedStyle(document.querySelector('.result-score-wrap')).marginBottom")), '28px', '음성 점수 아래 간격 28px');
-  await done(page);
-  page = await openConcept();
-  await page.click('[data-t="open-study"]'); await page.waitFor("!!document.querySelector('[data-t=term]')"); await settle(page);
-  await page.click('#quiz-open'); await page.waitFor("!!document.querySelector('[data-t=quiz-question]')"); await settle(page);
-  await step(page, 'S.quiz.i = S.quiz.questions.length; S.quiz.results = [{ item: S.items[0], correct: true }, { item: S.items[1], correct: false }]; renderQuiz();');
-  check(await m(page, '[data-t=quiz-score-big]'), '개념'); assert.equal(await page.text('[data-t=quiz-score]'), '5문제 중 1개 맞혔어요'); assert.ok(!EMOJI.test(await page.text('#quiz-box')), '개념 이모지 없음');
-  assert.equal((await page.eval("getComputedStyle(document.querySelector('.result-score-wrap')).marginBottom")), '28px', '개념 점수 아래 간격 28px');
-  assert.equal(await page.count('[data-t=quiz-wrong]'), 1, '개념 틀린 개념 목록(기존 정보 유지)');
   await done(page);
   page = await openReading('literature_compass'); await step(page, LIT_RESULT);
   check(await m(page, '.result-score'), '문학'); assert.ok(!EMOJI.test(await page.text('#view-result')), '문학 이모지 없음'); assert.equal(await page.count('.result-emoji'), 0);
@@ -386,7 +336,6 @@ test('220 (k) 글자 대비: 보조·약한 색 글자가 모두 4.5:1 이상(�
   page = await openReading('literature_compass');
   assert.deepEqual(await page.eval(SUB_CONTRAST([GRAY.sub])), [], '문학 홈의 보조색 글자'); await done(page);
   page = await openVoice(); assert.deepEqual(await page.eval(SUB_CONTRAST([BLUE.sub])), [], '음성 목록의 보조색 글자'); await done(page);
-  page = await openConcept(); assert.deepEqual(await page.eval(SUB_CONTRAST([BLUE.sub])), [], '개념 목록의 보조색 글자'); await done(page);
   page = await openDict();
   assert.deepEqual(await page.eval(SUB_CONTRAST([BLUE.sub])), [], '사전 홈의 보조·약한 색 글자');
   await step(page, DICT_QUIZ); assert.deepEqual(await page.eval(SUB_CONTRAST([BLUE.sub])), [], '사전 퀴즈의 보조·약한 색 글자');
@@ -395,17 +344,12 @@ test('220 (k) 글자 대비: 보조·약한 색 글자가 모두 4.5:1 이상(�
 });
 
 // ───────────────────────── (l) 본문 시작 x ─────────────────────────
-test('222 (l) 글자 시작 x: 카드 테두리가 없어진 뒤에도 본문이 제목과 같은 16px에서 시작(음성·개념·문학·과학·한입, 390px)', { skip: SKIP }, async () => {
+test('222 (l) 글자 시작 x: 카드 테두리가 없어진 뒤에도 본문이 제목과 같은 16px에서 시작(음성·문학·과학·한입, 390px)', { skip: SKIP }, async () => {
   const left = (page, sel) => page.eval(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); const r = e.getBoundingClientRect(); return Math.round((r.left + parseFloat(getComputedStyle(e).paddingLeft)) * 10) / 10; })()`);
   const at16 = async (page, sel, label) => assert.equal(await left(page, sel), 16, `${label}(${sel}) 글자 시작 x`);
   let page = await openVoice();
   await at16(page, '.note-title', '음성 목록 행');
   await step(page, VOICE_QUIZ); await at16(page, '.quiz-question', '음성 퀴즈 질문'); await at16(page, '.mcq-option', '음성 보기 행');
-  await done(page);
-  page = await openConcept();
-  await page.click('[data-t="open-study"]'); await page.waitFor("!!document.querySelector('[data-t=term]')"); await settle(page);
-  await page.click('#quiz-open'); await page.waitFor("!!document.querySelector('[data-t=quiz-question]')"); await settle(page);
-  await at16(page, '.qz-prompt', '개념 퀴즈 질문');
   await done(page);
   page = await openReading('literature_compass');
   await at16(page, '.era-name', '문학 시대 영역');

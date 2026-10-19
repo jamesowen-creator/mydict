@@ -34,7 +34,7 @@ test('/api/cmap/status: 권한 조회가 실패하면 닫힘(403, 500 아님)', 
   assert.equal((await t.call('GET', '/api/cmap/status', undefined, { user: 1 })).status, 403);
 });
 
-test('관리자: perm_concept_map 조회·변경, 옛 perm_concept_study 와 독립, 일반 사용자는 403', async ctx => {
+test('관리자: perm_concept_map 조회·변경(작업CL-1: 옛 perm_concept_study 열은 조회하지 않고 값도 바뀌지 않음), 일반 사용자는 403', async ctx => {
   const db = createMockDb();
   db.addUser(7); db.addUser(8, { perm_concept_map: false, perm_concept_study: true });
   const seen = [];
@@ -44,7 +44,7 @@ test('관리자: perm_concept_map 조회·변경, 옛 perm_concept_study 와 독
   ctx.after(() => t.close());   // 작업271-3: 단언이 실패해도 서버를 닫는다
   assert.equal((await t.call('GET', '/api/admin/users', undefined, { user: 7 })).status, 200);
   assert.match(seen[0], /u\.perm_concept_map/);
-  assert.match(seen[0], /u\.perm_concept_study/, '옛 열 조회는 그대로');
+  assert.doesNotMatch(seen[0], /perm_concept_study/, '작업CL-1: 개념학습 삭제로 옛 열은 조회하지 않음');
   let r = await t.call('PATCH', '/api/admin/users/8', { perm_concept_map: true }, { user: 7 });
   assert.equal(r.status, 200);
   assert.equal(r.body.perm_concept_map, true);
@@ -61,7 +61,8 @@ test('소스 확인: server.js 라우터 등록, /api/me 와 신규 가입 INSER
   const server = read('server.js');
   assert.equal(server.split("app.use(require('./routes/concept_map'));").length - 1, 1, '개념 지도 라우터 등록은 한 줄');
   const auth = read('routes/auth.js');
-  assert.match(auth, /perm_voice_study, perm_concept_study, perm_concept_map\s+FROM users WHERE id = \$1/, '/api/me SELECT 에 열 포함');
+  assert.match(auth, /perm_voice_study, perm_concept_map, perm_jgrammar\s+FROM users WHERE id = \$1/, '/api/me SELECT 에 열 포함(개념학습 열은 작업CL-1 에서 뺌)');
+  assert.doesNotMatch(auth, /perm_concept_study/, '/api/me 에 개념학습 권한 필드 없음');
   assert.match(auth, /perm_concept_map: false/, 'DB 없는 응답은 닫힘');
   const insert = auth.slice(auth.indexOf('INSERT INTO users'), auth.indexOf('RETURNING *'));
   assert.doesNotMatch(insert, /perm_/, '신규 가입 INSERT 는 권한 열을 쓰지 않으므로 DB 기본값(false)이 적용됨');

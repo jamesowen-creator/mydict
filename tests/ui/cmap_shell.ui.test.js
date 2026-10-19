@@ -89,7 +89,7 @@ test('홈 휠: 권한자(perm_concept_map=true)에게만 "개념 지도"가 개�
   await page.close();
 });
 
-test('관리자: "개념 지도" 열이 "개념학습" 다음에 있고, 값이 없으면 꺼짐(옛 열과 반대), 켜고 저장하면 perm_concept_map만 전송', { skip: SKIP }, async () => {
+test('관리자: "개념 지도" 열이 "음성 학습"(작업CL-1: 개념학습 삭제) 다음에 있고, 값이 없으면 꺼짐(옛 열과 반대), 켜고 저장하면 perm_concept_map만 전송', { skip: SKIP }, async () => {
   srv.reset();
   const row = (id, name, extra = {}) => ({ id, email: `u${id}@example.com`, name, role: 'user', is_blocked: false, is_approved: true, can_search: true, can_wordbook: true, can_quiz: true, can_tts: true, can_podcast: true,
     perm_literature_compass: true, perm_digest_reading: true, perm_science_reading: true, perm_voice_study: true, perm_concept_study: true, created_at: '2026-01-01', wordbook_count: 0, search_count: 0, tts_count: 0, ...extra });
@@ -99,7 +99,7 @@ test('관리자: "개념 지도" 열이 "개념학습" 다음에 있고, 값이 
   await page.goto(srv.url + '/admin');
   await page.waitFor("document.querySelectorAll('#user-tbody tr').length === 2", 8000);
   const heads = await page.eval("[...document.querySelectorAll('thead th')].map(t => t.innerText.trim())");
-  const i = heads.indexOf('개념학습');
+  const i = heads.indexOf('음성 학습');
   assert.equal(heads[i + 1], '개념 지도');
   assert.equal(await page.eval("document.querySelectorAll('thead th').length"), await page.eval("document.querySelectorAll('#row-8 > td').length"), '열 수가 머리글과 같음');
   const cell = id => `#row-${id} > td:nth-child(${i + 2}) input`;

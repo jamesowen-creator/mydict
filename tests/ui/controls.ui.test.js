@@ -26,8 +26,6 @@ const SCREENS = [
   { name: 'science_reading', ready: DB_READY, go: 'showScience(DB.concepts[0].id)', post: { buttons: [] } },   // 작업217-3: 정복 버튼은 박스 없는 글자 버튼이 되어 '주요 버튼(반경 10px·굵기 600)' 검사에서 뺌(높이 44px는 text_choices.ui가 확인)
   { name: 'voice_study', ready: "document.getElementById('list-count').textContent === '0건'", setup: s => { s.state.voiceNotes = []; },
     pre: { buttons: ['#new-rec-btn'] }, go: "openEditNew('연습 문장입니다.')", post: { buttons: ['#sum-make'], inputs: ['#edit-title', '#edit-text'] } },
-  { name: 'concept_study', ready: "!document.getElementById('app').hidden && !document.getElementById('study-rows').hidden", seed: true,
-    pre: { buttons: ['#start-open'] }, click: '#start-open', post: { inputs: ['#start-topic'] } },
 ];
 
 for (const sc of SCREENS) {

@@ -1,4 +1,4 @@
-// 작업237-2: 지도 순수 함수(배치·정렬·선 곡선)가 public/js/map/mapCore.js 한 곳에만 있고, 개념·음성 학습 화면이 그것을 불러 쓰는지 확인한다.
+// 작업237-2: 지도 순수 함수(배치·정렬·선 곡선)가 public/js/map/mapCore.js 한 곳에만 있고, 음성 학습 화면이 그것을 불러 쓰는지 확인한다. (작업CL-1: 개념학습 화면은 삭제됨 — mapCore.js 는 음성 학습·개념 지도가 계속 쓴다)
 // 브라우저 없이 파일 내용만 본다. 실행: node --test tests/map_core_shared.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -8,7 +8,7 @@ const path = require('node:path');
 const PUB = path.join(__dirname, '..', 'public');
 const read = f => fs.readFileSync(path.join(PUB, f), 'utf8').replace(/\r\n/g, '\n');
 const core = read('js/map/mapCore.js');
-const pages = { 'concept_study.html': read('concept_study.html'), 'voice_study.html': read('voice_study.html') };
+const pages = { 'voice_study.html': read('voice_study.html') };
 const SCRIPT_TAG = '<script src="/js/map/mapCore.js?v=1"></script>';
 
 test('mapCore.js: 순수 함수와 상수를 전역 클래식 스크립트로 정의(import/export 없음)', () => {
@@ -29,7 +29,7 @@ for (const [name, html] of Object.entries(pages)) {
   });
 }
 
-test('두 화면 안에는 배치·정렬·선 곡선 함수 본문이 다시 정의되어 있지 않다', () => {
+test('음성 학습 화면 안에는 배치·정렬·선 곡선 함수 본문이 다시 정의되어 있지 않다', () => {
   for (const [name, html] of Object.entries(pages)) {
     for (const re of [/^function sortLevels\(/m, /^function layoutMap\(/m, /^function edgeGeom\(/m, /^const MAPD = \{/m, /^let MAP_LAYOUT_SWEEPS\b/m, /^function sv\(/m, /^function clipText\(/m]) {
       assert.doesNotMatch(html, re, `${name} 에 ${re} 가 있음`);

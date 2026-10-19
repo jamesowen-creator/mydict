@@ -62,7 +62,6 @@ app.use(require('./routes/wordbook'));
 app.use(require('./routes/tts'));
 app.use(require('./routes/admin'));
 app.use(require('./routes/voice_study'));
-app.use(require('./routes/concept_study'));
 app.use(require('./routes/concept_map'));   // 작업270-1: 새 메뉴 개념 지도
 app.use(require('./routes/jgrammar'));      // 작업JG-1: 일본어 문법 해설
 

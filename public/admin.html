@@ -238,7 +238,6 @@
               <th>한입 독서</th>
               <th>과학</th>
               <th>음성 학습</th>
-              <th>개념학습</th>
               <th>개념 지도</th>
               <th>일본어 문법</th>
               <th style="text-align:right">검색 횟수</th>
@@ -374,7 +373,6 @@ function renderUserRow(u) {
     ${permToggle(u, 'perm_digest_reading', '한입 독서')}
     ${permToggle(u, 'perm_science_reading', '과학')}
     ${permToggle(u, 'perm_voice_study', '음성 학습')}
-    ${permToggle(u, 'perm_concept_study', '개념학습')}
     ${permToggleStrict(u, 'perm_concept_map', '개념 지도')}
     ${permToggleStrict(u, 'perm_jgrammar', '일본어 문법')}
     <td style="text-align:right;font-weight:600">${fmt(u.search_count)}</td>

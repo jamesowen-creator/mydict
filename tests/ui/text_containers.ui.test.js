@@ -83,7 +83,7 @@ test('217-4 voice 연상 그림 카드(.img-card)·합본 행(.merge-row, .merge
   await done(page);
 });
 
-test('217-4 voice·concept 메시지(.msg, .notice): 색 바탕·테두리·둥근 모서리 없이 앞의 기호(✕ ! i)+글자색, 대비 4.5:1', { skip: SKIP }, async () => {
+test('217-4 voice 메시지(.msg, .notice): 색 바탕·테두리·둥근 모서리 없이 앞의 기호(✕ ! i)+글자색, 대비 4.5:1', { skip: SKIP }, async () => {
   let page = await openVoice();
   await step(page, INJECT(`<div class="msg error">오류 문구</div><div class="msg warn">경고 문구</div><div class="msg info">안내 문구</div><div class="msg notice">공지 문구</div><div class="msg">중립 문구</div>`));
   const exp = [['error', '"✕"', VOICE_RED], ['warn', '"!"', VOICE_TEXT], ['info', '"i"', CORAL_DARK], ['notice', '"i"', CORAL_DARK]];
@@ -96,23 +96,6 @@ test('217-4 voice·concept 메시지(.msg, .notice): 색 바탕·테두리·둥�
   // 실제 메시지 하나: 퀴즈 해설(.msg.quiz-feedback.error)
   await step(page, "quizData = [{ question: 'Q', choices: ['가', '나', '다', '라'], answer_index: 2, explanation: '해설', quote: '근거' }]; quizState = { i: 0, score: 0, answers: [], answered: false, saved: true }; showView('quiz'); renderQuizQuestion(); answerQuiz(0);");
   const fb = await page.eval(MEASURE('#quiz-feedback', '::before')); assertNoBox(fb, '.quiz-feedback'); assert.equal(fb.mark, '"✕"'); assert.equal(fb.markColor, VOICE_RED); assert.equal(fb.color, VOICE_TEXT, '작업221: 해설·근거는 주 글자색(옛 기대: 전체 빨강)'); assert.ok(fb.ratio >= 4.5 && fb.markRatio >= 4.5);
-  await done(page);
-
-  // concept: 오류(✕), 안내(i)
-  srv.reset(); srv.state.me = me();
-  srv.seed({ topic: '메시지', items: [{ term: '가' }, { term: '나' }] });
-  page = await browser.newPage({ width: 390, height: 844 });
-  await page.goto(srv.url + '/concept_study.html');
-  await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('study-rows').hidden", 8000);
-  await page.eval(NO_MOTION);
-  await page.click('[data-t="open-study"]');
-  await page.waitFor("!!document.querySelector('[data-t=term]')");
-  await settle(page);
-  await step(page, "document.getElementById('ask-msg').textContent = '오류 문구'; document.getElementById('ask-voice').textContent = '안내 문구';");
-  const er = await page.eval(MEASURE('#ask-msg', '::before')), inf = await page.eval(MEASURE('#ask-voice', '::before'));
-  assertNoBox(er, 'concept .msg.error'); assertNoBox(inf, 'concept .msg.info');
-  assert.equal(er.mark, '"✕"'); assert.equal(er.color, CONCEPT_RED); assert.ok(er.ratio >= 4.5, '오류 대비 ' + er.ratio.toFixed(2));
-  assert.equal(inf.mark, '"i"'); assert.equal(inf.color, CORAL_DARK); assert.ok(inf.ratio >= 4.5, '안내 대비 ' + inf.ratio.toFixed(2));
   await done(page);
 });
 

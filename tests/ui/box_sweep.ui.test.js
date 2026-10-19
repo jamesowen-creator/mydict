@@ -80,23 +80,6 @@ test('훑기 voice_study: 목록·선택 모드·녹음·상세·퀴즈(풀이·
   await done(page);
 });
 
-// ── concept_study ──
-test('훑기 concept_study: 학습 목록·시작 폼·상세·퀴즈(풀이·채점 후)', { skip: SKIP }, async () => {
-  srv.reset(); srv.state.me = me();
-  srv.seed({ topic: '훑기용', items: [{ term: '가', set: { review_state: 'new' } }, { term: '나', set: { review_state: 'confused' } }, { term: '다', set: { review_state: 'new' } }, { term: '라', set: { review_state: 'understood' } }], links: [[0, 1], [1, 2]], path: [0, 1] });
-  const page = await browser.newPage({ width: 390, height: 844 });
-  await page.goto(srv.url + '/concept_study.html');
-  await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('study-rows').hidden", 8000);
-  await page.eval(NO_MOTION); await settle(page);
-  await sweep(page, '학습 목록');
-  await page.click('#start-open'); await settle(page); await sweep(page, '시작 폼');
-  await page.click('#start-cancel'); await page.waitFor("!!document.querySelector('[data-t=open-study]')"); await settle(page);
-  await page.click('[data-t="open-study"]'); await page.waitFor("!!document.querySelector('[data-t=term]')"); await settle(page); await sweep(page, '상세');
-  await page.click('#quiz-open'); await page.waitFor("!!document.querySelector('[data-t=quiz-question]')"); await settle(page); await sweep(page, '퀴즈 풀이');
-  await page.click('[data-t="quiz-opt"][data-i="0"]'); await page.waitFor("!!document.querySelector('[data-t=quiz-feedback]')"); await settle(page); await sweep(page, '퀴즈 채점 후');
-  await done(page);
-});
-
 // ── 읽기 3화면 ──
 const MCQ = "[{ type: 'mcq', question: 'Q', options: ['가', '나', '다', '라'], answer: '다', explanation: '해설', roundLabel: 'r' }]";
 const OX = "[{ type: 'ox', statement: '참인 문장', answer: true, explanation: '정답! 해설입니다.', roundLabel: 'r' }]";

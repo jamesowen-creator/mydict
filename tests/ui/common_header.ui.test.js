@@ -10,7 +10,7 @@ let browser, srv;
 test.before(async () => { if (SKIP) return; srv = await startMockServer(); browser = await launchBrowser(); });
 test.after(async () => { if (browser) await browser.close(); if (srv) await srv.close(); });
 
-const PAGES = ['english_dictionary', 'literature_compass', 'digest_reading', 'science_reading', 'voice_study', 'concept_study'];
+const PAGES = ['english_dictionary', 'literature_compass', 'digest_reading', 'science_reading', 'voice_study'];
 const me = role => ({ id: 7, email: 'u7@example.com', name: '테스터', role, perm_voice_study: true, perm_concept_study: true,
   perm_literature_compass: true, perm_digest_reading: true, perm_science_reading: true });
 

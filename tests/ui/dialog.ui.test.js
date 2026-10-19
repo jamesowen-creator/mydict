@@ -15,7 +15,7 @@ test.after(async () => { if (browser) await browser.close(); if (srv) await srv.
 async function open(width = 390) {
   srv.reset();
   const page = await browser.newPage({ width, height: 844 });
-  await page.goto(srv.url + '/concept_study.html');
+  await page.goto(srv.url + '/voice_study.html');   // 작업CL-1: 개념학습 화면이 삭제되어 음성 학습 화면에서 시험(공용 dialog.js)
   await page.waitFor("typeof window.metisConfirm === 'function' && typeof window.metisAlert === 'function'", 8000);
   await page.eval('window.__res = []');
   return page;
@@ -122,9 +122,9 @@ for (const w of [390, 768, 1024]) {
   });
 }
 
-test('dialog.js를 불러오지 못했을 때: 6개 화면 모두 같은 대체 코드가 기본 confirm/alert로 같은 이름의 함수를 만듦', { skip: SKIP }, async () => {
+test('dialog.js를 불러오지 못했을 때: 5개 화면 모두 같은 대체 코드가 기본 confirm/alert로 같은 이름의 함수를 만듦', { skip: SKIP }, async () => {
   const pub = path.resolve(__dirname, '..', '..', 'public');
-  for (const f of ['english_dictionary', 'literature_compass', 'digest_reading', 'science_reading', 'voice_study', 'concept_study']) {
+  for (const f of ['english_dictionary', 'literature_compass', 'digest_reading', 'science_reading', 'voice_study']) {
     const html = fs.readFileSync(path.join(pub, f + '.html'), 'utf8');
     assert.ok(html.includes('<script src="/js/common/dialog.js"></script>'), f + ': dialog.js 로드');
     const m = html.match(/<script>(if \(!window\.metisConfirm\)[^\n]*)<\/script>/);
@@ -141,7 +141,7 @@ test('dialog.js를 불러오지 못했을 때: 6개 화면 모두 같은 대체 
 test('교체 범위: 남은 기본 confirm()/alert()는 음성 학습의 동기 반환값이 필요한 이탈 확인 3곳뿐', { skip: SKIP }, async () => {
   const pub = path.resolve(__dirname, '..', '..', 'public');
   const left = [];
-  for (const f of ['english_dictionary', 'literature_compass', 'digest_reading', 'science_reading', 'voice_study', 'concept_study']) {
+  for (const f of ['english_dictionary', 'literature_compass', 'digest_reading', 'science_reading', 'voice_study']) {
     fs.readFileSync(path.join(pub, f + '.html'), 'utf8').split('\n').forEach((line, i) => {
       if (/(^|[^\w.])(confirm|alert)\(/.test(line) && !/window\.metis(Confirm|Alert) = function/.test(line)) left.push(f + ':' + (i + 1));
     });

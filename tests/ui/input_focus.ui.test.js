@@ -20,7 +20,6 @@ const me = () => ({ id: 7, email: 'u7@example.com', name: '테스터', role: 'ad
 // [화면 파일, 입력 요소 종류들]. sel 은 실제 요소 선택자, 없으면 tag/cls 로 임시 요소를 만든다
 const CASES = [
   ['english_dictionary', [{ sel: '#search-input' }, { tag: 'input', cls: 'metacog-fill-input', type: 'text' }, { tag: 'textarea', cls: 'metacog-subj-textarea' }], true],
-  ['concept_study', [{ tag: 'input', type: 'text' }, { tag: 'textarea' }, { tag: 'select' }]],
   ['voice_study', [{ tag: 'input', type: 'text' }, { tag: 'textarea' }, { tag: 'select', cls: 'sel' }, { tag: 'select', wrap: 'tts-rate' }]],
   ['admin', [{ tag: 'select', cls: 'role-select' }]],
 ];

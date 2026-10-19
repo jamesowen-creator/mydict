@@ -29,7 +29,7 @@ async function openAdmin(users, { width = 1280, height = 800 } = {}) {
 }
 const patches = id => srv.state.log.filter(l => l.method === 'PATCH' && l.url === '/api/admin/users/' + id);
 const cellSel = (id, col) => `#row-${id} > td:nth-child(${col}) input`;
-const COL = { dictionary: 5, literature: 6, digest: 7, science: 8, voice: 9, concept: 10 };   // 사용자 · 역할 · 승인 · 차단 · 그다음 과목 열
+const COL = { dictionary: 5, literature: 6, digest: 7, science: 8, voice: 9 };   // 사용자 · 역할 · 승인 · 차단 · 그다음 과목 열
 const click = (page, sel) => page.eval(`document.querySelector(${JSON.stringify(sel)}).click()`);
 
 test('사용자 현황 섹션과 #stats-grid 가 없고, API 비용 추정·사용자 관리 섹션은 있다', { skip: SKIP }, async () => {
@@ -66,10 +66,10 @@ for (const width of [1280, 390]) {
   });
 }
 
-test('표 머리글 순서: 사용자·역할·승인·차단·과목 6열+개념 지도(작업270-1)·일본어 문법(작업JG-2)·사용 횟수 3열·저장', { skip: SKIP }, async () => {
+test('표 머리글 순서: 사용자·역할·승인·차단·과목 5열(작업CL-1: 개념학습 열 삭제)+개념 지도(작업270-1)·일본어 문법(작업JG-2)·사용 횟수 3열·저장', { skip: SKIP }, async () => {
   const page = await openAdmin([userRow(7, '관리자', { role: 'admin' }), userRow(8, '학생')]);
   const heads = await page.eval("[...document.querySelectorAll('thead th')].map(t => t.innerText.trim())");
-  assert.deepEqual(heads, ['사용자', '역할', '승인', '차단', '언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '개념학습', '개념 지도', '일본어 문법', '검색 횟수', 'TTS 횟수', '단어장', '저장']);
+  assert.deepEqual(heads, ['사용자', '역할', '승인', '차단', '언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '개념 지도', '일본어 문법', '검색 횟수', 'TTS 횟수', '단어장', '저장']);
   assert.equal(await page.eval("document.querySelectorAll('#row-8 > td').length"), heads.length, '열 수가 머리글과 같음');
   await page.close();
 });
@@ -109,9 +109,9 @@ test('언어 사전 토글을 저장하면 PATCH 가 can_search·can_wordbook·c
   await page.close();
 });
 
-test('문학·한입·과학·음성·개념 토글은 각각 컬럼 하나만 보낸다', { skip: SKIP }, async () => {
+test('문학·한입·과학·음성 토글은 각각 컬럼 하나만 보낸다', { skip: SKIP }, async () => {
   const page = await openAdmin([userRow(7, '관리자', { role: 'admin' }), userRow(8, '학생')]);
-  const cases = [['literature', 'perm_literature_compass'], ['digest', 'perm_digest_reading'], ['science', 'perm_science_reading'], ['voice', 'perm_voice_study'], ['concept', 'perm_concept_study']];
+  const cases = [['literature', 'perm_literature_compass'], ['digest', 'perm_digest_reading'], ['science', 'perm_science_reading'], ['voice', 'perm_voice_study']];
   let n = 0;
   for (const [col, field] of cases) {
     await click(page, cellSel(8, COL[col]));

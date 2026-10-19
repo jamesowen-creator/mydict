@@ -14,22 +14,12 @@ const baseline = require('./fixtures/init_sql_baseline.json');
 const baseline211 = require('./fixtures/init_sql_baseline_211.json');   // 작업211 시점의 기준(72문장)
 
 const STEPS = ['client_encoding', 'users', 'users_name_repair', 'wordbook', 'tts_cache', 'api_usage', 'review_log', 'voice_notes', 'voice_quizzes',
-  'voice_quiz_attempts', 'voice_concepts', 'voice_links', 'voice_links_user_edit', 'voice_images', 'concept_user_permission', 'concept_studies', 'concept_items', 'concept_links',
-  'concept_links_user_edited', 'concept_links_relation_types_v2', 'concept_quiz_attempts', 'concept_migrations_table', 'concept_migration_v1', 'concept_migration_v2',
+  'voice_quiz_attempts', 'voice_concepts', 'voice_links', 'voice_links_user_edit', 'voice_images', 'concept_user_permission',
   'cmap_user_permission', 'cmap_topics', 'cmap_concepts', 'cmap_concept_explanation',
-  'cmap_maps', 'cmap_map_nodes', 'cmap_edges', 'cmap_narrations', 'cmap_quiz_attempts', 'cmap_concept_marks', 'cmap_answer_attempts', 'cmap_edges_types_v2', 'cmap_edges_types_v3', 'jgrammar_cache', 'jgrammar_user_permission', 'jgrammar_saved'];   // 작업JG-1: 마지막 jgrammar_cache 는 일본어 문법 해설 캐시   // 작업270-1·271-1·273-1·273-2·273-4·273-5·275-4·278-1: 마지막 열한 단계가 개념 지도용으로 추가됨
+  'cmap_maps', 'cmap_map_nodes', 'cmap_edges', 'cmap_narrations', 'cmap_quiz_attempts', 'cmap_concept_marks', 'cmap_answer_attempts', 'cmap_edges_types_v2', 'cmap_edges_types_v3', 'jgrammar_cache', 'jgrammar_user_permission', 'jgrammar_saved', 'concept_study_drop'];   // 작업CL-1: 개념학습 테이블·이전 단계 9개를 없애고 마지막에 삭제 단계 1개를 더함   // 작업JG-1: 마지막 jgrammar_cache 는 일본어 문법 해설 캐시   // 작업270-1·271-1·273-1·273-2·273-4·273-5·275-4·278-1: 마지막 열한 단계가 개념 지도용으로 추가됨
 const summaryOf = r => r.logs.filter(l => l.startsWith('[DB] init done:'));
 const failedLogs = r => r.logs.filter(l => l.startsWith('[DB] init step failed:'));
 const sqlText = r => r.sqls.map(x => x.sql);
-
-// 작업227-9: concept_links_relation_types_v2 단계가 실행하는 문장(user_edited ALTER 뒤, concept_quiz_attempts CREATE 앞)을 따로 떼어 낸다.
-// 그 밖의 문장은 변경 전 기준(baseline)과 완전히 같아야 한다.
-function splitRelStep(sqls) {
-  const i = sqls.findIndex(x => /^ALTER TABLE concept_links ADD COLUMN IF NOT EXISTS user_edited/.test(x.sql));
-  const j = sqls.findIndex(x => /^CREATE TABLE IF NOT EXISTS concept_quiz_attempts/.test(x.sql));
-  assert.ok(i >= 0 && j > i, '단계 위치');
-  return { step: sqls.slice(i + 1, j), rest: sqls.slice(0, i + 1).concat(sqls.slice(j)) };
-}
 
 // 작업270-1: 개념 지도 단계(cmap_user_permission, cmap_topics, cmap_concepts)의 문장은 맨 끝에 더해졌다. 그 문장들만 따로 떼어 내고 나머지는 기존 기준과 같음을 단언한다(의도된 변경).
 const CMAP_SQL = /perm_concept_map|cmap_topics|idx_cmap_topics_|cmap_concepts|idx_cmap_concepts_|cmap_maps|idx_cmap_maps_|cmap_map_nodes|cmap_edges|idx_cmap_edges_|cmap_narrations|cmap_quiz_attempts|idx_cmap_quiz_attempts_|cmap_concept_marks|cmap_answer_attempts|idx_cmap_answer_attempts_/;
@@ -53,8 +43,10 @@ function splitEdgeTypesStep(sqlsAll) {
 }
 // 작업JG-1: jgrammar_cache 단계의 문장(CREATE TABLE 1개)은 맨 끝에 있다. 개념 지도와 무관하므로 따로 떼어 낸다
 const JG_SQL = /^(CREATE TABLE IF NOT EXISTS jgrammar_cache|ALTER TABLE users ADD COLUMN IF NOT EXISTS perm_jgrammar|CREATE TABLE IF NOT EXISTS jgrammar_saved|CREATE INDEX IF NOT EXISTS idx_jgrammar_saved_)/;   // 작업JG-6: 저장 목록 테이블·인덱스 포함   // 작업JG-2: 권한 열 추가 문장 포함
+// 작업CL-1: 개념학습 전용 테이블 삭제 문장(맨 끝, 한 문장)
+const CL_DROP_SQL = 'DROP TABLE IF EXISTS concept_quiz_attempts, concept_links, concept_items, concept_studies, concept_migrations';
 function withoutCmap(sqlsAll0) {
-  const sqlsAll = sqlsAll0.filter(x => !JG_SQL.test(x.sql));
+  const sqlsAll = sqlsAll0.filter(x => !JG_SQL.test(x.sql) && x.sql !== CL_DROP_SQL);
   const sqls = splitEdgeTypesStep(sqlsAll).without;
   const cmap = sqls.filter(x => CMAP_SQL.test(x.sql));
   const rest = sqls.filter(x => !CMAP_SQL.test(x.sql));
@@ -63,41 +55,35 @@ function withoutCmap(sqlsAll0) {
   return { cmap, rest };
 }
 
-for (const scenario of ['fresh', 'v1done']) {
-  test(`실행 SQL 목록 비교(${scenario}): 변경 후 initDB가 실행한 문장·순서·인자가 변경 전 기준과 완전히 같다`, async () => {
-    const r = await recordInit({ scenario });
-    assert.equal(r.error, null);
-    const { step, rest } = splitRelStep(withoutCmap(r.sqls).rest);   // 작업227-9: 새 CHECK 단계의 문장은 따로 비교(아래 새 테스트와 concept_links_check_v2.test.js)
-    assert.equal(step.length, 6, '새 CHECK 단계 문장 수(조회, BEGIN, LOCK, 조회, ADD, COMMIT)');
-    assert.equal(baseline[scenario].length, 75, '기준 문장 수(211의 72 + 작업214-2의 voice_links 컬럼 3)');
-    assert.equal(rest.length, baseline[scenario].length, '문장 수');
-    for (let i = 0; i < rest.length; i++) {
-      assert.deepEqual(rest[i], baseline[scenario][i], `${i + 1}번째 문장 차이`);
-    }
-  });
-}
+test('실행 SQL 목록 비교: 개념학습 문장(테이블·이전)을 뺀 기준(작업CL-1에서 해당 문장만 제거)과 initDB가 실행한 문장·순서·인자가 완전히 같다', async () => {
+  const r = await recordInit({ scenario: 'fresh' });
+  assert.equal(r.error, null);
+  const { rest } = withoutCmap(r.sqls);
+  assert.equal(baseline.fresh.length, 53, '기준 문장 수(75 - 개념학습 테이블·이전 18 - 이전 단계의 BEGIN/COMMIT 4)');
+  assert.equal(rest.length, baseline.fresh.length, '문장 수');
+  for (let i = 0; i < rest.length; i++) assert.deepEqual(rest[i], baseline.fresh[i], `${i + 1}번째 문장 차이`);
+});
 
-for (const scenario of ['fresh', 'v1done']) {
-  test(`SQL 목록(${scenario}): 작업214-2가 추가한 voice_links 컬럼 3문장을 빼면 작업211 기준(72문장)과 완전히 같다 — 기존 SQL은 그대로`, async () => {
-    const r0 = await recordInit({ scenario });
-    const r = { ...r0, sqls: splitRelStep(withoutCmap(r0.sqls).rest).rest };   // 작업227-9: 새 CHECK 단계 문장은 제외하고 비교
-    const added = r.sqls.filter(x => /^ALTER TABLE voice_links ADD COLUMN IF NOT EXISTS (source TEXT NOT NULL DEFAULT 'ai'|user_edited BOOLEAN NOT NULL DEFAULT false|hidden BOOLEAN NOT NULL DEFAULT false)$/.test(x.sql));
-    assert.equal(added.length, 3);
-    assert.deepEqual(r.sqls.filter(x => !added.includes(x)), baseline211[scenario]);
-    // 새 문장은 voice_links 단계 바로 뒤(voice_images 앞)에 있다
-    const iLast = r.sqls.findIndex(x => /idx_voice_links_to/.test(x.sql));
-    assert.ok(r.sqls.findIndex(x => x === added[0]) > iLast);
-    assert.ok(r.sqls.findIndex(x => x === added[2]) < r.sqls.findIndex(x => /^CREATE TABLE IF NOT EXISTS voice_image_sets/.test(x.sql)));
-  });
-}
+test('SQL 목록: 작업214-2가 추가한 voice_links 컬럼 3문장을 빼면 작업211 기준(개념학습 문장 제거본 50문장)과 완전히 같다 — 기존 SQL은 그대로', async () => {
+  const r0 = await recordInit({ scenario: 'fresh' });
+  const r = { ...r0, sqls: withoutCmap(r0.sqls).rest };
+  const added = r.sqls.filter(x => /^ALTER TABLE voice_links ADD COLUMN IF NOT EXISTS (source TEXT NOT NULL DEFAULT 'ai'|user_edited BOOLEAN NOT NULL DEFAULT false|hidden BOOLEAN NOT NULL DEFAULT false)$/.test(x.sql));
+  assert.equal(added.length, 3);
+  assert.equal(baseline211.fresh.length, 50);
+  assert.deepEqual(r.sqls.filter(x => !added.includes(x)), baseline211.fresh);
+  // 새 문장은 voice_links 단계 바로 뒤(voice_images 앞)에 있다
+  const iLast = r.sqls.findIndex(x => /idx_voice_links_to/.test(x.sql));
+  assert.ok(r.sqls.findIndex(x => x === added[0]) > iLast);
+  assert.ok(r.sqls.findIndex(x => x === added[2]) < r.sqls.findIndex(x => /^CREATE TABLE IF NOT EXISTS voice_image_sets/.test(x.sql)));
+});
 
-test('정상: 40단계 모두 성공, 요약 로그 "실패 0단계", 반환값, client 반환', async () => {
+test('정상: 32단계 모두 성공, 요약 로그 "실패 0단계", 반환값, client 반환', async () => {
   const r = await recordInit();
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 40단계, 실패 0단계']);
-  assert.deepEqual(r.result, { total: 40, failed: [], skipped: [] });
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 32단계, 실패 0단계']);
+  assert.deepEqual(r.result, { total: 32, failed: [], skipped: [] });
   assert.equal(failedLogs(r).length, 0);
   assert.equal(r.released, true);
-  assert.equal(STEPS.length, 40);
+  assert.equal(STEPS.length, 32);
 });
 
 test('중간 단계(voice_notes)가 실패해도 이후 단계가 계속 실행되고, 실패 이름과 요약이 로그에 남음', async () => {
@@ -107,12 +93,11 @@ test('중간 단계(voice_notes)가 실패해도 이후 단계가 계속 실행�
   const fl = failedLogs(r);
   assert.equal(fl.length, 1);
   assert.match(fl[0], /^\[DB\] init step failed: voice_notes: 주입된 오류/);
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 40단계, 실패 1단계 (실패: voice_notes)']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 32단계, 실패 1단계 (실패: voice_notes)']);
   const sqls = sqlText(r);
-  assert.ok(sqls.some(s => /^ALTER TABLE concept_links ADD COLUMN IF NOT EXISTS user_edited/.test(s)), '뒤쪽 user_edited ALTER도 실행됨');
-  assert.ok(sqls.some(s => /^CREATE TABLE IF NOT EXISTS concept_quiz_attempts/.test(s)));
+  assert.ok(sqls.some(s => /^CREATE TABLE IF NOT EXISTS jgrammar_saved/.test(s)), '뒤쪽 단계도 실행됨');
+  assert.ok(sqls.includes(CL_DROP_SQL), '마지막 개념학습 삭제 단계도 실행됨');
   assert.ok(!sqls.some(s => /^CREATE INDEX IF NOT EXISTS idx_voice_notes_user_id/.test(s)), '실패한 단계의 나머지 문장은 실행하지 않음');
-  assert.ok(sqls.some(s => /^SELECT 1 FROM concept_migrations/.test(s)), '마이그레이션은 선행 단계(voice_concepts 등)가 성공이라 실행됨');
   assert.equal(r.released, true);
 });
 
@@ -123,53 +108,37 @@ test('이름 복구 단계의 조회가 실패해도 다음 단계(wordbook 이�
 });
 
 test('여러 단계 실패: 요약에 실패 이름이 순서대로 나열됨', async () => {
-  const r = await recordInit({ failOn: /^(CREATE TABLE IF NOT EXISTS tts_cache|CREATE TABLE IF NOT EXISTS concept_quiz_attempts)/ });
-  assert.deepEqual(r.result.failed, ['tts_cache', 'concept_quiz_attempts']);
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 40단계, 실패 2단계 (실패: tts_cache, concept_quiz_attempts)']);
+  const r = await recordInit({ failOn: /^(CREATE TABLE IF NOT EXISTS tts_cache|DROP TABLE IF EXISTS concept_quiz_attempts)/ });
+  assert.deepEqual(r.result.failed, ['tts_cache', 'concept_study_drop']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 32단계, 실패 2단계 (실패: tts_cache, concept_study_drop)']);
   assert.equal(failedLogs(r).length, 2);
-  assert.ok(sqlText(r).some(s => /^CREATE TABLE IF NOT EXISTS concept_migrations/.test(s)));
+  assert.ok(sqlText(r).some(s => /^CREATE TABLE IF NOT EXISTS jgrammar_saved/.test(s)), '삭제 단계 앞의 단계는 실행됨');
 });
 
-test('user_edited ALTER가 있는 단계는 앞쪽 단계(users)가 실패해도 실행된다', async () => {
-  const r = await recordInit({ failOn: /^CREATE TABLE IF NOT EXISTS users/ });
-  assert.deepEqual(r.result.failed.slice(0, 1), ['users']);
-  assert.ok(sqlText(r).some(s => /^ALTER TABLE concept_links ADD COLUMN IF NOT EXISTS user_edited BOOLEAN NOT NULL DEFAULT false/.test(s)));
-});
-
-test('선행 DDL 단계가 실패하면 마이그레이션 v1·v2는 건너뛰고 이유를 로그에 남김', async () => {
-  const r = await recordInit({ failOn: /^CREATE TABLE IF NOT EXISTS concept_items/ });
-  assert.deepEqual(r.result.failed, ['concept_items']);
-  assert.deepEqual(r.result.skipped, ['concept_migration_v1', 'concept_migration_v2']);
-  const skips = r.logs.filter(l => l.startsWith('[DB] init step skipped:'));
-  assert.deepEqual(skips, [
-    '[DB] init step skipped: concept_migration_v1: 선행 단계 실패 (concept_items)',
-    '[DB] init step skipped: concept_migration_v2: 선행 단계 실패 (concept_items)',
-  ]);
+test('작업CL-1: 개념학습 전용 테이블 5개는 DROP TABLE IF EXISTS 한 문장(CASCADE 없음)으로 맨 끝에 지우고, 새 DB 에서도 같은 문장 하나만 실행한다', async () => {
+  const r = await recordInit();
   const sqls = sqlText(r);
-  assert.equal(sqls.filter(x => x === 'BEGIN').length, 3, '마이그레이션 트랜잭션은 시작하지 않음(BEGIN 3번은 작업227-9 의 CHECK 확장 단계, 작업286-1 의 cmap_edges 유형 확장 단계, 작업308-1 의 37번 단계)');
-  assert.ok(!sqls.some(x => /^INSERT INTO concept_migrations/.test(x)), '마이그레이션 완료 표시도 남기지 않음');
-  assert.ok(!sqls.some(s => /FROM voice_concepts/.test(s)), '원본 voice_concepts를 읽지 않음');
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 40단계, 실패 1단계 (실패: concept_items), 건너뜀 2단계 (건너뜀: concept_migration_v1, concept_migration_v2)']);
+  assert.equal(sqls.filter(x => /^DROP TABLE/.test(x)).length, 1, 'DROP TABLE 은 이 문장 하나');
+  assert.equal(sqls[sqls.length - 1], CL_DROP_SQL, '맨 끝');
+  assert.doesNotMatch(CL_DROP_SQL, /CASCADE/i);
+  for (const t of ['concept_quiz_attempts', 'concept_links', 'concept_items', 'concept_studies', 'concept_migrations']) assert.ok(CL_DROP_SQL.includes(t), t);
+  for (const keep of ['voice_concepts', 'users', 'cmap_', 'jgrammar_']) assert.ok(!CL_DROP_SQL.includes(keep), keep + ' 은 지우지 않는다');
+  // 개념학습 테이블을 만들거나 읽는 문장은 더는 없다(삭제 문장 제외)
+  assert.deepEqual(sqls.filter(x => x !== CL_DROP_SQL && /concept_(studies|items|links|quiz_attempts|migrations)|legacy_voice_concept_id/.test(x)), []);
 });
 
-test('선행 단계 중 하나(voice_concepts, concept_migrations_table)만 실패해도 마이그레이션 건너뜀', async () => {
-  for (const [re, name] of [[/^CREATE TABLE IF NOT EXISTS voice_concepts/, 'voice_concepts'], [/^CREATE TABLE IF NOT EXISTS concept_migrations/, 'concept_migrations_table'], [/^CREATE TABLE IF NOT EXISTS concept_studies/, 'concept_studies']]) {
-    const r = await recordInit({ failOn: re });
-    assert.deepEqual(r.result.failed, [name]);
-    assert.deepEqual(r.result.skipped, ['concept_migration_v1', 'concept_migration_v2'], name);
-  }
-  // 선행과 무관한 단계(tts_cache) 실패는 마이그레이션에 영향 없음
-  const ok = await recordInit({ failOn: /^CREATE TABLE IF NOT EXISTS tts_cache/ });
-  assert.deepEqual(ok.result.skipped, []);
+test('작업CL-1: 사용자 권한 열 perm_concept_study 와 음성 학습의 voice_concepts 테이블은 그대로 남는다(삭제·변경 문장 없음)', async () => {
+  const sqls = sqlText(await recordInit());
+  assert.ok(sqls.includes('ALTER TABLE users ADD COLUMN IF NOT EXISTS perm_concept_study BOOLEAN NOT NULL DEFAULT true'));
+  assert.ok(sqls.some(x => /^CREATE TABLE IF NOT EXISTS voice_concepts/.test(x)));
+  assert.ok(!sqls.some(x => /DROP COLUMN|DROP TABLE IF EXISTS voice_concepts/.test(x)));
 });
 
-test('마이그레이션 자체가 실패하면 ROLLBACK 후 실패 단계로 기록하고 서버 시작에는 영향 없음', async () => {
-  const r = await recordInit({ failOn: /^SELECT 1 FROM concept_migrations WHERE name = \$1$/ });
+test('작업CL-1: 삭제 단계가 실패해도 이 단계만 실패로 기록하고 서버 시작은 계속, 다른 단계는 건너뛰지 않는다', async () => {
+  const r = await recordInit({ failOn: /^DROP TABLE IF EXISTS concept_quiz_attempts/ });
   assert.equal(r.error, null);
-  assert.deepEqual(r.result.failed, ['concept_migration_v1', 'concept_migration_v2']);
-  assert.ok(sqlText(r).includes('ROLLBACK'));
-  assert.ok(r.logs.some(l => /concept migration failed/.test(l)), '기존 오류 로그도 유지');
-  assert.equal(summaryOf(r).length, 1);
+  assert.deepEqual(r.result, { total: 32, failed: ['concept_study_drop'], skipped: [] });
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 32단계, 실패 1단계 (실패: concept_study_drop)']);
 });
 
 test('DB 연결 자체가 안 되면 initDB는 예외를 던짐(server.js의 .catch가 로그)', async () => {
@@ -440,7 +409,7 @@ const edgeStepOf = r => splitEdgeTypesStep(r.sqls).edgeStep.map(x => x.sql);
 
 test('286-1 단계 36(cmap_edges_types_v2): 새 DB — 컬럼 기준 제약 조회 → BEGIN → LOCK → 재조회 → label NOT NULL 해제 → 새 CHECK 3개 ADD → COMMIT, 맨 끝 단계이며 총 36', async () => {
   const r = await recordInit();
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 40단계, 실패 0단계']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 32단계, 실패 0단계']);
   const st = edgeStepOf(r);
   assert.equal(st.length, 9);
   assert.ok(isFound(st[0]) && /a\.attname IN \('relation_type', 'label'\)/.test(st[0]) && /a\.attnum = ANY \(c\.conkey\)/.test(st[0]), '제약 이름을 가정하지 않고 컬럼 기준으로 찾음');
@@ -451,7 +420,7 @@ test('286-1 단계 36(cmap_edges_types_v2): 새 DB — 컬럼 기준 제약 조�
   assert.equal(st[7], 'ALTER TABLE cmap_edges ADD CONSTRAINT cmap_edges_has_content_check_v2 CHECK (label IS NOT NULL OR relation_type IS NOT NULL)');
   assert.equal(st[8], 'COMMIT');
   for (const x of st) assert.doesNotMatch(x, /UPDATE|DELETE|TRUNCATE|DROP TABLE/, '기존 행을 건드리지 않음');
-  assert.equal(r.sqls.filter(x => !JG_SQL.test(x.sql)).slice(-1)[0].sql, 'COMMIT', '맨 끝 단계(작업JG-1 의 jgrammar_cache 문장은 제외)');
+  assert.equal(r.sqls.filter(x => !JG_SQL.test(x.sql) && x.sql !== CL_DROP_SQL).slice(-1)[0].sql, 'COMMIT', '맨 끝 단계(작업JG-1 의 jgrammar 문장과 작업CL-1 의 삭제 문장은 제외)');
 });
 
 test('286-1 단계 36: 옛 제약(이름을 모름)이 있으면 조회된 이름 그대로 모두 DROP 한 뒤 ADD — 이름을 가정하지 않음', async () => {
@@ -472,7 +441,7 @@ test('286-1 단계 36: 이미 새 제약 3개(유형 10값)가 있으면 조회 
   const st = edgeStepOf(r);
   assert.equal(st.length, 1); assert.ok(isFound(st[0]));
   assert.ok(!splitV3Step(r.sqls).without.some(x => /LOCK TABLE cmap_edges/.test(x.sql)), 'v2 구간에는 잠금 없음(37번 단계의 잠금은 따로)');
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 40단계, 실패 0단계']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 32단계, 실패 0단계']);
   const stale = upToDateRows(); stale[0] = { conname: stale[0].conname, def: "CHECK (relation_type IN ('사용', '구별'))" };   // 이름만 같고 값이 다르면 적용 대상
   const r2 = await recordInit({ respond: sql => (isFound(sql) ? { rows: stale, rowCount: 3 } : undefined) });
   assert.ok(edgeStepOf(r2).some(x => /LOCK TABLE cmap_edges/.test(x)));
@@ -487,9 +456,9 @@ test('286-1 단계 36: 잠금을 기다리는 사이 다른 서버가 먼저 적
 test('286-1 단계 36 실패: 이 단계만 실패로 기록(ROLLBACK), 다른 모든 단계는 영향 없음·서버 시작 계속, cmap_edges 가 실패하면 건너뜀', async () => {
   const r = await recordInit({ failOn: /^ALTER TABLE cmap_edges ADD CONSTRAINT cmap_edges_label_check_v2/ });
   assert.deepEqual(r.result.failed, ['cmap_edges_types_v2']);
-  assert.equal(r.result.total, 40); assert.deepEqual(r.result.skipped, ['cmap_edges_types_v3'], '선행 단계(v2)가 실패하면 37번 단계는 건너뜀');
+  assert.equal(r.result.total, 32); assert.deepEqual(r.result.skipped, ['cmap_edges_types_v3'], '선행 단계(v2)가 실패하면 37번 단계는 건너뜀');
   assert.ok(r.sqls.some(x => x.sql === 'ROLLBACK'), '실패하면 ROLLBACK');
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 40단계, 실패 1단계 (실패: cmap_edges_types_v2), 건너뜀 1단계 (건너뜀: cmap_edges_types_v3)']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 32단계, 실패 1단계 (실패: cmap_edges_types_v2), 건너뜀 1단계 (건너뜀: cmap_edges_types_v3)']);
   assert.equal(failedLogs(r).length, 1);
   assert.equal(r.error, null, 'initDB 는 던지지 않음 → 서버 시작과 /api 대기에 영향 없음');
   const r2 = await recordInit({ failOn: /^CREATE TABLE IF NOT EXISTS cmap_edges/ });
@@ -516,9 +485,9 @@ const label = (sql, kind) => ({
   addCheck: /^ALTER TABLE cmap_edges ADD CONSTRAINT cmap_edges_relation_type_check_v3 CHECK \(relation_type IN \('종류', '일부', '대립'\)\)$/, notNull: /^ALTER TABLE cmap_edges ALTER COLUMN relation_type SET NOT NULL$/,
 }[kind].test(sql));
 
-test('308-1 단계 37(cmap_edges_types_v3): 새 DB — 조회 2 → BEGIN → LOCK → 재조회 2 → legacy_type 추가 → 보관 → 변환 → 정규화 → CHECK 교체 → NOT NULL → COMMIT, 총 40단계', async () => {
+test('308-1 단계 37(cmap_edges_types_v3): 새 DB — 조회 2 → BEGIN → LOCK → 재조회 2 → legacy_type 추가 → 보관 → 변환 → 정규화 → CHECK 교체 → NOT NULL → COMMIT, 총 32단계', async () => {
   const r = await recordInit();
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 40단계, 실패 0단계']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 32단계, 실패 0단계']);
   const st = v3Of(r);
   assert.ok(V3_STATE.test(st[0]) && isFound3(st[1]), '잠금 전 상태 조회(컬럼·NOT NULL·3종 밖 행 수) + 유형 제약 조회');
   assert.equal(st[2], 'BEGIN'); assert.equal(st[3], 'LOCK TABLE cmap_edges IN ACCESS EXCLUSIVE MODE'); assert.ok(V3_STATE.test(st[4]) && isFound3(st[5]), '잠금 뒤 다시 조회');
@@ -528,7 +497,7 @@ test('308-1 단계 37(cmap_edges_types_v3): 새 DB — 조회 2 → BEGIN → LO
   order.forEach((k, i) => assert.ok(label(body[i], k), `${i + 1}번째: ${k} — ${body[i]}`));
   assert.equal(st[st.length - 1], 'COMMIT');
   for (const x of st) assert.doesNotMatch(x, /DELETE|TRUNCATE|DROP TABLE|DROP COLUMN/, 'DB 삭제 없음(컬럼 추가와 값 수정, 유형 CHECK 교체만)');
-  assert.equal(r.sqls.filter(x => !JG_SQL.test(x.sql)).slice(-1)[0].sql, 'COMMIT', '맨 끝 단계(작업JG-1 의 jgrammar_cache 문장은 제외)');
+  assert.equal(r.sqls.filter(x => !JG_SQL.test(x.sql) && x.sql !== CL_DROP_SQL).slice(-1)[0].sql, 'COMMIT', '맨 끝 단계(작업JG-1 의 jgrammar 문장과 작업CL-1 의 삭제 문장은 제외)');
   assert.deepEqual(T3, CM.RELATION_TYPES, 'DB 3값 = 서버 상수'); assert.ok(body[8].includes(T3.map(x => "'" + x + "'").join(', ')));
   assert.ok(!r.sqls.some(x => /relation_type_check_v3/.test(x.sql) && /\bhash\b|semantic/.test(x.sql)), '해시와 무관');
 });
@@ -549,7 +518,7 @@ test('308-1 단계 37: 이미 적용됨(3값 CHECK + legacy_type + NOT NULL + 3�
   const st = v3Of(r);
   assert.equal(st.length, 2); assert.ok(V3_STATE.test(st[0]) && isFound3(st[1]));
   assert.ok(!splitEdgeTypesStep(r.sqls).without.some(x => /ADD COLUMN IF NOT EXISTS legacy_type|SET relation_type|relation_type_check_v3 CHECK/.test(x.sql)));
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 40단계, 실패 0단계']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 32단계, 실패 0단계']);
   assert.ok(!r.logs.some(l => /관계 유형 3종 통일/.test(l)), '변환이 없으면 로그도 없다');
   // 한 가지라도 아니면 적용 대상: 3종 밖 행이 남음 / legacy_type 컬럼 없음 / NOT NULL 아님 / 제약 값이 다름 / 제약 이름이 다름
   const variants = [
@@ -568,7 +537,7 @@ test('308-1 단계 37: v3 가 적용된 DB 에서 서버를 다시 시작해도 
   const r = await recordInit({ respond: sql => (isFound(sql) && !isFound3(sql) ? { rows, rowCount: 3 } : V3_STATE.test(sql) ? doneState : isFound3(sql) ? { rows: [typeCheck3, contentCheck], rowCount: 2 } : undefined) });
   assert.equal(edgeStepOf(r).length, 1, 'v2: 조회 한 번뿐');
   assert.ok(!r.sqls.some(x => /DROP CONSTRAINT/.test(x.sql)), '어떤 제약도 DROP 하지 않는다(재시작해도 제자리)');
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 40단계, 실패 0단계']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 32단계, 실패 0단계']);
 });
 
 test('308-1 단계 37: 잠금을 기다리는 사이 다른 서버가 먼저 적용했으면 잠금 안의 재조회에서 알아보고 바꾸지 않은 채 COMMIT', async () => {
@@ -579,10 +548,10 @@ test('308-1 단계 37: 잠금을 기다리는 사이 다른 서버가 먼저 적
 
 test('308-1 단계 37 실패: 이 단계만 실패로 기록(ROLLBACK), 다른 단계는 영향 없음·서버 시작 계속, 선행 단계(v2)가 실패하면 건너뜀', async () => {
   const r = await recordInit({ failOn: /^UPDATE cmap_edges SET relation_type = '대립' WHERE relation_type IS NULL/ });
-  assert.deepEqual(r.result.failed, ['cmap_edges_types_v3']); assert.equal(r.result.total, 40); assert.deepEqual(r.result.skipped, []);
+  assert.deepEqual(r.result.failed, ['cmap_edges_types_v3']); assert.equal(r.result.total, 32); assert.deepEqual(r.result.skipped, []);
   assert.ok(r.sqls.some(x => x.sql === 'ROLLBACK'), '실패하면 ROLLBACK');
   assert.ok(!r.sqls.some(x => /ADD CONSTRAINT cmap_edges_relation_type_check_v3/.test(x.sql)), '실패 뒤 문장은 실행하지 않음(제약 교체 없음)');
-  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 40단계, 실패 1단계 (실패: cmap_edges_types_v3)']);
+  assert.deepEqual(summaryOf(r), ['[DB] init done: 총 32단계, 실패 1단계 (실패: cmap_edges_types_v3)']);
   assert.equal(failedLogs(r).length, 1); assert.equal(r.error, null, 'initDB 는 던지지 않음');
   const r2 = await recordInit({ failOn: /^ALTER TABLE cmap_edges ADD CONSTRAINT cmap_edges_label_check_v2/ });
   assert.deepEqual(r2.result.failed, ['cmap_edges_types_v2']); assert.deepEqual(r2.result.skipped, ['cmap_edges_types_v3']);

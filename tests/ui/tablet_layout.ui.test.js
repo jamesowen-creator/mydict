@@ -1,4 +1,4 @@
-// 작업223: 태블릿 폭(768/820/1024/1280px)에서 6개 화면(개념 학습·음성 학습·한입 독서·문학 나침반·과학 읽기·언어 사전)이 모두 같은 680px 열의 가운데에 오는지,
+// 작업223: 태블릿 폭(768/820/1024/1280px)에서 5개 화면(음성 학습·한입 독서·문학 나침반·과학 읽기·언어 사전)이 모두 같은 680px 열의 가운데에 오는지,
 // 폰 폭(320/390px)에서 가로 스크롤이 없는지. 기준 화면은 문학 나침반(헤더·내비·본문이 같은 --content-max 열).
 // 확인 대상: 공용 헤더(바깥/안쪽 로고), 화면 제목 바(.screen-bar), body·본문 컨테이너, position이 fixed/sticky인 요소 전부(하단 탭바·입력 바·정복 바·플레이어·플로팅 버튼 등), 팝업(dialog).
 // 원칙(작업216-3): transition·animation을 끄고(NO_MOTION) 레이아웃이 안정된 뒤(settle) 잰다. 스크롤바 폭 차이로 x가 달라지지 않게 스크롤바를 숨기고 잰다.
@@ -26,7 +26,6 @@ const ART_QUIZ = "quizState = { questions: [{ type: 'mcq', roundLabel: '작품 �
 const ART_RESULT = "quizState = { questions: [{}, {}], currentIdx: 0, score: 1, wrong: [{ q: '문항', a: '정답' }], answered: false }; showResult()";   // 작가 노트 퀴즈 결과
 // 화면별 대표 상태: [이름, 이동 스크립트(없으면 첫 화면), 클릭할 선택자(있으면)]
 const SCREENS = {
-  concept: { file: '/concept_study.html', ready: "!document.getElementById('app').hidden && !document.getElementById('study-rows').hidden", states: [['목록'], ['상세', null, '[data-t="open-study"]'], ['퀴즈', null, '#quiz-open']] },
   voice: { file: '/voice_study.html', ready: "!!document.querySelector('.metis-app-header-logo') && document.getElementById('list-count').textContent === '1건'", states: [['목록'], ['녹음', "showView('record')"], ['상세', "showView('edit')"], ['퀴즈', VQ]] },
   digest: { file: '/digest_reading.html', ready: DB_READY + HDR, states: [['목록'], ['상세', 'showDigest(DB.works[0].id)'], ['퀴즈', READ_QUIZ], ['결과', READ_RESULT]] },
   lit: { file: '/literature_compass.html', ready: DB_READY + HDR, states: [['목록'], ['퀴즈', "quizData = { rounds: [{ type: 'mcq', questions: [{ question: '문제 하나', options: ['가', '나', '다', '라'], answer: '다' }] }], currentRound: 0, currentQ: 0, score: 0, wrong: [], totalQ: 1 }; showView('view-quiz'); renderQuizRound();"], ['결과', "quizData = { rounds: [], currentRound: 0, currentQ: 0, score: 1, totalQ: 2, wrong: [{ q: 'a', a: 'b' }] }; showResult()"]] },
@@ -106,21 +105,8 @@ for (const w of [768, 820, 1024, 1280]) {
   });
 }
 
-test('223 팝업: 개념 학습 지도 시트·상세 대화상자(dialog)가 태블릿 폭에서 화면 가운데에 열림(좌우 여백 차이 ≤ 1px)', { skip: SKIP }, async () => {
-  for (const w of [768, 1024, 1280]) {
-    const page = await open('concept', w);
-    for (const id of ['map-sheet', 'edge-dialog']) {
-      await page.eval(`document.getElementById('${id}').showModal()`); await sleep(300);
-      const r = await page.eval(`(() => { const r = document.getElementById('${id}').getBoundingClientRect(); return { x0: r.left, x1: r.right, vw: document.documentElement.clientWidth }; })()`);
-      assert.ok(near(r.x0, r.vw - r.x1), `${w}px ${id}: 왼쪽 ${r.x0} vs 오른쪽 ${r.vw - r.x1}`);
-      await page.eval(`document.getElementById('${id}').close()`);
-    }
-    await page.close();
-  }
-});
-
 for (const w of [320, 390]) {
-  test(`223 폰 ${w}px: 7개 화면(대표 상태)에 가로 스크롤 없음(문서 폭 ≤ ${w}), 헤더·body가 화면 전체 폭`, { skip: SKIP }, async () => {
+  test(`223 폰 ${w}px: 6개 화면(대표 상태)에 가로 스크롤 없음(문서 폭 ≤ ${w}), 헤더·body가 화면 전체 폭`, { skip: SKIP }, async () => {
     for (const key of Object.keys(SCREENS)) {
       for (const [st, m] of Object.entries(await states(key, w))) {
         assert.ok(m.sw <= w, `${key} ${w}px [${st}]: 문서 폭 ${m.sw} > ${w}`);
