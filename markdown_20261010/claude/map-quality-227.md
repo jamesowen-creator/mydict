@@ -1,5 +1,7 @@
 # 지도 품질 고도화 (작업 227)
 
+> [작업 311] 개념학습 화면·API·DB 테이블은 CL-1(cfa63d1, 2026-10-19)에서 삭제되었다. 이 문서의 개념학습 서술은 삭제 전 기록이며 현재 코드와 다르다. 현황은 orchestrator-handover.md의 "개념학습 삭제" 절.
+
 기준일: 2026-10-10. 상태: **연결 생성 방식 교체(B2) + 가독성 3단계 + 인사이트 패널 + 허브 규칙(B3) + 큰 개념 나누기 제안(4a) 배포 완료.** 사용자 실사용 확인 대기. 음성 지도 이식(가독성만)은 229에서 배포 완료, 인사이트 패널은 이식하지 않음(claude/voice-map-214.md 참고).
 최신 코드 커밋 = 7dda05d (229-2~4, 음성 지도 이식, voice_study.html만 변경), 이후 origin/master = a900655 (230-1 저장소 정리). 227 마지막 코드 커밋 = 24c13a4 (227-25, 서버 코드만 변경). 화면 파일 concept_study 운영 해시 d4aac6212a5db1f8 (227-18).
 
@@ -79,7 +81,7 @@ Haiku 4.5(claude-haiku-4-5-20251001)만 사용. Opus 미사용.
 - API 키: 실험도 앱과 같은 jamesowen 키 사용. 삭제하면 앱 AI 기능이 멈추므로 삭제 금지. 교체는 새 키 생성 → Railway ANTHROPIC_API_KEY 교체 → 구 키 삭제 순서.
 
 ## 237 지도 순수 함수 공용 모듈 분리 (2026-10-10, 커밋 57ac3a7)
-- public/js/map/mapCore.js(85줄): sortLevels, layoutMap, edgeGeom, clipText, sv, MAPD, MAP_LAYOUT_SWEEPS(전역 let), SVG 이름공간. 개념 쪽 코드를 그대로 옮김(diff 동일). 클래식 스크립트이고 concept_study.html·voice_study.html이 `/js/map/mapCore.js?v=1`을 로드. 음성 쪽은 vmapSortLevels·vmapLayout·vmapEdgeGeom·vmapClip·vmapSv를 한 줄 별칭으로 남기고 VMAPD = MAPD.
+- public/js/map/mapCore.js(85줄): sortLevels, layoutMap, edgeGeom, clipText, sv, MAPD, MAP_LAYOUT_SWEEPS(전역 let), SVG 이름공간. 개념 쪽 코드를 그대로 옮김(diff 동일). 클래식 스크립트이고 concept_study.html·voice_study.html이 `/js/map/mapCore.js?v=1`을 로드[2026-10-19: concept_study.html은 CL-1에서 삭제됨, 현재는 voice_study.html과 개념 지도 concept_map.html이 로드하고 tests/map_core_shared.test.js는 음성 학습만 확인]. 음성 쪽은 vmapSortLevels·vmapLayout·vmapEdgeGeom·vmapClip·vmapSv를 한 줄 별칭으로 남기고 VMAPD = MAPD.
 - 줄 수: concept_study.html 2184→2104, voice_study.html 3421→3353, 공용 파일 변경 0. 어긋남 방지 테스트 tests/map_core_shared.test.js 4건(두 html이 mapCore.js를 로드하고 함수 본문을 다시 정의하지 않음). 기준선 UI 테스트 건수 동일, 전체 608건 통과.
 - 수정할 때 주의: mapCore.js를 고치면 주소의 ?v=N을 올려야 옛 서비스 워커 캐시를 피함(.js는 캐시 우선). 개념 UI 테스트는 MAP_LAYOUT_SWEEPS를 직접 대입.
 - 보류: B안(끌기·핀치·휠·맞춤·확대까지 약 170줄, 상태 객체를 인자로 넘김)은 위험 중간이라 폰 확인 후. C안(지도 전체)은 그리기 골격 일치율 37%라 비권장.

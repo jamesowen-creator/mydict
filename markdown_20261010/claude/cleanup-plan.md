@@ -33,6 +33,7 @@
 ## voice_concepts, concept_migrations (233-1, 화면 확인)
 - 코드: 앱 기능에서는 미사용, lib/db.js initDB의 일회성 이전 단계(11, 22~24번째)에서만 사용. 이전 코드는 완료 표시가 있으면 서버 시작마다 SELECT 1~2개만 하고 건너뜀.
 - 운영 DB 화면: concept_migrations에 voice_concepts_v1(2026-10-06 21:47), voice_concepts_v2(2026-10-07 22:28) 완료 기록. voice_concepts는 비어 있음. concept_items에는 개념 데이터 있음(3페이지).
+- [작업 311, 2026-10-19] CL-1에서 concept_migrations를 포함한 개념학습 테이블 5개를 지우는 단계(concept_study_drop)가 추가되고 이전 코드는 제거되었다. voice_concepts 테이블은 남아 있고 읽는 코드는 없다. 운영 DB에서 실제로 삭제되었는지는 확인하지 않았다.
 - 사용자 결정: **그대로 둠**(이득이 작고 공용 lib/db.js와 테스트 6파일을 건드려야 함). 나중에 정리하려면 코드 제거(B안) → 테이블 삭제 순서, 테이블 삭제는 항목별 동의.
 
 ## 로컬·저장소 (모두 반영됨)

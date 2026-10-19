@@ -5,7 +5,7 @@
 ## 변경 (public/admin.html만, 서버·DB 변경 0)
 - 상단 "사용자 현황" 삭제(HTML·CSS·JS). 비용 섹션이 같은 /api/admin/stats 응답을 써서 그 요청은 유지. 응답의 users·usage·monthly 필드는 화면에서 안 쓰지만 legacy/admin193_2가 단언해서 서버는 그대로.
 - 헤더·본문 폭: tokens.css 링크 추가, body에 max-width var(--content-max)(680px)·margin 0 auto, 헤더 높이 65px·좌우 16px, main의 1200px 제한 삭제. 폭 1280에서 헤더·본문 680px, 좌우 여백 300px씩. 폭 390에서 헤더 내용이 두 줄로 줄바꿈되어 높이 95px(다른 화면은 65px, 조정하지 않음). 표는 .table-wrap 안에서 가로 스크롤하고 저장 열은 고정.
-- 사용자 관리 열: 사용자, 역할, 승인, 차단, 언어 사전, 문학 나침반, 한입 독서, 과학, 음성 학습, 개념학습(랜딩페이지 과목 순서·이름), 사용 횟수 열들(유지), 저장.
+- 사용자 관리 열: 사용자, 역할, 승인, 차단, 언어 사전, 문학 나침반, 한입 독서, 과학, 음성 학습, 개념학습(랜딩페이지 과목 순서·이름), 사용 횟수 열들(유지), 저장. [작업 311 정정, 현재 열: ... 음성 학습, 개념 지도(270-1), 일본어 문법(JG-2), 검색 횟수·TTS 횟수·단어장, 저장 — 개념학습 열은 CL-1(2026-10-19)에서 삭제됨]
 - 언어 사전 토글은 can_search·can_wordbook·can_quiz·can_tts·can_podcast 5개를 묶음: 모두 켜짐=켜짐, 모두 꺼짐=꺼짐, 섞임=혼합(aria-checked="mixed"). 혼합에서 누르면 5개 모두 켜짐. 저장 시 사전은 PATCH에 5개 키를 함께 보내고, 나머지 5과목은 변경한 컬럼 하나씩 보냄.
 - 테스트: concept_home_admin.ui 열 라벨 3줄 수정, 새 tests/ui/admin_permissions.ui.test.js 7건, 전체 619건 통과.
 
@@ -17,11 +17,14 @@
 | 한입 독서 | perm_digest_reading | 없음 | 클라이언트만(digest 669행) |
 | 과학 | perm_science_reading | 없음 | 클라이언트만(science 1186~1198행) |
 | 음성 학습 | perm_voice_study | voice_study.js:21(전체) | 화면도 |
-| 개념학습 | perm_concept_study | concept_study.js:32(전체) | 화면도 |
+| 개념학습(삭제됨, CL-1) | perm_concept_study(열은 DB에 남음, 사용처 없음) | 삭제됨 | 삭제됨 |
+| 개념 지도(270-1) | perm_concept_map | routes/concept_map.js requireCmapPerm(전체): 명시적 true만 통과, 차단·행 없음·조회 오류·DB 없음은 403(fail-closed), 관리자 예외 없음 | concept_map.html은 /api/me가 true일 때만, 홈 휠 항목도 perm_concept_map===true일 때만 |
+| 일본어 문법(JG-2) | perm_jgrammar | routes/jgrammar.js requireJgrammarPerm(전체): 관리자(ADMIN_EMAILS 또는 DB role=admin)는 항상 허용, 그 외는 명시적 true·비차단만, 행 없음·조회 오류·DB 없음은 403(fail-closed) | jgrammar.html은 /api/me의 perm_jgrammar===true 또는 role=admin일 때만 입력창, 홈 휠 항목도 같은 조건 |
 - can_quiz, can_podcast는 서버·화면 어디에서도 검사하지 않고 저장만 됨.
 - checkPermission(middleware/auth.js:55): 차단되면 false, 조회 오류·행 없음은 통과(fail-open).
+- [작업 311 추가] 개념 지도(perm_concept_map)와 일본어 문법(perm_jgrammar) 열은 BOOLEAN NOT NULL 기본 false라 기존 사용자도 차단으로 시작하며, 관리자가 켜 준 계정만 쓴다. 관리자 PATCH 허용 컬럼에 둘이 있고 perm_concept_study는 CL-1에서 빠졌다(보내면 허용 항목이 아니라 400).
 - 기본값: users 권한 컬럼은 BOOLEAN 기본 true(개념은 NOT NULL 기본 true), is_approved 기본 true(신규 가입 INSERT가 명시), role 기본 user. PATCH /api/admin/users/:id는 허용 컬럼 목록의 키만 받아 한 번에 UPDATE, 변경이 없으면 400, 자기 자신의 role 강등·차단·승인 취소는 400.
-- 랜딩 과목 소스: home-wheel/src/HomeWheelApp.jsx 8~15행(언어 사전, 문학 나침반, 한입 독서, 과학, 음성 학습, 개념학습).
+- 랜딩 과목 소스: home-wheel/src/HomeWheelApp.jsx 8~15행(언어 사전, 문학 나침반, 한입 독서, 과학, 음성 학습, 개념학습). [작업 311 정정, 현재] OPTIONS 기본 6개(언어 사전, 문학 나침반, 한입 독서, 과학, 음성 학습, 작가 노트)에 buildOptions가 일본어 문법(언어 사전 다음, 권한자·관리자)과 개념 지도(맨 끝, perm_concept_map 권한자)를 더한다.
 
 ## 알려진 한계·후보
 - 문학·한입·과학은 서버가 권한을 검사하지 않아, 권한을 꺼도 API를 직접 호출하면 쓸 수 있음. 퀴즈·팟캐스트 플래그는 아무것도 막지 않음. 현재 사용자 3명이라 급하지 않지만 사용자를 늘리기 전에 서버 검사 추가가 후보(공용 routes·middleware 수정, 위험 중간).
