@@ -106,8 +106,9 @@ test('이름·언어 선택: 제목과 화면 제목이 "문장 학습", "일본
   const page = await open();
   assert.equal(await page.eval('document.title'), '문장 학습');
   assert.equal(await page.text('.screen-bar-title'), '문장 학습');
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('.lang-switch [data-lang]')].map(b => b.textContent + ':' + b.className)"), ['일본어:btn text', '영어:btn text'], '기존 .btn.text 링크 스타일');
-  assert.match(await page.eval("document.querySelector('.lang-switch').textContent.replace(/\\s+/g, '')"), /^일본어·영어$/);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('.lang-switch:not(#zh-switch) .btn.text')].map(b => b.textContent + ':' + b.className)"), ['일본어:btn text', '영어:btn text', '중국어:btn text'], '기존 .btn.text 링크 스타일');
+  assert.match(await page.eval("document.querySelector('.lang-switch').textContent.replace(/\\s+/g, '')"), /^일본어·영어·중국어$/);
+  assert.equal(await page.eval("document.getElementById('zh-switch').hidden"), true, '간체·번체 줄은 중국어를 고르기 전에는 숨김');
   assert.deepEqual(await pressed(page), ['ja'], '기본은 일본어');
   const st = await page.eval(`(() => { const [a, b] = [...document.querySelectorAll('.lang-switch .btn.text')].map(x => { const c = getComputedStyle(x); return { w: c.fontWeight, bg: c.backgroundColor, bd: c.borderTopWidth, dec: c.textDecorationLine, h: x.getBoundingClientRect().height, wd: x.getBoundingClientRect().width }; }); return { a, b }; })()`);
   assert.equal(st.a.bd, '0px'); assert.equal(st.b.bd, '0px'); assert.equal(st.a.bg, 'rgba(0, 0, 0, 0)', '박스(배경) 없음');
@@ -133,7 +134,7 @@ test('언어 선택 기억: 영어를 고르면 새로 열어도 영어(안내·
   assert.ok(state.requests.some(r => r.url === '/api/jgrammar/saved' && r.query === '?lang=en'), '저장 목록은 영어 것을 요청');
   assert.ok(!state.requests.some(r => r.url === '/api/jgrammar/saved' && r.query === '?lang=ja'));
   assert.deepEqual(await savedTexts(page), [EN, 'He runs.']);
-  await page.eval("localStorage.setItem('jgrammar_lang', 'zh-Hans')");   // 알 수 없는 저장값은 무시
+  await page.eval("localStorage.setItem('jgrammar_lang', 'zh-CN')");   // 알 수 없는 저장값은 무시
   await page.close();
   page = await open();
   assert.deepEqual(await pressed(page), ['ja'], '알 수 없는 저장값은 일본어');

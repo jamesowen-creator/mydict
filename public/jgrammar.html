@@ -38,6 +38,7 @@
   .btn.text { padding: var(--sp-0) var(--sp-8); color: var(--color-text-sub); background: none; text-decoration: underline; font-weight: 500; }
   .btn.text:hover { background: none; color: var(--color-text); }
   .lang-switch { display: flex; align-items: center; margin-bottom: var(--sp-4); color: var(--color-text-sub); }   /* 작업313: 언어 선택 — 박스 없이 텍스트 링크(.btn.text), 선택된 항목만 진하게 */
+  .lang-switch[hidden] { display: none; }   /* 작업314: 중국어를 고를 때만 보이는 간체·번체 줄 */
   .lang-switch .btn.text { min-width: var(--ctl-min-h); }
   .lang-switch .btn.text[aria-pressed="true"] { color: var(--color-text); font-weight: 700; text-decoration: none; }
   .photo-links { display: flex; align-items: center; gap: var(--sp-8); }
@@ -64,6 +65,7 @@
   .source { padding-bottom: var(--sp-8); font-size: var(--fs-22); line-height: 1.6; }
   .source rt { font-size: var(--fs-11); font-weight: 400; color: var(--color-text-sub); }
   #result.no-furigana .source rt { display: none; }
+  #result.pinyin .source ruby { white-space: nowrap; margin-right: var(--sp-4); }   /* 작업314: 병음은 글자 폭이 넓어, 한 단어의 병음이 줄 끝에서 끊기거나 이웃 병음과 붙어 보이지 않게 */
   .g-item { padding: var(--sp-16) 0; border-top: 1px solid var(--color-line); }
   .g-head { display: flex; align-items: baseline; gap: var(--sp-8); flex-wrap: wrap; }
   .g-name { font-size: var(--fs-18); font-weight: 700; }
@@ -98,6 +100,13 @@
     <button type="button" class="btn text" data-lang="ja" aria-pressed="true">일본어</button>
     <span aria-hidden="true">·</span>
     <button type="button" class="btn text" data-lang="en" aria-pressed="false">영어</button>
+    <span aria-hidden="true">·</span>
+    <button type="button" class="btn text" data-lang-group="zh" aria-pressed="false">중국어</button>
+  </p>
+  <p class="lang-switch" id="zh-switch" role="group" aria-label="중국어 글자체" hidden>
+    <button type="button" class="btn text" data-lang="zh-Hans" aria-pressed="false">간체</button>
+    <span aria-hidden="true">·</span>
+    <button type="button" class="btn text" data-lang="zh-Hant" aria-pressed="false">번체</button>
   </p>
   <p class="lead" id="lead">일본어 문장을 입력하면 그 문장을 이해하는 데 필요한 문법을 골라 설명해 드립니다.</p>
   <textarea id="sentence" aria-label="일본어 문장" maxlength="200" lang="ja" placeholder="例: 私は毎日学校に行きます。" autocomplete="off"></textarea>
@@ -127,18 +136,29 @@
     for (var i = 0; i < chars.length; i++) { if (/\p{Script=Latin}/u.test(chars[i])) latin++; else if (/\p{L}/u.test(chars[i])) other++; }
     return latin > 0 && other <= latin;
   }
-  // 작업313: 언어별 화면 설정(서버 lib/jgrammar.js 의 LANGS 와 같은 값). 중국어(zh-Hans·zh-Hant)는 작업314 에서 추가
+  // 작업314: 중국어 — 한자가 하나라도 있고 일본어 가나(히라가나·가타카나)가 없으면 통과. 간체·번체 글자체는 검사하지 않는다(서버 looksChinese 와 같은 기준)
+  function looksChinese(text) { return /[\u3400-\u4DBF\u4E00-\u9FFF\u{20000}-\u{2FA1F}]/u.test(text) && !/[\u3040-\u30FF]/.test(text); }
+  // 작업313: 언어별 화면 설정(서버 lib/jgrammar.js 의 LANGS 와 같은 값). reading: 원문 위 읽기 표시 종류(furigana·pinyin·없음). 작업314: 중국어 간체·번체 추가
   var LANG_UI = {
-    ja: { name: '일본어', max: 200, htmlLang: 'ja', speech: 'ja-JP', test: function (t) { return KANA_KANJI.test(t); }, furigana: true, levelKey: 'jlpt', levelPrefix: 'JLPT ',
+    ja: { name: '일본어', max: 200, htmlLang: 'ja', speech: 'ja-JP', test: function (t) { return KANA_KANJI.test(t); }, reading: 'furigana', levelKey: 'jlpt', levelPrefix: 'JLPT ',
       lead: '일본어 문장을 입력하면 그 문장을 이해하는 데 필요한 문법을 골라 설명해 드립니다.', aria: '일본어 문장', placeholder: '例: 私は毎日学校に行きます。',
       empty: '일본어 문장을 입력해 주세요.', notLang: '일본어 문장(히라가나·가타카나·한자)을 입력해 주세요.', noneFound: '일본어 문장을 찾지 못했습니다.', disclaimer: 'AI가 생성한 설명과 읽기라 틀릴 수 있습니다' },
-    en: { name: '영어', max: 300, htmlLang: 'en', speech: 'en-US', test: looksEnglish, furigana: false, levelKey: 'level', levelPrefix: 'CEFR ',
+    en: { name: '영어', max: 300, htmlLang: 'en', speech: 'en-US', test: looksEnglish, reading: null, levelKey: 'level', levelPrefix: 'CEFR ',
       lead: '영어 문장을 입력하면 그 문장을 이해하는 데 필요한 문법을 골라 설명해 드립니다.', aria: '영어 문장', placeholder: 'e.g. She has lived in Seoul since 2020.',
       empty: '영어 문장을 입력해 주세요.', notLang: '선택한 언어(영어)의 문장이 아닙니다. 영어 문장을 입력해 주세요.', noneFound: '영어 문장을 찾지 못했습니다.', disclaimer: 'AI가 생성한 설명이라 틀릴 수 있습니다' },
+    'zh-Hans': { name: '중국어', max: 200, htmlLang: 'zh-Hans', speech: 'zh-CN', test: looksChinese, reading: 'pinyin', levelKey: 'level', levelPrefix: 'HSK ',
+      lead: '중국어(간체) 문장을 입력하면 그 문장을 이해하는 데 필요한 문법을 골라 설명해 드립니다.', aria: '중국어 간체 문장', placeholder: '例：我每天去学校。',
+      empty: '중국어 문장을 입력해 주세요.', notLang: '선택한 언어(중국어 간체)의 문장이 아닙니다. 중국어 문장(한자)을 입력해 주세요.', noneFound: '중국어 문장을 찾지 못했습니다.', disclaimer: 'AI가 생성한 설명과 병음이라 틀릴 수 있습니다' },
+    'zh-Hant': { name: '중국어', max: 200, htmlLang: 'zh-Hant', speech: 'zh-TW', test: looksChinese, reading: 'pinyin', levelKey: 'level', levelPrefix: 'HSK ',
+      lead: '중국어(번체) 문장을 입력하면 그 문장을 이해하는 데 필요한 문법을 골라 설명해 드립니다.', aria: '중국어 번체 문장', placeholder: '例：我每天去學校。',
+      empty: '중국어 문장을 입력해 주세요.', notLang: '선택한 언어(중국어 번체)의 문장이 아닙니다. 중국어 문장(한자)을 입력해 주세요.', noneFound: '중국어 문장을 찾지 못했습니다.', disclaimer: 'AI가 생성한 설명과 병음이라 틀릴 수 있습니다' },
   };
   var LANG_KEY = 'jgrammar_lang';
   var lang = 'ja';   // 현재 선택한 언어. 시작할 때 localStorage 의 값을 읽고(try/catch), 바꾸면 입력·결과·읽어주기를 초기화한다
   try { var savedLang = localStorage.getItem(LANG_KEY); if (savedLang && Object.prototype.hasOwnProperty.call(LANG_UI, savedLang)) lang = savedLang; } catch (e) { /* 읽지 못하면 일본어 */ }
+  var ZH_KEY = 'jgrammar_zh';   // 마지막에 쓴 간체/번체(처음 중국어를 고르면 간체)
+  var lastZh = lang.indexOf('zh') === 0 ? lang : 'zh-Hans';
+  if (lang.indexOf('zh') !== 0) { try { var savedZh = localStorage.getItem(ZH_KEY); if (savedZh === 'zh-Hans' || savedZh === 'zh-Hant') lastZh = savedZh; } catch (e) { /* 읽지 못하면 간체 */ } }
   function cur() { return LANG_UI[lang]; }
   var $ = function (id) { return document.getElementById(id); };
   var input = $('sentence'), go = $('go'), msg = $('msg'), result = $('result'), count = $('count'), picks = $('picks');
@@ -280,7 +300,7 @@
 
   // 작업JG-7: 원문 위에 후리가나. ruby(조각 배열)가 입력 문장과 정확히 맞고 형식이 올바를 때만 쓰고, 아니면(없음·null·옛 형식·어긋남) 원문만 보여 준다.
   // AI 응답은 innerHTML 없이 요소를 만들어 textContent 로만 넣는다.
-  var FURIGANA_KEY = 'jgrammar_furigana';
+  var FURIGANA_KEY = 'jgrammar_furigana', PINYIN_KEY = 'jgrammar_pinyin';
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 저장이 안 돼도 동작한다 */ } }
   // ── 읽어주기(듣기): 브라우저 내장 speechSynthesis 만 쓴다. 읽을 텍스트는 서버로 보내지 않고, 사용자가 링크를 눌렀을 때만 읽는다(자동 재생 없음). ──
@@ -304,9 +324,14 @@
   }
   function normLang(l) { return String(l || '').toLowerCase().replace('_', '-'); }
   // 작업313: 선택한 언어(code: 'ja'|'en')로 시작하는 음성 중 ja-JP / en-US 를 우선해 고른다. 없으면 null
+  // 작업314: 중국어(code 'zh-Hans'|'zh-Hant')는 간체 zh-CN / 번체 zh-TW 를 우선하고 없으면 그 밖의 zh 음성. 광둥어(yue·zh-HK) 음성은 제외한다
   function pickVoice(voices, code) {
-    var pref = code === 'en' ? 'en-us' : 'ja-jp';
-    var m = (voices || []).filter(function (v) { return v && normLang(v.lang).indexOf(code) === 0; });
+    var zh = code.indexOf('zh') === 0, base = zh ? 'zh' : code;
+    var pref = zh ? (code === 'zh-Hant' ? 'zh-tw' : 'zh-cn') : (code === 'en' ? 'en-us' : 'ja-jp');
+    var m = (voices || []).filter(function (v) {
+      if (!v || normLang(v.lang).indexOf(base) !== 0) return false;
+      return !(zh && (normLang(v.lang).indexOf('yue') >= 0 || normLang(v.lang).indexOf('-hk') >= 0 || /cantonese|粵|粤/i.test(String(v.name || ''))));
+    });
     return m.filter(function (v) { return normLang(v.lang) === pref; })[0] || m[0] || null;
   }
   // 일본어(ja 로 시작) 음성 중 ja-JP 를 우선해 고른다. 없으면 null
@@ -315,6 +340,7 @@
   // 작업313: 영어(code 'en')는 . ! ? 뒤에 공백이나 끝이 올 때 나누고(3.5·U.S.A 같은 중간 마침표는 나누지 않음), 쉼표도 없으면 단어 사이(공백)에서 자른다. 일본어(기본)는 예전 그대로
   function splitForSpeech(text, max, code) {
     var chars = Array.from(String(text)), out = [], cur = [], en = code === 'en';
+    var brk = String(code).indexOf('zh') === 0 ? /[、,，；;：:]/ : /[、,，]/;   // 작업314: 중국어는 ，；： 도 긴 문장을 자르는 기준
     var flush = function () { var t = cur.join('').trim(); if (t) out.push(t); cur = []; };
     var endsEn = function (i) {
       var c = chars[i], next = chars[i + 1];
@@ -328,7 +354,7 @@
       if (en ? endsEn(i) : (/[。！？!?\n]/.test(c) && !/[」』）)”]/.test(chars[i + 1] || ''))) flush();
       else if (cur.length >= max) {
         var k = -1;
-        for (var j = cur.length - 1; j > cur.length / 3; j--) if (/[、,，]/.test(cur[j])) { k = j; break; }
+        for (var j = cur.length - 1; j > cur.length / 3; j--) if (brk.test(cur[j])) { k = j; break; }
         if (k < 0 && en) for (var w = cur.length - 1; w > cur.length / 3; w--) if (/\s/.test(cur[w])) { k = w; break; }
         if (k >= 0) { var rest = cur.slice(k + 1); cur = cur.slice(0, k + 1); flush(); cur = rest; } else flush();
       }
@@ -344,6 +370,7 @@
     ruby.forEach(function (piece) {
       if (piece.reading) { var r = document.createElement('ruby'); r.appendChild(document.createTextNode(piece.text)); r.appendChild(el('rt', null, piece.reading)); p.appendChild(r); }
       else p.appendChild(document.createTextNode(piece.text));
+      if (cur().reading === 'pinyin') p.appendChild(document.createElement('wbr'));   // 병음 단어는 줄 중간에서 끊기지 않게 nowrap 으로 두고, 단어 사이에서만 줄바꿈하도록 <wbr>(글자가 아니라 textContent 는 그대로)
     });
     return p;
   }
@@ -445,18 +472,20 @@
   function render(r, sentence) {
     stopSpeech();   // 새 분석·저장 항목 열기 등으로 결과를 다시 그리면 읽던 것을 멈춘다
     result.textContent = '';
-    var ruby = cur().furigana ? usableRuby(r.ruby, sentence) : null;   // 영어에는 읽기(ruby)가 없다
+    var rk = cur().reading, readingKey = rk === 'pinyin' ? PINYIN_KEY : FURIGANA_KEY, readingName = rk === 'pinyin' ? '병음' : '후리가나';
+    var ruby = rk ? usableRuby(r.ruby, sentence) : null;   // 영어에는 읽기(ruby)가 없다. 일본어는 후리가나, 중국어는 병음
     var hasReading = !!ruby && ruby.some(function (p) { return !!p.reading; });
-    result.classList.toggle('no-furigana', lsGet(FURIGANA_KEY) === 'off');
+    result.classList.toggle('pinyin', rk === 'pinyin');
+    result.classList.toggle('no-furigana', lsGet(readingKey) === 'off');   // 같은 클래스가 rt(후리가나·병음)를 가린다
     var tools = el('div', 'result-tools');
     var area = el('span', 'speak-area');
     tools.appendChild(area);
-    speakCtx = { text: cur().furigana ? speechText(r, sentence) : sentence, area: area, buttons: {} };   // 읽을 텍스트는 후리가나 표시 켜기/끄기와 무관
+    speakCtx = { text: rk === 'furigana' ? speechText(r, sentence) : sentence, area: area, buttons: {} };   // 읽을 텍스트는 후리가나 표시 켜기/끄기와 무관
     renderSpeakArea();
     if (hasReading) {   // 읽기가 없는 결과(옛 형식·null·한자 없음)에서는 토글 링크를 숨긴다
       var tg = el('button', 'btn text furi-toggle'); tg.type = 'button';
-      var sync = function () { var off = result.classList.contains('no-furigana'); tg.textContent = off ? '후리가나 켜기' : '후리가나 끄기'; tg.setAttribute('aria-pressed', off ? 'false' : 'true'); };
-      tg.addEventListener('click', function () { var off = !result.classList.contains('no-furigana'); result.classList.toggle('no-furigana', off); lsSet(FURIGANA_KEY, off ? 'off' : 'on'); sync(); });
+      var sync = function () { var off = result.classList.contains('no-furigana'); tg.textContent = off ? readingName + ' 켜기' : readingName + ' 끄기'; tg.setAttribute('aria-pressed', off ? 'false' : 'true'); };
+      tg.addEventListener('click', function () { var off = !result.classList.contains('no-furigana'); result.classList.toggle('no-furigana', off); lsSet(readingKey, off ? 'off' : 'on'); sync(); });
       sync(); tools.appendChild(tg);
     }
     if (tools.firstChild.firstChild || hasReading) result.appendChild(tools);
@@ -511,11 +540,15 @@
 
   // ── 작업313: 언어 선택. 바꾸면 입력창·결과·사진 후보·메시지·읽어주기(읽는 중이면 정지)를 초기화하고 저장 목록을 그 언어 것으로 다시 불러온다. 선택은 localStorage 에 기억(실패해도 동작) ──
   var langBtns = Array.prototype.slice.call(document.querySelectorAll('.lang-switch [data-lang]'));
+  var zhGroupBtn = document.querySelector('.lang-switch [data-lang-group="zh"]'), zhRow = $('zh-switch');
   function applyLang() {
     var ui = cur();
     input.maxLength = ui.max; input.lang = ui.htmlLang; input.placeholder = ui.placeholder; input.setAttribute('aria-label', ui.aria);
     $('lead').textContent = ui.lead;
     langBtns.forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-lang') === lang ? 'true' : 'false'); });
+    var isZh = lang.indexOf('zh') === 0;
+    zhGroupBtn.setAttribute('aria-pressed', isZh ? 'true' : 'false');
+    zhRow.hidden = !isZh;   // 간체·번체 줄은 중국어를 고를 때만
     updateCount();
   }
   function setLang(code) {
@@ -523,11 +556,13 @@
     stopSpeech();
     lang = code;
     lsSet(LANG_KEY, code);
+    if (code.indexOf('zh') === 0) { lastZh = code; lsSet(ZH_KEY, code); }
     input.value = ''; picks.hidden = true; picks.textContent = ''; result.hidden = true; result.textContent = ''; speakCtx = null; setMsg('');
     applyLang();
     if (!$('main').hidden) loadSaved();   // 권한이 없으면 저장 목록은 요청도 하지 않는다
   }
   langBtns.forEach(function (b) { b.addEventListener('click', function () { setLang(b.getAttribute('data-lang')); }); });
+  zhGroupBtn.addEventListener('click', function () { setLang(lastZh); });   // 중국어를 다시 고르면 마지막에 쓴 간체/번체
   applyLang();
 })();
 </script>

@@ -139,3 +139,47 @@ test('영어 조각 나누기: . ! ? 뒤 공백/끝에서 나누고 숫자 안�
   assert.deepEqual(G.splitForSpeech('今日は雨です。明日は晴れますか？', 80, 'ja'), ['今日は雨です。', '明日は晴れますか？']);
   assert.deepEqual(G.splitForSpeech('Hi. Yes! Ok', 80), ['Hi. Yes!', 'Ok'], '일본어 경로는 예전처럼 ASCII 마침표에서 나누지 않고 ! ? 에서만 나눈다(변경 없음)');
 });
+
+// ───── 작업314: 중국어 읽어주기(순수 함수) ─────
+test('중국어 음성 고르기: 간체 zh-CN·번체 zh-TW 우선, 없으면 그 밖의 zh, 광둥어(yue·zh-HK·이름 Cantonese)는 제외, 없으면 null. ja·en 은 그대로', () => {
+  const cn = { name: 'Ting', lang: 'zh-CN' }, tw = { name: 'Mei', lang: 'zh-TW' }, hk = { name: 'Sinji', lang: 'zh-HK' }, yue = { name: 'Y', lang: 'yue-HK' }, zyue = { name: 'Z', lang: 'zh-yue' }, hant = { name: 'H', lang: 'zh-Hant-HK' };
+  const named = { name: 'Cantonese (HK)', lang: 'zh-CN' }, ja = { name: 'Kyoko', lang: 'ja-JP' }, en = { name: 'Sam', lang: 'en-US' }, under = { name: 'U', lang: 'zh_CN' };
+  assert.equal(G.pickVoice([hk, tw, cn, ja], 'zh-Hans'), cn);
+  assert.equal(G.pickVoice([hk, cn, tw, ja], 'zh-Hant'), tw);
+  assert.equal(G.pickVoice([hk, tw, ja], 'zh-Hans'), tw, '간체에 zh-CN 이 없으면 다른 zh');
+  assert.equal(G.pickVoice([hk, cn, ja], 'zh-Hant'), cn, '번체에 zh-TW 가 없으면 다른 zh');
+  assert.equal(G.pickVoice([under, ja], 'zh-Hans'), under, 'zh_CN 표기도 허용');
+  for (const code of ['zh-Hans', 'zh-Hant']) {
+    assert.equal(G.pickVoice([hk, yue, zyue, hant, named, ja, en], code), null, '광둥어만 있으면 null: ' + code);
+    assert.equal(G.pickVoice([ja, en], code), null);
+    assert.equal(G.pickVoice([], code), null); assert.equal(G.pickVoice(null, code), null); assert.equal(G.pickVoice([null, { lang: undefined }], code), null);
+  }
+  assert.equal(G.pickVoice([cn, tw, en, ja], 'ja'), ja); assert.equal(G.pickVoice([cn, tw, en, ja], 'en'), en);
+  assert.equal(G.pickVoice([cn, tw, ja], 'en'), null);
+});
+
+test('중국어 조각 나누기: 。！？ 에서 나누고, 길면 ，；：、 에서 자른다(80자 이하·이어 붙이면 원문과 같음). 일본어 규칙은 그대로', () => {
+  const t = '今天天气很好。你去哪儿？我去学校！';
+  assert.deepEqual(G.splitForSpeech(t, 80, 'zh-Hans'), ['今天天气很好。', '你去哪儿？', '我去学校！']);
+  assert.deepEqual(G.splitForSpeech(t, 80, 'zh-Hant'), ['今天天气很好。', '你去哪儿？', '我去学校！']);
+  const long = ('我昨天去了图书馆' + '；').repeat(4) + ('他说：这本书很有意思' + '，').repeat(5) + '我们都同意。';
+  for (const code of ['zh-Hans', 'zh-Hant']) {
+    const parts = G.splitForSpeech(long, 25, code);
+    assert.ok(parts.length >= 4);
+    for (const p of parts) assert.ok(Array.from(p).length <= 25, p);
+    assert.equal(parts.join(''), long);
+    assert.ok(parts.slice(0, -1).every(p => /[。！？，；：]$/.test(p)), '문장부호에서 나뉨: ' + JSON.stringify(parts));
+  }
+  // 콜론·세미콜론이 있어도 일본어 경로는 그 문장부호를 기준으로 삼지 않는다(예전 그대로: 、,， 만)
+  const ja = 'あ'.repeat(10) + '；' + 'い'.repeat(10) + '、' + 'う'.repeat(10);
+  assert.deepEqual(G.splitForSpeech(ja, 15).map(x => x.length), [15, 7, 10], '일본어: ； 는 기준이 아니라 15자에서 자르고, 이어서 、 에서 자름');
+  assert.deepEqual(G.splitForSpeech(ja, 15, 'ja').map(x => x.length), [15, 7, 10]);
+});
+
+test('소스 규칙(작업314): 중국어 읽을 텍스트는 원문 그대로(speechText 는 후리가나(ja)에서만), zh 설정 한 줄에 lang(zh-CN·zh-TW), 병음 토글 키는 후리가나와 따로', () => {
+  assert.match(html, /'zh-Hans': \{[^\n]*speech: 'zh-CN'/);
+  assert.match(html, /'zh-Hant': \{[^\n]*speech: 'zh-TW'/);
+  assert.match(html, /text: rk === 'furigana' \? speechText\(r, sentence\) : sentence/);
+  assert.match(html, /FURIGANA_KEY = 'jgrammar_furigana', PINYIN_KEY = 'jgrammar_pinyin'/);
+  assert.equal(G.speechText({ ruby: [{ text: '学习', reading: 'xué xí' }] }, '学习'), 'xué xí', '함수 자체는 ja 용 치환(중국어에서는 화면이 호출하지 않는다)');
+});

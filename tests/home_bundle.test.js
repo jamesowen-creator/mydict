@@ -23,6 +23,7 @@ test('index.html 이 가리키는 번들(.js 1개·.css 1개)이 모두 있고 a
 test('번들: 일본어 문법 정식 항목(라벨·주소)은 있고, "(임시)" 링크 문구와 삭제된 개념학습 주소는 없다', () => {
   const code = js();
   assert.ok(code.includes('/jgrammar.html') && code.includes('문장 학습'));
+  assert.ok(code.includes('일본어·영어·중국어 문장 속 문법을 AI가 풀어주기'), '작업314: 설명 문구에 중국어 추가');
   assert.ok(!code.includes('일본어 문법 (임시)') && !code.includes('(임시)'));
   assert.ok(!code.includes('/concept_study.html') && !code.includes('개념학습'));
   for (const url of ['/english_dictionary.html', '/literature_compass.html', '/digest_reading.html', '/science_reading.html', '/voice_study.html', '/artist_notes.html', '/concept_map.html']) assert.ok(code.includes(url), '기존 진입 주소 유지: ' + url);

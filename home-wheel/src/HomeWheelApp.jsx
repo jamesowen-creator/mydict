@@ -20,7 +20,7 @@ const CMAP_OPTION = { id: 'cmap', name: '개념 지도', description: '주제별
 
 // 작업N: 일본어 문법 정식 항목(예전 휠 아래 "일본어 문법 (임시)" 링크를 대체). perm_jgrammar 가 true 인 계정과 관리자(role=admin — ADMIN_EMAILS 계정은 /api/me 가 admin 으로 돌려줌)에게만 보인다.
 // 위치는 언어 사전 바로 다음: 언어를 다루는 항목끼리 이웃하게 하고, 기존 항목의 순서는 그대로 둔 채 사이에만 끼운다. 라벨·설명은 다른 항목과 같은 방식이다.
-const JGRAMMAR_OPTION = { id: 'jgrammar', name: '문장 학습', description: '일본어·영어 문장 속 문법을 AI가 풀어주기', url: '/jgrammar.html' };
+const JGRAMMAR_OPTION = { id: 'jgrammar', name: '문장 학습', description: '일본어·영어·중국어 문장 속 문법을 AI가 풀어주기', url: '/jgrammar.html' };
 
 // 로그인한 사용자 기준 휠 항목: 기본 6개 + (권한자) 일본어 문법(언어 사전 다음) + (권한자) 개념 지도(맨 끝). 로그인 전·권한 없음이면 기본 6개 그대로.
 function buildOptions(user) {

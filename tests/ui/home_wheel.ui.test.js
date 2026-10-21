@@ -90,7 +90,7 @@ test('일본어 문법 항목을 가운데로 돌려 누르면 /jgrammar.html �
   await page.eval("document.querySelector('[role=listbox]').focus()");
   await key(page, 'ArrowDown', 'ArrowDown', 40);
   await page.waitFor("(document.querySelector('[role=option][aria-selected=true]') || { getAttribute: () => '' }).getAttribute('aria-label').startsWith('문장 학습')", 4000);
-  assert.match(await page.eval("document.querySelector('[role=option][aria-selected=true]').getAttribute('aria-label')"), /^문장 학습 — /, '라벨·설명 형식은 다른 항목과 같다');
+  assert.match(await page.eval("document.querySelector('[role=option][aria-selected=true]').getAttribute('aria-label')"), /^문장 학습 — 일본어·영어·중국어 문장 속 문법을 AI가 풀어주기/, '라벨·설명 형식은 다른 항목과 같다(작업314: 설명에 중국어 추가)');
   await sleep(400);
   await page.click('[role=option][aria-selected=true]');
   await page.waitFor("location.pathname === '/jgrammar.html'", 6000);

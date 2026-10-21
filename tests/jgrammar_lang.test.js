@@ -307,14 +307,14 @@ test('하루 한도는 언어와 무관하게 합산(ja 분석 + en 분석 + en 
 });
 
 // ───── lang 오류와 권한 순서 ─────
-test('lang 이 모르는 값·zh-Hans·zh-Hant 이면 400 — explain·ocr·saved 모두 AI·캐시·저장·사용량·한도 계산이 없다', async t => {
+test('lang 이 모르는 값이면 400(zh-Hans·zh-Hant 는 작업314 에서 정상 언어가 됨) — explain·ocr·saved 모두 AI·캐시·저장·사용량·한도 계산이 없다', async t => {
   const a = await setup();
   t.after(() => a.t.close());
-  for (const lang of ['fr', 'zh-Hans', 'zh-Hant', 'EN', 'Ja', '', 'zh', 'ko']) {
+  for (const lang of ['fr', 'EN', 'Ja', '', 'zh', 'ko', 'zh-hans', 'zh_Hans', 'zh-CN', 'zh-Hans ']) {
     const e = await a.post(EN_SENTENCE, lang), s = await a.saved(lang), o = await a.ocr(PNG, lang);
     assert.deepEqual([e.status, s.status, o.status], [400, 400, 400], JSON.stringify(lang));
     assert.equal(e.body.ok, false);
-    assert.equal(e.body.error, lang.startsWith('zh-') ? J.MSG.unsupportedLang : J.MSG.unknownLang, lang);
+    assert.equal(e.body.error, J.MSG.unknownLang, lang);
   }
   assert.equal((await a.t.call('POST', '/api/jgrammar/explain', { sentence: EN_SENTENCE, lang: 5 }, { user: 1 })).status, 400);
   assert.equal((await a.t.call('POST', '/api/jgrammar/explain', { sentence: EN_SENTENCE, lang: ['en'] }, { user: 1 })).status, 400);
@@ -329,15 +329,15 @@ test('권한 없음 403 과 비로그인 401 은 lang 검사보다 먼저(잘못
   const a = await setup();
   t.after(() => a.t.close());
   for (const user of [3, 77, 9]) {
-    assert.equal((await a.post(EN_SENTENCE, 'zh-Hans', user)).status, 403, 'explain ' + user);
-    assert.equal((await a.saved('zh-Hant', user)).status, 403, 'saved ' + user);
+    assert.equal((await a.post(EN_SENTENCE, 'fr', user)).status, 403, 'explain ' + user);
+    assert.equal((await a.saved('ko', user)).status, 403, 'saved ' + user);
     assert.equal((await a.ocr(PNG, 'fr', { user })).status, 403, 'ocr ' + user);
   }
-  assert.equal((await a.post(EN_SENTENCE, 'zh-Hans', null)).status, 401);
+  assert.equal((await a.post(EN_SENTENCE, 'fr', null)).status, 401);
   assert.equal((await a.saved('fr', null)).status, 401);
   assert.equal((await a.ocr(PNG, 'fr', { user: null })).status, 401);
   assert.equal((await a.post(EN_SENTENCE, 'en', 3)).status, 403, '올바른 lang 이어도 권한 없으면 403');
-  assert.equal((await a.post(EN_SENTENCE, 'zh-Hans', 4)).status, 400, '관리자는 권한을 통과한 뒤 lang 에서 400');
+  assert.equal((await a.post(EN_SENTENCE, 'fr', 4)).status, 400, '관리자는 권한을 통과한 뒤 lang 에서 400');
   assert.equal(a.anthropic.calls.length, 0);
   assert.deepEqual(nonUserQueries(a.db), []);
 });
@@ -412,5 +412,6 @@ test('소스: 서버가 쓰는 lang 만 받고(저장 SQL 에 lang 인자), ja �
   assert.deepEqual(J.resolveLang('en'), { lang: 'en' }); assert.deepEqual(J.resolveLang('ja'), { lang: 'ja' });
   assert.equal(J.LANGS.en.speech, 'en-US'); assert.equal(J.LANGS.ja.speech, 'ja-JP');
   assert.equal(J.LANGS.en.maxSentence, 300); assert.equal(J.LANGS.ja.maxSentence, 200);
-  assert.equal(J.LANGS['zh-Hans'], undefined); assert.equal(J.LANGS['zh-Hant'], undefined);
+  assert.equal(J.LANGS['zh-Hans'].speech, 'zh-CN'); assert.equal(J.LANGS['zh-Hant'].speech, 'zh-TW');   // 작업314: 중국어를 켬
+  assert.deepEqual(J.resolveLang('zh-Hans'), { lang: 'zh-Hans' }); assert.deepEqual(J.resolveLang('zh-Hant'), { lang: 'zh-Hant' });
 });

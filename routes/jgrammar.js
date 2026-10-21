@@ -23,7 +23,7 @@ async function requireJgrammarPerm(req, res, next) {
   }
 }
 
-// 작업313: lang(없으면 ja). 모르는 값·아직 지원하지 않는 값(zh-Hans·zh-Hant)은 400 — 권한 검사 바로 다음이라 AI·캐시·한도 계산이 일어나지 않는다.
+// 작업313: lang(없으면 ja). 모르는 값은 400(작업314: zh-Hans·zh-Hant 는 정상 언어) — 권한 검사 바로 다음이라 AI·캐시·한도 계산이 일어나지 않는다.
 // explain 은 본문(JSON), ocr 과 saved 는 쿼리(?lang=)로 받는다(ocr 본문은 이미지 바이너리).
 function langFrom(source) {
   return (req, res, next) => {

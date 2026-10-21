@@ -283,6 +283,8 @@ test('HTML 문자열이 들어간 원문은 요소가 되지 않고 글자 그�
 test('읽을 텍스트는 서버로 보내지 않는다: 읽는 동안 새 요청이 없고, 읽을 때 쓴 reading 문자열이 어떤 요청 본문에도 없다', { skip: SKIP }, async () => {
   const page = await open([JA]);
   await analyze(page, S1);
+  for (let i = 0; i < 50 && state.requests.filter(r => r.url === '/api/jgrammar/saved').length < 2; i++) await sleep(100);   // 분석 뒤 저장 목록 재요청(부하가 크면 늦게 도착)이 끝난 다음에 기록을 비운다
+  await sleep(150);
   state.requests.length = 0;
   await tap(page, 'normal'); await page.waitFor('window.__speech.spoken.length === 1', 3000);
   await tap(page, 'slow'); await page.waitFor('window.__speech.spoken.length === 2', 3000);
