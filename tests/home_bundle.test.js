@@ -22,7 +22,7 @@ test('index.html 이 가리키는 번들(.js 1개·.css 1개)이 모두 있고 a
 
 test('번들: 일본어 문법 정식 항목(라벨·주소)은 있고, "(임시)" 링크 문구와 삭제된 개념학습 주소는 없다', () => {
   const code = js();
-  assert.ok(code.includes('/jgrammar.html') && code.includes('일본어 문법'));
+  assert.ok(code.includes('/jgrammar.html') && code.includes('문장 학습'));
   assert.ok(!code.includes('일본어 문법 (임시)') && !code.includes('(임시)'));
   assert.ok(!code.includes('/concept_study.html') && !code.includes('개념학습'));
   for (const url of ['/english_dictionary.html', '/literature_compass.html', '/digest_reading.html', '/science_reading.html', '/voice_study.html', '/artist_notes.html', '/concept_map.html']) assert.ok(code.includes(url), '기존 진입 주소 유지: ' + url);
@@ -32,7 +32,7 @@ test('홈 소스: 일본어 문법은 언어 사전 바로 다음에 끼우고(�
   const src = fs.readFileSync(path.join(__dirname, '..', 'home-wheel', 'src', 'HomeWheelApp.jsx'), 'utf8');
   assert.match(src, /user\.perm_jgrammar === true \|\| user\.role === 'admin'/);
   assert.match(src, /list\.splice\(list\.findIndex\(\(o\) => o\.id === 'dictionary'\) \+ 1, 0, JGRAMMAR_OPTION\)/);
-  assert.match(src, /id: 'jgrammar', name: '일본어 문법'[^}]*url: '\/jgrammar\.html'/);
+  assert.match(src, /id: 'jgrammar', name: '문장 학습'[^}]*url: '\/jgrammar\.html'/);
   assert.ok(!/\(임시\)/.test(src.replace(/\/\/[^\n]*|\{\/\*[\s\S]*?\*\/\}/g, '')), '코드(주석 제외)에 (임시) 문구 없음');
   const ids = [...src.matchAll(/\{ id: '(\w+)', name:/g)].map(m => m[1]);
   assert.deepEqual(ids.slice(0, 6), ['dictionary', 'literature', 'digest', 'science', 'voice', 'artist_notes'], '기존 6개의 순서');

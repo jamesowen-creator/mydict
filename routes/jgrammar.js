@@ -7,7 +7,7 @@ const router = express.Router();
 
 // 작업JG-2: 권한은 users.perm_jgrammar 가 명시적으로 true 인 계정만 통과(fail-closed: DB 없음·조회 실패·행 없음·차단 계정은 거부). 관리자는 항상 허용한다.
 // 이 검사는 캐시 조회·AI 호출·한도 계산보다 앞이라, 거부되면 그 어느 것도 일어나지 않는다. 개념 지도와 코드를 공유하지 않는다.
-const DENIED = { ok: false, error: '일본어 문법 사용 권한이 없습니다.' };
+const DENIED = { ok: false, error: '문장 학습 사용 권한이 없습니다.' };
 async function requireJgrammarPerm(req, res, next) {
   if (ADMIN_EMAILS.includes((req.user.email || '').toLowerCase())) return next();
   if (!process.env.DATABASE_URL) return res.status(403).json(DENIED);
@@ -22,6 +22,19 @@ async function requireJgrammarPerm(req, res, next) {
     res.status(403).json(DENIED);
   }
 }
+
+// 작업313: lang(없으면 ja). 모르는 값·아직 지원하지 않는 값(zh-Hans·zh-Hant)은 400 — 권한 검사 바로 다음이라 AI·캐시·한도 계산이 일어나지 않는다.
+// explain 은 본문(JSON), ocr 과 saved 는 쿼리(?lang=)로 받는다(ocr 본문은 이미지 바이너리).
+function langFrom(source) {
+  return (req, res, next) => {
+    const r = J.resolveLang(source(req));
+    if (r.error) return res.status(400).json({ ok: false, error: r.error });
+    req.lang = r.lang;
+    next();
+  };
+}
+const queryLang = langFrom(req => req.query.lang);
+const bodyLang = langFrom(req => (req.body && typeof req.body === 'object' ? req.body.lang : undefined));
 
 // 작업JG-3: 사진 → 일본어 문장 인식. 원본 이미지 바이너리를 Content-Type(image/*)으로 받는다(개념학습 음성 변환과 같은 방식).
 // 순서: 로그인 → 권한 → 형식(415) → 본문 읽기·용량(413) → 하루 한도 → AI. 권한이 없으면 본문을 읽지도 않는다. 이미지는 메모리에서만 쓰고 저장하지 않는다.
@@ -38,9 +51,9 @@ function requireImageType(req, res, next) {
   next();
 }
 
-router.post('/api/jgrammar/ocr', requireAuth, requireJgrammarPerm, requireImageType, imageBody, async (req, res) => {
+router.post('/api/jgrammar/ocr', requireAuth, requireJgrammarPerm, queryLang, requireImageType, imageBody, async (req, res) => {
   try {
-    const out = await J.ocr(req.user.id, req.body, baseType(req));
+    const out = await J.ocr(req.user.id, req.body, baseType(req), req.lang);
     res.status(out.status).json(out.body);
   } catch (err) {
     console.error('jgrammar ocr error:', err && err.message);
@@ -48,10 +61,10 @@ router.post('/api/jgrammar/ocr', requireAuth, requireJgrammarPerm, requireImageT
   }
 });
 
-router.post('/api/jgrammar/explain', requireAuth, requireJgrammarPerm, async (req, res) => {
+router.post('/api/jgrammar/explain', requireAuth, requireJgrammarPerm, bodyLang, async (req, res) => {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const out = await J.explain(req.user.id, body.sentence);
+    const out = await J.explain(req.user.id, body.sentence, req.lang);
     res.status(out.status).json(out.body);
   } catch (err) {
     console.error('jgrammar error:', err && err.message);
@@ -60,9 +73,9 @@ router.post('/api/jgrammar/explain', requireAuth, requireJgrammarPerm, async (re
 });
 
 // 작업JG-6: 사용자별 저장 목록. 권한 검사(JG-2)가 가장 앞이라 권한이 없으면 DB 조회·저장·삭제가 일어나지 않는다. 본인 항목만 다룬다.
-router.get('/api/jgrammar/saved', requireAuth, requireJgrammarPerm, async (req, res) => {
+router.get('/api/jgrammar/saved', requireAuth, requireJgrammarPerm, queryLang, async (req, res) => {
   try {
-    res.json({ ok: true, items: await J.listSaved(req.user.id) });
+    res.json({ ok: true, items: await J.listSaved(req.user.id, req.lang) });
   } catch (err) {
     console.error('jgrammar saved list error:', (err && (err.code || err.name)) || 'unknown');
     res.status(500).json({ ok: false, error: '서버 오류가 발생했습니다.' });

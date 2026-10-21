@@ -42,7 +42,7 @@ function splitEdgeTypesStep(sqlsAll) {
   return { edgeStep: sqls.slice(i, end), without: sqls.slice(0, i).concat(sqls.slice(end)) };
 }
 // 작업JG-1: jgrammar_cache 단계의 문장(CREATE TABLE 1개)은 맨 끝에 있다. 개념 지도와 무관하므로 따로 떼어 낸다
-const JG_SQL = /^(CREATE TABLE IF NOT EXISTS jgrammar_cache|ALTER TABLE users ADD COLUMN IF NOT EXISTS perm_jgrammar|CREATE TABLE IF NOT EXISTS jgrammar_saved|CREATE INDEX IF NOT EXISTS idx_jgrammar_saved_)/;   // 작업JG-6: 저장 목록 테이블·인덱스 포함   // 작업JG-2: 권한 열 추가 문장 포함
+const JG_SQL = /^(CREATE TABLE IF NOT EXISTS jgrammar_cache|ALTER TABLE users ADD COLUMN IF NOT EXISTS perm_jgrammar|CREATE TABLE IF NOT EXISTS jgrammar_saved|CREATE INDEX IF NOT EXISTS idx_jgrammar_saved_|ALTER TABLE jgrammar_(cache|saved) ADD COLUMN IF NOT EXISTS lang )/;   // 작업313: 언어 코드 열 추가 문장 포함   // 작업JG-6: 저장 목록 테이블·인덱스 포함   // 작업JG-2: 권한 열 추가 문장 포함
 // 작업CL-1: 개념학습 전용 테이블 삭제 문장(맨 끝, 한 문장)
 const CL_DROP_SQL = 'DROP TABLE IF EXISTS concept_quiz_attempts, concept_links, concept_items, concept_studies, concept_migrations';
 function withoutCmap(sqlsAll0) {

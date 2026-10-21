@@ -14,7 +14,7 @@ test.after(async () => { if (browser) await browser.close(); if (srv) await srv.
 const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
 const userToken = () => `${b64({ alg: 'none' })}.${b64({ id: 7, role: 'user', exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`;
 const BASE6 = ['언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '작가 노트'];
-const WITH_JG = ['언어 사전', '일본어 문법', '문학 나침반', '한입 독서', '과학', '음성 학습', '작가 노트'];
+const WITH_JG = ['언어 사전', '문장 학습', '문학 나침반', '한입 독서', '과학', '음성 학습', '작가 노트'];
 
 async function openHome(me, { token = userToken(), width = 390, height = 844 } = {}) {
   srv.reset();
@@ -89,8 +89,8 @@ test('일본어 문법 항목을 가운데로 돌려 누르면 /jgrammar.html �
   const page = await openHome({ perm_jgrammar: true });
   await page.eval("document.querySelector('[role=listbox]').focus()");
   await key(page, 'ArrowDown', 'ArrowDown', 40);
-  await page.waitFor("(document.querySelector('[role=option][aria-selected=true]') || { getAttribute: () => '' }).getAttribute('aria-label').startsWith('일본어 문법')", 4000);
-  assert.match(await page.eval("document.querySelector('[role=option][aria-selected=true]').getAttribute('aria-label')"), /^일본어 문법 — /, '라벨·설명 형식은 다른 항목과 같다');
+  await page.waitFor("(document.querySelector('[role=option][aria-selected=true]') || { getAttribute: () => '' }).getAttribute('aria-label').startsWith('문장 학습')", 4000);
+  assert.match(await page.eval("document.querySelector('[role=option][aria-selected=true]').getAttribute('aria-label')"), /^문장 학습 — /, '라벨·설명 형식은 다른 항목과 같다');
   await sleep(400);
   await page.click('[role=option][aria-selected=true]');
   await page.waitFor("location.pathname === '/jgrammar.html'", 6000);

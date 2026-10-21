@@ -90,7 +90,9 @@ test('소스 규칙: speechSynthesis 만 쓰고(외부 음성 API·서버 호출
   assert.match(html, /addEventListener\('click', function \(\) \{ onSpeakClick\(m\); \}\)/);
   // 속도·언어
   assert.match(html, /SPEAK_RATE = \{ normal: 1\.0, slow: 0\.7 \}/);
-  assert.match(html, /u\.lang = voice \? voice\.lang : 'ja-JP'/);
+  assert.match(html, /u\.lang = voice \? voice\.lang : LANG_UI\[lang\]\.speech/);   // 작업313: 음성이 없을 때의 기본 lang 이 언어 설정(ja: 'ja-JP', en: 'en-US')에서 온다
+  assert.match(html, /ja: \{[^\n]*speech: 'ja-JP'/);
+  assert.match(html, /en: \{[^\n]*speech: 'en-US'/);
   // 읽는 텍스트는 fetch 본문으로 보내지 않는다: 이 파일의 fetch 호출은 기존 7개 주소뿐
   const urls = [...html.matchAll(/fetch\('([^']+)'/g)].map(x => x[1]);
   assert.deepEqual([...new Set(urls)].sort(), ['/api/jgrammar/explain', '/api/jgrammar/ocr', '/api/jgrammar/saved', '/api/jgrammar/saved/', '/api/me'].sort());
@@ -103,4 +105,37 @@ test('소스 규칙: 정지 조건 — 결과를 다시 그릴 때(새 분석·�
   assert.match(html, /if \(!file\) return;\n    stopSpeech\(\);/);
   assert.match(html, /addEventListener\('pagehide', stopSpeech\)/);
   assert.match(html, /addEventListener\('beforeunload', stopSpeech\)/);
+});
+
+// ───── 작업313: 영어 읽어주기(순수 함수) ─────
+const G = new Function(m[1] + '\nreturn { pickVoice, splitForSpeech, speechText };')();
+
+test('영어 음성 고르기: en-US 우선, 없으면 en 으로 시작하는 것, 없으면 null. 일본어 고르기는 그대로', () => {
+  const us = { name: 'Sam', lang: 'en-US' }, gb = { name: 'Dan', lang: 'en-GB' }, ja = { name: 'Kyoko', lang: 'ja-JP' }, under = { name: 'A', lang: 'en_US' };
+  assert.equal(G.pickVoice([gb, ja, us], 'en'), us);
+  assert.equal(G.pickVoice([ja, gb], 'en'), gb);
+  assert.equal(G.pickVoice([ja, under], 'en'), under, 'en_US 표기도 허용');
+  assert.equal(G.pickVoice([ja, { name: 'zh', lang: 'zh-CN' }], 'en'), null);
+  assert.equal(G.pickVoice([], 'en'), null); assert.equal(G.pickVoice(null, 'en'), null);
+  assert.equal(G.pickVoice([us, gb, ja], 'ja'), ja);
+  assert.equal(G.pickVoice([us, gb], 'ja'), null);
+});
+
+test('영어 조각 나누기: . ! ? 뒤 공백/끝에서 나누고 숫자 안의 마침표·약어 안은 나누지 않으며, 이어 붙이면 원문과 같다. max 를 넘으면 쉼표, 없으면 단어 사이에서 자른다', () => {
+  const t = 'Pi is about 3.14. Is it true? Yes! He said "Go." Then left.';
+  const parts = G.splitForSpeech(t, 80, 'en');
+  assert.deepEqual(parts, ['Pi is about 3.14.', 'Is it true?', 'Yes!', 'He said "Go."', 'Then left.']);
+  assert.equal(parts.join(' '), t);
+  assert.deepEqual(G.splitForSpeech('', 80, 'en'), []);
+  const long = 'This is a rather long sentence that keeps going without any comma at all until it must be cut somewhere reasonable';
+  const cut = G.splitForSpeech(long, 40, 'en');
+  assert.ok(cut.length >= 3);
+  for (const p of cut) { assert.ok(Array.from(p).length <= 40, p); assert.ok(!/^\s|\s$/.test(p)); }
+  assert.equal(cut.join(' '), long, '단어 중간에서 자르지 않는다');
+  const comma = 'First part of the sentence, second part of the sentence, third part of the sentence here';
+  assert.ok(G.splitForSpeech(comma, 40, 'en').every(p => Array.from(p).length <= 40));
+  // 일본어 경로(기본값·'ja')는 예전과 같다
+  assert.deepEqual(G.splitForSpeech('今日は雨です。明日は晴れますか？', 80), ['今日は雨です。', '明日は晴れますか？']);
+  assert.deepEqual(G.splitForSpeech('今日は雨です。明日は晴れますか？', 80, 'ja'), ['今日は雨です。', '明日は晴れますか？']);
+  assert.deepEqual(G.splitForSpeech('Hi. Yes! Ok', 80), ['Hi. Yes!', 'Ok'], '일본어 경로는 예전처럼 ASCII 마침표에서 나누지 않고 ! ? 에서만 나눈다(변경 없음)');
 });

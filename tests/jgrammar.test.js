@@ -37,7 +37,7 @@ function createJgDb({ blocked = [], failCacheRead = false, failUsers = false } =
         return db.cache.has(params[0]) ? { rows: [{ result: db.cache.get(params[0]).result }] } : { rows: [] };
       }
       if (/INSERT INTO jgrammar_cache/.test(sql)) {
-        if (!db.cache.has(params[0])) db.cache.set(params[0], { sentence: params[1], result: JSON.parse(params[2]), model: params[3] });
+        if (!db.cache.has(params[0])) db.cache.set(params[0], { sentence: params[1], result: JSON.parse(params[2]), model: params[3], lang: params[4] });   // 작업313: lang 열
         return { rows: [] };
       }
       if (/^UPDATE jgrammar_cache SET result = \$2, model = \$3 WHERE sentence_hash = \$1/.test(sql.trim())) {   // 작업JG-7
@@ -46,9 +46,9 @@ function createJgDb({ blocked = [], failCacheRead = false, failUsers = false } =
       }
       if (/jgrammar_saved/.test(sql)) {   // 작업JG-6
         if (db.failSaved) throw Object.assign(new Error('saved down'), { code: 'XX000' });
-        const mine = uid => [...db.saved.values()].filter(r => r.user_id === uid).sort((a, b) => b.last_used_at - a.last_used_at || b.id - a.id);
+        const mine = (uid, lang) => [...db.saved.values()].filter(r => r.user_id === uid && (r.lang || 'ja') === lang).sort((a, b) => b.last_used_at - a.last_used_at || b.id - a.id);
         if (/^INSERT INTO jgrammar_saved/.test(sql.trim())) {
-          const [user_id, sentence_hash, sentence, result] = params;
+          const [user_id, sentence_hash, sentence, result, lang] = params;   // 작업313: lang 열
           if (!db.users.has(user_id)) throw Object.assign(new Error('fk'), { code: '23503' });   // users 행이 없으면 외래 키 위반
           const key = user_id + ':' + sentence_hash;
           if (db.saved.has(key)) {   // ON CONFLICT DO UPDATE SET last_used_at = now(), result = CASE WHEN (저장본에 ruby 키 없음) AND (새 결과에 ruby 키 있음) THEN 새 결과 ELSE 저장본 END
@@ -56,12 +56,12 @@ function createJgDb({ blocked = [], failCacheRead = false, failUsers = false } =
             row.last_used_at = ++db.clock;
             if (!Object.prototype.hasOwnProperty.call(row.result, 'ruby') && Object.prototype.hasOwnProperty.call(next, 'ruby')) row.result = next;
           }
-          else { const t = ++db.clock; db.saved.set(key, { id: db.nextId++, user_id, sentence_hash, sentence, result: JSON.parse(result), created_at: t, last_used_at: t }); }
+          else { const t = ++db.clock; db.saved.set(key, { id: db.nextId++, user_id, sentence_hash, sentence, result: JSON.parse(result), lang, created_at: t, last_used_at: t }); }
           return { rows: [] };
         }
-        if (/^DELETE FROM jgrammar_saved WHERE user_id = \$1 AND id IN/.test(sql.trim())) {   // 상한 정리: 최신 100건 밖을 삭제
+        if (/^DELETE FROM jgrammar_saved WHERE user_id = \$1 AND lang = \$2 AND id IN/.test(sql.trim())) {   // 상한 정리: 그 언어의 최신 100건 밖을 삭제(작업313: 언어별)
           const m = sql.match(/OFFSET (\d+)/);
-          for (const r of mine(params[0]).slice(Number(m[1]))) db.saved.delete(r.user_id + ':' + r.sentence_hash);
+          for (const r of mine(params[0], params[1]).slice(Number(m[1]))) db.saved.delete(r.user_id + ':' + r.sentence_hash);
           return { rows: [] };
         }
         if (/^DELETE FROM jgrammar_saved WHERE id = \$1 AND user_id = \$2/.test(sql.trim())) {
@@ -69,9 +69,9 @@ function createJgDb({ blocked = [], failCacheRead = false, failUsers = false } =
           if (!hit) return { rows: [] };
           db.saved.delete(hit[0]); return { rows: [{ id: params[0] }] };
         }
-        if (/^SELECT id, sentence, result, created_at, last_used_at FROM jgrammar_saved WHERE user_id = \$1/.test(sql.trim())) {
+        if (/^SELECT id, sentence, result, created_at, last_used_at FROM jgrammar_saved WHERE user_id = \$1 AND lang = \$2/.test(sql.trim())) {
           const m = sql.match(/LIMIT (\d+)/);
-          return { rows: mine(params[0]).slice(0, Number(m[1])).map(r => ({ id: r.id, sentence: r.sentence, result: r.result, created_at: r.created_at, last_used_at: r.last_used_at })) };
+          return { rows: mine(params[0], params[1]).slice(0, Number(m[1])).map(r => ({ id: r.id, sentence: r.sentence, result: r.result, created_at: r.created_at, last_used_at: r.last_used_at })) };
         }
         throw new Error('지원하지 않는 SQL: ' + sql);
       }
@@ -536,7 +536,8 @@ test('저장: AI 로 새로 만든 설명이 본인 목록에 문장 원문(공�
   assert.equal(rows[0].sentence, '猫が好き');
   assert.equal(rows[0].sentence_hash, J.hashSentence('猫が好き'));
   assert.deepEqual(rows[0].result, r.body.result);
-  assert.deepEqual(Object.keys(rows[0]).sort(), ['created_at', 'id', 'last_used_at', 'result', 'sentence', 'sentence_hash', 'user_id'], '저장 항목은 문장과 결과만(이미지·인식 목록 없음)');
+  assert.deepEqual(Object.keys(rows[0]).sort(), ['created_at', 'id', 'lang', 'last_used_at', 'result', 'sentence', 'sentence_hash', 'user_id'], '저장 항목은 문장과 결과(+작업313 언어 코드)만(이미지·인식 목록 없음)');
+  assert.equal(rows[0].lang, 'ja', '언어 없이 부르면 ja 로 저장');
 });
 
 test('저장: 캐시 적중(다른 사용자가 먼저 만든 문장)도 본인 목록에 저장된다. AI 는 부르지 않는다', async t => {
