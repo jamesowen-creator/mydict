@@ -10,7 +10,7 @@ let browser, srv;
 test.before(async () => { if (SKIP) return; srv = await startMockServer(); browser = await launchBrowser(); });
 test.after(async () => { if (browser) await browser.close(); if (srv) await srv.close(); });
 
-const PAGES = ['english_dictionary', 'literature_compass', 'digest_reading', 'science_reading', 'voice_study'];
+const PAGES = ['english_dictionary', 'literature_compass', 'digest_reading', 'science_reading', 'voice_study', 'spelling_run'];   // spelling_run: 헤더·뒤로가기만 앱 규격(무대는 몰입형 예외라 box_sweep·text_containers·btn_contrast·ui_consistency 목록에는 넣지 않는다)
 const me = role => ({ id: 7, email: 'u7@example.com', name: '테스터', role, perm_voice_study: true, perm_concept_study: true,
   perm_literature_compass: true, perm_digest_reading: true, perm_science_reading: true });
 

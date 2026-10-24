@@ -586,6 +586,10 @@
   .wb-side-btn.active-ja { border-color: var(--accent-ja); color: var(--accent-ja); background: rgba(179,38,30,0.06); }
   .wb-side-btn.active-zh { border-color: var(--accent-zh); color: var(--accent-zh); background: rgba(192,57,43,0.06); }
   .wb-side-btn.danger.active { border-color: var(--color-danger-ink, #B42318); color: var(--wrong); background: rgba(239,68,68,0.08); }
+  /* 선택 게임(스펠링 런) 선택 줄 버튼: 인라인 style 대신 클래스로 둔다 */
+  .wb-spell-all { white-space: nowrap; font-size: 12px; padding: 8px 12px; }
+  .wb-spell-go { flex: 1; font-size: 13px; padding: 10px 12px; }
+  .wb-spell-cancel { white-space: nowrap; font-size: 12px; padding: 8px 12px; }
   .wb-main { flex: 1; min-width: 0; }
 
   /* Selection action bar (전체선택/재생 or 전체선택/선택 삭제/취소) - sticks
@@ -1609,6 +1613,7 @@
         <div class="wb-side-group">
           <button class="wb-side-btn" id="wb-mode-listen-btn" onclick="setWordbookMode('listen')"><span class="wb-side-icon">🎙</span><span>선택 듣기</span></button>
           <button class="wb-side-btn" id="wb-mode-quiz-btn" onclick="setWordbookMode('quiz')"><span class="wb-side-icon">🎯</span><span>선택 퀴즈</span></button>
+          <button class="wb-side-btn" id="wb-mode-spell-btn" onclick="setWordbookMode('spell')"><span>선택 게임</span></button>
         </div>
 
         <div class="wb-side-group wb-side-gap-before">
@@ -1785,7 +1790,13 @@ async function initAuth() {
   } catch (e) {
     console.error('[initAuth] 로그인 후 초기화 중 예외 발생 (검색 화면은 계속 진행함):', e);
   }
-  showPage('search');
+  // 스펠링 런에서 돌아올 때(#wordbook)는 검색 탭이 아니라 단어장을 연다. 해시가 없으면 기존처럼 검색 탭.
+  if (location.hash === '#wordbook') {
+    showPage('wordbook', false);
+    try { history.replaceState({ page: 'wordbook' }, '', location.pathname + location.search); } catch (e) { /* 무시 */ }
+  } else {
+    showPage('search');
+  }
 }
 
 function showLoginScreen() {
@@ -3018,6 +3029,7 @@ function updateSelectedBtn() {
   if (btn) {
     const label = wordbookMode === 'delete' ? '🗑 선택 삭제'
       : wordbookMode === 'quiz' ? '🎯 퀴즈'
+      : wordbookMode === 'spell' ? '게임 시작'
       : '🎧 재생';
     btn.textContent = `${label} (${count}개)`;
     btn.disabled = count === 0;
@@ -3071,6 +3083,19 @@ function startSelectedWordsQuiz() {
   startQuiz(words);
 }
 
+// 선택한 영어 단어로 스펠링 런(spelling_run.html)을 시작한다. 단어 id 배열만 sessionStorage로 넘기고, 게임 페이지가 /api/wordbook에서 직접 받아 쓴다.
+const SPELLRUN_MIN_WORDS = 3;
+function startSpellRunSelected() {
+  const tab = currentWordbookTab;
+  if (tab !== 'en') { showToast('선택 게임은 영어 단어장에서만 가능합니다.'); return; }
+  const words = wordbook.filter(w => (w.lang || 'en') === tab && selectedWords.has(w.word + '|' + tab));
+  const ids = words.map(w => w.id).filter(id => id != null);
+  if (ids.length < SPELLRUN_MIN_WORDS) { showToast('게임은 단어를 ' + SPELLRUN_MIN_WORDS + '개 이상 선택해야 시작할 수 있습니다.'); return; }
+  try { sessionStorage.setItem('spellrun_ids', JSON.stringify(ids)); }
+  catch (e) { showToast('게임을 시작하지 못했습니다. 브라우저 저장 설정을 확인해 주세요.'); return; }
+  location.href = '/spelling_run.html';
+}
+
 async function confirmDeleteSelectedWords() {
   const tab = currentWordbookTab;
   const words = wordbook.filter(w => (w.lang || 'en') === tab && selectedWords.has(w.word + '|' + tab));
@@ -3088,6 +3113,11 @@ async function confirmDeleteSelectedWords() {
 // 다른 모드를 누르면 자동으로 이전 모드가 꺼지고 새 모드로 전환됨
 // (wordbookMode가 단일 값이라 둘이 동시에 켜지는 상태 자체가 존재하지 않음).
 function setWordbookMode(mode) {
+  // 선택 게임(스펠링 런)은 영어 단어장에서만: 다른 언어 탭이면 모드에 들어가지 않고 안내만 한다
+  if (mode === 'spell' && wordbookMode !== 'spell' && currentWordbookTab !== 'en') {
+    showToast('선택 게임은 영어 단어장에서만 가능합니다.');
+    return;
+  }
   wordbookMode = (wordbookMode === mode) ? 'none' : mode;
   selectedWords.clear();
   updateModeButtons();
@@ -3098,9 +3128,11 @@ function setWordbookMode(mode) {
 function updateModeButtons() {
   const listenBtn = document.getElementById('wb-mode-listen-btn');
   const quizBtn = document.getElementById('wb-mode-quiz-btn');
+  const spellBtn = document.getElementById('wb-mode-spell-btn');
   const deleteBtn = document.getElementById('wb-mode-delete-btn');
   if (listenBtn) listenBtn.classList.toggle('active', wordbookMode === 'listen');
   if (quizBtn) quizBtn.classList.toggle('active', wordbookMode === 'quiz');
+  if (spellBtn) spellBtn.classList.toggle('active', wordbookMode === 'spell');
   if (deleteBtn) deleteBtn.classList.toggle('active', wordbookMode === 'delete');
 }
 
@@ -3117,6 +3149,11 @@ function updateSelectRow() {
       '<button class="btn secondary" onclick="toggleSelectAll()" id="wb-select-all-btn" style="white-space:nowrap;font-size:12px;padding:8px 12px">전체선택</button>' +
       '<button class="btn" onclick="startSelectedWordsQuiz()" id="wb-selected-action-btn" style="flex:1;font-size:13px;padding:10px 12px;background:var(--accent);opacity:0.4" disabled>🎯 퀴즈 (0개)</button>' +
       '<button class="btn secondary" onclick="setWordbookMode(\'quiz\')" style="font-size:12px;padding:8px 12px;white-space:nowrap">취소</button>';
+  } else if (wordbookMode === 'spell') {
+    row.innerHTML =
+      '<button class="btn secondary wb-spell-all" onclick="toggleSelectAll()" id="wb-select-all-btn">전체선택</button>' +
+      '<button class="btn wb-spell-go" onclick="startSpellRunSelected()" id="wb-selected-action-btn" disabled>게임 시작 (0개)</button>' +
+      '<button class="btn secondary wb-spell-cancel" onclick="setWordbookMode(\'spell\')">취소</button>';
   } else if (wordbookMode === 'delete') {
     row.innerHTML =
       '<button class="btn secondary" onclick="toggleSelectAll()" id="wb-select-all-btn" style="white-space:nowrap;font-size:12px;padding:8px 12px">전체선택</button>' +

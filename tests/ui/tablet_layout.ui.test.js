@@ -31,6 +31,7 @@ const SCREENS = {
   lit: { file: '/literature_compass.html', ready: DB_READY + HDR, states: [['목록'], ['퀴즈', "quizData = { rounds: [{ type: 'mcq', questions: [{ question: '문제 하나', options: ['가', '나', '다', '라'], answer: '다' }] }], currentRound: 0, currentQ: 0, score: 0, wrong: [], totalQ: 1 }; showView('view-quiz'); renderQuizRound();"], ['결과', "quizData = { rounds: [], currentRound: 0, currentQ: 0, score: 1, totalQ: 2, wrong: [{ q: 'a', a: 'b' }] }; showResult()"]] },
   sci: { file: '/science_reading.html', ready: DB_READY + HDR, states: [['목록'], ['상세', 'showScience(DB.concepts[0].id)'], ['퀴즈', READ_QUIZ], ['결과', READ_RESULT]] },
   artist: { file: '/artist_notes.html', ready: DB_READY + HDR, states: [['목록'], ['상세', 'showArtist(DB.artists[0].id)'], ['정복', 'renderAndShowConq()'], ['퀴즈', ART_QUIZ], ['결과', ART_RESULT]] },   // 작업131: 작가 노트
+  spell: { file: '/spelling_run.html', ready: "!!document.querySelector('.metis-app-header-logo') && document.getElementById('gateMsg').textContent !== '불러오는 중...'", states: [['안내']] },   // 스펠링 런(몰입형 예외 화면): 헤더·제목 바·본문 열만 검사. 무대 가로 폭은 spellrun.ui.test.js 가 본다
   dict: { file: '/english_dictionary.html', ready: "!!document.querySelector('.metis-app-header-logo') && !!document.querySelector('nav')", token: true, states: [['홈'], ['플레이어', "document.getElementById('podcast-player').classList.add('show')"]] },
 };
 // 한 상태에서 잰 값: 헤더(바깥·안쪽 로고), 제목 바, body, 본문 컨테이너, fixed/sticky 요소 전부
@@ -77,7 +78,7 @@ const near = (a, b, tol = 1) => Math.abs(a - b) <= tol;
 const FIXED_EXCEPT = { '#toast': 'center', '#ocr-open': 'right16' };
 
 for (const w of [768, 820, 1024, 1280]) {
-  test(`223 태블릿 ${w}px: 7개 화면의 헤더·제목 바·본문·fixed/sticky 요소가 문학 나침반과 같은 680px 열의 가운데(좌우 여백 차이 ≤ 1px)`, { skip: SKIP }, async () => {
+  test(`223 태블릿 ${w}px: 8개 화면의 헤더·제목 바·본문·fixed/sticky 요소가 문학 나침반과 같은 680px 열의 가운데(좌우 여백 차이 ≤ 1px)`, { skip: SKIP }, async () => {
     const col0 = (w - 680) / 2, col1 = col0 + 680;
     const ref = (await states('lit', w, ['목록']))['목록'];
     assert.ok(near(ref.header.x0, col0) && near(ref.header.x1, col1), `기준(문학 나침반) 헤더 ${ref.header.x0}~${ref.header.x1}`);
@@ -106,7 +107,7 @@ for (const w of [768, 820, 1024, 1280]) {
 }
 
 for (const w of [320, 390]) {
-  test(`223 폰 ${w}px: 6개 화면(대표 상태)에 가로 스크롤 없음(문서 폭 ≤ ${w}), 헤더·body가 화면 전체 폭`, { skip: SKIP }, async () => {
+  test(`223 폰 ${w}px: 7개 화면(대표 상태)에 가로 스크롤 없음(문서 폭 ≤ ${w}), 헤더·body가 화면 전체 폭`, { skip: SKIP }, async () => {
     for (const key of Object.keys(SCREENS)) {
       for (const [st, m] of Object.entries(await states(key, w))) {
         assert.ok(m.sw <= w, `${key} ${w}px [${st}]: 문서 폭 ${m.sw} > ${w}`);

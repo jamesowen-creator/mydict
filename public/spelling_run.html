@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>스펠링 런</title>
+<link rel="icon" type="image/png" href="/icons/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/common/appHeader.css">
+<link rel="stylesheet" href="/css/common/tokens.css">
+<link rel="stylesheet" href="/css/common/screenBar.css">
+<style>
+  /* 스펠링 런: 껍데기(헤더·뒤로가기·안내)만 앱 규격(tokens.css)을 따른다. 무대(캔버스·HUD)는 몰입형 예외로 js/spellrun/stage_style.js 가 자체 색으로 그린다.
+     이 파일 안에는 직접 지정한 색·이모지가 없다(design_lint 기준선 0). */
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  body { font-size: var(--body-font-size); font-family: var(--font-sans); background: var(--color-bg); color: var(--color-text); line-height: 1.5; max-width: var(--content-max); margin: 0 auto; overflow-x: hidden; }
+  .content { max-width: var(--content-max); margin: 0 auto; padding: var(--sp-16) var(--gutter) var(--sp-24); }
+  .msg { font-size: var(--fs-14); color: var(--color-text-sub); }
+  .gate-link { display: inline-flex; align-items: center; min-height: var(--ctl-min-h); color: var(--color-text-sub); font-size: var(--fs-14); font-weight: 500; text-decoration: underline; }
+  .gate-link:hover { color: var(--color-text); }
+</style>
+</head>
+<body>
+
+<script src="/js/common/appHeader.js"></script>
+<script>MetisAppHeader.inject();</script>
+
+<script src="/js/common/dialog.js"></script>
+<script>if (!window.metisConfirm) { window.metisConfirm = function (m) { return Promise.resolve(confirm(m)); }; }   // dialog.js를 못 불렀을 때 기본 확인창으로 대체</script>
+
+<div class="screen-bar">
+  <a class="screen-bar-back" href="/english_dictionary.html#wordbook" aria-label="단어장으로">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <h1 class="screen-bar-title">스펠링 런</h1>
+</div>
+
+<main class="content">
+  <div id="gate">
+    <p class="msg" id="gateMsg" role="status">불러오는 중...</p>
+    <p><a class="gate-link" id="gateLink" href="/english_dictionary.html#wordbook" hidden></a></p>
+  </div>
+
+  <div id="app" hidden>
+    <div class="sr-stage" id="stage">
+      <div class="sr-box" id="box">
+        <canvas id="cv" role="img" aria-label="스펠링 런 게임 화면"></canvas>
+
+        <div class="hud" id="hud" hidden>
+          <div class="row">
+            <div class="hearts" id="hearts" role="img"></div>
+            <div class="scorebox"><span class="combo" id="combo" hidden></span><span class="score" id="score">0</span></div>
+          </div>
+          <div class="row">
+            <span class="progress" id="progress"></span>
+            <span class="speedtag" id="speedTag"></span>
+            <button class="snd" id="snd" type="button">소리 켬</button>
+          </div>
+          <div class="meaning" id="meaning"></div>
+          <div class="word" id="word"></div>
+        </div>
+
+        <div class="popword" id="pop" hidden>
+          <div class="tag" id="popTag"></div>
+          <div class="pw" id="popWord"></div>
+          <div class="pm" id="popMean"></div>
+          <div class="pn" id="popNote"></div>
+        </div>
+
+        <div class="banner" id="bossBanner" hidden>
+          <div class="b1">BOSS</div>
+          <div class="b2" id="bossSub"></div>
+        </div>
+
+        <section class="screen" id="start">
+          <div class="card">
+            <h1 class="title">스펠링 런</h1>
+            <ul class="rules">
+              <li>뜻에 맞는 철자를 채워 단어를 완성합니다. 탭(스페이스바)으로 점프하고, 정답 글자가 지나갈 때 공중에 있으면 먹습니다.</li>
+              <li>맞힐수록 빨라지고 5콤보부터는 최고 속도입니다. 빠를수록 점수가 높고, 틀리면 속도가 줄어듭니다.</li>
+              <li class="mint">오답을 먹거나 정답을 놓치면 체력이 1 줄고, 같은 칸에 새 글자가 나옵니다.</li>
+              <li class="gold">금색 테두리 조각은 한 음절(2~4글자)을 통째로 먹는 칸이라 점수가 높습니다.</li>
+              <li class="red">3단어마다 하트가 하나 나옵니다. 점프해서 먹으면 체력이 1 회복됩니다.</li>
+              <li>단어를 모두 끝내면 보스 단어가 나오고, 끝까지 먹으면 발음이 한 번 더 천천히 나옵니다.</li>
+            </ul>
+            <button class="btn" id="startBtn" type="button" disabled>달리기 시작</button>
+            <p class="note" id="startInfo"></p>
+            <p class="note" id="startExcluded" hidden></p>
+            <div class="trow">
+              <button class="toggle" id="sndStart" type="button">소리 켬</button>
+              <button class="toggle" id="ttsTest" type="button">발음 테스트</button>
+            </div>
+            <p class="note" id="ttsStatus" aria-live="polite"></p>
+            <p class="note" id="speechNote" hidden>이 기기에서는 발음 재생을 지원하지 않습니다.</p>
+          </div>
+        </section>
+
+        <section class="screen" id="result" hidden>
+          <div class="card">
+            <h2 class="title small" id="resTitle"></h2>
+            <div class="big" id="resScore">0</div>
+            <div class="stats">
+              <div><b id="resDone">0</b>완성한 단어</div>
+              <div><b id="resCombo">0</b>최고 콤보</div>
+            </div>
+            <div class="chips" id="resChips"></div>
+            <div class="legend"><span class="c">한 번에 완성</span><span class="s">실수 후 완성</span><span class="f">미완성</span><span class="k">도전 안 함</span></div>
+            <p class="note">단어를 탭하면 발음을 다시 들을 수 있습니다.</p>
+            <button class="btn alt" id="revBtn" type="button">틀린 단어만 다시 도전</button>
+            <button class="btn" id="againBtn" type="button">새 판 시작</button>
+          </div>
+        </section>
+      </div>
+      <div class="sr-only" id="live" aria-live="polite"></div>
+    </div>
+  </div>
+</main>
+
+<!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
+<script src="/js/spellrun/logic.js?v=54"></script>
+<script src="/js/spellrun/stage_style.js?v=54"></script>
+<script src="/js/spellrun/game.js?v=54"></script>
+</body>
+</html>
