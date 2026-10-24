@@ -559,3 +559,33 @@ test('318-2. 시작 대기: WORD_START_DELAY 1.6 → 2.2, 첫 단어 추가 0.4�
   assert.equal(CONFIG.WORD_START_DELAY, 2.2); assert.equal(CONFIG.POP_SEC, 1.6); assert.equal(CONFIG.POP_SEC_FINAL, 3.2); assert.equal(CONFIG.FINAL_REPEAT_SEC, 1.6);
   assert.equal(CONFIG.GAP_SEC_FAST, 0.554); assert.equal(CONFIG.JUMP_BUFFER, 0.12);
 });
+
+// ───────── 작업319: 주소 옵션 저장(localStorage 'spellrun_opts') ─────────
+test('319-1. 옵션 병합: 주소 값이 저장값보다 항목 단위로 우선, 저장값은 허용 항목·범위만, 범위 밖 값은 저장하지 않는다', () => {
+  const ro = (s, st) => L.resolveOptions(s, st);
+  assert.equal(L.OPTION_KEY, 'spellrun_opts');
+  let r = ro('?dj=1&hp=7', null);
+  assert.deepEqual(r.values, { dj: 1, hp: 7 }); assert.deepEqual(r.save, { dj: 1, hp: 7 }); assert.equal(r.reset, false);
+  // 옵션 없이 열면 저장값 적용(다시 저장하지는 않는다)
+  r = ro('', JSON.stringify({ dj: 1, hp: 7 }));
+  assert.deepEqual(r.values, { dj: 1, hp: 7 }); assert.equal(r.save, null); assert.deepEqual(r.applied.sort(), ['dj', 'hp']);
+  // 주소가 우선하고 그 항목만 덮어쓴다(나머지 저장값은 유지) → 합친 값을 저장
+  r = ro('?hp=9&pace=1.1', JSON.stringify({ dj: 1, hp: 7, popsec: 2 }));
+  assert.deepEqual(r.values, { dj: 1, hp: 9, popsec: 2, pace: 1.1 }); assert.deepEqual(r.save, r.values);
+  // 범위 밖·숫자 아님은 저장하지 않는다(주소의 유효한 항목만 저장). 유효한 주소 옵션이 없으면 저장 동작 없음
+  r = ro('?hp=99&pace=abc&dj=1', JSON.stringify({ hp: 6 }));
+  assert.deepEqual(r.save, { hp: 6, dj: 1 }); assert.equal(r.values.hp, 6);
+  assert.equal(ro('?hp=99&pace=abc', JSON.stringify({ hp: 6 })).save, null);
+  assert.equal(ro('?foo=1', null).save, null);
+  // 저장값도 같은 규칙을 다시 거친다: 범위 밖·모르는 항목·문자열 숫자·깨진 JSON·배열은 버린다
+  assert.deepEqual(ro('', JSON.stringify({ hp: 99, pace: '1.1', dj: 1, evil: 1, popsec: 0.1, highprob: 0 })).values, { dj: 1, highprob: 0 });
+  for (const bad of ['{', 'null', '[1]', '"x"', '5', '', undefined, null]) assert.deepEqual(ro('', bad).values, {}, String(bad));
+  // reset=1: 저장값 삭제, 기본값으로 시작(다른 주소 옵션도 무시)
+  r = ro('?reset=1&dj=1', JSON.stringify({ dj: 1 }));
+  assert.deepEqual(r, { values: {}, applied: [], save: null, reset: true });
+  assert.equal(ro('?reset=0', JSON.stringify({ dj: 1 })).reset, false);
+  // 기본값과 같은 값만 있으면 적용 표시(applied)가 비어 있다
+  r = ro('?pace=1.3&hp=5&dj=0', JSON.stringify({ heartevery: 3, startdelay: 2.2 }));
+  assert.deepEqual(r.applied, []); assert.ok(Object.keys(r.values).length === 5);
+  assert.deepEqual(ro('', JSON.stringify({ dj: 0 })).applied, []);
+});

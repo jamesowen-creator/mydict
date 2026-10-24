@@ -106,6 +106,31 @@ function parseOptions(search) {
   });
   return { values: values, applied: applied };
 }
+// 작업319: 저장값(localStorage 'spellrun_opts' 의 JSON 문자열)과 주소 옵션을 합친다. 주소가 항목 단위로 우선한다.
+// 저장값도 같은 범위 규칙을 다시 거친다(범위 밖 값·모르는 항목은 버림). ?reset=1 이면 저장값을 지우고 기본값으로 시작한다.
+// 반환 { values, applied, save: 저장할 값(주소에 유효한 옵션이 있을 때만, 아니면 null), reset }
+const OPTION_KEY = 'spellrun_opts';
+function storedOptions(raw) {
+  let o;
+  try { o = JSON.parse(raw); } catch (e) { return {}; }
+  const out = {};
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return out;
+  Object.keys(OPTION_RULES).forEach(function (k) {
+    const rule = OPTION_RULES[k], n = o[k];
+    if (typeof n !== 'number' || !Number.isFinite(n) || n < rule.min || n > rule.max || (rule.int && !Number.isInteger(n))) return;
+    out[k] = n;
+  });
+  return out;
+}
+function resolveOptions(search, storedRaw) {
+  let reset = false;
+  try { reset = new URLSearchParams(String(search || '')).get('reset') === '1'; } catch (e) { reset = false; }
+  if (reset) return { values: {}, applied: [], save: null, reset: true };
+  const url = parseOptions(search).values;
+  const values = Object.assign({}, storedOptions(storedRaw), url);
+  const applied = Object.keys(values).filter(function (k) { return values[k] !== OPTION_RULES[k].def; });
+  return { values: values, applied: applied, save: Object.keys(url).length ? values : null, reset: false };
+}
 function configure(values) { return Object.assign(CONFIG, buildConfig(values)); }
 
 // 화면 배치(논리 px, 360x640 기준). 힌트 아래 끝은 높은 칸(2단 점프) 타일 위쪽보다 위에 있어야 한다.
@@ -483,7 +508,7 @@ return {
   speedLevel: speedLevel, speedMult: speedMult, gapSec: gapSec, leadSec: leadSec, speedAfterHit: speedAfterHit, speedAfterFail: speedAfterFail,
   targetSpeed: targetSpeed, planHearts: planHearts, pickHeartSlot: pickHeartSlot, jumpHeight: jumpHeight, judge: judge, buildRound: buildRound,
   letterCount: letterCount, planRound: planRound, bossConfig: bossConfig,
-  buildConfig: buildConfig, parseOptions: parseOptions, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
+  buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
   wordWidth: wordWidth, fitWord: fitWord, POS_KO: POS_KO, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint
 };

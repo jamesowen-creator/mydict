@@ -76,7 +76,7 @@
 .sr-box .hint .h-alt,.sr-box .hint .h-note{font-weight:500;font-size:calc(var(--hfs,12) * var(--u) * .92);color:var(--ink-soft)}
 .sr-box .hint .h-ex.clip{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .sr-box .hint .h-alt.clip,.sr-box .hint .h-note.clip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sr-box .tune{position:absolute;left:calc(8 * var(--u));bottom:calc(6 * var(--u));font-size:calc(10 * var(--u));font-weight:700;color:var(--gold);pointer-events:none;z-index:5}
+.sr-box .tune{position:absolute;left:0;bottom:0;min-height:44px;padding:0 calc(10 * var(--u));margin:0;background:none;border:0;font-family:var(--f-body);font-size:calc(11 * var(--u));font-weight:700;color:var(--gold);text-decoration:underline;cursor:pointer;z-index:5}
 .sr-box .slot.chunk{
   padding:0 calc(4 * var(--u));margin-top:calc(2 * var(--u));
   background:rgba(255,183,0,.24);border-radius:calc(10 * var(--u));

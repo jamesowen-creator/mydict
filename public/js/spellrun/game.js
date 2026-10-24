@@ -5,7 +5,11 @@
 'use strict';
 
 const L = window.SpellRunLogic;
-const OPT = L.parseOptions(location.search);   // 작업318-5: 주소 옵션. 허용 범위 밖 값은 무시하고, 적용된 것이 있으면 "조정값 사용 중"을 보인다
+// 작업319: 옵션은 기기(localStorage)에 저장해 사전에서 시작해도 이어진다. 주소 값이 저장값보다 우선, ?reset=1 이면 삭제. 저장소를 못 쓰면 이번 방문에만 적용
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const OPT = L.resolveOptions(location.search, lsGet(L.OPTION_KEY));
+try { if (OPT.reset) localStorage.removeItem(L.OPTION_KEY); else if (OPT.save) localStorage.setItem(L.OPTION_KEY, JSON.stringify(OPT.save)); } catch (e) { /* 저장 실패는 무시 */ }
+
 L.configure(OPT.values);                       // CONFIG 를 한 번에 다시 만든다(pace 는 속도·간격·점프 시간에 같은 비율로 반영)
 const CONFIG = L.CONFIG;
 const { planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
@@ -986,7 +990,11 @@ function showGame(words, excluded) {
   els.speechNote.hidden = hasSpeech();
   els.djRule.hidden = !CONFIG.DJ_ENABLED;
   els.tune.hidden = !OPT.applied.length;
-  els.tune.title = OPT.applied.join(', ');
+  els.tune.title = OPT.applied.length ? OPT.applied.join(', ') + ' (누르면 저장값을 지우고 기본값으로)' : '';
+  els.tune.addEventListener('click', () => {   // 저장값을 지우고 옵션 없이 다시 연다
+    try { localStorage.removeItem(L.OPTION_KEY); } catch (e) { /* 무시 */ }
+    location.replace(location.pathname + '?reset=1');
+  });
   els.startBtn.disabled = false;
   requestAnimationFrame(frame);
 }

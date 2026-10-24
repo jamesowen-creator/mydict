@@ -77,6 +77,7 @@ const SPEECH = `(() => {
 async function openGame({ ids, token = true, width = 390, height = 844, speech = false } = {}) {
   state.requests.length = 0;
   const page = await browser.newPage({ width, height, token: token ? jwt() : null });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); } catch (e) {}" });   // 작업319: 저장된 주소 옵션이 다른 시험으로 새지 않게 비운다
   if (!token) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('mydict_token'); } catch (e) {}" });   // 같은 Chrome 프로필을 쓰는 앞선 시험이 남긴 토큰 제거
   if (speech) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
   if (ids) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` });
@@ -387,9 +388,10 @@ const HINT_ROWS = [
 ];
 const WIDTHS = [320, 360, 390, 768, 1024];
 const queryOf = q => (q ? '?' + q : '');
-async function openQ({ ids, query = '', width = 390, height = 844 }) {
+async function openQ({ ids, query = '', width = 390, height = 844, keep = false }) {
   state.requests.length = 0;
   const page = await browser.newPage({ width, height, token: jwt() });
+  if (!keep) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); } catch (e) {}" });   // 작업319: keep=true 가 아니면 저장된 주소 옵션을 비우고 시작
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` });
   await page.goto(base + '/spelling_run.html' + queryOf(query));
   await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
@@ -747,5 +749,105 @@ test('318-5) 주소 옵션: 허용 항목은 적용되고 "조정값 사용 중"
   page = await openQ({ ids: [1, 2, 3], query: 'pace=9&hp=abc&dj=x' });
   assert.equal((await badge(page)).hidden, true, '적용된 옵션이 없으면 표시도 없다');
   assert.deepEqual(await cfgOf(page), base0);
+  await page.close();
+});
+
+// ───────── 작업319: 주소 옵션 저장 ─────────
+const OPTS_KEY = 'spellrun_opts';
+const lsOpts = page => page.eval("localStorage.getItem('spellrun_opts')");
+const clearOpts = async () => { const p = await browser.newPage({ width: 390, height: 844, token: jwt() }); await p.goto(base + '/spelling_run.html?reset=1'); await p.eval("localStorage.removeItem('spellrun_opts')"); await p.close(); };
+
+test('319-1) 옵션만으로 직접 열어(안내 화면) 저장 → 사전에서 "게임 시작"으로 들어가도 적용되고 "조정값 사용 중"이 보인다', { skip: SKIP }, async () => {
+  resetState(); await clearOpts();
+  try {
+    let page = await browser.newPage({ width: 390, height: 844, token: jwt() });
+    await page.goto(base + '/spelling_run.html?dj=1&hp=7&pace=9&popsec=abc');   // 선택 단어 없음 → 안내 화면. pace·popsec 은 범위 밖/숫자 아님
+    await page.waitFor("document.getElementById('gateMsg').textContent !== '불러오는 중...'", 8000);
+    assert.equal(await page.eval("document.getElementById('app').hidden"), true, '안내 화면');
+    assert.deepEqual(JSON.parse(await lsOpts(page)), { dj: 1, hp: 7 }, '유효한 항목만 저장');
+    await page.close();
+    // 사전에서 선택 게임으로 시작
+    resetState();
+    page = await browser.newPage({ width: 390, height: 844, token: jwt() });
+    await page.goto(base + '/english_dictionary.html');
+    await page.waitFor("!!document.querySelector('nav') && typeof wordbook !== 'undefined' && wordbook.length > 5", 12000);
+    await page.eval("showPage('wordbook')");
+    await page.waitFor("document.querySelectorAll('.word-chip-text').length > 5", 5000);
+    await page.eval("switchWordbookTab('en')");
+    await page.click('#wb-mode-spell-btn');
+    for (const w of ['apple', 'book', 'environment']) { const i = await page.eval(`[...document.querySelectorAll('.word-chip-text')].map(e => e.textContent).indexOf(${JSON.stringify(w)})`); await page.click('.word-chip', { index: i }); }
+    await page.click('#wb-selected-action-btn');
+    await page.waitFor("location.pathname === '/spelling_run.html'", 8000);
+    assert.equal(await page.eval('location.search'), '', '사전에서 이동하면 주소 옵션은 없다');
+    await gameReady(page);
+    assert.deepEqual(await page.eval('[SpellRun.CONFIG.DJ_ENABLED, SpellRun.CONFIG.HP]'), [true, 7], '저장값 적용');
+    assert.equal(await page.eval("document.getElementById('tune').hidden"), false);
+    assert.equal(await page.text('#tune'), '조정값 사용 중');
+    assert.match(await page.text('#startInfo'), /체력 7$/);
+    await page.close();
+  } finally { await clearOpts(); }
+});
+
+test('319-1) 주소 값이 저장값을 항목 단위로 덮어쓰고, 기본값과 같은 값만 있으면 표시가 없다', { skip: SKIP }, async () => {
+  resetState(); await clearOpts();
+  try {
+    let p = await openQ({ ids: [1, 2, 3], query: 'dj=1&hp=7' , keep: true }); await p.close();
+    p = await openQ({ ids: [1, 2, 3], query: 'hp=9' , keep: true });
+    assert.deepEqual(await p.eval('[SpellRun.CONFIG.DJ_ENABLED, SpellRun.CONFIG.HP]'), [true, 9]);
+    assert.deepEqual(JSON.parse(await lsOpts(p)), { dj: 1, hp: 9 });
+    await p.close();
+    p = await openQ({ ids: [1, 2, 3] , keep: true });   // 옵션 없음 → 저장값(hp 9)
+    assert.equal(await p.eval('SpellRun.CONFIG.HP'), 9); await p.close();
+    await clearOpts();
+    p = await openQ({ ids: [1, 2, 3], query: 'hp=5&dj=0&pace=1.3' , keep: true });   // 전부 기본값과 같다
+    assert.equal(await p.eval("document.getElementById('tune').hidden"), true, '기본값과 같은 값만 있으면 표시 없음');
+    assert.deepEqual(JSON.parse(await lsOpts(p)), { hp: 5, dj: 0, pace: 1.3 });
+    await p.close();
+    p = await openQ({ ids: [1, 2, 3] , keep: true });
+    assert.equal(await p.eval("document.getElementById('tune').hidden"), true); await p.close();
+  } finally { await clearOpts(); }
+});
+
+test('319-1) 해제: ?reset=1 로 열면 저장값이 지워지고 기본값, "조정값 사용 중"을 누르면 저장값을 지우고 다시 열린다(텍스트·44px 이상·박스·이모지 없음)', { skip: SKIP }, async () => {
+  resetState(); await clearOpts();
+  try {
+    let p = await openQ({ ids: [1, 2, 3], query: 'dj=1&hp=7' , keep: true });
+    // 표시 모양
+    const st = await p.eval("(() => { const e = document.getElementById('tune'), c = getComputedStyle(e), r = e.getBoundingClientRect(); return { tag: e.tagName, h: r.height, w: r.width, bg: c.backgroundColor, bd: c.borderTopWidth, deco: c.textDecorationLine, text: e.textContent, emoji: /\\p{Extended_Pictographic}/u.test(e.textContent) }; })()");
+    assert.deepEqual([st.tag, st.bg, st.bd, st.deco, st.text, st.emoji], ['BUTTON', 'rgba(0, 0, 0, 0)', '0px', 'underline', '조정값 사용 중', false]);
+    assert.ok(st.h >= 44 && st.w >= 44, '터치 영역 44px 이상: ' + st.h + 'x' + st.w);
+    await p.click('#tune');
+    await p.waitFor("location.search === '?reset=1'", 6000);
+    await p.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
+    assert.equal(await lsOpts(p), null, '저장값 삭제'); assert.equal(await p.eval('SpellRun.CONFIG.HP'), 5); assert.equal(await p.eval('SpellRun.CONFIG.DJ_ENABLED'), false);
+    assert.equal(await p.eval("document.getElementById('tune').hidden"), true);
+    await p.close();
+    p = await openQ({ ids: [1, 2, 3], query: 'dj=1' , keep: true }); await p.close();
+    p = await openQ({ ids: [1, 2, 3], query: 'reset=1&hp=8' , keep: true });   // reset 이 우선: 다른 옵션도 무시
+    assert.equal(await lsOpts(p), null); assert.equal(await p.eval('SpellRun.CONFIG.HP'), 5); assert.equal(await p.eval('SpellRun.CONFIG.DJ_ENABLED'), false);
+    await p.close();
+    p = await openQ({ ids: [1, 2, 3] , keep: true });
+    assert.equal(await p.eval('SpellRun.CONFIG.DJ_ENABLED'), false, '이후에도 기본값'); await p.close();
+  } finally { await clearOpts(); }
+});
+
+test('319-1) localStorage 를 쓸 수 없으면(읽기·쓰기 예외) 예외 없이 이번 방문에만 적용된다', { skip: SKIP }, async () => {
+  resetState(); await clearOpts();
+  state.requests.length = 0;
+  const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => { const g = Storage.prototype.getItem, s = Storage.prototype.setItem, d = Storage.prototype.removeItem;
+    Storage.prototype.getItem = function (k) { if (k === 'spellrun_opts') throw new Error('blocked'); return g.call(this, k); };
+    Storage.prototype.setItem = function (k, v) { if (k === 'spellrun_opts') throw new Error('blocked'); return s.call(this, k, v); };
+    Storage.prototype.removeItem = function (k) { if (k === 'spellrun_opts') throw new Error('blocked'); return d.call(this, k); };
+    sessionStorage.setItem('spellrun_ids', '[1,2,3]'); })();` });
+  await page.goto(base + '/spelling_run.html?dj=1&hp=7');
+  await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
+  assert.deepEqual(await page.eval('[SpellRun.CONFIG.DJ_ENABLED, SpellRun.CONFIG.HP]'), [true, 7], '이번 방문에는 적용');
+  assert.equal(await page.eval("document.getElementById('tune').hidden"), false);
+  await page.click('#tune');   // 지우기도 예외 없이 다시 열린다
+  await page.waitFor("location.search === '?reset=1'", 6000);
+  await page.waitFor("!document.getElementById('app').hidden", 8000);
+  assert.equal(await page.eval('SpellRun.CONFIG.HP'), 5);
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), [], '예외 없음');
   await page.close();
 });
