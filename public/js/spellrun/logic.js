@@ -9,10 +9,14 @@
 'use strict';
 
 // 달리기 속도 배율. 1.0이면 이전 속도. 속도(px/초)는 곱하고, 후보 간격과 점프 시간은 나눠서 전체가 같은 비율로 빨라진다.
-const PACE = 1.3;
-const P = x => Math.round(x * PACE * 100) / 100;
-const T = x => Math.round(x / PACE * 1000) / 1000;
-const CONFIG = {
+const DEFAULT_PACE = 1.3;
+// 작업318-5: CONFIG 는 buildConfig 로 한 번에 만든다(pace 가 속도·간격·점프 시간에 같은 비율로 반영된다). 주소 옵션은 configure()로 CONFIG 를 제자리에서 바꾼다.
+function buildConfig(v) {
+  v = v || {};
+  const PACE = v.pace || DEFAULT_PACE;
+  const P = x => Math.round(x * PACE * 100) / 100;
+  const T = x => Math.round(x / PACE * 1000) / 1000;
+  const cfg = {
   CANDIDATES: 3,          // 한 칸당 후보 글자 수 (정답 1 + 오답)
   WORDS_PER_ROUND: 10,    // 한 판 단어 수
   HP: 5,                  // 체력
@@ -38,7 +42,7 @@ const CONFIG = {
   PACK_DELAY: T(0.3),     // 묶음이 끝난 뒤 다음 묶음까지 대기(초)
   HEART_EVERY: 3,         // 이 개수의 단어마다 하트 1개 (보스 단어 제외)
   HEART_HEAL: 1,          // 하트를 먹으면 회복하는 체력
-  WORD_START_DELAY: 1.6,  // 새 단어가 시작된 뒤 첫 묶음이 나오기까지 대기(초). 뜻을 읽을 시간
+  WORD_START_DELAY: 2.2,  // 새 단어가 시작된 뒤 첫 묶음이 나오기까지 대기(초). 뜻을 읽을 시간
   JUMP_PEAK: 118,         // 점프 최고 높이(px)
   JUMP_TIME: T(0.6),      // 점프 체공 시간(초)
   GRAB_H: 22,             // 이 높이보다 위에 있으면 "점프 중"으로 판정(px)
@@ -64,8 +68,48 @@ const CONFIG = {
   BOSS_HEAL: 1,           // 보스 시작 전 체력 회복
   BOSS_MULT: 2,           // 보스 글자 점수 배율
   BOSS_BONUS: 1000,       // 보스 격파 보너스
-  BOSS_INTRO_SEC: 1.8     // 보스 등장 연출 시간(초)
+  BOSS_INTRO_SEC: 1.8,    // 보스 등장 연출 시간(초)
+  // 작업318-4: 2단 점프. DJ_ENABLED 가 꺼져 있으면(기본) 높은 칸이 나오지 않고 점프 규칙도 그대로다.
+  DJ_ENABLED: false,
+  HIGH_SLOT_PROB: 0.2,    // 첫 칸을 뺀 칸이 높은 칸이 될 확률
+  HIGH_MAX: 2,            // 한 단어의 높은 칸 최대 개수
+  HIGH_GRAB_H: 160,       // 높은 칸은 이 높이 이상일 때만 "공중"으로 본다(px). JUMP_PEAK(118)보다 높아 한 번 점프로는 닿지 않는다
+  HIGH_BONUS: 100         // 높은 칸 획득 가산점(속도·콤보 배율 이전에 더한다)
+  };
+  if (v.hp) cfg.HP = v.hp;
+  if (v.startdelay) cfg.WORD_START_DELAY = v.startdelay;
+  if (v.popsec) { cfg.POP_SEC = v.popsec; cfg.POP_SEC_FINAL = Math.round(v.popsec * 2 * 100) / 100; cfg.FINAL_REPEAT_SEC = v.popsec; }
+  if (v.highprob !== undefined) cfg.HIGH_SLOT_PROB = v.highprob;
+  if (v.heartevery) cfg.HEART_EVERY = v.heartevery;
+  if (v.dj) cfg.DJ_ENABLED = true;
+  return cfg;
+}
+const CONFIG = buildConfig();
+
+// 작업318-5: 주소 옵션(?pace=1.1&hp=7&startdelay=2.6&popsec=2&highprob=0.3&heartevery=3&dj=1). 허용 범위를 벗어나거나 숫자가 아니면 무시(기본값).
+const OPTION_RULES = {
+  pace: { min: 0.7, max: 1.8, def: DEFAULT_PACE }, hp: { min: 1, max: 10, int: true, def: 5 }, startdelay: { min: 0.5, max: 6, def: 2.2 },
+  popsec: { min: 0.5, max: 5, def: 1.6 }, highprob: { min: 0, max: 1, def: 0.2 }, heartevery: { min: 1, max: 10, int: true, def: 3 }, dj: { min: 0, max: 1, int: true, def: 0 }
 };
+// 반환 { values: 유효한 값(기본값과 같아도 포함), applied: 기본값과 다른 옵션 이름 }
+function parseOptions(search) {
+  const values = {}, applied = [];
+  let sp;
+  try { sp = new URLSearchParams(String(search || '')); } catch (e) { return { values: values, applied: applied }; }
+  Object.keys(OPTION_RULES).forEach(function (k) {
+    const raw = sp.get(k), rule = OPTION_RULES[k];
+    if (raw === null || !/^\s*-?\d+(\.\d+)?\s*$/.test(raw)) return;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < rule.min || n > rule.max || (rule.int && !Number.isInteger(n))) return;
+    values[k] = n;
+    if (n !== rule.def) applied.push(k);
+  });
+  return { values: values, applied: applied };
+}
+function configure(values) { return Object.assign(CONFIG, buildConfig(values)); }
+
+// 화면 배치(논리 px, 360x640 기준). 힌트 아래 끝은 높은 칸(2단 점프) 타일 위쪽보다 위에 있어야 한다.
+const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TILE_H: 58, HINT_BOTTOM_Y: 340, HINT_BOTTOM_Y_DJ: 258, WORD_AVAIL_W: 332 };
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz';
 const CONFUSABLE = (() => {
@@ -252,9 +296,9 @@ function comboMult(combo, cfg) {
   cfg = cfg || CONFIG;
   return 1 + Math.min(combo, cfg.COMBO_CAP) * cfg.COMBO_STEP;
 }
-function slotPoints(len, combo, cfg) {
+function slotPoints(len, combo, cfg, bonus) {
   cfg = cfg || CONFIG;
-  const base = cfg.BASE * len + (len > 1 ? cfg.CHUNK_BONUS * len : 0);
+  const base = cfg.BASE * len + (len > 1 ? cfg.CHUNK_BONUS * len : 0) + (bonus || 0);   // 작업318: 높은 칸 가산점도 콤보·속도 배율 이전에 더한다
   return Math.round(base * comboMult(combo, cfg));
 }
 function clamp01(x) { return Math.max(0, Math.min(1, x)); }
@@ -291,6 +335,115 @@ function jumpHeight(t, cfg) {
   const u = t / cfg.JUMP_TIME;
   return 4 * cfg.JUMP_PEAK * u * (1 - u);
 }
+// 작업318-4: 2단 점프. 공중에서 한 번 더 누르면 그 높이에서 첫 점프와 같은 초속도(4*PEAK/TIME)로 다시 솟는다(중력도 같다) → 최대 높이는 누른 높이 + JUMP_PEAK.
+function jumpV0(cfg) { cfg = cfg || CONFIG; return 4 * cfg.JUMP_PEAK / cfg.JUMP_TIME; }
+function jumpG(cfg) { cfg = cfg || CONFIG; return 8 * cfg.JUMP_PEAK / (cfg.JUMP_TIME * cfg.JUMP_TIME); }
+// t1: 첫 점프 시작 후 시간, t2: 2단 점프 시작 후 시간(-1이면 아직), h2: 2단 점프를 누른 순간의 높이
+function airHeight(t1, t2, h2, cfg) {
+  cfg = cfg || CONFIG;
+  if (t2 < 0) return jumpHeight(t1, cfg);
+  return Math.max(0, h2 + jumpV0(cfg) * t2 - 0.5 * jumpG(cfg) * t2 * t2);
+}
+function secondJumpLandTime(h2, cfg) {
+  cfg = cfg || CONFIG;
+  const v = jumpV0(cfg), g = jumpG(cfg);
+  return (v + Math.sqrt(v * v + 2 * g * h2)) / g;
+}
+// 한 단어의 높은 칸 번호 집합. 꺼져 있으면 비어 있다. 첫 칸 제외, 최대 HIGH_MAX개, 칸이 하나뿐이면 없음(모든 칸이 높은 경우는 없다). 조각 칸 여부와 무관.
+function planHighSlots(nSlots, rng, cfg) {
+  rng = rng || Math.random; cfg = cfg || CONFIG;
+  const out = new Set();
+  if (!cfg.DJ_ENABLED || nSlots < 2) return out;
+  const idx = shuffle(Array.from({ length: nSlots - 1 }, function (_, i) { return i + 1; }), rng);
+  for (const i of idx) {
+    if (out.size >= cfg.HIGH_MAX) break;
+    if (rng() < cfg.HIGH_SLOT_PROB) out.add(i);
+  }
+  return out;
+}
+
+// ---- 작업318-1: 글자 칸 줄 폭 배분 ----
+// items: 칸 목록 [{ n: 글자 수, chunk: 조각 칸 여부 }] 과 고정 글자 { fixed: true }. 실제 CSS 와 같은 식으로 줄 전체 폭을 센다.
+function wordWidth(items, cw, cellGap, slotGap, chunkPad) {
+  let w = 0;
+  for (const it of items) {
+    if (it.fixed) w += 0.6 * cw;
+    else w += it.n * cw + (it.n - 1) * cellGap + (it.chunk ? 2 * chunkPad + 6 : 0);   // +6: 점선 테두리가 바깥으로 나오는 만큼
+  }
+  return w + Math.max(0, items.length - 1) * slotGap;
+}
+// 사용 가능한 폭 안에 들어가는 칸 크기(cw)와 글자 크기(fs)·간격을 고른다. 글자 크기를 먼저 줄이고(하한 cwMin), 하한에서도 넘치면 간격부터 줄이고, 그래도 넘치면 하한 아래로 줄인다.
+function fitWord(items, availW, opt) {
+  opt = Object.assign({ cwMax: 34, cwMin: 16, cellGap: 3, slotGap: 5, chunkPad: 4, minCellGap: 1, minSlotGap: 2 }, opt || {});
+  const done = function (cw, cg, sg) { return { cw: cw, fs: Math.round(cw * 0.95 * 10) / 10, cellGap: cg, slotGap: sg, chunkPad: opt.chunkPad, width: wordWidth(items, cw, cg, sg, opt.chunkPad) }; };
+  for (let cw = opt.cwMax; cw >= opt.cwMin; cw--) if (wordWidth(items, cw, opt.cellGap, opt.slotGap, opt.chunkPad) <= availW) return done(cw, opt.cellGap, opt.slotGap);
+  if (wordWidth(items, opt.cwMin, opt.minCellGap, opt.minSlotGap, opt.chunkPad) <= availW) {
+    for (let cg = opt.cellGap; cg >= opt.minCellGap; cg--) for (let sg = opt.slotGap; sg >= opt.minSlotGap; sg--) {
+      if (wordWidth(items, opt.cwMin, cg, sg, opt.chunkPad) <= availW) return done(opt.cwMin, cg, sg);
+    }
+  }
+  let cw = opt.cwMin;
+  while (cw > 4 && wordWidth(items, cw, opt.minCellGap, opt.minSlotGap, opt.chunkPad) > availW) cw -= 0.5;
+  return done(cw, opt.minCellGap, opt.minSlotGap);
+}
+
+// ---- 작업318-2/3: 힌트 만들기와 정답 가리기 ----
+const POS_KO = { noun: '명사', verb: '동사', adjective: '형용사', adverb: '부사', preposition: '전치사', conjunction: '접속사', pronoun: '대명사', interjection: '감탄사', phrase: '구', idiom: '관용어' };
+const MASK = '＿＿';
+function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+// 정답 단어와 그 활용형(접미 변화). 불규칙 활용(ran 등)은 만들지 못한다.
+function wordForms(word) {
+  const w = String(word).toLowerCase();
+  const set = new Set([w]);
+  ['s', 'es', 'ed', 'd', 'ing', 'ings', 'ly', 'er', 'ers', 'est', 'ness', 'y'].forEach(function (x) { set.add(w + x); });
+  if (/[^aeiou]y$/.test(w)) ['ies', 'ied', 'ier', 'iers', 'iest', 'ily', 'iness'].forEach(function (x) { set.add(w.slice(0, -1) + x); });
+  if (/e$/.test(w)) { ['ing', 'ings', 'y', 'er', 'ers', 'ish'].forEach(function (x) { set.add(w.slice(0, -1) + x); }); set.add(w + 'r'); set.add(w + 'rs'); set.add(w + 'st'); }
+  if (/[^aeiou][aeiou][bdgklmnprt]$/.test(w)) { const c = w[w.length - 1]; ['ing', 'ings', 'ed', 'er', 'ers', 'est', 'y'].forEach(function (x) { set.add(w + c + x); }); }
+  return Array.from(set).sort(function (a, b) { return b.length - a.length; });
+}
+function wordRegex(word) {
+  const alt = wordForms(word).map(function (f) { return escRe(f).replace(/'/g, "['’]"); }).join('|');
+  return new RegExp('(?<![A-Za-z])(?:' + alt + ')(?![A-Za-z])', 'gi');
+}
+function maskText(text, word, token) {
+  return typeof text === 'string' ? text.replace(wordRegex(word), token || MASK) : '';
+}
+function findWordRanges(text, word) {
+  const out = [], re = wordRegex(word), s = String(text || '');
+  let m;
+  while ((m = re.exec(s))) { out.push([m.index, m.index + m[0].length]); if (m[0].length === 0) re.lastIndex++; }
+  return out;
+}
+const clip = function (s, n) { s = String(s).trim(); return Array.from(s).length > n ? Array.from(s).slice(0, n).join('').trim() : s; };
+const txt = function (v) { return typeof v === 'string' ? v.trim() : ''; };
+// row: 단어장 행 { data, example_sentence }, word: 소문자 단어, main: 대표 뜻.
+// 반환 { hint: { meaning, pos, example, alts, note }(모두 정답이 가려진 값, 없는 항목은 ''/[]), pop: { pron, meaning, example, ranges }(가리지 않은 값 + 강조 위치) }
+function buildHint(row, word, main) {
+  const d = row && row.data && typeof row.data === 'object' ? row.data : {};
+  const meanings = Array.isArray(d.meanings) ? d.meanings.filter(function (m) { return m && typeof m === 'object'; }) : [];
+  const m0 = meanings[0] || {};
+  const posRaw = txt(m0.pos);
+  const pos = POS_KO[posRaw.toLowerCase()] || clip(posRaw, 8);
+  const alts = [];
+  for (let i = 1; i < meanings.length && alts.length < 2; i++) {
+    const a = clip(txt(meanings[i].definition) || txt(meanings[i].core_meaning), 24);
+    if (a && a !== main && !alts.includes(a)) alts.push(a);
+  }
+  let note = '';
+  for (const m of meanings) { note = clip(txt(m.usage_note) || txt(m.nuance), 70); if (note) break; }
+  const cands = [txt(row && row.example_sentence)]
+    .concat(meanings.map(function (m) { return txt(m.example); }))
+    .concat((Array.isArray(d.usages) ? d.usages : []).map(function (u) { return u && typeof u === 'object' ? txt(u.example) : ''; }))
+    .filter(Boolean).map(function (e) { return clip(e, 140); });
+  const found = cands.find(function (e) { return findWordRanges(e, word).length > 0; });
+  const popExample = found || cands[0] || '';
+  const mk = function (t) { return maskText(t, word); };
+  return {
+    hint: { meaning: mk(main), pos: mk(pos), example: found ? mk(found) : '', alts: alts.map(mk), note: mk(note) },
+    pop: { pron: txt(d.pronunciation), meaning: main, example: popExample, ranges: popExample ? findWordRanges(popExample, word) : [] }
+  };
+}
+
 // 후보가 캐릭터 위치를 지나는 순간의 판정
 function judge(isCorrect, airborne) {
   if (airborne) return isCorrect ? 'hit' : 'wrong';
@@ -329,6 +482,9 @@ return {
   chunkProbFor: chunkProbFor, planSlots: planSlots, mutateChunk: mutateChunk, makeCandidates: makeCandidates, comboMult: comboMult, slotPoints: slotPoints,
   speedLevel: speedLevel, speedMult: speedMult, gapSec: gapSec, leadSec: leadSec, speedAfterHit: speedAfterHit, speedAfterFail: speedAfterFail,
   targetSpeed: targetSpeed, planHearts: planHearts, pickHeartSlot: pickHeartSlot, jumpHeight: jumpHeight, judge: judge, buildRound: buildRound,
-  letterCount: letterCount, planRound: planRound, bossConfig: bossConfig
+  letterCount: letterCount, planRound: planRound, bossConfig: bossConfig,
+  buildConfig: buildConfig, parseOptions: parseOptions, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
+  jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
+  wordWidth: wordWidth, fitWord: fitWord, POS_KO: POS_KO, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint
 };
 });

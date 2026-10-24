@@ -5,10 +5,12 @@
 'use strict';
 
 const L = window.SpellRunLogic;
+const OPT = L.parseOptions(location.search);   // 작업318-5: 주소 옵션. 허용 범위 밖 값은 무시하고, 적용된 것이 있으면 "조정값 사용 중"을 보인다
+L.configure(OPT.values);                       // CONFIG 를 한 번에 다시 만든다(pace 는 속도·간격·점프 시간에 같은 비율로 반영)
 const CONFIG = L.CONFIG;
-const { planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, jumpHeight, judge, bossConfig, planRound, letterCount } = L;
+const { planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
 
-const W = 360, H = 640, GROUND = 520, RUNNER_X = 72, TILE_Y = GROUND - 108, TILE_H = 58;
+const W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, RUNNER_X = 72, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;
 const INK = '#1d2b53', CORAL = '#ff6b5a', GOLD = '#ffb700', GOOD = '#1fae68', BAD = '#e8454f';
 const TILE_COLORS = ['#ffd25e', '#ff9fb2', '#7ed9c3', '#a8c0ff'];
 const FL = '"Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';   // 앱의 기존 글꼴 스택(tokens.css --font-sans). 시제품의 Fredoka는 쓰지 않는다
@@ -22,6 +24,7 @@ const $ = id => document.getElementById(id);
 const box = $('box'), stage = $('stage'), cv = $('cv'), ctx = cv.getContext('2d');
 const els = {
   hud: $('hud'), hearts: $('hearts'), score: $('score'), combo: $('combo'), progress: $('progress'),
+  hint: $('hint'), popPron: $('popPron'), popEx: $('popEx'), tune: $('tune'), djRule: $('djRule'),
   meaning: $('meaning'), speedTag: $('speedTag'), word: $('word'), pop: $('pop'), popTag: $('popTag'), popWord: $('popWord'), popMean: $('popMean'), popNote: $('popNote'),
   start: $('start'), startBtn: $('startBtn'), startInfo: $('startInfo'), startExcluded: $('startExcluded'), speechNote: $('speechNote'),
   result: $('result'), resTitle: $('resTitle'), resScore: $('resScore'), resDone: $('resDone'), resCombo: $('resCombo'),
@@ -49,8 +52,77 @@ function resize() {
   cv.width = Math.round(W * scale * dpr);
   cv.height = Math.round(H * scale * dpr);
   S = cv.width / W;
+  fitAll();   // 폭이 바뀌면(리사이즈·회전) 글자 맞춤을 다시 계산한다
 }
 window.addEventListener('resize', resize);
+
+// ---------- 작업318-1: 폭을 재서 맞추는 글자 크기 ----------
+// 단계로 줄이지 않고 실제 폭을 재서 한 줄(또는 허용 줄 수)에 들어올 때까지 0.5px 씩 줄인다. 크기는 논리 px(×--u)라 화면 배율과 무관하게 같은 결과가 나온다.
+function lineHeightPx(el) { const cs = getComputedStyle(el); return parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.25; }
+function fitsIn(el, lines) { return el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= lineHeightPx(el) * lines + 2; }
+function fitFont(el, max, min, linesFor) {
+  if (!el || !el.clientWidth) return max;
+  el.style.overflowWrap = '';
+  for (let px = max; px >= min; px -= 0.5) {
+    el.style.fontSize = 'calc(' + px + ' * var(--u))';
+    if (fitsIn(el, linesFor(px))) return px;
+  }
+  el.style.overflowWrap = 'anywhere';   // 하한에서도 넘치는 공백 없는 아주 긴 글자만 마지막 수단으로 끊는다
+  return min;
+}
+const unitPx = () => parseFloat(box.style.getPropertyValue('--u')) || 1;
+// 힌트 항목: 대표 뜻(.meaning)은 따로 맞추고, 품사·예문·다른 뜻·쓰임 설명은 공간이 부족하면 뒤에서부터 생략한다
+function renderHint(w) {
+  const h = (w && w.hint) || {};
+  els.hint.textContent = '';
+  const add = (cls, text) => { if (!text) return; const d = document.createElement('div'); d.className = cls; d.textContent = text; els.hint.appendChild(d); };
+  add('h-pos', h.pos);
+  add('h-ex', h.example);
+  add('h-alt', h.alts && h.alts.length ? '다른 뜻: ' + h.alts.join(' · ') : '');
+  add('h-note', h.note);
+  els.hint.hidden = !els.hint.children.length;
+}
+function fitHint() {
+  if (els.hint.hidden) return;
+  const limit = CONFIG.DJ_ENABLED ? LAYOUT.HINT_BOTTOM_Y_DJ : LAYOUT.HINT_BOTTOM_Y;
+  Array.from(els.hint.children).forEach(c => {
+    c.hidden = false; c.classList.remove('clip');
+    if (c.classList.contains('h-ex')) {
+      const px = fitFont(c, 12, 9, () => 2);
+      if (!fitsIn(c, 2)) c.classList.add('clip');
+    } else if (c.classList.contains('h-pos')) {
+      c.style.fontSize = '';
+    } else {
+      fitFont(c, 11, 8.5, () => 1);
+      if (!fitsIn(c, 1)) c.classList.add('clip');
+    }
+  });
+  const bottom = () => (els.hint.getBoundingClientRect().bottom - box.getBoundingClientRect().top) / unitPx();
+  const kids = Array.from(els.hint.children);
+  for (let i = kids.length - 1; i >= 0 && bottom() > limit; i--) kids[i].hidden = true;   // 뒤(쓰임 설명 → 다른 뜻 → 예문 → 품사)부터 생략
+  if (kids.every(c => c.hidden)) els.hint.hidden = true;
+}
+function fitHud() {
+  if (els.hud.hidden || !G.plan) return;
+  fitFont(els.meaning, 28, 14, px => (px > 22 ? 1 : 2));   // 한 줄을 먼저 시도하고, 22 이하부터 두 줄까지 허용
+  els.hint.hidden = false; renderHint(G.words[G.wi]);
+  fitHint();
+}
+function fitPop() {
+  if (els.pop.hidden) return;
+  fitFont(els.popWord, 44, 16, () => 1);   // 완성한 단어는 반드시 한 줄
+  fitFont(els.popMean, 22, 12, px => (px > 16 ? 1 : 2));
+  if (!els.popEx.hidden) fitFont(els.popEx, 13, 9, () => 3);
+}
+function fitResult() {
+  if (els.result.hidden) return;
+  fitFont(els.resTitle, 36, 16, () => 1);
+  fitFont(els.resScore, 56, 20, () => 1);
+}
+function fitAll() {
+  if (G.plan && !els.hud.hidden) { layoutWord(); fitHud(); }
+  fitPop(); fitResult();
+}
 
 // ---------- 소리 ----------
 const SND = { on: true, ac: null };
@@ -76,6 +148,7 @@ function tone(f, d, type, v, delay) {
 }
 const sfx = {
   jump: () => tone(520, 0.08, 'triangle', 0.05),
+  jump2: () => tone(780, 0.09, 'triangle', 0.05),
   good: c => { const k = Math.min(c, 10) * 30; tone(660 + k, 0.1, 'sine', 0.08); tone(880 + k, 0.12, 'sine', 0.07, 0.07); },
   bad: () => tone(170, 0.22, 'sawtooth', 0.05),
   word: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, 'triangle', 0.08, i * 0.09)),
@@ -207,7 +280,7 @@ const G = {
   speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
   tiles: [], parts: [], floats: [],
   packActive: false, packId: 0, spawnT: 0,
-  jumpT: -1, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
+  jumpT: -1, j2: -1, j2h: 0, j2Land: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
   hintTimer: 0,
   regular: 0, bossMode: false, introT: 0, repeatT: 0, repeatWord: '', review: false
 };
@@ -230,17 +303,31 @@ function renderProgress() {
     : '단어 ' + Math.min(G.wi + 1, G.regular) + ' / ' + G.regular + (G.review ? ' · 복습' : '');
   box.classList.toggle('boss', !!(w && w.boss));
 }
+// 글자 칸 줄 폭 배분(작업318-1): 칸 수와 칸별 글자 수(조각 칸은 폭이 큼)로 사용 가능한 폭을 나눈다. 계산은 logic.js(fitWord)
+function wordItems() {
+  const plan = G.plan, items = [], n = plan.cells.length;
+  const slotAt = new Map(plan.slots.map((s, i) => [s.start, i]));
+  for (let i = 0; i < n;) {
+    if (slotAt.has(i)) { const sl = plan.slots[slotAt.get(i)]; items.push({ n: sl.len, chunk: sl.chunk }); i += sl.len; }
+    else { items.push({ fixed: true }); i++; }
+  }
+  return items;
+}
+function layoutWord() {
+  const fit = fitWord(wordItems(), LAYOUT.WORD_AVAIL_W);
+  els.word.style.setProperty('--cw', fit.cw);
+  els.word.style.setProperty('--fs', fit.fs);
+  els.word.style.setProperty('--cg', fit.cellGap);
+  els.word.style.setProperty('--sg', fit.slotGap);
+  return fit;
+}
 function renderWord() {
   const plan = G.plan;
   const n = plan.cells.length;
-  const cw = Math.max(20, Math.min(34, Math.floor(316 / (n + 0.6))));
-  els.word.style.setProperty('--cw', cw);
-  els.word.style.setProperty('--fs', Math.round(cw * 0.95));
+  layoutWord();
   els.word.innerHTML = '';
-  const mean = G.words[G.wi].meaning;
-  els.meaning.textContent = mean;
-  els.meaning.classList.toggle('long', mean.length > 9 && mean.length <= 16);   // 뜻이 길면 글자를 줄여 두 줄 안에 담는다
-  els.meaning.classList.toggle('xlong', mean.length > 16);
+  const w0 = G.words[G.wi];
+  els.meaning.textContent = (w0.hint && w0.hint.meaning) || w0.meaning;   // 정답 단어(활용형 포함)는 ＿＿ 로 가려진 뜻
   els.meaning.classList.remove('enter'); void els.meaning.offsetWidth; els.meaning.classList.add('enter');
   slotEls = [];
   const slotAt = new Map(plan.slots.map((s, i) => [s.start, i]));
@@ -249,7 +336,7 @@ function renderWord() {
     if (slotAt.has(i)) {
       const s = plan.slots[slotAt.get(i)];
       const el = document.createElement('span');
-      el.className = 'slot' + (s.chunk ? ' chunk' : '');
+      el.className = 'slot' + (s.chunk ? ' chunk' : '') + (s.high ? ' high' : '');
       if (s.chunk) el.dataset.mult = '×' + s.len;
       for (let k = 0; k < s.len; k++) {
         const c = document.createElement('span'); c.className = 'cell'; el.appendChild(c);
@@ -263,6 +350,7 @@ function renderWord() {
     }
   }
   setCur();
+  fitHud();
 }
 function setCur() {
   slotEls.forEach((el, i) => el.classList.toggle('cur', i === G.si && G.state !== 'pop'));
@@ -311,10 +399,10 @@ function updateFx(dt) {
 // 정규 단어는 최대 10개(틀린 단어 우선), 보스는 선택 단어 중 8글자 이상이 있을 때만 1개(planRound). 복습 판에는 보스가 없다.
 function startRound(reviewOnly) {
   const plan = planRound(VALID_WORDS, missedSet, CONFIG, Math.random, !!reviewOnly);
-  const pool = plan.regular.map(w => ({ word: w.word, meaning: w.meaning }));
+  const pool = plan.regular.map(w => ({ word: w.word, meaning: w.meaning, hint: w.hint, pop: w.pop }));
   if (!pool.length) return;
   const regular = pool.length;
-  if (plan.boss) pool.push({ word: plan.boss.word, meaning: plan.boss.meaning, boss: true });
+  if (plan.boss) pool.push({ word: plan.boss.word, meaning: plan.boss.meaning, hint: plan.boss.hint, pop: plan.boss.pop, boss: true });
   primeAudio();
   els.bossBanner.hidden = true;
   Object.assign(G, {
@@ -322,7 +410,7 @@ function startRound(reviewOnly) {
     state: 'run', words: pool, wi: 0, mist: pool.map(() => 0),
     hp: CONFIG.HP, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
     speed: CONFIG.SPEED_MIN, speedTarget: CONFIG.SPEED_MIN, speedBase: CONFIG.SPEED_MIN, shownMult: 0, heartWords: planHearts(regular), tiles: [], parts: [], floats: [],
-    packActive: false, jumpT: -1, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
+    packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
     review: !!reviewOnly
   });
   els.start.hidden = true; els.result.hidden = true; els.pop.hidden = true; els.hud.hidden = false;
@@ -334,6 +422,8 @@ function loadWord(i) {
   G.wi = i; G.plan = planSlots(G.words[i].word, Math.random, boss ? bossConfig() : CONFIG, G.words[i].syl); G.si = 0;
   G.heartPending = !boss && G.heartWords.has(i);
   G.heartSlot = pickHeartSlot(G.plan.slots.length);
+  const highs = planHighSlots(G.plan.slots.length);   // 작업318-4: 2단 점프가 꺼져 있으면 빈 집합
+  G.plan.slots.forEach((sl, k) => { sl.high = highs.has(k); });
   G.packActive = false; G.spawnT = CONFIG.WORD_START_DELAY + (i === 0 ? 0.4 : 0);
   renderWord(); renderProgress();
 }
@@ -345,7 +435,7 @@ function spawnPack() {
   let x0 = RUNNER_X + v * leadSec(v);
   G.packId++; G.packActive = true;
   // 하트: 체력이 줄었고 하트가 나올 칸이면, 묶음 앞에 한 칸 간격을 두고 둔다(점프해야 먹는다)
-  if (G.heartPending && G.si >= G.heartSlot && G.hp < CONFIG.HP) {
+  if (G.heartPending && G.si >= G.heartSlot && G.hp < CONFIG.HP && !slot.high) {   // 높은 칸 묶음 앞에는 하트를 두지 않는다(점프 시점이 겹치지 않게)
     G.heartPending = false;
     G.tiles.push({ id: -G.packId, kind: 'heart', x: x0, w: 46, text: '', correct: false, chunk: false, state: 'live', t: 0, age: 0, checked: false, ok: false, color: '' });
     x0 += gap;
@@ -353,7 +443,7 @@ function spawnPack() {
   cands.forEach((c, i) => {
     G.tiles.push({
       id: G.packId, x: x0 + i * gap, w: slot.chunk ? 20 + slot.text.length * 26 : 58,
-      text: c.text, correct: c.correct, chunk: slot.chunk, state: 'live', t: 0, age: 0,
+      text: c.text, correct: c.correct, chunk: slot.chunk, high: !!slot.high, state: 'live', t: 0, age: 0,
       checked: false, ok: false, color: TILE_COLORS[(i + G.si) % TILE_COLORS.length]
     });
   });
@@ -366,10 +456,13 @@ function endPack(hint) {
   }
   G.packActive = false; G.spawnT = CONFIG.PACK_DELAY;
 }
+function curH() { return airHeight(G.jumpT, G.j2, G.j2h); }
 function resolve(t) {
-  const air = jumpHeight(G.jumpT) > CONFIG.GRAB_H;
+  const hh = curH();
+  const air = hh > CONFIG.GRAB_H;
   if (t.kind === 'heart') { if (air) onHeart(t); return; }
-  const r = judge(t.correct, air);
+  // 높은 칸은 HIGH_GRAB_H 이상일 때만 "공중"으로 본다(한 번 점프로는 닿지 않는다). 일반 칸 판정은 그대로
+  const r = judge(t.correct, t.high ? hh >= CONFIG.HIGH_GRAB_H : air);
   if (r === 'pass') return;
   if (r === 'hit') onHit(t);
   else onFail(t, r);
@@ -388,7 +481,7 @@ function onHit(t) {
   const slot = G.plan.slots[G.si];
   G.combo++; G.maxCombo = Math.max(G.maxCombo, G.combo);
   const sm = speedMult(G.speed);
-  const pts = Math.round(slotPoints(slot.text.length, G.combo) * sm * (G.words[G.wi].boss ? CONFIG.BOSS_MULT : 1));
+  const pts = Math.round(slotPoints(slot.text.length, G.combo, CONFIG, t.high ? CONFIG.HIGH_BONUS : 0) * sm * (G.words[G.wi].boss ? CONFIG.BOSS_MULT : 1));
   G.lastPts = pts; G.lastSpeedMult = sm;
   G.speedBase = speedAfterHit(G.speedBase, slot.chunk);
   G.speedTarget = targetSpeed(G.speedBase, G.combo);
@@ -397,6 +490,7 @@ function onHit(t) {
   burst(RUNNER_X + 8, TILE_Y, GOLD, slot.chunk ? 18 : 9);
   floatText(RUNNER_X + 34, GROUND - 150, '+' + pts, slot.chunk ? '#e07b00' : INK, slot.chunk ? 26 : 20);
   if (slot.chunk) floatText(RUNNER_X + 34, GROUND - 178, '조각 보너스', '#a86a00', 15);
+  if (t.high) floatText(RUNNER_X + 70, GROUND - 225, '2단 점프 +' + CONFIG.HIGH_BONUS, '#a86a00', 17);
   if (G.combo % 5 === 0) floatText(RUNNER_X + 80, GROUND - 120, '콤보 ' + G.combo + '!', BAD, 24);
   fillSlotUI(G.si);
   G.si++;
@@ -434,13 +528,45 @@ function completeWord() {
   // 마지막 단어는 발음을 한 번 더, 천천히 들려준다 (게임 시간 기준으로 예약)
   if (isFinal) { G.repeatT = CONFIG.FINAL_REPEAT_SEC; G.repeatWord = w.word; }
   els.popTag.textContent = isBoss ? '보스 격파!' : (perfect ? '한 번에 성공!' : '');
-  els.popWord.textContent = w.word;
+  const pop = w.pop || {};
+  els.popWord.textContent = '';
+  Array.from(w.word).forEach((ch, i) => { const sp = document.createElement('span'); sp.className = 'pl'; sp.style.setProperty('--i', i); sp.textContent = ch; els.popWord.appendChild(sp); });
+  els.popPron.textContent = pop.pron || ''; els.popPron.hidden = !pop.pron;     // 발음기호(있을 때만)
   els.popMean.textContent = w.meaning;
+  renderPopExample(pop);
   els.pop.hidden = false;
-  els.pop.classList.remove('go'); void els.pop.offsetWidth; els.pop.classList.add('go');
+  els.pop.classList.remove('go');
+  fitPop();
+  setLetterFly();
+  void els.pop.offsetWidth; els.pop.classList.add('go');
   els.live.textContent = (isBoss ? '보스 격파 ' : '') + w.word + ' ' + w.meaning;
   G.state = 'pop'; G.popT = isFinal ? CONFIG.POP_SEC_FINAL : CONFIG.POP_SEC;
   setCur(); renderScore();
+}
+// 예문: 정답 단어와 활용형은 강조(여기서는 가리지 않는다). 단어를 찾지 못하면 강조 없이 그대로 보인다
+function renderPopExample(pop) {
+  els.popEx.textContent = '';
+  const text = pop.example || '';
+  els.popEx.hidden = !text;
+  if (!text) return;
+  let pos = 0;
+  (pop.ranges || []).forEach(rg => {
+    if (rg[0] > pos) els.popEx.appendChild(document.createTextNode(text.slice(pos, rg[0])));
+    const b = document.createElement('b'); b.textContent = text.slice(rg[0], rg[1]); els.popEx.appendChild(b);
+    pos = rg[1];
+  });
+  if (pos < text.length) els.popEx.appendChild(document.createTextNode(text.slice(pos)));
+}
+// 글자가 글자 칸에서 날아와 순서대로 튀어 오른다: 각 글자의 시작 위치(칸 중심)와 도착 위치의 차이를 CSS 변수로 준다
+function setLetterFly() {
+  const cells = els.word.querySelectorAll('.cell');
+  els.popWord.querySelectorAll('.pl').forEach((sp, i) => {
+    const c = cells[i];
+    if (!c) return;
+    const a = c.getBoundingClientRect(), b = sp.getBoundingClientRect();
+    sp.style.setProperty('--fx', Math.round((a.left + a.width / 2) - (b.left + b.width / 2)) + 'px');
+    sp.style.setProperty('--fy', Math.round((a.top + a.height / 2) - (b.top + b.height / 2)) + 'px');
+  });
 }
 function afterPop() {
   els.pop.hidden = true;
@@ -488,14 +614,21 @@ function finish(cleared) {
   els.revBtn.textContent = n ? '틀린 단어만 다시 도전 (' + n + ')' : '틀린 단어 없음';
   els.revBtn.disabled = n === 0;
   els.result.hidden = false;
+  fitResult();
   els.live.textContent = cleared ? '완주했습니다' : '게임 오버';
 }
 
 // ---------- 입력 ----------
-function startJump() { G.jumpT = 0; G.jumpBuf = 0; sfx.jump(); }
+function startJump() { G.jumpT = 0; G.j2 = -1; G.j2h = 0; G.jumpBuf = 0; sfx.jump(); }
+// 작업318-4: 공중에서 한 번 더 누르면 2단 점프(공중에서 1회만). 점프 버퍼는 2단 점프를 쓴 뒤의 착지 직전 입력에만 쓴다. 2단 점프가 꺼져 있으면 예전 그대로
+function startSecondJump() {
+  G.j2h = curH(); G.j2 = 0; G.j2Land = secondJumpLandTime(G.j2h); G.jumpBuf = 0;
+  sfx.jump2(); burst(RUNNER_X, GROUND - 27 - G.j2h + 24, '#ffffff', 8);
+}
 function jump() {
   if (G.state !== 'run' && G.state !== 'pop' && G.state !== 'intro') return;
   if (G.jumpT < 0) startJump();
+  else if (CONFIG.DJ_ENABLED && G.j2 < 0) startSecondJump();
   else G.jumpBuf = CONFIG.JUMP_BUFFER;
 }
 box.addEventListener('pointerdown', e => {
@@ -541,8 +674,9 @@ function step(dt) {
 
   if (G.jumpT >= 0) {
     G.jumpT += dt;
-    if (G.jumpT >= CONFIG.JUMP_TIME) {
-      G.jumpT = -1; G.land = 0.12;
+    if (G.j2 >= 0) G.j2 += dt;
+    if (G.j2 >= 0 ? G.j2 >= G.j2Land : G.jumpT >= CONFIG.JUMP_TIME) {
+      G.jumpT = -1; G.j2 = -1; G.land = 0.12;
       if (G.jumpBuf > 0) startJump();
     }
   }
@@ -659,20 +793,26 @@ function drawHeartItem(t) {
 }
 function drawTile(t) {
   if (t.kind === 'heart') { drawHeartItem(t); return; }
+  const h = TILE_H;
   let a = 1, sc = 1;
   if (t.state === 'fade') { a = 1 - t.t / 0.3; sc = 1 - 0.2 * Math.min(1, t.t / 0.3); }
   else if (t.state === 'taken') { a = 1 - t.t / 0.35; sc = 1 + 0.5 * Math.min(1, t.t / 0.35); }
   if (a <= 0) return;
   const bob = t.state === 'live' ? Math.sin(G.time * 4 + t.x * 0.02) * 3 : 0;
+  const ty = t.high ? HIGH_Y : TILE_Y;
   if (t.state === 'live' || t.state === 'hint') {
-    ctx.fillStyle = 'rgba(0,0,0,.28)';
+    ctx.fillStyle = t.high ? 'rgba(0,0,0,.14)' : 'rgba(0,0,0,.28)';
     ctx.beginPath(); ctx.ellipse(t.x, GROUND + 10, t.w * 0.38, 6, 0, 0, Math.PI * 2); ctx.fill();
   }
-  const w = t.w, h = TILE_H;
+  const w = t.w;
   ctx.save();
   ctx.globalAlpha = Math.max(0, Math.min(1, a, t.age / 0.2));
-  ctx.translate(t.x, TILE_Y + bob); ctx.scale(sc, sc);
+  ctx.translate(t.x, ty + bob); ctx.scale(sc, sc);
   if (t.state === 'hint') { ctx.shadowColor = GOOD; ctx.shadowBlur = 20; }
+  if (t.high) {   // 2단 점프 칸 표시: 위쪽 삼각형(도형)
+    ctx.fillStyle = GOLD; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(0, -h / 2 - 17); ctx.lineTo(-9, -h / 2 - 4); ctx.lineTo(9, -h / 2 - 4); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
   ctx.fillStyle = INK; rr(-w / 2, -h / 2 + 5, w, h, 14); ctx.fill();
   ctx.shadowBlur = 0;
   ctx.fillStyle = t.color; rr(-w / 2, -h / 2, w, h, 14); ctx.fill();
@@ -700,7 +840,7 @@ function drawTile(t) {
   ctx.restore();
 }
 function drawRunner() {
-  const h = jumpHeight(G.jumpT);
+  const h = curH();
   const air = h > 1;
   const cx = RUNNER_X, cy = GROUND - 27 - h;
   const sx = (G.shake > 0 && !reduce) ? (Math.random() - 0.5) * 6 : 0;
@@ -808,7 +948,8 @@ function pickWords(rows, ids) {
     const key = word.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    words.push({ id: r.id, word: key, meaning: meaning });
+    const hp = buildHint(r, key, meaning);   // 단어장에 저장된 값만 쓴다(AI 호출 없음). 힌트의 모든 문자열에서 정답 단어와 활용형은 ＿＿ 로 가린다
+    words.push({ id: r.id, word: key, meaning: meaning, hint: hp.hint, pop: hp.pop });
   }
   return { words: words, excluded: excluded };
 }
@@ -843,6 +984,9 @@ function showGame(words, excluded) {
   els.startExcluded.hidden = excluded === 0;
   els.startExcluded.textContent = excluded + '개 제외(구절·특수문자)';
   els.speechNote.hidden = hasSpeech();
+  els.djRule.hidden = !CONFIG.DJ_ENABLED;
+  els.tune.hidden = !OPT.applied.length;
+  els.tune.title = OPT.applied.join(', ');
   els.startBtn.disabled = false;
   requestAnimationFrame(frame);
 }
@@ -886,7 +1030,7 @@ function frame(ts) {
 }
 
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
-const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, pickWords: pickWords };
+const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, pickWords: pickWords, curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y };
 window.SpellRun = API;
 boot();
 })();

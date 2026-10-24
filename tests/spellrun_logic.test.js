@@ -347,3 +347,215 @@ test('8. 보스: 선택 단어 중 8글자 이상이 있을 때만 1개, 정규 
   }
   assert.deepEqual(fails.slice(0, 8), [], '실패 ' + fails.length + '건');
 });
+
+// ───────── 작업318: 폭 배분 · 힌트 · 2단 점프 · 주소 옵션 ─────────
+const seq = (seed => () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+
+test('318-1. 글자 칸 줄 폭 배분: 칸 수 1~7, 조각 칸·고정 글자 포함, 어떤 입력에서도 합계가 사용 가능 폭 이하이고 글자 크기 하한 이상 → 간격 순으로 줄어든다', () => {
+  const avail = L.LAYOUT.WORD_AVAIL_W;
+  const rng = seq(7);
+  const mk = (slots, chunkProb) => Array.from({ length: slots }, () => (rng() < chunkProb ? { n: 2 + Math.floor(rng() * 3), chunk: true } : { n: 1, chunk: false }));
+  let shrunk = 0;
+  for (let slots = 1; slots <= 7; slots++) for (const chunkProb of [0, 0.5, 1]) for (let k = 0; k < 40; k++) {
+    const items = mk(slots, chunkProb);
+    if (rng() < 0.2) items.splice(Math.floor(rng() * items.length), 0, { fixed: true });
+    const f = L.fitWord(items, avail);
+    assert.ok(f.width <= avail + 1e-9, `폭 초과 ${f.width} > ${avail}: ${JSON.stringify(items)}`);
+    assert.equal(f.width, L.wordWidth(items, f.cw, f.cellGap, f.slotGap, f.chunkPad));
+    assert.ok(f.cw <= 34 && f.fs > 0);
+    if (f.cw >= 16) assert.ok(f.cellGap >= 1 && f.slotGap >= 2);
+    if (f.cw < 34) shrunk++;
+    if (f.cw === 16 && (f.cellGap < 3 || f.slotGap < 5)) assert.ok(L.wordWidth(items, 16, 3, 5, 4) > avail, '간격은 하한 글자 크기에서도 넘칠 때만 줄인다');
+    if (f.cw > 16) assert.equal(f.cellGap, 3, '글자 크기를 줄이는 동안은 간격 유지');
+  }
+  assert.ok(shrunk > 0);
+  assert.equal(L.fitWord([{ n: 1 }, { n: 1 }, { n: 1 }, { n: 1 }, { n: 1 }], avail).cw, 34, '짧은 단어는 최대 크기');
+  // 보스 단어(최대 7칸)와 4글자 조각 칸 = 실제 최악: 13글자 7칸 / 조각 4글자 칸 4개
+  const boss = [{ n: 4, chunk: true }, { n: 1 }, { n: 1 }, { n: 4, chunk: true }, { n: 1 }, { n: 1 }, { n: 4, chunk: true }];
+  const fb = L.fitWord(boss, avail);
+  assert.ok(fb.width <= avail && fb.cw >= 16, `보스 최악 ${JSON.stringify(fb)}`);
+  // 폭 320~768 (resize() 와 같은 배율 식): 줄 전체 폭(px) 이 상자 안쪽 폭 이하
+  for (const css of [320, 360, 390, 768, 1024]) {
+    const scale = Math.max(0.5, Math.min((css - 16) / 360, 1.5));
+    assert.ok(fb.width * scale <= (360 - 28) * scale + 1e-6, 'css ' + css);
+  }
+  // 7칸이 전부 4글자 조각 칸이면 하한 아래로 내려가더라도 반드시 들어간다(비현실적 입력의 마지막 수단)
+  const all = L.fitWord(Array(7).fill({ n: 4, chunk: true }), avail);
+  assert.ok(all.width <= avail && all.cw < 16);
+});
+
+test('318-2. 힌트 만들기: 대표 뜻·품사·빈칸 예문·다른 뜻(최대 2)·쓰임 설명, 단어장 필드만 사용, 정답과 활용형은 ＿＿ 로 가린다', () => {
+  const row = {
+    example_sentence: 'She runs every morning.',
+    data: { pronunciation: '/rʌn/', short_meaning: '달리다', meanings: [
+      { pos: 'verb', definition: '달리다', usage_note: '아침 운동처럼 규칙적으로 run 하는 상황에서 쓴다.', example: 'He ran home.' },
+      { pos: 'verb', definition: '운영하다' }, { definition: '흐르다' }, { definition: '출마하다' }, { definition: '달리다' } ] },
+  };
+  const h = L.buildHint(row, 'run', '달리다');
+  assert.equal(h.hint.meaning, '달리다'); assert.equal(h.hint.pos, '동사');
+  assert.equal(h.hint.example, 'She ＿＿ every morning.', '활용형(runs)도 가린다');
+  assert.deepEqual(h.hint.alts, ['운영하다', '흐르다'], '다른 뜻은 최대 2개');
+  assert.equal(h.hint.note, '아침 운동처럼 규칙적으로 ＿＿ 하는 상황에서 쓴다.');
+  assert.deepEqual(h.pop, { pron: '/rʌn/', meaning: '달리다', example: 'She runs every morning.', ranges: [[4, 8]] }, '완성 화면용은 가리지 않고 강조 위치만');
+  // 활용형: -s -es -ed -ing -ly -er -est, e 탈락, y→i, 자음 중복
+  const cases = [['happy', 'Happily, the happier one was happiest.'], ['make', 'Making it, she maked and makes makers.'], ['stop', 'It stopped, stopping the stopper.'], ['watch', 'He watches it.'], ['quick', 'Quickly now, quicker, quickest.'], ['study', 'She studies and studied.']];
+  for (const [w, text] of cases) {
+    const masked = L.maskText(text, w);
+    assert.ok(masked.includes('＿＿'), w);
+    for (const form of L.wordForms(w)) assert.ok(!L.maskText(`x ${form} y`, w).includes(form), `${w}: ${form}`);
+    assert.ok(!L.maskText(text.toUpperCase(), w).toLowerCase().includes(w + ' '), '대소문자 무시');
+  }
+  assert.equal(L.maskText('Running, RUN and Runs', 'run'), '＿＿, ＿＿ and ＿＿');
+  assert.equal(L.maskText('The runway and a rerun', 'run'), 'The runway and a rerun', '다른 단어 안에 든 철자는 가리지 않는다');
+  assert.equal(L.maskText("It is 5 o'clock now", "o'clock"), 'It is 5 ＿＿ now');
+  assert.equal(L.maskText("It is 5 o’clock now", "o'clock"), 'It is 5 ＿＿ now', '곧은/굽은 아포스트로피');
+  assert.equal(L.maskText('이 run을 보라', 'run'), '이 ＿＿을 보라', '한글 조사가 붙어도');
+  // 한계(보고서): 불규칙 활용은 가리지 못한다
+  assert.equal(L.maskText('He ran home.', 'run'), 'He ran home.');
+});
+
+test('318-2. 힌트: 예문에서 단어를 찾지 못하면 예문 생략, 필드가 없는 오래된 데이터도 있는 항목만, 어떤 필드에서도 정답이 그대로 남지 않는다', () => {
+  const none = L.buildHint({ data: { short_meaning: '사과' } }, 'apple', '사과');
+  assert.deepEqual(none.hint, { meaning: '사과', pos: '', example: '', alts: [], note: '' });
+  assert.deepEqual(none.pop, { pron: '', meaning: '사과', example: '', ranges: [] });
+  const missing = L.buildHint({ example_sentence: 'He ran fast.', data: { meanings: [{ pos: 'verb', definition: '달리다' }] } }, 'run', '달리다');
+  assert.equal(missing.hint.example, '', '단어(활용형)가 없는 예문은 생략');
+  assert.equal(missing.pop.example, 'He ran fast.', '완성 화면에는 강조 없이 그대로'); assert.deepEqual(missing.pop.ranges, []);
+  // 다른 예문 후보에서 찾는다: example_sentence 에 없으면 meanings[].example, 그다음 옛 스키마 usages[].example
+  const alt = L.buildHint({ example_sentence: 'Nothing here.', data: { meanings: [{ definition: '길', example: 'Take the road.' }], usages: [{ example: 'A road trip.' }] } }, 'road', '길');
+  assert.equal(alt.hint.example, 'Take the ＿＿.');
+  const legacy = L.buildHint({ data: { short_meaning: '길', usages: [{ example: 'A road trip.' }, null, 'x'] } }, 'road', '길');
+  assert.equal(legacy.hint.example, 'A ＿＿ trip.');
+  // 이상한 값(문자열 아닌 필드·null·빈 배열)에도 예외 없음
+  for (const row of [null, undefined, {}, { data: null }, { data: { meanings: 'x' } }, { data: { meanings: [null, 5, { pos: 5, definition: 7, example: {} }] } }, { data: { meanings: [] , usages: 'x' }, example_sentence: 5 }]) {
+    assert.doesNotThrow(() => L.buildHint(row, 'road', '길'));
+  }
+  // 모든 힌트 문자열에 정답(활용형 포함)이 남지 않는다
+  const words = ['book', 'happy', 'make', 'stop', 'environment', 'water', 'friend'];
+  for (const w of words) {
+    const text = `${w} ${w}s ${w}es ${w}ed ${w}ing ${w}ly ${w}er ${w}est ${w.toUpperCase()}`;
+    const h = L.buildHint({ example_sentence: text, data: { meanings: [{ pos: 'noun', definition: text, usage_note: text, example: text }, { definition: text }, { definition: text + '2' }] } }, w, text).hint;
+    const all = [h.meaning, h.pos, h.example, ...h.alts, h.note].join(' ');
+    for (const f of [w, ...L.wordForms(w)]) assert.ok(!all.toLowerCase().includes(f.toLowerCase()) || f.length < 3, `${w}: '${f}' 가 힌트에 남음`);
+  }
+});
+
+test('318-4. 높은 칸 계획: 꺼져 있으면 없음, 첫 칸 제외·최대 2개·전부 높은 칸 없음·확률 반영, 조각 칸과 무관', () => {
+  const on = { ...CONFIG, DJ_ENABLED: true };
+  for (let n = 0; n <= 8; n++) assert.equal(L.planHighSlots(n, Math.random, CONFIG).size, 0, 'dj 꺼짐');
+  assert.equal(L.planHighSlots(1, () => 0, on).size, 0, '칸이 하나뿐이면 없음');
+  let total = 0, trials = 0; const hist = {};
+  for (let n = 2; n <= 7; n++) for (let k = 0; k < 3000; k++) {
+    const s = L.planHighSlots(n, Math.random, on);
+    assert.ok(s.size <= on.HIGH_MAX && s.size < n, '최대 2개, 전부 높은 칸 없음');
+    assert.ok(!s.has(0), '첫 칸 제외');
+    for (const i of s) assert.ok(Number.isInteger(i) && i >= 1 && i < n);
+    hist[s.size] = (hist[s.size] || 0) + 1; total += s.size; trials += n - 1;
+  }
+  assert.ok(hist[0] > 0 && hist[1] > 0 && hist[2] > 0, '0·1·2개 모두 나온다 ' + JSON.stringify(hist));
+  assert.ok(total / trials > 0.12 && total / trials < 0.24, '칸당 비율이 HIGH_SLOT_PROB(0.2) 부근(상한 2개 때문에 약간 낮음): ' + (total / trials).toFixed(3));
+  assert.equal(L.planHighSlots(5, () => 0.99, on).size, 0, '확률 0 쪽 난수');
+  assert.equal(L.planHighSlots(7, () => 0, on).size, 2, '항상 뽑혀도 2개까지');
+  assert.equal(L.planHighSlots(7, () => 0.5, { ...on, HIGH_SLOT_PROB: 0 }).size, 0);
+  // 같은 입력 난수열이면 같은 결과(조각 칸 여부 정보를 받지 않는다)
+  assert.deepEqual([...L.planHighSlots(6, seq(3), on)], [...L.planHighSlots(6, seq(3), on)]);
+  assert.equal(L.planHighSlots.length >= 1, true);
+});
+
+test('318-4. 2단 점프 물리: 한 번 점프로는 높은 칸에 닿지 않고, 최고 속도에서 2단 점프가 높이 이상에 머무는 시간은 간격(GAP_SEC_FAST)보다 0.12초 넘게 짧아 인접한 두 타일을 덮지 못한다', () => {
+  const C = CONFIG, dt = 0.0005;
+  // 첫 점프 최고 높이 = JUMP_PEAK < HIGH_GRAB_H
+  let maxSingle = 0; for (let t = 0; t <= C.JUMP_TIME; t += dt) maxSingle = Math.max(maxSingle, L.airHeight(t, -1, 0));
+  assert.ok(Math.abs(maxSingle - C.JUMP_PEAK) < 0.5 && maxSingle < C.HIGH_GRAB_H, `단일 점프 최고 ${maxSingle}`);
+  assert.ok(C.HIGH_GRAB_H > C.JUMP_PEAK && C.HIGH_GRAB_H > C.GRAB_H);
+  // 2단 점프를 누르는 시점 s(첫 점프 시작 후) 전부에 대해: 높이 이상 머무는 시간, 최고 높이, 착지까지 시간
+  let worstAbove = 0, bestPeak = 0, worstPress = 0, longestAir = 0;
+  const grid = [];
+  for (let s = 0; s <= C.JUMP_TIME; s += 0.005) {
+    const h2 = L.airHeight(s, -1, 0), land = L.secondJumpLandTime(h2);
+    let above = 0, peak = 0, first = null, last = null;
+    for (let t2 = 0; t2 <= land; t2 += dt) {
+      const h = L.airHeight(s + t2, t2, h2);
+      peak = Math.max(peak, h);
+      if (h >= C.HIGH_GRAB_H) { above += dt; if (first === null) first = t2; last = t2; }
+    }
+    assert.ok(L.airHeight(s + land, land, h2) <= 1e-6, '착지한다');
+    if (above > worstAbove) { worstAbove = above; worstPress = s; }
+    bestPeak = Math.max(bestPeak, peak); longestAir = Math.max(longestAir, s + land);
+    if (first !== null) assert.ok(Math.abs((last - first) - above) < 2 * dt, '높이 이상 구간은 한 덩어리');
+    grid.push([s, above]);
+  }
+  const margin = C.GAP_SEC_FAST - worstAbove;
+  console.log(`2단 점프 물리(PACE 1.3): 첫 점프 체공 ${C.JUMP_TIME}s, 최고 ${bestPeak.toFixed(1)}px, 높이 ${C.HIGH_GRAB_H}px 이상 최대 ${worstAbove.toFixed(3)}s(첫 점프 ${worstPress.toFixed(3)}s에 누름), 간격 ${C.GAP_SEC_FAST}s, 여유 ${margin.toFixed(3)}s, 총 체공 최대 ${longestAir.toFixed(3)}s`);
+  assert.ok(Math.abs(bestPeak - 2 * C.JUMP_PEAK) < 1, '최고는 누른 높이 + JUMP_PEAK = 2*PEAK');
+  assert.ok(worstAbove < C.GAP_SEC_FAST - 0.12, `2단 점프가 높이 이상에 머무는 시간 ${worstAbove} 가 간격 ${C.GAP_SEC_FAST} 보다 0.12초 넘게 짧아야 한다`);
+  assert.ok(Math.abs(worstPress - C.JUMP_TIME / 2) < 0.02, '꼭대기에서 누를 때가 가장 오래 머문다');
+  // 최고 속도 간격만이 아니라 느린 간격에서도, 그리고 pace 허용 범위 전체에서 같은 비율이 유지된다
+  for (const pace of [0.7, 1, 1.3, 1.8]) {
+    const c = L.buildConfig({ pace });
+    const h2 = c.JUMP_PEAK, above = 2 * Math.sqrt(2 * (2 * c.JUMP_PEAK - c.HIGH_GRAB_H) / L.jumpG(c));
+    assert.ok(above / c.GAP_SEC_FAST < 0.7, `pace ${pace}: 비율 ${(above / c.GAP_SEC_FAST).toFixed(3)}`);
+    assert.ok(c.GAP_SEC_FAST - above >= 0.119, `pace ${pace}: 여유 ${(c.GAP_SEC_FAST - above).toFixed(3)}`);
+    assert.ok(h2 < c.HIGH_GRAB_H);
+  }
+  // 2단 점프는 공중에서 1회만(상태 모델): 누른 높이 h2 로 갱신되고 같은 초속도
+  assert.ok(Math.abs(L.jumpV0() * C.JUMP_TIME / 2 - 2 * C.JUMP_PEAK) < 1e-9, 'v0*T/2 = 2*PEAK');
+});
+
+test('318-4. 판정과 가산점: 높은 칸은 HIGH_GRAB_H 이상에서만 공중, 가산점은 속도·콤보 배율 이전에 더해지고 일반 칸 점수는 그대로', () => {
+  const C = CONFIG;
+  const isAir = (h, high) => (high ? h >= C.HIGH_GRAB_H : h > C.GRAB_H);
+  assert.equal(L.judge(true, isAir(C.JUMP_PEAK, true)), 'miss', '한 번 점프로는 높은 정답 칸을 놓친다');
+  assert.equal(L.judge(false, isAir(C.JUMP_PEAK, true)), 'pass', '높은 오답 칸은 그 높이에 있지 않으면 통과');
+  assert.equal(L.judge(true, isAir(C.HIGH_GRAB_H, true)), 'hit');
+  assert.equal(L.judge(false, isAir(C.HIGH_GRAB_H + 20, true)), 'wrong');
+  assert.equal(L.judge(true, isAir(C.JUMP_PEAK, false)), 'hit', '일반 칸 판정은 변경 없음');
+  assert.equal(L.judge(true, isAir(C.GRAB_H, false)), 'miss');
+  // 점수: (기본 + 가산점) × 콤보 배율 × 속도 배율
+  for (const combo of [0, 1, 3, 10, 14]) for (const len of [1, 2, 4]) {
+    const base = C.BASE * len + (len > 1 ? C.CHUNK_BONUS * len : 0);
+    assert.equal(slotPoints(len, combo, C, C.HIGH_BONUS), Math.round((base + C.HIGH_BONUS) * comboMult(combo)));
+    assert.equal(slotPoints(len, combo, C), Math.round(base * comboMult(combo)), '가산점 없는 기존 값');
+    assert.equal(slotPoints(len, combo), slotPoints(len, combo, C, 0));
+    const sm = speedMult(C.SPEED_MAX);
+    assert.equal(Math.round(slotPoints(len, combo, C, C.HIGH_BONUS) * sm), Math.round(Math.round((base + C.HIGH_BONUS) * comboMult(combo)) * sm));
+    assert.ok(slotPoints(len, combo, C, C.HIGH_BONUS) > slotPoints(len, combo, C) + C.HIGH_BONUS - 1, '배율을 거치므로 +100 이상');
+  }
+  assert.equal(C.HIGH_BONUS, 100); assert.equal(C.HIGH_SLOT_PROB, 0.2); assert.equal(C.HIGH_MAX, 2); assert.equal(C.DJ_ENABLED, false, '기본 꺼짐');
+});
+
+test('318-5. 주소 옵션: 허용 항목·범위, 범위 밖·숫자 아님은 무시, 기본값과 같으면 적용으로 세지 않는다, pace 는 CONFIG 를 한 번에 바꾼다', () => {
+  const po = s => L.parseOptions(s);
+  assert.deepEqual(po('?pace=1.1&hp=7&startdelay=2.6&popsec=2&highprob=0.3&heartevery=4&dj=1').values, { pace: 1.1, hp: 7, startdelay: 2.6, popsec: 2, highprob: 0.3, heartevery: 4, dj: 1 });
+  assert.deepEqual(po('?pace=1.1&hp=7').applied, ['pace', 'hp']);
+  assert.deepEqual(po('').values, {}); assert.deepEqual(po(undefined).applied, []); assert.deepEqual(po('?foo=1&bar=2').values, {}, '모르는 항목 무시');
+  for (const bad of ['pace=0.1', 'pace=9', 'pace=abc', 'pace=', 'pace=NaN', 'pace=Infinity', 'pace=1e1', 'hp=0', 'hp=11', 'hp=2.5', 'hp=-1', 'startdelay=7', 'startdelay=0', 'popsec=0.1', 'popsec=6', 'highprob=1.1', 'highprob=-0.1', 'heartevery=0', 'heartevery=11', 'dj=2', 'dj=-1', 'dj=yes', 'hp=5;6', 'hp=0x5']) {
+    assert.deepEqual(po('?' + bad).values, {}, '무시: ' + bad);
+  }
+  assert.deepEqual(po('?pace=9&hp=6').values, { hp: 6 }, '유효한 것만 적용');
+  assert.deepEqual(po('?pace=1.3&hp=5&dj=0&highprob=0.2&heartevery=3&startdelay=2.2&popsec=1.6').applied, [], '기본값과 같으면 조정으로 세지 않는다');
+  assert.deepEqual(po('?highprob=0').values, { highprob: 0 }, '확률 0 도 유효');
+  assert.equal(po('?hp=5&hp=7').values.hp, 5, '첫 값');
+  // 기본 CONFIG 는 옵션 없이 이전과 같다
+  const d = L.buildConfig();
+  for (const k of Object.keys(CONFIG)) assert.deepEqual(d[k], CONFIG[k], k);
+  assert.equal(d.HP, 5); assert.equal(d.WORD_START_DELAY, 2.2); assert.equal(d.POP_SEC, 1.6); assert.equal(d.POP_SEC_FINAL, 3.2); assert.equal(d.FINAL_REPEAT_SEC, 1.6); assert.equal(d.HEART_EVERY, 3);
+  // 옵션 적용
+  const o = L.buildConfig({ hp: 7, startdelay: 2.6, popsec: 2, highprob: 0.3, heartevery: 4, dj: 1 });
+  assert.deepEqual([o.HP, o.WORD_START_DELAY, o.POP_SEC, o.POP_SEC_FINAL, o.FINAL_REPEAT_SEC, o.HIGH_SLOT_PROB, o.HEART_EVERY, o.DJ_ENABLED], [7, 2.6, 2, 4, 2, 0.3, 4, true]);
+  assert.equal(o.SPEED_MIN, CONFIG.SPEED_MIN, 'pace 가 없으면 속도 그대로');
+  // pace: 속도(px/초)는 곱하고 간격·점프 시간은 나눈다(같은 비율)
+  const a = L.buildConfig({ pace: 1.3 }), b = L.buildConfig({ pace: 1.04 });
+  assert.ok(Math.abs(b.SPEED_MAX / a.SPEED_MAX - 1.04 / 1.3) < 0.01 && Math.abs(b.JUMP_TIME / a.JUMP_TIME - 1.3 / 1.04) < 0.01 && Math.abs(b.GAP_SEC_FAST / a.GAP_SEC_FAST - 1.3 / 1.04) < 0.01);
+  assert.equal(b.JUMP_PEAK, a.JUMP_PEAK, '점프 높이는 pace 와 무관');
+  // configure 는 제자리에서 바꾼다(다른 함수의 기본 cfg 가 같은 객체를 본다) — 원래대로 되돌린다
+  const before = JSON.stringify(CONFIG);
+  try { L.configure({ hp: 9, dj: 1 }); assert.equal(CONFIG.HP, 9); assert.equal(CONFIG.DJ_ENABLED, true); assert.equal(L.planHighSlots(7, () => 0).size, 2); }
+  finally { L.configure({}); }
+  assert.equal(JSON.stringify(CONFIG), before);
+});
+
+test('318-2. 시작 대기: WORD_START_DELAY 1.6 → 2.2, 첫 단어 추가 0.4초와 팝업 시간(1.6·3.2)은 그대로', () => {
+  assert.equal(CONFIG.WORD_START_DELAY, 2.2); assert.equal(CONFIG.POP_SEC, 1.6); assert.equal(CONFIG.POP_SEC_FINAL, 3.2); assert.equal(CONFIG.FINAL_REPEAT_SEC, 1.6);
+  assert.equal(CONFIG.GAP_SEC_FAST, 0.554); assert.equal(CONFIG.JUMP_BUFFER, 0.12);
+});

@@ -63,12 +63,15 @@
           </div>
           <div class="meaning" id="meaning"></div>
           <div class="word" id="word"></div>
+          <div class="hint" id="hint" hidden></div>
         </div>
 
         <div class="popword" id="pop" hidden>
           <div class="tag" id="popTag"></div>
           <div class="pw" id="popWord"></div>
+          <div class="pp" id="popPron" hidden></div>
           <div class="pm" id="popMean"></div>
+          <div class="pe" id="popEx" hidden></div>
           <div class="pn" id="popNote"></div>
         </div>
 
@@ -86,6 +89,7 @@
               <li class="mint">오답을 먹거나 정답을 놓치면 체력이 1 줄고, 같은 칸에 새 글자가 나옵니다.</li>
               <li class="gold">금색 테두리 조각은 한 음절(2~4글자)을 통째로 먹는 칸이라 점수가 높습니다.</li>
               <li class="red">3단어마다 하트가 하나 나옵니다. 점프해서 먹으면 체력이 1 회복됩니다.</li>
+              <li id="djRule" hidden>높이 떠 있는 칸(위쪽 삼각형 표시)은 공중에서 한 번 더 탭하는 2단 점프로만 먹을 수 있고, 먹으면 가산점입니다.</li>
               <li>단어를 모두 끝내면 보스 단어가 나오고, 끝까지 먹으면 발음이 한 번 더 천천히 나옵니다.</li>
             </ul>
             <button class="btn" id="startBtn" type="button" disabled>달리기 시작</button>
@@ -115,6 +119,7 @@
             <button class="btn" id="againBtn" type="button">새 판 시작</button>
           </div>
         </section>
+        <div class="tune" id="tune" hidden>조정값 사용 중</div>
       </div>
       <div class="sr-only" id="live" aria-live="polite"></div>
     </div>
@@ -122,8 +127,8 @@
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=54"></script>
-<script src="/js/spellrun/stage_style.js?v=54"></script>
-<script src="/js/spellrun/game.js?v=54"></script>
+<script src="/js/spellrun/logic.js?v=55"></script>
+<script src="/js/spellrun/stage_style.js?v=55"></script>
+<script src="/js/spellrun/game.js?v=55"></script>
 </body>
 </html>
