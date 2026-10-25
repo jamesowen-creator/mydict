@@ -789,3 +789,194 @@ test('325-2. ttsdebug 옵션: 0|1(기본 0), 범위 밖은 무시, 저장 방식
   assert.deepEqual(L.resolveOptions('', JSON.stringify({ ttsdebug: 1 })).values, { ttsdebug: 1 }); assert.deepEqual(L.resolveOptions('?ttsdebug=0', JSON.stringify({ ttsdebug: 1 })).values, { ttsdebug: 0 });
   const d = L.buildConfig({ ttsdebug: 1 }), e = L.buildConfig(); for (const k of Object.keys(e)) assert.deepEqual(d[k], e[k], 'CONFIG 에는 영향 없음: ' + k);
 });
+
+// ───────── 작업326: 장애물(바닥 상자·구덩이) ─────────
+const mulberry = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const OBST_KINDS = ['box', 'pit'];
+
+test('326-1. 배치: 후보 자리는 묶음 사이 간격뿐(첫 묶음 앞·마지막 묶음 뒤 제외), 단어당 최대 1개, 보스·높은 칸·하트에서 1묶음 이내는 제외, 확률은 난수로 정한다', () => {
+  const C = L.buildConfig({ obsprob: 1 });
+  // 기준 구현(규칙을 글자 그대로 옮긴 것): 간격 g 는 묶음 g-1 과 g 사이. 높은 칸 j 와 1묶음 이내 = 간격 양옆 묶음 중 하나가 j 에서 1 이하.
+  const expected = (n, highs, heartSlot) => {
+    const out = [];
+    for (let g = 1; g < n; g++) {
+      let ok = true;
+      for (const j of highs) if (Math.abs(g - 1 - j) <= 1 || Math.abs(g - j) <= 1) ok = false;
+      if (heartSlot !== null) for (let k = heartSlot; k < n; k++) if (Math.abs(g - 1 - k) <= 1 || Math.abs(g - k) <= 1) ok = false;   // 하트는 heartSlot 이후 어느 묶음 앞에도 나올 수 있다
+      if (ok) out.push(g);
+    }
+    return out;
+  };
+  const rnd = mulberry(326);
+  let placed = 0; const kinds = { box: 0, pit: 0 };
+  for (let i = 0; i < 4000; i++) {
+    const n = 1 + Math.floor(rnd() * 8);
+    const highs = new Set(); for (let j = 1; j < n; j++) if (rnd() < 0.25) highs.add(j);
+    const heartSlot = rnd() < 0.4 ? (n <= 1 ? 0 : 1 + Math.floor(rnd() * (n - 1))) : null;
+    const boss = rnd() < 0.1;
+    const r = L.planObstacle(n, highs, heartSlot, boss, mulberry(i + 1), C);
+    const cand = expected(n, highs, heartSlot);
+    if (boss || n < 2 || !cand.length) { assert.equal(r, null, `n=${n} boss=${boss} 후보 ${cand}`); continue; }
+    assert.ok(r, '확률 1 이면 후보가 있을 때 항상 배치'); placed++; kinds[r.kind]++;
+    assert.ok(cand.includes(r.slot), `자리 ${r.slot} 는 후보 ${cand} 안`);
+    assert.ok(r.slot >= 1 && r.slot <= n - 1, '첫 묶음 앞(0)·마지막 묶음 뒤(n) 제외');
+    assert.ok(OBST_KINDS.includes(r.kind));
+    assert.equal(typeof r.slot, 'number', '한 단어에 장애물 하나');
+  }
+  assert.ok(placed > 500 && kinds.box > 100 && kinds.pit > 100, `두 종류가 모두 나온다: ${JSON.stringify(kinds)}`);
+  // 구체 사례
+  assert.equal(L.planObstacle(4, new Set(), null, false, () => 0, C).slot, 1, '난수 0 → 첫 후보');
+  assert.equal(L.planObstacle(4, new Set(), null, false, () => 0.999, C).slot, 3, '난수 끝 → 마지막 후보(마지막 묶음 앞 간격 n-1)');
+  assert.equal(L.planObstacle(1, new Set(), null, false, () => 0, C), null, '칸이 하나면 간격이 없다');
+  assert.equal(L.planObstacle(5, new Set(), null, true, () => 0, C), null, '보스 단어는 없음');
+  assert.equal(L.planObstacle(5, new Set([2]), null, false, () => 0, C), null, '높은 칸이 가운데(2)에 있으면 간격 1~4 모두 1묶음 이내');
+  assert.equal(L.planObstacle(7, new Set([1]), null, false, () => 0, C).slot, 4, '높은 칸 1 → 간격 0~3 제외, 4~6 후보');
+  assert.equal(L.planObstacle(4, new Set(), 1, false, () => 0, C), null, '하트가 1번 칸부터 나올 수 있으면 간격 모두 1묶음 이내');
+  assert.equal(L.planObstacle(6, new Set(), 4, false, () => 0.999, C).slot, 2, '하트 4번 칸 이후 → 간격 3 이상 제외, 1·2 만 후보');
+  // 확률: 기본 0.5, 0, 1 / 꺼짐
+  const hit = (cfg, N) => { let c = 0; const r = mulberry(7); for (let i = 0; i < N; i++) if (L.planObstacle(5, new Set(), null, false, r, cfg)) c++; return c / N; };
+  const d = hit(L.buildConfig(), 6000); assert.ok(d > 0.46 && d < 0.54, '기본 확률 약 0.5: ' + d);
+  assert.equal(hit(L.buildConfig({ obsprob: 0 }), 500), 0); assert.equal(hit(L.buildConfig({ obsprob: 1 }), 500), 1);
+  assert.equal(L.buildConfig().OBSTACLE_PROB, 0.5); assert.equal(L.buildConfig().OBST_ENABLED, true);
+  let calls = 0; const counter = () => { calls++; return 0; };
+  assert.equal(L.planObstacle(5, new Set(), null, false, counter, L.buildConfig({ obs: 0 })), null); assert.equal(calls, 0, 'obs=0 이면 난수를 쓰지 않는다(이전과 같은 난수 흐름)');
+  L.planObstacle(5, new Set(), null, true, counter, C); assert.equal(calls, 0, '보스도 난수를 쓰지 않는다');
+  // 같은 난수열이면 같은 배치
+  assert.deepEqual(L.planObstacle(6, new Set([4]), null, false, mulberry(5), C), L.planObstacle(6, new Set([4]), null, false, mulberry(5), C));
+});
+
+test('326-0. 안전 간격 수식: 속도 기본(SPEED_MIN)~SPEED_MAX 전 구간에서 여유 창이 OBST_MIN_WINDOW 이상이고, 거리는 SPEED_MAX 기준 px 이다', () => {
+  const C = CONFIG;
+  assert.equal(C.OBST_MIN_WINDOW, 0.15);
+  const grab = L.airWindow(C, C.GRAB_H);
+  assert.ok(Math.abs(grab.len - 0.4167) < 0.001 && Math.abs(grab.a - 0.02264) < 0.0001, '글자 획득(높이 22 초과) 구간 ≈ 0.0226~0.4394초');
+  for (const kind of OBST_KINDS) {
+    const lay = L.obstacleLayout(C, kind), sp = L.obstacleSpec(C, kind), win = L.airWindow(C, sp.clearH);
+    assert.equal(lay.w, sp.w);
+    // 식 확인: 최악 속도 px 로 계획한 값이 공식과 같다
+    const v = C.SPEED_MAX, MIN = C.OBST_MIN_WINDOW + 0.01, M = C.OBST_NEXT_MARGIN, F = C.OBST_FOOT, PD = C.PACK_DELAY, J = C.JUMP_TIME;
+    assert.ok(lay.D1 >= v * (MIN + grab.a + J + M + grab.b - PD) - 1e-9, kind + ': D1 ≥ SPEED_MAX × (여유 + 체공 + 준비 − 팩 대기)');
+    assert.ok(lay.Do >= F + v * (MIN + win.a + grab.b - PD) - 1e-9, kind + ': 앞 거리');
+    assert.ok(lay.post >= F + v * (MIN + grab.a + J + M - win.b) - 1e-9, kind + ': 뒤 거리');
+    assert.ok(Math.abs(lay.Do + lay.w + lay.post - lay.D1) < 1e-9);
+    // 모든 속도에서 여유 창
+    let minW = Infinity;
+    for (let s = C.SPEED_MIN; s <= C.SPEED_MAX; s += 0.5) minW = Math.min(minW, L.obstacleWindow(C, lay, s).width);
+    assert.ok(minW >= C.OBST_MIN_WINDOW, `${kind}: 속도 ${C.SPEED_MIN}~${C.SPEED_MAX} 의 최소 여유 창 ${minW.toFixed(4)} ≥ ${C.OBST_MIN_WINDOW}`);
+    // 장애물 자체의 통과 가능 시간: 최저 속도에서 (폭+2×발폭)/속도 가 높이 창보다 OBST_MIN_WINDOW 이상 짧다
+    assert.ok(win.len - (sp.w + 2 * F) / C.SPEED_MIN >= C.OBST_MIN_WINDOW, kind + ' 통과 창');
+  }
+  // 속도 옵션(pace)이 달라도 같은 보장(폭이 줄어든다)
+  for (const pace of [0.7, 0.9, 1.0, 1.3, 1.5, 1.8]) {
+    const c = L.buildConfig({ pace: pace });
+    for (const kind of OBST_KINDS) {
+      const lay = L.obstacleLayout(c, kind);
+      for (let s = c.SPEED_MIN; s <= c.SPEED_MAX; s += 1) assert.ok(L.obstacleWindow(c, lay, s).width >= c.OBST_MIN_WINDOW, `pace ${pace} ${kind} v=${s}`);
+    }
+  }
+  assert.equal(L.buildConfig({ pace: 1.3 }).OBST_W, 28, '기본 pace 에서는 폭이 줄지 않는다'); assert.ok(L.buildConfig({ pace: 1.8 }).OBST_W < 28);
+  // 늘어난 시간(보고용): 기본 리드보다 D1 이 큰 만큼
+  const slow = L.obstacleAddedSec(C, 'box', C.SPEED_MIN), fast = L.obstacleAddedSec(C, 'box', C.SPEED_MAX);
+  assert.ok(slow > fast && fast > 0 && slow < 1.0, `기본 속도 +${slow.toFixed(3)}초, 최고 속도 +${fast.toFixed(3)}초`);
+  let sum = 0, n = 0; for (let s = C.SPEED_MIN; s <= C.SPEED_MAX; s++) { sum += L.obstacleAddedSec(C, 'pit', s); n++; } assert.ok(sum / n < 0.5, '평균 ' + (sum / n).toFixed(3));
+});
+
+test('326-2. 통과 판정: 겹치는 동안 공중 높이(airHeight)가 계속 OBST_H 를 넘어야 통과, 구덩이는 떠 있기만 하면 통과', () => {
+  const C = CONFIG, RX = 72, F = C.OBST_FOOT;
+  assert.equal(L.obstacleOverlaps(RX + F - 0.1, 28, RX), true); assert.equal(L.obstacleOverlaps(RX + F, 28, RX), false, '앞 끝이 발 앞에 닿기 전');
+  assert.equal(L.obstacleOverlaps(RX - F - 28 + 0.1, 28, RX), true); assert.equal(L.obstacleOverlaps(RX - F - 28, 28, RX), false, '뒤 끝이 발 뒤를 지난 뒤');
+  assert.equal(L.obstacleHit('box', C.OBST_H, C), true, '높이가 정확히 OBST_H 면 걸림'); assert.equal(L.obstacleHit('box', C.OBST_H + 0.01, C), false);
+  assert.equal(L.obstacleHit('box', 0, C), true); assert.equal(L.obstacleHit('pit', 0, C), true, '땅에 닿아 있으면 빠짐');
+  assert.equal(L.obstacleHit('pit', C.OBST_H, C), false); assert.equal(L.obstacleHit('pit', C.PIT_CLEAR_H + 0.01, C), false);
+  // 일정 속도로 지나가며 1ms 단위로 판정: 점프 시작 s 를 훑어 통과하는 구간이 airWindow 이론값과 같다
+  for (const kind of OBST_KINDS) {
+    const sp = L.obstacleSpec(C, kind), win = L.airWindow(C, sp.clearH);
+    for (const v of [C.SPEED_MIN, C.SPEED_MAX]) {
+      const A = 1.0, dur = (sp.w + 2 * F) / v, ok = [];
+      for (let s = A - 0.6; s <= A + 0.6; s += 0.001) {
+        let hit = false;
+        for (let t = A; t <= A + dur; t += 0.001) if (L.obstacleHit(kind, L.airHeight(t - s, -1, 0, C), C)) { hit = true; break; }
+        if (!hit) ok.push(s);
+      }
+      assert.ok(ok.length > 0, kind + ' 통과 가능');
+      const width = ok[ok.length - 1] - ok[0], theory = win.len - dur;
+      assert.ok(Math.abs(width - theory) < 0.004, `${kind} v=${v}: 통과 구간 ${width.toFixed(4)} ≈ 이론 ${theory.toFixed(4)}`);
+      assert.ok(width >= C.OBST_MIN_WINDOW, `${kind} v=${v} 통과 구간 ≥ 0.15`);
+    }
+  }
+});
+
+test('326-2. 맞았을 때 효과: 체력 -1, 속도 즉시 0.6배·기본 속도 -SPEED_DROP_FAIL, 콤보 불변, 이후 기존 가속도로 목표 속도까지 회복', () => {
+  const C = CONFIG;
+  assert.equal(C.OBST_SLOW_FACTOR, 0.6); assert.equal(C.OBST_INVULN_SEC, 0.8);
+  const s0 = { hp: 5, speed: 300, speedBase: 250, combo: 4 };
+  const r = L.afterObstacleHit(s0, C);
+  assert.equal(r.hp, 4); assert.ok(Math.abs(r.speed - 180) < 1e-9, '300 × 0.6'); assert.equal(r.speedBase, 250 - C.SPEED_DROP_FAIL);
+  assert.equal(r.combo, 4, '콤보 불변'); assert.equal(r.speedTarget, L.targetSpeed(250 - C.SPEED_DROP_FAIL, 4, C), '목표 속도는 새 기본 속도와 콤보로 다시 계산');
+  assert.deepEqual(s0, { hp: 5, speed: 300, speedBase: 250, combo: 4 }, '입력을 바꾸지 않는다');
+  assert.equal(L.afterObstacleHit({ hp: 1, speed: 200, speedBase: C.SPEED_MIN, combo: 0 }, C).speedBase, C.SPEED_MIN, '기본 속도는 SPEED_MIN 아래로 내려가지 않는다');
+  // 회복: 가속도(SPEED_ACCEL)로 목표 속도에 닿는다. 단조 증가이고 한 걸음에 SPEED_ACCEL×dt 를 넘지 않는다
+  let v = r.speed; const dt = 1 / 60; let t = 0, prev = v;
+  while (v < r.speedTarget - 1e-9 && t < 5) { const dv = r.speedTarget - v, m = C.SPEED_ACCEL * dt; v += Math.abs(dv) <= m ? dv : Math.sign(dv) * m; assert.ok(v >= prev && v - prev <= m + 1e-9); prev = v; t += dt; }
+  assert.ok(v >= r.speedTarget - 1e-9 && t < 2, '목표 속도로 회복 ' + t.toFixed(2) + '초');
+});
+
+test('326-3. 옵션 obs(0|1, 기본 1)·obsprob(0~1, 기본 0.5): 범위 밖은 무시, 저장 방식 동일, 기본값과 같으면 "조정값 사용 중" 없음', () => {
+  const po = q => L.parseOptions(q);
+  assert.deepEqual(po('?obs=0').values, { obs: 0 }); assert.deepEqual(po('?obs=0').applied, ['obs']);
+  assert.deepEqual(po('?obs=1').applied, [], '기본값과 같으면 표시 없음'); assert.deepEqual(po('?obsprob=0.5').applied, []);
+  assert.deepEqual(po('?obsprob=0.8&obs=1').values, { obs: 1, obsprob: 0.8 }); assert.deepEqual(po('?obsprob=0.8').applied, ['obsprob']);
+  assert.deepEqual(po('?obsprob=0').values, { obsprob: 0 }); assert.deepEqual(po('?obsprob=1').values, { obsprob: 1 });
+  for (const bad of ['obs=2', 'obs=-1', 'obs=0.5', 'obs=x', 'obs=', 'obsprob=1.1', 'obsprob=-0.1', 'obsprob=x', 'obsprob=']) assert.deepEqual(po('?' + bad).values, {}, bad);
+  assert.deepEqual(L.resolveOptions('', JSON.stringify({ obs: 0, obsprob: 0.2 })).values, { obs: 0, obsprob: 0.2 }, '저장값 사용');
+  assert.deepEqual(L.resolveOptions('', JSON.stringify({ obs: 3, obsprob: 7 })).values, {}, '저장값도 범위 규칙');
+  assert.deepEqual(L.resolveOptions('?obs=1', JSON.stringify({ obs: 0 })).values, { obs: 1 }, '주소가 우선'); assert.deepEqual(L.resolveOptions('?obs=1', JSON.stringify({ obs: 0 })).applied, []);
+  assert.deepEqual(L.resolveOptions('?obs=0').save, { obs: 0 }, '주소에 유효한 옵션이 있으면 저장');
+  const d = L.buildConfig({ obs: 0 }), e = L.buildConfig(); assert.equal(d.OBST_ENABLED, false);
+  for (const k of Object.keys(e)) if (k !== 'OBST_ENABLED') assert.deepEqual(d[k], e[k], 'obs=0 은 다른 값에 영향 없음: ' + k);
+  const p = L.buildConfig({ obsprob: 0.2 }); assert.equal(p.OBSTACLE_PROB, 0.2);
+  for (const k of Object.keys(e)) if (k !== 'OBSTACLE_PROB') assert.deepEqual(p[k], e[k], k);
+});
+
+// 핵심: "틀린 타일을 먹지 않고 장애물을 통과하는 점프 타이밍이 항상 존재한다". 1ms 단위로 점프 시작 시각을 훑어, 실제 점프 곡선(airHeight)으로 판정한다.
+test('326-4. [핵심] 난수 조건 600개: 어떤 장애물·속도·앞뒤 점프 위상·정답 위치에서도 틀린 타일을 먹지 않고 넘는 점프 타이밍이 있고, 그 여유 창이 0.15초 이상이다', () => {
+  const rnd = mulberry(20260326);
+  let tested = 0, minWidth = Infinity, worst = null; const byKind = { box: 0, pit: 0 }, bySpeed = { min: 0, max: 0 };
+  for (let i = 0; i < 600; i++) {
+    const pace = [1.3, 1.3, 1.3, 0.7, 1.0, 1.8, 0.7 + rnd() * 1.1][Math.floor(rnd() * 7)];
+    const C = L.buildConfig({ pace: pace }), kind = OBST_KINDS[Math.floor(rnd() * 2)];
+    const speedName = rnd() < 0.5 ? 'min' : 'max', v = speedName === 'min' ? C.SPEED_MIN : C.SPEED_MAX;
+    const lay = L.obstacleLayout(C, kind), F = C.OBST_FOOT, J = C.JUMP_TIME;
+    const grab = L.airWindow(C, C.GRAB_H);
+    // 앞 묶음의 정답 글자를 먹은 점프 위상(점프 시작 후 τ): 글자 획득이 성립하는 범위 안에서 무작위(양 끝 포함)
+    const tau = [grab.a, grab.b, grab.a + rnd() * (grab.b - grab.a)][Math.floor(rnd() * 3)];
+    const T0 = -C.PACK_DELAY, landPrev = T0 + (J - tau);
+    // 다음 묶음: 세 후보, 정답 위치 무작위. 후보 간 시간 간격 = 간격 px / 속도 (같은 속도로 지난다고 본다)
+    const gapT = L.gapSec(v, C), P1 = lay.D1 / v, tiles = [0, 1, 2].map(k => P1 + k * gapT), correct = Math.floor(rnd() * 3);
+    const A = (lay.Do - F) / v, B = (lay.Do + lay.w + F) / v;   // 겹치는 시간 구간
+    const hAt = (s, t) => L.airHeight(t - s, -1, 0, C);
+    const wrongOK = s => tiles.every((tt, k) => k === correct || hAt(s, tt) <= C.GRAB_H);   // 틀린 타일은 공중이면 먹는다
+    const clears = s => { for (let t = A; t <= B + 1e-9; t += 0.001) if (L.obstacleHit(kind, hAt(s, t), C)) return false; return true; };
+    // 이어서 정답 글자를 먹는 점프가 가능한지(착지 뒤 시작 → 정답 때 공중, 틀린 타일은 땅)
+    const followUp = s => { for (let sg = s + J; sg <= tiles[correct]; sg += 0.002) if (hAt(sg, tiles[correct]) > C.GRAB_H && tiles.every((tt, k) => k === correct || hAt(sg, tt) <= C.GRAB_H)) return true; return false; };
+    let run = 0, best = 0;
+    for (let s = landPrev; s <= A + 0.2; s += 0.001) {   // 점프는 앞 점프 착지 뒤에만 시작할 수 있다
+      if (clears(s) && wrongOK(s) && followUp(s)) { run += 0.001; best = Math.max(best, run); } else run = 0;
+    }
+    tested++; byKind[kind]++; bySpeed[speedName]++;
+    if (best < minWidth) { minWidth = best; worst = { pace, kind, speedName, tau }; }
+    assert.ok(best >= C.OBST_MIN_WINDOW - 0.003, `조건 ${i}: pace ${pace.toFixed(2)} ${kind} 속도 ${speedName} 점프 위상 ${tau.toFixed(3)} → 안전 점프 구간 ${best.toFixed(3)}초`);
+    assert.ok(best >= L.obstacleWindow(C, lay, v).width - 0.012, `조건 ${i}: 해석식(${L.obstacleWindow(C, lay, v).width.toFixed(3)})보다 좁지 않다`);
+  }
+  assert.equal(tested, 600); assert.ok(byKind.box > 200 && byKind.pit > 200 && bySpeed.min > 200 && bySpeed.max > 200, JSON.stringify([byKind, bySpeed]));
+  assert.ok(minWidth >= 0.147, '최소 여유 창 ' + minWidth.toFixed(4) + ' ' + JSON.stringify(worst));
+});
+
+test('326-4. 음성 대조: 간격을 늘리지 않고 기본 리드 거리에 장애물을 끼우면 여유 창이 0.15초 미만이 된다(시험이 실제로 잡아낸다)', () => {
+  const C = CONFIG, v = C.SPEED_MAX;
+  const lay = L.obstacleLayout(C, 'box');
+  const lead = v * L.leadSec(v, C);
+  const short = Object.assign({}, lay, { D1: lead, Do: 100, post: lead - 100 - lay.w });
+  assert.ok(L.obstacleWindow(C, short, v).width < C.OBST_MIN_WINDOW, '늘리지 않으면 ' + L.obstacleWindow(C, short, v).width.toFixed(3));
+  assert.ok(L.obstacleWindow(C, lay, v).width >= C.OBST_MIN_WINDOW);
+});

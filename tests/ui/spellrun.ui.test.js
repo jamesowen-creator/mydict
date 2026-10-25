@@ -65,6 +65,13 @@ test.before(async () => {
 });
 test.after(async () => { if (browser) await browser.close(); if (srv) await new Promise(r => srv.close(r)); });
 
+// 작업326: 장애물이 기본으로 켜져 있어 글자만 보고 뛰는 기존 봇이 장애물에 걸리므로, 기존 시험의 페이지에는 "장애물 넘기 보조"를 끼운다.
+// SpellRun.step 을 감싸서, 땅에 있고 아직 안 맞은 장애물의 가운데가 점프 정점(체공의 절반)에 닿을 때 점프를 한 번 누른다. 글자 쪽 봇의 규칙은 그대로다.
+// 작업326 새 시험은 이 보조 없이(dodge:false) 장애물을 직접 다룬다.
+const DODGE = `(() => { let api; Object.defineProperty(window, 'SpellRun', { configurable: true, get: () => api, set: v => { api = v; const st = v.step;
+  v.step = function (dt) { const G = v.G; if (G.state === 'run' && G.jumpT < 0) { const o = G.obstacles.find(x => !x.hit && x.x + x.w / 2 > v.RUNNER_X); if (o && (o.x + o.w / 2 - v.RUNNER_X) / G.speed <= v.CONFIG.JUMP_TIME / 2) v.jump(); } return st.call(this, dt); }; } }); })();`;
+const withDodge = (page, dodge) => dodge === false ? Promise.resolve() : page.send('Page.addScriptToEvaluateOnNewDocument', { source: DODGE });
+
 // 내장 음성 모의: speak 하면 곧바로 onstart 를 불러 "재생 시작"으로 본다
 const SPEECH = `(() => {
   const S = window.__speech = { spoken: [] };
@@ -76,14 +83,15 @@ const SPEECH = `(() => {
 })();`;
 
 // 게임 페이지를 직접 연다. ids 가 있으면 sessionStorage 에 넣고, token=false 면 로그인 토큰 없이 연다.
-async function openGame({ ids, token = true, width = 390, height = 844, speech = false } = {}) {
+async function openGame({ ids, token = true, width = 390, height = 844, speech = false, query = '', dodge = true } = {}) {
   state.requests.length = 0;
   const page = await browser.newPage({ width, height, token: token ? jwt() : null });
+  await withDodge(page, dodge);
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); } catch (e) {}" });   // 작업319: 저장된 주소 옵션이 다른 시험으로 새지 않게 비운다
   if (!token) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('mydict_token'); } catch (e) {}" });   // 같은 Chrome 프로필을 쓰는 앞선 시험이 남긴 토큰 제거
   if (speech) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
   if (ids) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` });
-  await page.goto(base + '/spelling_run.html');
+  await page.goto(base + '/spelling_run.html' + query);
   await page.waitFor("!!document.querySelector('.metis-app-header-logo') && document.getElementById('gateMsg').textContent !== '불러오는 중...' || !document.getElementById('app').hidden", 8000);
   return page;
 }
@@ -395,9 +403,10 @@ const HINT_ROWS = [
 ];
 const WIDTHS = [320, 360, 390, 768, 1024];
 const queryOf = q => (q ? '?' + q : '');
-async function openQ({ ids, query = '', width = 390, height = 844, keep = false }) {
+async function openQ({ ids, query = '', width = 390, height = 844, keep = false, dodge = true }) {
   state.requests.length = 0;
   const page = await browser.newPage({ width, height, token: jwt() });
+  await withDodge(page, dodge);
   if (!keep) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); } catch (e) {}" });   // 작업319: keep=true 가 아니면 저장된 주소 옵션을 비우고 시작
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` });
   await page.goto(base + '/spelling_run.html' + queryOf(query));
@@ -1129,9 +1138,10 @@ test('320-4) 속도 램프: 콤보에 따라 목표 속도가 25·50·75·100%�
 // ───────── 작업323: 새 단어 시작 연출 ─────────
 const SEED = "Math.random = (() => { let s = 12345; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();";
 const ROWS_I = [RICH(91, 'apple', '사과', { meanings: [{ definition: '사과, 능금, 애플' }] }), RICH(92, 'happy', '행복한', { meanings: [{ definition: '행복한, 기쁜, 즐거운' }] }), RICH(93, 'water', '물', { meanings: [{ definition: '물, 식수' }] })];
-async function openI({ query = '', width = 390, ids = [91, 92, 93], seed = true } = {}) {
+async function openI({ query = '', width = 390, ids = [91, 92, 93], seed = true, dodge = true } = {}) {
   state.requests.length = 0;
   const page = await browser.newPage({ width, height: 844, token: jwt() });
+  await withDodge(page, dodge);
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); } catch (e) {}" });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` + (seed ? SEED : '') });
   await page.goto(base + '/spelling_run.html' + (query ? '?' + query : ''));
@@ -1362,6 +1372,7 @@ test('321-2) 로딩 성공: 스프라이트로 그려지고(달리기 0~3 순환
 test('321-2) 로딩 실패(시트 요청 차단): 기존 도형 캐릭터로 그려지고 게임은 끝까지 동작하며 오류가 없다. 로딩 전에도 시작을 막지 않는다', { skip: SKIP }, async () => {
   resetState();
   const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
+  await withDodge(page);
   await page.send('Network.enable');
   await page.send('Network.setBlockedURLs', { urls: ['*spellrun_penguin_sheet*'] });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
@@ -1498,4 +1509,265 @@ test('325-2) ttsdebug=0(기본)이면 표시도 요소도 없고 동작이 같�
   const p2 = await openQ({ ids: [1, 2, 3], query: 'ttsdebug=0' });
   assert.equal(await p2.eval("document.getElementById('tune').hidden"), true, '기본값과 같으면 표시 없음');
   await p2.close(); await page.close();
+});
+
+// ───────── 작업326: 장애물(바닥 상자·구덩이) ─────────
+// 봇(페이지 안): 정답 글자는 기존 봇과 같은 규칙(정점에서 닿게)으로 점프하고, 장애물은 o.dodge 가 true 일 때만 "가운데가 점프 정점에 닿는 순간 + o.offset 초"에 점프한다.
+// 틀린 글자는 절대 먹지 않는다(정답이 아니면 점프하지 않는다). 수동 진행(step) 모드. 장애물 계획과 결과를 모아 돌려 준다.
+const OBOT = `(async (o) => {
+  const R = window.SpellRun, G = R.G, C = R.CONFIG, T = C.JUMP_TIME, RX = R.RUNNER_X;
+  const out = { steps: 0, obstSeen: 0, kinds: { box: 0, pit: 0 }, plans: [], hpMin: 99, speedDrops: 0, over: false, rounds: 0, mist: 0, hits: 0, hpStart: G.hp, snap: null, tilesSeenAtObstacle: 0 };
+  const seen = new Set(); let lastWi = -1, lastWords = null, prev = G.speed, hpPrev = G.hp;
+  const maxSteps = o.maxSteps || 60 * 1500;
+  while (out.steps < maxSteps && G.state !== 'over') {
+    if (G.words !== lastWords || G.wi !== lastWi) {
+      lastWords = G.words; lastWi = G.wi;
+      out.plans.push({ wi: G.wi, boss: !!G.words[G.wi].boss, obst: G.obst ? { slot: G.obst.slot, kind: G.obst.kind } : null, n: G.plan.slots.length, highs: G.plan.slots.map((s, i) => s.high ? i : -1).filter(i => i >= 0), heart: G.heartPending ? G.heartSlot : null, review: G.review });
+    }
+    if (G.state === 'run' && G.jumpT < 0) {
+      const ob = G.obstacles.find(x => !x.hit && x.x + x.w / 2 > RX);
+      const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && (x.kind !== 'heart' && x.correct) && x.x > RX).sort((a, b) => a.x - b.x)[0];
+      if (ob && o.dodge && (ob.x + ob.w / 2 - RX) / G.speed <= T / 2 + (o.offset || 0)) R.jump();
+      else if (tg) {
+        const tta = (tg.x - RX) / G.speed;
+        if (tg.high) { if (tta <= T) R.jump(); } else if (tta <= T / 2) R.jump();
+      }
+    } else if (G.state === 'run' && G.jumpT >= 0 && G.j2 < 0) {   // 높은 칸: 공중에서 한 번 더
+      const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.high && x.x > RX).sort((a, b) => a.x - b.x)[0];
+      if (tg && (tg.x - RX) / G.speed <= T / 2) R.jump();
+    }
+    const hits0 = G.obstHits, spd0 = G.speed;
+    R.step(1 / 60); out.steps++;
+    for (const ob of G.obstacles) if (!seen.has(ob)) { seen.add(ob); out.obstSeen++; out.kinds[ob.kind]++; }
+    if (G.speed < spd0 - 1e-6) out.speedDrops++;
+    out.hits = G.obstHits; out.hpMin = Math.min(out.hpMin, G.hp);
+    if (o.stopOnHit && G.obstHits > hits0) { out.snap = { hp: G.hp, hp0: hpPrev, speed: G.speed, spd0: spd0, speedBase: G.speedBase, target: G.speedTarget, combo: G.combo, score: G.score, invuln: G.invuln, state: G.state }; break; }
+    hpPrev = G.hp;
+    if (o.stopAfterObst && out.obstSeen >= o.stopAfterObst && G.obstacles.every(x => x.x + x.w < RX - 30)) break;
+    if (steps_yield(out.steps)) await new Promise(r => setTimeout(r, 0));
+  }
+  out.over = G.state === 'over'; out.wordsDone = G.wordsDone; out.total = G.words.length; out.title = document.getElementById('resTitle').textContent; out.mist = G.mist.reduce((a, b) => a + b, 0); out.hp = G.hp;
+  return out;
+  function steps_yield(n) { return n % 300 === 0; }
+})`;
+const O_Q = '?obsprob=1&dj=0';   // 장애물 항상(후보가 있으면), 높은 칸 없음 → 장애물 행동만 따로 본다
+
+test('326-2) 장애물이 나타난다(obsprob=1): 상자·구덩이가 둘 다 나오고, 장애물은 묶음 사이에만(첫 글자가 나오기 전·마지막 묶음 뒤에는 없음), 좌표는 첫 글자 앞이다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: O_Q, dodge: false });
+  await gameReady(page);
+  await page.click('#startBtn');
+  await page.waitFor("SpellRun.G.state === 'run'", 4000);
+  await page.eval('SpellRun.manual = true');
+  assert.equal(await page.eval("document.getElementById('obsRule') && document.getElementById('obsRule').textContent.length > 10"), true, '시작 화면 규칙에 장애물 설명');
+  const r = await page.eval(`${OBOT}({ dodge: true, offset: 0 })`);
+  assert.equal(r.over, true); assert.ok(r.obstSeen >= 3, '장애물이 여러 번 나온다: ' + r.obstSeen);
+  assert.ok(r.kinds.box > 0 && r.kinds.pit > 0, '상자와 구덩이 모두: ' + JSON.stringify(r.kinds));
+  for (const p of r.plans) { if (p.obst) { assert.ok(p.obst.slot >= 1 && p.obst.slot <= p.n - 1, `장애물 자리 ${p.obst.slot} / ${p.n}칸: 첫 묶음 앞·마지막 묶음 뒤 아님`); assert.ok(!p.boss); } }
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+  await page.close();
+});
+
+test('326-2) 점프로 넘으면 체력·속도·콤보가 그대로다. 점프하지 않으면 체력 -1, 속도가 0.6배로 즉시 줄고 기존 가속도로 회복하며, 콤보·점수는 그대로이고 같은 장애물에 두 번 맞지 않는다', { skip: SKIP }, async () => {
+  resetState();
+  // (가) 점프: 여러 판 동안 한 번도 맞지 않고, 장애물 때문에 속도가 줄어드는 일이 없다(실수가 없으면 속도는 줄지 않는다)
+  let page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: O_Q, dodge: false });
+  await gameReady(page);
+  await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+  const a = await page.eval(`${OBOT}({ dodge: true, offset: 0 })`);
+  assert.ok(a.obstSeen >= 3); assert.equal(a.hits, 0, '점프한 장애물에는 맞지 않는다'); assert.equal(a.hpMin, a.hpStart, '체력 불변'); assert.equal(a.speedDrops, 0, '속도 감소 없음');
+  await page.close();
+
+  // (나) 점프하지 않음: 글자만 먹는 봇이 첫 장애물에서 멈춘다
+  page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: O_Q, dodge: false });
+  await gameReady(page);
+  await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+  const b = await page.eval(`${OBOT}({ dodge: false, stopOnHit: true })`);
+  assert.ok(b.snap, '장애물에 맞았다'); assert.equal(b.hits, 1);
+  const C = await page.eval('SpellRun.CONFIG'), s = b.snap, acc = C.SPEED_ACCEL / 60;
+  assert.equal(s.hp, s.hp0 - 1, '체력 -1');
+  assert.ok(s.speed >= 0.6 * (b.snap.spd0 - 1) && s.speed <= 0.6 * (b.snap.spd0 + acc + 1), `속도 즉시 0.6배: ${s.spd0.toFixed(1)} → ${s.speed.toFixed(1)}`);
+  assert.ok(s.speedBase <= C.SPEED_MIN + 1e-9 || s.speedBase >= 0, '기본 누적 속도는 SPEED_DROP_FAIL 만큼 줄었거나 최저');
+  assert.ok(s.invuln > 0 && Math.abs(s.invuln - C.OBST_INVULN_SEC) < 0.02, '무적 시간 0.8초: ' + s.invuln);
+  assert.equal(s.state, 'run');
+  const before = await page.eval('(() => { const G = SpellRun.G; return { combo: G.combo, score: G.score, mist: G.mist.reduce((x, y) => x + y, 0) }; })()');
+  assert.equal(s.combo, before.combo, '콤보 불변'); assert.equal(s.score, before.score, '점수 불변'); assert.equal(before.mist, 0, '철자 실수로 세지 않는다(한 번에 완성 기록 유지)');
+  // 회복: 다음 1.5초 동안 속도가 목표 속도로 올라온다(내려가지 않음). 같은 장애물에 다시 맞지 않는다(체력 그대로)
+  const rec = await page.eval(`(() => { const R = SpellRun, G = R.G, C = R.CONFIG; const hp0 = G.hp, o = []; let prev = G.speed, mono = true, t = 0, reach = -1; const target = G.speedTarget;
+    while (t < 1.5) { const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.kind !== 'heart' && x.x > R.RUNNER_X).sort((p, q) => p.x - q.x)[0]; if (G.state === 'run' && G.jumpT < 0 && tg && (tg.x - R.RUNNER_X) / G.speed <= C.JUMP_TIME / 2) R.jump();   // 글자는 계속 정상 플레이
+      R.step(1 / 60); t += 1 / 60; if (G.speed < prev - 1e-6 && G.hp === hp0) mono = false; prev = G.speed; if (reach < 0 && G.speed >= G.speedTarget - 1) reach = t; if (G.state !== 'run') break; }
+    return { hp0: hp0, hp: G.hp, hits: G.obstHits, mono: mono, reach: reach, target: target, speed: G.speed }; })()`);
+  assert.equal(rec.hits, 1, '한 장애물에 한 번만'); assert.equal(rec.hp, rec.hp0, '회복하는 동안 체력 변화 없음');
+  assert.ok(rec.mono, '속도는 올라가기만 한다'); assert.ok(rec.reach > 0 && rec.reach < 1.5, '1.5초 안에 목표 속도로 회복: ' + rec.reach.toFixed(2) + '초');
+  await page.close();
+
+  // (다) 구덩이/상자 각각 한 번씩 맞는 경우를 모두 본다(맞은 종류 기록): 두 종류 모두 같은 효과
+  const kinds = new Set();
+  for (let i = 0; i < 12 && kinds.size < 2; i++) {
+    const p = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: O_Q, dodge: false });
+    await gameReady(p); await p.click('#startBtn'); await p.waitFor("SpellRun.G.state === 'run'", 4000); await p.eval('SpellRun.manual = true');
+    const r = await p.eval(`${OBOT}({ dodge: false, stopOnHit: true })`);
+    const kind = await p.eval("SpellRun.G.obstacles.find(o => o.hit).kind");
+    assert.equal(r.snap.hp, r.snap.hp0 - 1, kind + ' 체력 -1'); assert.ok(r.snap.speed < r.snap.spd0 * 0.65, kind + ' 속도 감소');
+    assert.ok(await p.eval('SpellRun.G.fall > 0 || SpellRun.G.stumble > 0'), kind + ' 연출 시작(구덩이 fall, 상자 stumble)');
+    assert.equal(await p.eval(`(SpellRun.G.fall > 0) === (${JSON.stringify(kind)} === 'pit')`), true, '구덩이는 빠짐, 상자는 비틀거림');
+    kinds.add(kind); await p.close();
+  }
+  assert.equal(kinds.size, 2, '상자·구덩이 둘 다 확인: ' + [...kinds]);
+});
+
+test('326-2) 체력이 1일 때 장애물에 맞으면 기존 게임 오버 경로(ending → 결과 화면)로 간다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: O_Q + '&hp=1', dodge: false });
+  await gameReady(page);
+  await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+  const r = await page.eval(`${OBOT}({ dodge: false, stopOnHit: true })`);
+  assert.equal(r.snap.hp, 0); assert.equal(r.snap.state, 'ending');
+  await page.eval('(() => { for (let i = 0; i < 80; i++) SpellRun.step(1 / 60); })()');
+  assert.equal(await page.eval('SpellRun.G.state'), 'over'); assert.equal(await page.text('#resTitle'), '게임 오버');
+  await page.close();
+});
+
+test('326-4) 장애물에서만 점프하는 봇(글자는 정답일 때만, 틀린 글자는 절대 안 먹음)이 점프 타이밍을 앞·가운데·뒤로 바꿔 여러 판을 틀린 글자 없이 끝까지 진행한다(높은 칸·기본 옵션 포함)', { skip: SKIP }, async () => {
+  resetState();
+  let total = 0, kinds = { box: 0, pit: 0 };
+  for (const [offset, q] of [[0, '?obsprob=1'], [-0.04, '?obsprob=1'], [0.04, '?obsprob=1'], [0, O_Q], [0.03, '?obsprob=1&heartevery=1']]) {
+    const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: q, dodge: false });
+    await gameReady(page);
+    for (let round = 0; round < 2; round++) {
+      await page.click(round ? '#againBtn' : '#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+      if (round) await page.eval("SpellRun.G.hp = 5");   // 하트 규칙은 이 시험의 대상이 아니다
+      const r = await page.eval(`${OBOT}({ dodge: true, offset: ${offset} })`);
+      assert.equal(r.over, true, `offset ${offset} 판 ${round}: 끝났다`);
+      assert.equal(r.title === '게임 오버', false, `offset ${offset}: 게임 오버 아님(${r.title})`);
+      assert.equal(r.mist, 0, `offset ${offset}: 틀린 글자·놓침 0`); assert.equal(r.hits, 0, `offset ${offset}: 장애물에 맞은 적 없음`);
+      assert.equal(r.hpMin, 5, `offset ${offset}: 체력 한 번도 안 줄어듦`); assert.equal(r.wordsDone, r.total);
+      total += r.obstSeen; kinds.box += r.kinds.box; kinds.pit += r.kinds.pit;
+    }
+    assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+    await page.close();
+  }
+  assert.ok(total >= 20 && kinds.box > 3 && kinds.pit > 3, `충분히 많은 장애물을 넘었다: ${total} ${JSON.stringify(kinds)}`);
+});
+
+test('326-1) 배치 규칙(페이지 안): 보스 단어에는 없고, 높은 칸·하트 묶음에서 1묶음 이내에는 없으며, 단어당 최대 1개. 복습 판에도 같다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?obsprob=1&highprob=0.5&heartevery=1', dodge: false });
+  await gameReady(page);
+  const plans = [];
+  for (const review of [false, false, true]) {
+    if (review) await page.eval("(() => { for (const w of ['apple', 'book', 'environment', 'water', 'happy']) SpellRun.missedSet.add(w); })()");
+    await page.eval(`SpellRun.startRound(${review})`); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+    const r = await page.eval(`${OBOT}({ dodge: true, offset: 0 })`);
+    assert.equal(r.over, true); plans.push(...r.plans);
+    await page.eval("(() => { SpellRun.G.state = 'idle'; })()");
+  }
+  assert.ok(plans.length >= 15 && plans.some(p => p.boss) && plans.some(p => p.review) && plans.some(p => p.highs.length) && plans.some(p => p.heart !== null && p.obst), '다양한 단어: ' + plans.length);
+  for (const p of plans) {
+    if (p.boss) assert.equal(p.obst, null, '보스 단어에는 장애물 없음');
+    if (!p.obst) continue;
+    const g = p.obst.slot;
+    assert.ok(g >= 1 && g <= p.n - 1);
+    for (const j of p.highs) assert.ok(Math.min(Math.abs(g - 1 - j), Math.abs(g - j)) > 1, `높은 칸 ${j} 와 장애물 간격 ${g} 는 1묶음 넘게 떨어져 있다 (${JSON.stringify(p)})`);
+    if (p.heart !== null) assert.ok(g <= p.heart - 2, `하트 ${p.heart} 와 장애물 간격 ${g} (${JSON.stringify(p)})`);
+  }
+  await page.close();
+});
+
+test('326-3) obs=0 이면 장애물 없음: 상태·화면 구성(규칙 줄 없음)이 이전과 같고, 첫 글자는 이전 식(리드 거리) 그대로 나오며, 글자만 보는 봇이 체력 손실 없이 끝까지 간다. obsprob=0 도 장애물이 없다', { skip: SKIP }, async () => {
+  resetState();
+  for (const q of ['?obs=0', '?obsprob=0']) {
+    const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: q, dodge: false });
+    await gameReady(page);
+    assert.equal(await page.eval("!!document.getElementById('obsRule')"), false, q + ': 장애물이 나올 수 없으면 규칙 줄 없음');
+    assert.equal(await page.eval("document.querySelectorAll('.rules li').length"), 7, q + ': 규칙 줄 7개(이전과 같음)');
+    assert.equal(await page.eval("document.getElementById('tune').hidden"), false, q + ': 기본값과 다른 옵션이라 조정값 표시');
+    await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+    // 첫 글자가 나오는 순간의 위치 = 이전 식(RUNNER_X + 목표 속도 × 리드 시간)
+    const first = await page.eval(`(() => { const R = SpellRun, G = R.G, C = R.CONFIG; let n = 0; while (!G.tiles.length && n++ < 1200) R.step(1 / 60);
+      const v = G.speedTarget, lead = C.LEAD_SEC_SLOW + (C.LEAD_SEC_FAST - C.LEAD_SEC_SLOW) * Math.max(0, Math.min(1, (v - C.SPEED_MIN) / (C.SPEED_MAX - C.SPEED_MIN)));
+      return { x: G.tiles[0].x, expect: R.RUNNER_X + v * lead, obst: G.obstacles.length, plan: G.obst }; })()`);
+    assert.ok(Math.abs(first.x - first.expect) < 0.01, `${q}: 첫 글자 위치 ${first.x} = 이전 식 ${first.expect}`);
+    const r = await page.eval(`${OBOT}({ dodge: false })`);
+    assert.equal(r.obstSeen, 0, q + ': 장애물 없음'); assert.ok(r.plans.every(p => p.obst === null)); assert.equal(r.over, true); assert.equal(r.title === '게임 오버', false);
+    assert.equal(r.hpMin, 5, q + ': 체력 손실 없음'); assert.equal(r.mist, 0);
+    await page.close();
+  }
+});
+
+test('326-3) 기본(옵션 없음)은 장애물 켜짐이고 "조정값 사용 중" 표시가 없다. obs=1·obsprob=0.5 처럼 기본값과 같은 값만 있어도 표시가 없다', { skip: SKIP }, async () => {
+  resetState();
+  for (const q of ['', '?obs=1', '?obsprob=0.5', '?obs=1&obsprob=0.5']) {
+    const page = await openGame({ ids: [1, 2, 3], query: q, dodge: false });
+    await gameReady(page);
+    assert.equal(await page.eval("document.getElementById('tune').hidden"), true, q + ' 표시 없음');
+    assert.equal(await page.eval('SpellRun.CONFIG.OBST_ENABLED'), true); assert.equal(await page.eval('SpellRun.CONFIG.OBSTACLE_PROB'), 0.5);
+    assert.equal(await page.eval("!!document.getElementById('obsRule')"), true);
+    await page.close();
+  }
+  const p = await openGame({ ids: [1, 2, 3], query: '?obsprob=0.8&obs=2', dodge: false });
+  await gameReady(p);
+  assert.equal(await p.eval('SpellRun.CONFIG.OBSTACLE_PROB'), 0.8); assert.equal(await p.eval("document.getElementById('tune').hidden"), false, 'obsprob=0.8 은 조정값'); assert.match(await p.eval("document.getElementById('tune').title"), /obsprob/);
+  assert.doesNotMatch(await p.eval("document.getElementById('tune').title"), /\bobs\b[^p]/, '범위 밖 obs=2 는 무시');
+  await p.close();
+  await clearOpts();
+});
+
+test('326-2) 폭 320·360·390: 장애물(경고 표지 윗끝)은 상단 힌트·글자 칸 줄·HUD 와 겹치지 않고 글자 타일 줄 아래에 있으며, 화면 밖으로 삐져나가 가로 스크롤을 만들지 않는다', { skip: SKIP }, async () => {
+  resetState();
+  for (const w of [320, 360, 390]) {
+    const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: O_Q, width: w, dodge: false });
+    await gameReady(page);
+    await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+    const r = await page.eval(`(async () => { const R = SpellRun, G = R.G; let n = 0, found = null;
+      while (n++ < 60 * 400 && G.state !== 'over' && !found) {
+        const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.x > R.RUNNER_X).sort((a, b) => a.x - b.x)[0];
+        const ob = G.obstacles.find(x => !x.hit && x.x + x.w / 2 > R.RUNNER_X);
+        if (G.state === 'run' && G.jumpT < 0) { if (ob && (ob.x + ob.w / 2 - R.RUNNER_X) / G.speed <= R.CONFIG.JUMP_TIME / 2) R.jump(); else if (tg && (tg.x - R.RUNNER_X) / G.speed <= R.CONFIG.JUMP_TIME / 2) R.jump(); }
+        R.step(1 / 60);
+        const o2 = G.obstacles[0]; if (o2 && o2.x > 150 && o2.x < 330) found = o2;
+        if (n % 200 === 0) await new Promise(r => setTimeout(r, 0));
+      }
+      if (!found) return null;
+      R.draw();
+      const box = document.getElementById('box').getBoundingClientRect(), u = parseFloat(document.getElementById('box').style.getPropertyValue('--u'));
+      const bot = id => { const e = document.getElementById(id); return e && !e.hidden ? (e.getBoundingClientRect().bottom - box.top) / u : 0; };
+      const top = R.obstTop(found);
+      return { top: top, hint: Math.max(bot('hintbox'), bot('word'), bot('sub'), bot('meaning')), hud: bot('hud') && Math.max(...[...document.querySelectorAll('#hud .row')].map(e => (e.getBoundingClientRect().bottom - box.top) / u)), tileBottom: R.TILE_Y + 29 + 5, scrollW: document.documentElement.scrollWidth, clientW: document.documentElement.clientWidth, kind: found.kind, x: found.x, w: found.w }; })()`);
+    assert.ok(r, w + ': 장애물이 화면에 나온다');
+    assert.ok(r.top > r.hint + 20, `${w}px: 표지 윗끝 ${r.top} 가 힌트·글자 칸 줄 아래 끝 ${r.hint} 보다 충분히 아래`);
+    assert.ok(r.top > r.hud + 20, `${w}px: HUD 아래 끝 ${r.hud}`);
+    assert.ok(r.top > r.tileBottom, `${w}px: 글자 타일 줄(아래 끝 ${r.tileBottom}) 아래: ${r.top}`);
+    assert.ok(r.scrollW <= r.clientW, `${w}px: 가로 스크롤 없음 (${r.scrollW} / ${r.clientW})`);
+    await page.close();
+  }
+});
+
+test('326-2) 그림: 상자·구덩이·경고 표지가 캔버스에 실제로 그려지고(색이 있는 픽셀), 글자 타일 색과 구분된다. 연출 중에도 오류가 없다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: O_Q, dodge: false });
+  await gameReady(page);
+  await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+  const px = await page.eval(`(() => { const R = SpellRun, G = R.G, cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360; const seenKinds = {};
+    const colorAt = (x, y) => Array.from(cx.getImageData(Math.round(x * S), Math.round(y * S), 1, 1).data);
+    for (let n = 0; n < 60 * 600 && Object.keys(seenKinds).length < 2; n++) {
+      const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.x > R.RUNNER_X).sort((a, b) => a.x - b.x)[0];
+      if (G.jumpT < 0 && tg && (tg.x - R.RUNNER_X) / G.speed <= R.CONFIG.JUMP_TIME / 2) R.jump();
+      const ob = G.obstacles.find(x => !x.hit && x.x + x.w / 2 > R.RUNNER_X); if (G.jumpT < 0 && ob && (ob.x + ob.w / 2 - R.RUNNER_X) / G.speed <= R.CONFIG.JUMP_TIME / 2) R.jump();
+      R.step(1 / 60);
+      const o = G.obstacles.find(x => !x.hit && x.x > 200 && x.x < 300);
+      if (o && !seenKinds[o.kind]) { R.draw(); const mid = o.x + o.w / 2;
+        seenKinds[o.kind] = o.kind === 'pit' ? { hole: colorAt(mid, 560), road: colorAt(mid - o.w, 560), sign: colorAt(mid + 6, R.obstTop(o) + 20) } : { face: colorAt(o.x + 4, 520 - 6), outline: colorAt(mid, 520 - R.CONFIG.OBST_H - 1), sign: colorAt(mid + 6, R.obstTop(o) + 20) }; }
+    }
+    return seenKinds; })()`);
+  assert.ok(px.pit && px.box, '두 종류를 그렸다: ' + JSON.stringify(Object.keys(px)));
+  const lum = c => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  assert.ok(lum(px.pit.hole) < 25 && lum(px.pit.road) > 25 || lum(px.pit.hole) < lum(px.pit.road), '구덩이는 도로보다 어둡다: ' + JSON.stringify(px.pit));
+  assert.ok(px.pit.sign[0] > 180 && px.pit.sign[1] < 120, '경고 표지는 빨강: ' + px.pit.sign);
+  assert.ok(px.box.face[3] === 255 && px.box.sign[0] > 180 && px.box.sign[1] < 120, '상자 쪽 경고 표지도 빨강: ' + JSON.stringify(px.box));
+  const TILE = [[255, 210, 94], [255, 159, 178], [126, 217, 195], [168, 192, 255]];   // 글자 타일 색(game.js TILE_COLORS)
+  const near = (c, t) => Math.abs(c[0] - t[0]) + Math.abs(c[1] - t[1]) + Math.abs(c[2] - t[2]) < 40;
+  assert.ok(!TILE.some(t => near(px.box.face, t)), '상자 색은 글자 타일 색과 다르다: ' + px.box.face);
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+  await page.close();
 });

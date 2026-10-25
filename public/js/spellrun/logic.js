@@ -85,7 +85,19 @@ function buildConfig(v) {
   BOSS_INTRO_EXTRA: 0.4,  // 보스 단어의 큰 뜻 유지 추가 시간(초). 일반 단어는 불변
   INTRO_SLOT_STEP: 0.04,  // 글자 칸 하나가 나타나는 간격(초)
   INTRO_SLOT_MAX: 0.4,    // 모든 칸이 나타나는 데 걸리는 최대 시간(초)
-  INTRO_SCALE: 1.3        // 큰 뜻 카드의 최대 확대 배율(한 줄이 폭을 넘지 않는 범위에서)
+  INTRO_SCALE: 1.3,       // 큰 뜻 카드의 최대 확대 배율(한 줄이 폭을 넘지 않는 범위에서)
+  // 작업326: 장애물(바닥 상자·구덩이). 묶음 사이 간격에 놓고 1단 점프로 넘는다. 크기·판정 수치는 모두 여기 한 곳이다(논리 px / 초).
+  OBST_ENABLED: true,     // 주소 옵션 obs=0 이면 장애물 없음(작업325까지와 같다)
+  OBSTACLE_PROB: 0.5,     // 단어마다 장애물이 나올 확률(주소 옵션 obsprob)
+  OBST_H: 28,             // 상자 높이. 점프 높이가 계속 이 값을 넘어야 통과
+  OBST_W: 28,             // 상자 폭 (빠른 pace 에서는 여유 창을 지키려고 아래에서 줄인다)
+  PIT_W: 36,              // 구덩이 폭
+  PIT_CLEAR_H: 2,         // 구덩이 위를 지날 때 이 높이를 넘어 떠 있으면 통과
+  OBST_FOOT: 6,           // 러너 발 폭의 반(장애물과 겹침 판정에 쓰는 가로 범위)
+  OBST_SLOW_FACTOR: 0.6,  // 맞았을 때 현재 속도에 곱하는 배율
+  OBST_INVULN_SEC: 0.8,   // 맞은 직후 이 시간 동안은 장애물에 다시 맞지 않는다
+  OBST_MIN_WINDOW: 0.15,  // 장애물을 틀린 글자 없이 넘는 점프 시작 시각 구간(여유 창)의 최소 길이(초)
+  OBST_NEXT_MARGIN: 0.1   // 장애물 점프 뒤 다음 묶음 첫 글자를 위한 점프를 준비할 최소 여유(초)
   };
   if (v.hp) cfg.HP = v.hp;
   if (v.startdelay) cfg.WORD_START_DELAY = v.startdelay;
@@ -96,6 +108,12 @@ function buildConfig(v) {
   if (v.maxcombo) cfg.COMBO_MAX_SPEED = v.maxcombo;
   if (v.intro !== undefined) cfg.INTRO_ENABLED = !!v.intro;
   if (v.introhold) cfg.INTRO_HOLD = v.introhold;
+  if (v.obs !== undefined) cfg.OBST_ENABLED = !!v.obs;
+  if (v.obsprob !== undefined) cfg.OBSTACLE_PROB = v.obsprob;
+  // 빠른 pace 에서는 같은 px 폭이 더 짧은 시간에 지나가 점프 창도 같은 비율로 짧아지므로, 최저 속도에서도 여유 창이 남도록 폭을 줄인다(기본 pace 1.3 에서는 줄지 않는다)
+  const fitW = (base, H) => Math.max(8, Math.min(base, Math.floor(cfg.SPEED_MIN * (airWindow(cfg, H).len - cfg.OBST_MIN_WINDOW - 0.01) - 2 * cfg.OBST_FOOT)));
+  cfg.OBST_W = fitW(cfg.OBST_W, cfg.OBST_H);
+  cfg.PIT_W = fitW(cfg.PIT_W, cfg.PIT_CLEAR_H);
   return cfg;
 }
 const CONFIG = buildConfig();
@@ -104,7 +122,8 @@ const CONFIG = buildConfig();
 const OPTION_RULES = {
   pace: { min: 0.7, max: 1.8, def: DEFAULT_PACE }, hp: { min: 1, max: 10, int: true, def: 5 }, startdelay: { min: 0.5, max: 6, def: 2.2 },
   popsec: { min: 0.5, max: 5, def: 1.6 }, highprob: { min: 0, max: 1, def: 0.2 }, heartevery: { min: 1, max: 10, int: true, def: 3 }, dj: { min: 0, max: 1, int: true, def: 1 }, maxcombo: { min: 3, max: 12, int: true, def: 5 },
-  intro: { min: 0, max: 1, int: true, def: 1 }, ttsdebug: { min: 0, max: 1, int: true, def: 0 }, introhold: { min: 0.5, max: 3, def: 1.3 }
+  intro: { min: 0, max: 1, int: true, def: 1 }, ttsdebug: { min: 0, max: 1, int: true, def: 0 }, introhold: { min: 0.5, max: 3, def: 1.3 },
+  obs: { min: 0, max: 1, int: true, def: 1 }, obsprob: { min: 0, max: 1, def: 0.5 }
 };
 // 반환 { values: 유효한 값(기본값과 같아도 포함), applied: 기본값과 다른 옵션 이름 }
 function parseOptions(search) {
@@ -414,6 +433,81 @@ function planHighSlots(nSlots, rng, cfg) {
   return out;
 }
 
+// ---- 작업326: 장애물(바닥 상자·구덩이) ----
+// 1단 점프의 높이가 H 를 넘는 구간 [a, b] (점프 시작 후 초). 점프 높이는 jumpHeight 와 같은 포물선이라 길이는 JUMP_TIME * sqrt(1 - H / PEAK).
+function airWindow(cfg, H) {
+  cfg = cfg || CONFIG;
+  const len = H >= cfg.JUMP_PEAK ? 0 : cfg.JUMP_TIME * Math.sqrt(1 - H / cfg.JUMP_PEAK);
+  return { a: (cfg.JUMP_TIME - len) / 2, b: (cfg.JUMP_TIME + len) / 2, len: len };
+}
+// 종류별 폭과 "통과하려면 넘어야 하는 높이"
+function obstacleSpec(cfg, kind) {
+  cfg = cfg || CONFIG;
+  return kind === 'pit' ? { kind: 'pit', w: cfg.PIT_W, clearH: cfg.PIT_CLEAR_H } : { kind: 'box', w: cfg.OBST_W, clearH: cfg.OBST_H };
+}
+// 러너(가로 범위 RUNNER_X ± OBST_FOOT)와 장애물 [x, x+w] 가 겹치는지
+function obstacleOverlaps(x, w, runnerX, cfg) {
+  cfg = cfg || CONFIG;
+  return x < runnerX + cfg.OBST_FOOT && x + w > runnerX - cfg.OBST_FOOT;
+}
+// 겹쳐 있는 동안 공중 높이 h 가 계속 clearH 를 넘어야 통과한다. 한 번이라도 같거나 낮으면 맞은 것(상자는 걸림, 구덩이는 빠짐)
+function obstacleHit(kind, h, cfg) { return h <= obstacleSpec(cfg, kind).clearH; }
+// 장애물 앞뒤 간격(px, 러너 위치 기준). 최악 속도(SPEED_MAX)로 계산한다: 시간이 아니라 px 로 정한다.
+// 타임라인(묶음이 나오는 순간 = 0): 앞 묶음의 정답 글자를 먹은 때 T0 = -PACK_DELAY. 러너는 그 점프의 착지(T0 + gb)까지 공중에 있을 수 있다.
+// 장애물 점프 시작 s 는 ① 착지 뒤 ② 겹치는 구간 전체가 높이 H 초과 구간에 들어오게 ③ 점프 중(높이 GRAB_H 초과)에 다음 묶음 글자가 지나가지 않고 ④ 착지 뒤 다음 점프를 준비할 여유가 남게 잡아야 한다.
+// s 의 가능한 구간 [l, u] 의 길이(여유 창)가 모든 속도에서 OBST_MIN_WINDOW 이상이 되도록(계산 오차 대비 0.01초 더) Do(장애물 앞쪽 끝까지 거리)와 D1(다음 묶음 첫 글자까지 거리)을 정한다.
+function obstacleLayout(cfg, kind) {
+  cfg = cfg || CONFIG;
+  const sp = obstacleSpec(cfg, kind), win = airWindow(cfg, sp.clearH), grab = airWindow(cfg, cfg.GRAB_H);
+  const v = cfg.SPEED_MAX, MIN = cfg.OBST_MIN_WINDOW + 0.01, M = cfg.OBST_NEXT_MARGIN, F = cfg.OBST_FOOT, PD = cfg.PACK_DELAY, J = cfg.JUMP_TIME;
+  const doMin = Math.max(F, F + v * (MIN + win.a + grab.b - PD));
+  const postMin = Math.max(F, F + v * (MIN + grab.a + J + M - win.b));
+  const d1Req = v * (MIN + grab.a + J + M + grab.b - PD);
+  const D1 = Math.max(doMin + sp.w + postMin, d1Req);
+  const extra = D1 - (doMin + sp.w + postMin);
+  const Do = doMin + extra / 2;
+  return { kind: sp.kind, w: sp.w, clearH: sp.clearH, Do: Do, post: D1 - Do - sp.w, D1: D1 };
+}
+// 일정한 속도 v 에서 장애물을 틀린 글자를 먹지 않고 넘는 점프 시작 시각의 구간(초). width 가 여유 창이다(음수면 불가능).
+function obstacleWindow(cfg, layout, v) {
+  cfg = cfg || CONFIG;
+  const win = airWindow(cfg, layout.clearH), grab = airWindow(cfg, cfg.GRAB_H), F = cfg.OBST_FOOT;
+  const A = (layout.Do - F) / v, B = (layout.Do + layout.w + F) / v, P1 = layout.D1 / v;
+  const lo = Math.max(B - win.b, -cfg.PACK_DELAY + grab.b), hi = Math.min(A - win.a, P1 - (grab.a + cfg.JUMP_TIME + cfg.OBST_NEXT_MARGIN));
+  return { lo: lo, hi: hi, width: hi - lo };
+}
+// 장애물 때문에 첫 글자가 나오기까지 늘어나는 시간(초): 기본 리드 거리(v * leadSec)보다 D1 이 클 때만 늘어난다
+function obstacleAddedSec(cfg, kind, v) {
+  cfg = cfg || CONFIG;
+  return Math.max(0, obstacleLayout(cfg, kind).D1 - v * leadSec(v, cfg)) / v;
+}
+// 한 단어의 장애물 계획 { slot: 장애물 뒤에 오는 묶음 번호(1~칸 수-1), kind } 또는 null.
+// 후보 자리는 묶음 사이 간격(첫 묶음 앞·마지막 묶음 뒤 제외). 보스 단어, 높은 칸 묶음(highSet)·하트 묶음에서 1묶음 이내인 자리는 제외한다.
+// heartSlot: 이 단어에 하트가 계획돼 있으면 하트가 나올 수 있는 가장 앞 칸 번호(그 칸 이후 어디든 나올 수 있다), 없으면 null.
+// 꺼져 있거나 보스면 난수를 쓰지 않는다. 난수 호출 순서: 확률 → 자리 → 종류
+function planObstacle(nSlots, highSet, heartSlot, boss, rng, cfg) {
+  rng = rng || Math.random; cfg = cfg || CONFIG;
+  if (!cfg.OBST_ENABLED || boss || nSlots < 2) return null;
+  if (!(rng() < cfg.OBSTACLE_PROB)) return null;
+  const near = (g, j) => Math.min(Math.abs(g - 1 - j), Math.abs(g - j)) <= 1;   // 간격 g 는 묶음 g-1 과 g 사이
+  const cand = [];
+  for (let g = 1; g < nSlots; g++) {
+    let ok = true;
+    if (highSet) highSet.forEach(function (j) { if (near(g, j)) ok = false; });
+    if (heartSlot !== null && heartSlot !== undefined && g >= heartSlot - 1) ok = false;
+    if (ok) cand.push(g);
+  }
+  if (!cand.length) return null;
+  const slot = cand[Math.floor(rng() * cand.length)];
+  return { slot: slot, kind: rng() < 0.5 ? 'box' : 'pit' };
+}
+// 맞았을 때의 효과(순수): 체력 -1, 현재 속도 x OBST_SLOW_FACTOR, 기본 누적 속도에서 SPEED_DROP_FAIL 만큼 뺀 뒤 목표 속도 다시 계산. 콤보·점수는 그대로
+function afterObstacleHit(s, cfg) {
+  cfg = cfg || CONFIG;
+  const speedBase = speedAfterFail(s.speedBase, cfg);
+  return { hp: s.hp - 1, speed: s.speed * cfg.OBST_SLOW_FACTOR, speedBase: speedBase, speedTarget: targetSpeed(speedBase, s.combo, cfg), combo: s.combo };
+}
+
 // ---- 작업321: 펭귄 스프라이트 ----
 // 시트(spellrun_penguin_sheet.png 1728x288)는 288x288 칸 6개: 0~3 달리기, 4 점프 상승, 5 점프 하강. 모두 오른쪽을 본다.
 // 칸 안에서 발바닥은 아래에서 8px 위, 얼굴 중심은 폭의 55% 지점이다. size 는 화면(논리 px)에서 그리는 한 칸의 한 변(높이 기준 크기 — 한 곳에서 조정).
@@ -626,6 +720,7 @@ return {
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
+  airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };
 });

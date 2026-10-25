@@ -12,9 +12,10 @@ try { if (OPT.reset) localStorage.removeItem(L.OPTION_KEY); else if (OPT.save) l
 
 L.configure(OPT.values);                       // CONFIG 를 한 번에 다시 만든다(pace 는 속도·간격·점프 시간에 같은 비율로 반영)
 const CONFIG = L.CONFIG;
-const { PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
+const { obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
 
 const W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, RUNNER_X = 72, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;
+const FALL_SEC = 0.55, STUMBLE_SEC = 0.5, FALL_DEPTH = 46;   // 작업326: 연출 시간(초)·구덩이에 빠지는 깊이(논리 px)
 const INK = '#1d2b53', CORAL = '#ff6b5a', GOLD = '#ffb700', GOOD = '#1fae68', BAD = '#e8454f';
 const TILE_COLORS = ['#ffd25e', '#ff9fb2', '#7ed9c3', '#a8c0ff'];
 const FL = '"Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';   // 앱의 기존 글꼴 스택(tokens.css --font-sans). 시제품의 Fredoka는 쓰지 않는다
@@ -309,6 +310,7 @@ const G = {
   iActive: false, iClock: 0, iTl: null, iGeo: null, iKids: 0, iShown: 0,
   jumpT: -1, j2: -1, j2h: 0, j2Land: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
   hintTimer: 0,
+  obstacles: [], obst: null, invuln: 0, stumble: 0, fall: 0, obstHits: 0,   // 작업326: 화면의 장애물, 이 단어의 장애물 계획, 무적 시간, 걸려 비틀거림·구덩이에 빠짐 연출 시간, 이번 판에 맞은 횟수
   regular: 0, bossMode: false, introT: 0, repeatT: 0, repeatWord: '', review: false
 };
 let slotEls = [];
@@ -438,6 +440,7 @@ function startRound(reviewOnly) {
     hp: CONFIG.HP, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
     speed: CONFIG.SPEED_MIN, speedTarget: CONFIG.SPEED_MIN, speedBase: CONFIG.SPEED_MIN, shownMult: 0, heartWords: planHearts(regular), tiles: [], parts: [], floats: [],
     packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
+    obstacles: [], obst: null, invuln: 0, stumble: 0, fall: 0, obstHits: 0,
     review: !!reviewOnly
   });
   els.start.hidden = true; els.result.hidden = true; els.pop.hidden = true; els.hud.hidden = false;
@@ -452,6 +455,8 @@ function loadWord(i) {
   G.heartSlot = pickHeartSlot(G.plan.slots.length);
   const highs = planHighSlots(G.plan.slots.length);   // 작업318-4: 2단 점프가 꺼져 있으면 빈 집합
   G.plan.slots.forEach((sl, k) => { sl.high = highs.has(k); });
+  const ob = planObstacle(G.plan.slots.length, highs, G.heartPending ? G.heartSlot : null, boss);   // 작업326: 꺼져 있거나 보스면 null(난수를 쓰지 않는다)
+  G.obst = ob ? { slot: ob.slot, kind: ob.kind, done: false } : null;
   G.packActive = false; G.spawnT = CONFIG.WORD_START_DELAY + (i === 0 ? CONFIG.FIRST_WORD_EXTRA : 0);
   renderWord(); renderProgress();
   startIntro(i, boss);
@@ -499,12 +504,20 @@ function spawnPack() {
   const v = G.speedTarget;
   const gap = v * gapSec(v);
   let x0 = RUNNER_X + v * leadSec(v);
+  let heartPlaced = false;
   G.packId++; G.packActive = true;
   // 하트: 체력이 줄었고 하트가 나올 칸이면, 묶음 앞에 한 칸 간격을 두고 둔다(점프해야 먹는다)
   if (G.heartPending && G.si >= G.heartSlot && G.hp < CONFIG.HP && !slot.high) {   // 높은 칸 묶음 앞에는 하트를 두지 않는다(점프 시점이 겹치지 않게)
-    G.heartPending = false;
+    G.heartPending = false; heartPlaced = true;
     G.tiles.push({ id: -G.packId, kind: 'heart', x: x0, w: 46, text: '', correct: false, chunk: false, state: 'live', t: 0, age: 0, checked: false, ok: false, color: '' });
     x0 += gap;
+  }
+  // 작업326: 이 묶음 앞에 장애물이 계획돼 있으면(단어당 한 번, 첫 등장 때만) 첫 글자를 안전 간격(D1)까지 늘리고 그 사이에 둔다
+  if (G.obst && !G.obst.done && G.obst.slot === G.si && !heartPlaced) {
+    const lay = obstacleLayout(CONFIG, G.obst.kind);
+    x0 = Math.max(x0, RUNNER_X + lay.D1);
+    G.obstacles.push({ kind: lay.kind, x: x0 - lay.post - lay.w, w: lay.w, hit: false, age: 0 });
+    G.obst.done = true;
   }
   cands.forEach((c, i) => {
     G.tiles.push({
@@ -576,6 +589,20 @@ function onFail(t, kind) {
   floatText(RUNNER_X + 30, GROUND - 150, kind === 'wrong' ? '오답!' : '놓쳤어요', BAD, 22);
   flashHint(G.si);
   renderHearts(); renderScore();
+  if (G.hp <= 0) { G.state = 'ending'; G.endT = 0.9; sfx.over(); }
+}
+// 작업326: 장애물에 맞았다(상자에 걸림·구덩이에 빠짐). 체력 -1, 속도 즉시 감소(이후 가속도로 목표 속도까지 회복). 콤보·점수·실수 기록(mist)은 건드리지 않는다.
+function onObstacleHit(ob) {
+  ob.hit = true; G.obstHits++;
+  const r = afterObstacleHit({ hp: G.hp, speed: G.speed, speedBase: G.speedBase, combo: G.combo });
+  G.hp = r.hp; G.speed = r.speed; G.speedBase = r.speedBase; G.speedTarget = r.speedTarget;
+  G.invuln = CONFIG.OBST_INVULN_SEC;
+  G.hurt = 0.5; G.shake = 0.3;
+  if (ob.kind === 'pit') G.fall = FALL_SEC; else G.stumble = STUMBLE_SEC;
+  sfx.bad();
+  burst(RUNNER_X, GROUND - 6, ob.kind === 'pit' ? '#8a93c4' : '#c8791f', 10);
+  floatText(RUNNER_X + 30, GROUND - 150, ob.kind === 'pit' ? '구덩이!' : '걸렸어요', BAD, 22);
+  renderHearts();
   if (G.hp <= 0) { G.state = 'ending'; G.endT = 0.9; sfx.over(); }
 }
 function completeWord() {
@@ -752,6 +779,7 @@ function step(dt) {
   G.eat = Math.max(0, G.eat - dt);
   G.shake = Math.max(0, G.shake - dt);
   G.land = Math.max(0, G.land - dt);
+  G.invuln = Math.max(0, G.invuln - dt); G.stumble = Math.max(0, G.stumble - dt); G.fall = Math.max(0, G.fall - dt);
 
   for (const t of G.tiles) {
     t.age += dt; t.x -= G.speed * dt;
@@ -759,6 +787,14 @@ function step(dt) {
     if (t.state === 'hint' && t.t > CONFIG.HINT_SEC) { t.state = 'fade'; t.t = 0; }
   }
 
+  for (const o of G.obstacles) { o.x -= G.speed * dt; o.age += dt; }
+  if (G.state === 'run') {
+    // 작업326: 러너와 겹치는 동안 공중 높이(airHeight)가 장애물을 넘지 못하면 맞는다. 한 장애물에는 한 번만, 맞은 직후에는 무적 시간
+    for (const o of G.obstacles) {
+      if (o.hit || G.invuln > 0 || !obstacleOverlaps(o.x, o.w, RUNNER_X)) continue;
+      if (obstacleHit(o.kind, curH())) { onObstacleHit(o); if (G.state !== 'run') break; }
+    }
+  }
   if (G.state === 'run') {
     if (G.iActive) { G.iClock += dt; applyIntro(); }   // 연출 시간은 게임 시간
     for (const t of G.tiles) {
@@ -783,6 +819,7 @@ function step(dt) {
     if (G.endT <= 0) finish(false);
   }
 
+  G.obstacles = G.obstacles.filter(o => o.x + o.w > -80);
   G.tiles = G.tiles.filter(t => t.x > -140 && !((t.state === 'fade' && t.t > 0.35) || (t.state === 'taken' && t.t > 0.4)));
   updateFx(dt);
 }
@@ -832,6 +869,41 @@ function drawScene() {
   ctx.fillStyle = 'rgba(247,233,183,.35)';
   const off2 = (G.dist * 1.4 % 90);
   for (let x = -off2; x < W; x += 90) ctx.fillRect(x, GROUND + 92, 20, 4);
+}
+// ---------- 작업326: 장애물 그리기(캔버스 도형. 글자 타일과 다르게 각진 상자·어두운 구멍 + 빨간 경고 표지) ----------
+const signY = o => (o.kind === 'pit' ? GROUND - 40 : GROUND - CONFIG.OBST_H - 26);   // 경고 표지 가운데 높이. 표지 윗끝 = signY - 14
+const obstTop = o => signY(o) - 14;
+function drawWarnSign(cx, y) {   // 빨간 삼각형 + 흰 느낌표(글자). 높은 칸 표시(금색 삼각형)와 색으로 구분
+  ctx.save();
+  ctx.fillStyle = BAD; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(cx, y - 13); ctx.lineTo(cx - 13, y + 10); ctx.lineTo(cx + 13, y + 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.font = '700 15px ' + FL; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('!', cx, y + 3);
+  ctx.restore();
+}
+function drawPit(o) {
+  const x = o.x, w = o.w;
+  ctx.save();
+  const g = ctx.createLinearGradient(0, GROUND, 0, H);
+  g.addColorStop(0, '#000'); g.addColorStop(1, '#0a0d1f');
+  ctx.fillStyle = g; ctx.fillRect(x, GROUND, w, H - GROUND);
+  ctx.fillStyle = '#f7e9b7'; ctx.fillRect(x - 3, GROUND, 3, 12); ctx.fillRect(x + w, GROUND, 3, 12);   // 구멍 가장자리 표시
+  ctx.fillStyle = GOLD; ctx.fillRect(x - 3, GROUND - 3, w + 6, 3);
+  ctx.restore();
+  drawWarnSign(x + w / 2, signY(o));
+}
+function drawBox(o) {
+  const x = o.x, w = o.w, h = CONFIG.OBST_H, y = GROUND - h;
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(x + w / 2, GROUND + 8, w * 0.6, 5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#c8791f'; rr(x, y, w, h, 3); ctx.fill();
+  ctx.save(); rr(x, y, w, h, 3); ctx.clip();   // 위험 줄무늬(노랑·남색 대각선)
+  ctx.fillStyle = GOLD;
+  for (let k = -h; k < w + h; k += 14) { ctx.beginPath(); ctx.moveTo(x + k, y + h); ctx.lineTo(x + k + 7, y + h); ctx.lineTo(x + k + 7 + h, y); ctx.lineTo(x + k + h, y); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+  ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.lineJoin = 'miter'; rr(x, y, w, h, 3); ctx.stroke();
+  ctx.restore();
+  drawWarnSign(x + w / 2, signY(o));
 }
 function drawHeartItem(t) {
   let a = 1, sc = 1;
@@ -992,6 +1064,23 @@ function drawRunner() {
     for (let i = 0; i < 4; i++) { const a = t + i * Math.PI / 2; drawStar(bx + Math.cos(a) * sz * 0.5, by + Math.sin(a) * sz * 0.42, 4 + 3 * sp, sp); }
   }
 }
+// 작업326: 장애물에 맞은 연출. 상자는 발바닥 기준으로 짧게 비틀거리고, 구덩이는 땅 아래로 떨어졌다가 튀어 오른다(떨어진 부분은 구멍 모양 안에서만 보인다). 움직임 줄이기 설정이면 움직임 없이 기존 깜빡임만
+function drawRunnerFx() {
+  const h = curH();
+  if (reduce || h > 1 || (G.stumble <= 0 && G.fall <= 0)) { drawRunner(); return; }
+  ctx.save();
+  if (G.fall > 0) {
+    const p = 1 - G.fall / FALL_SEC, dy = FALL_DEPTH * Math.sin(Math.PI * p) * (p < 0.5 ? 1 : 0.9);
+    ctx.fillStyle = '#05070f'; ctx.beginPath(); ctx.ellipse(RUNNER_X, GROUND + 4, 30 * Math.sin(Math.PI * p) + 6, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.rect(0, 0, W, GROUND); ctx.ellipse(RUNNER_X, GROUND + 4, 30, 40, 0, 0, Math.PI * 2); ctx.clip();
+    ctx.translate(0, dy);
+  } else {
+    const p = 1 - G.stumble / STUMBLE_SEC, ang = -0.32 * Math.sin(Math.PI * p) * (1 - p * 0.3);
+    ctx.translate(RUNNER_X, GROUND); ctx.rotate(ang); ctx.translate(-RUNNER_X, -GROUND);
+  }
+  drawRunner();
+  ctx.restore();
+}
 function drawFx() {
   for (const p of G.parts) {
     ctx.globalAlpha = Math.max(0, p.life / p.max);
@@ -1015,8 +1104,10 @@ function draw() {
   ctx.save();
   if (G.shake > 0 && !reduce) ctx.translate((Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5);
   drawScene();
+  for (const o of G.obstacles) if (o.kind === 'pit') drawPit(o);
+  for (const o of G.obstacles) if (o.kind === 'box') drawBox(o);
   for (const t of G.tiles) drawTile(t);
-  drawRunner();
+  drawRunnerFx();
   drawFx();
   ctx.restore();
   if (G.hurt > 0) {
@@ -1083,6 +1174,10 @@ function showGame(words, excluded) {
   els.startExcluded.textContent = excluded + '개 제외(구절·특수문자)';
   els.speechNote.hidden = hasSpeech();
   els.djRule.hidden = !CONFIG.DJ_ENABLED;
+  if (CONFIG.OBST_ENABLED && CONFIG.OBSTACLE_PROB > 0 && !$('obsRule')) {   // 작업326: 장애물이 나올 수 있을 때만 규칙 줄을 넣는다(obs=0·obsprob=0 이면 화면 구성이 이전과 같다)
+    const li = document.createElement('li'); li.id = 'obsRule'; li.textContent = '길에 놓인 상자와 구덩이는 점프로 넘으세요. 걸리면 체력이 1 줄고 속도가 느려집니다(콤보와 점수는 그대로).';
+    els.djRule.parentNode.insertBefore(li, els.djRule.nextSibling);
+  }
   els.tune.hidden = !OPT.applied.length;
   els.tune.title = OPT.applied.length ? OPT.applied.join(', ') + ' (누르면 저장값을 지우고 기본값으로)' : '';
   els.tune.addEventListener('click', () => {   // 저장값을 지우고 옵션 없이 다시 연다
@@ -1132,7 +1227,7 @@ function frame(ts) {
 }
 
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
-const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y };
+const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y, obstTop: obstTop };
 window.SpellRun = API;
 boot();
 })();
