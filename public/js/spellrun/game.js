@@ -12,7 +12,7 @@ try { if (OPT.reset) localStorage.removeItem(L.OPTION_KEY); else if (OPT.save) l
 
 L.configure(OPT.values);                       // CONFIG 를 한 번에 다시 만든다(pace 는 속도·간격·점프 시간에 같은 비율로 반영)
 const CONFIG = L.CONFIG;
-const { planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
+const { introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
 
 const W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, RUNNER_X = 72, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;
 const INK = '#1d2b53', CORAL = '#ff6b5a', GOLD = '#ffb700', GOOD = '#1fae68', BAD = '#e8454f';
@@ -28,7 +28,7 @@ const $ = id => document.getElementById(id);
 const box = $('box'), stage = $('stage'), cv = $('cv'), ctx = cv.getContext('2d');
 const els = {
   hud: $('hud'), hearts: $('hearts'), score: $('score'), combo: $('combo'), progress: $('progress'),
-  sub: $('sub'), popPron: $('popPron'), popEx: $('popEx'), tune: $('tune'), djRule: $('djRule'),
+  sub: $('sub'), hintbox: $('hintbox'), popPron: $('popPron'), popEx: $('popEx'), tune: $('tune'), djRule: $('djRule'),
   meaning: $('meaning'), speedTag: $('speedTag'), word: $('word'), pop: $('pop'), popTag: $('popTag'), popWord: $('popWord'), popMean: $('popMean'), popNote: $('popNote'),
   start: $('start'), startBtn: $('startBtn'), startInfo: $('startInfo'), startExcluded: $('startExcluded'), speechNote: $('speechNote'),
   result: $('result'), resTitle: $('resTitle'), resScore: $('resScore'), resDone: $('resDone'), resCombo: $('resCombo'),
@@ -109,7 +109,7 @@ function fitResult() {
   fitFont(els.resScore, 56, 20, () => 1);
 }
 function fitAll() {
-  if (G.plan && !els.hud.hidden) { layoutWord(); fitHud(); }
+  if (G.plan && !els.hud.hidden) { layoutWord(); if (G.iActive) els.hintbox.style.transform = ''; fitHud(); if (G.iActive) { measureIntro(); applyIntro(); } }
   fitPop(); fitResult();
 }
 
@@ -269,6 +269,7 @@ const G = {
   speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
   tiles: [], parts: [], floats: [],
   packActive: false, packId: 0, spawnT: 0,
+  iActive: false, iClock: 0, iTl: null, iGeo: null, iKids: 0, iShown: 0,
   jumpT: -1, j2: -1, j2h: 0, j2Land: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
   hintTimer: 0,
   regular: 0, bossMode: false, introT: 0, repeatT: 0, repeatWord: '', review: false
@@ -317,7 +318,8 @@ function renderWord() {
   els.word.innerHTML = '';
   const w0 = G.words[G.wi];
   els.meaning.textContent = (w0.hint && w0.hint.meaning) || w0.meaning;   // 정답 단어(활용형 포함)는 ＿＿ 로 가려진 뜻
-  els.meaning.classList.remove('enter'); void els.meaning.offsetWidth; els.meaning.classList.add('enter');
+  els.meaning.classList.remove('enter');
+  if (!(CONFIG.INTRO_ENABLED && !reduce)) { void els.meaning.offsetWidth; els.meaning.classList.add('enter'); }   // 작업323: 새 단어 연출이 켜져 있으면 연출이 이 등장 효과를 대신한다
   slotEls = [];
   const slotAt = new Map(plan.slots.map((s, i) => [s.start, i]));
   let i = 0;
@@ -413,8 +415,46 @@ function loadWord(i) {
   G.heartSlot = pickHeartSlot(G.plan.slots.length);
   const highs = planHighSlots(G.plan.slots.length);   // 작업318-4: 2단 점프가 꺼져 있으면 빈 집합
   G.plan.slots.forEach((sl, k) => { sl.high = highs.has(k); });
-  G.packActive = false; G.spawnT = CONFIG.WORD_START_DELAY + (i === 0 ? 0.4 : 0);
+  G.packActive = false; G.spawnT = CONFIG.WORD_START_DELAY + (i === 0 ? CONFIG.FIRST_WORD_EXTRA : 0);
   renderWord(); renderProgress();
+  startIntro(i, boss);
+}
+// ---------- 작업323: 새 단어 시작 연출 ----------
+// 큰 뜻(= 상단 힌트 묶음 #hintbox 를 확대해 화면 가운데에 둔 모양)을 보여 주다가, 하나의 요소를 transform(이동+크기)으로 상단 힌트 위치(작업322 최종 모양)로 옮기며
+// 글자 칸을 왼쪽부터 하나씩 나타낸다. 시간은 게임 시간(step 의 dt)이라 탭이 가려지면 함께 멈춘다. 끝나면 transform 을 지워 322 레이아웃 그대로 남는다.
+function clearIntro() {
+  G.iActive = false;
+  els.hintbox.style.transform = ''; els.hintbox.classList.remove('intro');
+  Array.from(els.word.children).forEach(k => { k.style.visibility = ''; });
+}
+function measureIntro() {
+  els.hintbox.style.transform = '';
+  const u = unitPx(), bx = box.getBoundingClientRect(), r = els.hintbox.getBoundingClientRect();
+  const cy = ((r.top + r.bottom) / 2 - bx.top) / u;
+  let wmax = 0;
+  [els.meaning, els.sub].forEach(el => { if (el.hidden || !el.textContent) return; const rg = document.createRange(); rg.selectNodeContents(el); wmax = Math.max(wmax, rg.getBoundingClientRect().width / u); });
+  G.iGeo = { dy: LAYOUT.INTRO_CENTER_Y - cy, k: wmax ? Math.max(1, Math.min(CONFIG.INTRO_SCALE, (LAYOUT.WORD_AVAIL_W - 8) / wmax)) : CONFIG.INTRO_SCALE };
+}
+function applyIntro() {
+  const st = introState(G.iClock, G.iTl, G.iKids, CONFIG);
+  if (st.phase === 'done') { clearIntro(); return; }
+  const u = unitPx(), k = G.iGeo.k + (1 - G.iGeo.k) * st.e, dy = G.iGeo.dy * (1 - st.e);
+  els.hintbox.classList.add('intro');
+  els.hintbox.style.transform = 'translateY(' + (dy * u).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')';
+  const kids = els.word.children;
+  for (let i = 0; i < kids.length; i++) {
+    kids[i].style.visibility = i < st.visible ? '' : 'hidden';   // 자리는 유지하고 숨긴다(위치가 흔들리지 않게)
+    if (i < st.visible && i >= G.iShown) kids[i].classList.add('iv');
+  }
+  G.iShown = Math.max(G.iShown, st.visible);
+}
+function startIntro(i, boss) {
+  clearIntro();
+  if (!CONFIG.INTRO_ENABLED || reduce) return;
+  const tl = introTimeline(CONFIG, { first: i === 0, boss: !!boss });
+  if (tl.total <= 0) return;
+  Object.assign(G, { iTl: tl, iClock: 0, iActive: true, iKids: els.word.children.length, iShown: 0 });
+  measureIntro(); applyIntro();
 }
 function spawnPack() {
   const slot = G.plan.slots[G.si];
@@ -576,7 +616,7 @@ function afterPop() {
   } else { G.state = 'run'; loadWord(G.wi + 1); }
 }
 function finish(cleared) {
-  G.state = 'over'; G.bossMode = false;
+  G.state = 'over'; G.bossMode = false; clearIntro();
   box.classList.remove('boss');
   els.pop.hidden = true; els.hud.hidden = true; els.bossBanner.hidden = true;
   els.resChips.textContent = '';
@@ -682,6 +722,7 @@ function step(dt) {
   }
 
   if (G.state === 'run') {
+    if (G.iActive) { G.iClock += dt; applyIntro(); }   // 연출 시간은 게임 시간
     for (const t of G.tiles) {
       if (t.state === 'live' && !t.checked && t.x <= RUNNER_X) {
         t.checked = true;
@@ -691,7 +732,7 @@ function step(dt) {
     }
     if (G.state === 'run' && !G.packActive) {
       G.spawnT -= dt;
-      if (G.spawnT <= 0) spawnPack();
+      if (G.spawnT <= 0) { if (G.iActive) clearIntro(); spawnPack(); }   // 안전장치: 연출은 항상 첫 타일 등장 전에 끝난다
     }
   } else if (G.state === 'pop') {
     G.popT -= dt;

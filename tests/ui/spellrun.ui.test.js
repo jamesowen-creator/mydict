@@ -447,7 +447,7 @@ test('318-1) 최악 입력(13글자 단어·25자 넘는 뜻·보스 7칸·긴 �
     await page.waitFor("SpellRun.G.state === 'run' && !document.getElementById('hud').hidden", 4000);
     const seen = [];
     for (let k = 0; k < 4; k++) {
-      await advance(page, "G.state === 'run' && G.time > 0 && true", {});   // 곧바로 반환(현재 단어 시작 직후 측정)
+      await advance(page, "!G.iActive", {});   // 곧바로 반환(현재 단어 시작 직후 측정)
       const bad0 = await page.eval(OVERFLOW);
       assert.deepEqual(bad0, [], `${width}px 단어 시작: ${JSON.stringify(bad0)}`);
       const info = await page.eval(`({ w: SpellRun.G.words[SpellRun.G.wi].word, slots: SpellRun.G.plan.slots.length, chunks: SpellRun.G.plan.slots.filter(s => s.chunk).map(s => s.len), mean: document.getElementById('meaning').getBoundingClientRect().height / parseFloat(document.getElementById('box').style.getPropertyValue('--u')), word: document.getElementById('word').scrollWidth <= document.getElementById('word').clientWidth + 1 })`);
@@ -511,12 +511,13 @@ test('318-1) 리사이즈·회전 때 다시 계산된다: 폭을 320 으로 줄
 });
 
 // 작업322: 상세 힌트 박스는 없다. 상단 한글 힌트 = 대표 뜻(.meaning) + 보조 한 줄(.sub, 다른 뜻 키워드)
-const hudInfo = page => page.eval(`(() => { const G = SpellRun.G, w = G.words[G.wi], u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')), b = document.getElementById('box').getBoundingClientRect();
+const hudInfo = async page => { await advance(page, '!G.iActive', {}); return page.eval(`(() => {   // 작업323: 새 단어 연출이 끝난 뒤(작업322 최종 레이아웃)에 잰다
+ const G = SpellRun.G, w = G.words[G.wi], u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')), b = document.getElementById('box').getBoundingClientRect();
   const y = id => { const e = document.getElementById(id); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return { top: (r.top - b.top) / u, bottom: (r.bottom - b.top) / u, fs: parseFloat(getComputedStyle(e).fontSize) / u, h: r.height / u }; };
   const sub = document.getElementById('sub');
   return { word: w.word, meaning: document.getElementById('meaning').textContent, sub: sub.hidden ? null : sub.textContent, subShadow: getComputedStyle(sub).textShadow, subBg: getComputedStyle(sub).backgroundColor, subBorder: getComputedStyle(sub).borderTopWidth,
     hint: document.getElementById('hint'), boxes: document.querySelectorAll('.hint, .h-pos, .h-alt, .h-note, .h-ex').length, row1: y('hud') && null,
-    meanY: y('meaning'), subY: y('sub'), wordY: y('word'), progY: (() => { const r = document.getElementById('progress').getBoundingClientRect(); return { bottom: (r.bottom - b.top) / u }; })() }; })()`);
+    meanY: y('meaning'), subY: y('sub'), wordY: y('word'), progY: (() => { const r = document.getElementById('progress').getBoundingClientRect(); return { bottom: (r.bottom - b.top) / u }; })() }; })()`); };
 
 test('322-1/2) 상세 힌트 박스(흰 배경·품사·품사별 다른 뜻·쓰임 설명)는 DOM에도 없고, 대표 뜻 아래 보조 한 줄(다른 뜻 키워드)만 있으며 정답은 가려진다', { skip: SKIP }, async () => {
   resetState(); state.rows = HINT_ROWS;
@@ -1121,4 +1122,180 @@ test('320-4) 속도 램프: 콤보에 따라 목표 속도가 25·50·75·100%�
   assert.equal(await p3.eval("document.getElementById('tune').hidden"), true, '기본값과 같으면 표시 없음'); await p3.close();
   const p4 = await openQ({ ids: IDS12, query: 'maxcombo=2&dj=0' });
   assert.equal(await p4.eval('SpellRun.CONFIG.COMBO_MAX_SPEED'), 5, '범위 밖은 무시'); assert.equal(await p4.eval('SpellRun.CONFIG.DJ_ENABLED'), false); await p4.close();
+});
+
+// ───────── 작업323: 새 단어 시작 연출 ─────────
+const SEED = "Math.random = (() => { let s = 12345; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();";
+const ROWS_I = [RICH(91, 'apple', '사과', { meanings: [{ definition: '사과, 능금, 애플' }] }), RICH(92, 'happy', '행복한', { meanings: [{ definition: '행복한, 기쁜, 즐거운' }] }), RICH(93, 'water', '물', { meanings: [{ definition: '물, 식수' }] })];
+async function openI({ query = '', width = 390, ids = [91, 92, 93], seed = true } = {}) {
+  state.requests.length = 0;
+  const page = await browser.newPage({ width, height: 844, token: jwt() });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); } catch (e) {}" });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` + (seed ? SEED : '') });
+  await page.goto(base + '/spelling_run.html' + (query ? '?' + query : ''));
+  await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
+  await page.click('#startBtn');
+  await page.waitFor("SpellRun.G.state === 'run'", 4000);
+  await page.eval('SpellRun.manual = true');
+  return page;
+}
+const introInfo = page => page.eval(`(() => { const G = SpellRun.G, u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')), b = document.getElementById('box').getBoundingClientRect();
+  const R = id => { const e = document.getElementById(id); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return { top: +((r.top - b.top) / u).toFixed(2), bottom: +((r.bottom - b.top) / u).toFixed(2), left: +((r.left - b.left) / u).toFixed(2), right: +((r.right - b.left) / u).toFixed(2), h: +(r.height / u).toFixed(2) }; };
+  const kids = [...document.getElementById('word').children];
+  return { active: G.iActive, clock: G.iClock, tl: G.iTl, hidden: kids.filter(k => k.style.visibility === 'hidden').length, kids: kids.length, tiles: G.tiles.length, box: R('hintbox'), meaning: R('meaning'), sub: R('sub'), word: R('word'), slot0: (() => { const k = kids[0]; if (!k) return null; const r = k.getBoundingClientRect(); return { top: +((r.top - b.top) / u).toFixed(2), left: +((r.left - b.left) / u).toFixed(2), w: +(r.width / u).toFixed(2) }; })(),
+    cls: document.getElementById('hintbox').className, tf: document.getElementById('hintbox').style.transform, enter: document.getElementById('meaning').classList.contains('enter'), word_: G.words[G.wi].word, jumpT: G.jumpT }; })()`);
+const stepTo = (page, clock) => page.eval(`(() => { const G = SpellRun.G; let n = 0; while (G.iActive && G.iClock < ${clock} && n++ < 2000) SpellRun.step(1 / 240); })()`);   // 연출 시계가 clock 에 닿을 때까지(시험 시작 전 실시간 프레임 몇 개와 무관하게)
+const stepN = (page, n) => page.eval(`(() => { for (let i = 0; i < ${n}; i++) SpellRun.step(1 / 60); })()`);
+
+test('323-1/2/3) 새 단어 시작: 유지 구간에는 큰 뜻 카드가 화면 가운데에 있고 글자 칸은 숨겨져 있으며, 축소 구간에서 칸이 왼쪽부터 나타나고, 끝나면 모두 보인다', { skip: SKIP }, async () => {
+  resetState(); state.rows = ROWS_I;
+  const page = await openI();
+  let a = await introInfo(page);
+  assert.equal(a.active, true); assert.ok(a.tl.hold > 1.6 && a.tl.hold < 1.8, '첫 단어는 유지 1.3 + 0.4: ' + a.tl.hold);
+  assert.equal(a.hidden, a.kids, '유지 구간: 글자 칸이 모두 숨김(자리는 유지)'); assert.ok(a.word.h > 20, '자리는 유지되어 줄 높이가 있다');
+  assert.ok(/\bintro\b/.test(a.cls) && /scale\(/.test(a.tf) && /translateY\(/.test(a.tf), '하나의 요소를 transform(이동+크기)으로');
+  assert.equal(a.enter, false, '기존 등장 효과와 겹쳐 두 번 움직이지 않는다'); assert.equal(a.tiles, 0);
+  const centerY = (a.box.top + a.box.bottom) / 2;
+  assert.ok(Math.abs(centerY - 250) <= 3, '카드 가운데 높이 ≈ 250: ' + centerY);
+  const bigH = a.box.h;
+  // 유지가 끝나기 직전까지 그대로
+  await stepTo(page, a.tl.hold - 0.1);
+  a = await introInfo(page);
+  assert.equal(a.hidden, a.kids); assert.equal(a.active, true);
+  // 축소 구간: 일부만 보이고 왼쪽 칸부터
+  await stepTo(page, a.tl.hold + 0.03);
+  a = await introInfo(page);
+  assert.ok(a.kids >= 2, '칸이 둘 이상인 단어로 확인: ' + a.kids);
+  assert.ok(a.hidden > 0 && a.hidden < a.kids, `축소 중 일부만 보임: ${a.kids - a.hidden}/${a.kids}`);
+  const order = await page.eval("[...document.getElementById('word').children].map(k => k.style.visibility === 'hidden' ? 0 : 1).join('')");
+  assert.match(order, /^1+0*$/, '왼쪽부터 순서대로: ' + order);
+  assert.ok(a.box.h < bigH && a.box.top < centerY - 5, '카드가 작아지며 위로 이동 중');
+  // 끝
+  await stepN(page, 40);
+  a = await introInfo(page);
+  assert.equal(a.active, false); assert.equal(a.hidden, 0); assert.equal(a.tf, ''); assert.ok(!/\bintro\b/.test(a.cls));
+  assert.ok(bigH > a.box.h * 1.05, `큰 뜻 카드(${bigH})가 최종 힌트(${a.box.h})보다 크다`);
+  await page.close();
+});
+
+test('323-2) 연출이 끝난 뒤 대표 뜻·보조 줄·글자 칸 줄의 위치·크기·줄바꿈은 연출 없는(intro=0, 작업322) 최종 레이아웃과 1px 이내로 같고, 이후 재배치가 없다', { skip: SKIP }, async () => {
+  resetState(); state.rows = ROWS_I;
+  for (const width of [320, 360, 390]) {
+    const base0 = await openI({ query: 'intro=0', width });
+    assert.equal((await introInfo(base0)).active, false, 'intro=0 은 연출 없음');
+    await base0.eval("new Promise(r => setTimeout(r, 800))");   // 기존 등장 효과(.meaning.enter)가 끝난 뒤
+    const ref = await introInfo(base0);
+    assert.equal(ref.enter, true, 'intro=0 은 작업322 방식(등장 효과 유지)'); assert.equal(ref.hidden, 0); assert.equal(ref.tf, '');
+    const p = await openI({ width });
+    await advance(p, '!G.iActive', {});
+    await p.eval('new Promise(r => setTimeout(r, 450))');   // 글자 칸 등장 효과(CSS, 실시간 0.22초)가 끝난 뒤
+    const a = await introInfo(p);
+    assert.equal(ref.word_, a.word_, '같은 단어(난수 고정)');
+    for (const key of ['meaning', 'sub', 'word', 'slot0', 'box']) {
+      for (const f of Object.keys(ref[key] || {})) assert.ok(Math.abs(ref[key][f] - a[key][f]) <= 1, `${width}px ${key}.${f}: 이후 ${a[key][f]} / intro=0 ${ref[key][f]}`);
+    }
+    // 끝난 뒤 30프레임 동안 변하지 않는다(깜박임·재배치 없음)
+    for (let i = 0; i < 6; i++) { await stepN(p, 5); const b = await introInfo(p); assert.deepEqual([b.meaning, b.sub, b.word, b.slot0], [a.meaning, a.sub, a.word, a.slot0], '재배치 없음'); assert.equal(b.hidden, 0); }
+    await base0.close(); await p.close();
+  }
+});
+
+test('323-1) 첫 타일은 연출이 끝나기 전에 나오지 않고, 연출 중에도 캐릭터는 달리며(거리 증가) 점프 입력이 동작한다', { skip: SKIP }, async () => {
+  resetState(); state.rows = ROWS_I;
+  const page = await openI();
+  const r = await page.eval(`(async () => { const R = SpellRun, G = R.G; const out = { bad: 0, endAt: null, firstTile: null, t: 0, dist0: G.dist, jumpedDuring: false };
+    for (let i = 0; i < 60 * 4; i++) {
+      if (i === 30) { R.jump(); out.jumpedDuring = G.iActive && G.jumpT >= 0; }
+      R.step(1 / 60); out.t += 1 / 60;
+      if (G.tiles.length && G.iActive) out.bad++;
+      if (out.endAt === null && !G.iActive) out.endAt = out.t;
+      if (out.firstTile === null && G.tiles.length) out.firstTile = out.t;
+    }
+    out.dist = G.dist - out.dist0; out.tl = G.iTl; out.delay = R.CONFIG.WORD_START_DELAY + R.CONFIG.FIRST_WORD_EXTRA; return out; })()`);
+  assert.equal(r.bad, 0, '연출 중에는 타일이 없다');
+  assert.ok(r.endAt !== null && r.firstTile !== null && r.endAt <= r.firstTile + 1 / 60, `연출 종료 ${r.endAt} <= 첫 타일 ${r.firstTile}`);
+  assert.ok(r.endAt <= r.delay + 0.02 && Math.abs(r.firstTile - r.delay) < 0.25, '첫 타일은 기존 대기 시간(2.6초, 시험 시작 전 몇 프레임 제외)에 나온다: ' + r.firstTile);
+  assert.ok(r.dist > 0, '연출 중에도 계속 달린다(배경 거리 증가)'); assert.equal(r.jumpedDuring, true, '연출 중 점프 입력 정상');
+  await page.close();
+});
+
+test('323-1) 일시정지 중에는 연출이 멈춘다: 게임 시간(step)이 흐르지 않으면 단계도 그대로이고, 탭이 가려진 뒤 재개하면 이어진다(프레임 dt 상한)', { skip: SKIP }, async () => {
+  resetState(); state.rows = ROWS_I;
+  const page = await openI({ seed: true });
+  await stepN(page, 30);
+  const a = await introInfo(page);
+  await new Promise(r => setTimeout(r, 400));   // 수동 모드에서 step 을 부르지 않는 400ms = 일시정지
+  const b = await introInfo(page);
+  assert.equal(b.clock, a.clock, '정지 중에는 연출 시계가 그대로'); assert.deepEqual([b.hidden, b.box], [a.hidden, a.box]);
+  // 실제 시간 루프: 프레임 사이가 길어도(탭이 가려졌다 돌아옴) 한 프레임에 흐르는 시간은 50ms 이하
+  await page.eval('SpellRun.manual = false');
+  const c0 = (await introInfo(page)).clock;
+  await page.send('Page.setWebLifecycleState', { state: 'frozen' }).catch(() => {});
+  await new Promise(r => setTimeout(r, 700));
+  await page.send('Page.setWebLifecycleState', { state: 'active' }).catch(() => {});
+  await new Promise(r => setTimeout(r, 150));
+  const c1 = await introInfo(page);
+  assert.ok(c1.clock - c0 < 0.45, `동결 700ms 동안 연출이 건너뛰지 않는다(진행 ${(c1.clock - c0).toFixed(3)}s)`);
+  await page.close();
+});
+
+test('323-1) 보스 단어: 배너가 먼저 나오고(연출 없음) 배너가 끝난 뒤 연출이 시작되며 큰 뜻 유지가 일반보다 0.4초 길다. 일반 단어 시간은 그대로', { skip: SKIP }, async () => {
+  resetState(); state.rows = ROWS12;
+  const page = await openQ({ ids: IDS12 });
+  await page.click('#startBtn');
+  await page.waitFor("SpellRun.G.state === 'run'", 4000);
+  await page.eval('SpellRun.manual = true');
+  const first = await introInfo(page);
+  assert.equal(first.active, true);
+  await advance(page, 'G.state === "intro"', {});
+  const banner = await introInfo(page);
+  assert.equal(banner.active, false, '배너 동안에는 연출이 없다(이전 단어의 연출은 이미 끝남)');
+  assert.equal(await page.eval("!document.getElementById('bossBanner').hidden"), true);
+  await advance(page, 'G.state === "run" && G.wi === 4', {});
+  const boss = await introInfo(page);
+  assert.equal(boss.active, true, '배너 뒤에 보스 연출 시작'); assert.equal(await page.eval("document.getElementById('bossBanner').hidden"), true);
+  assert.ok(Math.abs(boss.tl.hold - 1.7) < 1e-9 && boss.tl.total <= 2.2 + 1e-9, '보스 큰 뜻 유지 1.7(= 1.3 + 0.4): ' + JSON.stringify(boss.tl));
+  assert.equal(boss.hidden, boss.kids);
+  await advance(page, '!G.iActive', {});
+  assert.equal((await introInfo(page)).hidden, 0);
+  // 일반 단어(2번째)는 1.3
+  await advance(page, 'G.state === "pop"', {}); await advance(page, 'G.state === "run" && G.wi === 5', {});
+  const n6 = await introInfo(page);
+  assert.ok(Math.abs(n6.tl.hold - 1.3) < 1e-9 && n6.tl.total === 1.8, '일반 단어는 불변: ' + JSON.stringify(n6.tl));
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+  await page.close();
+});
+
+test('323-2) 폭 320·360·390: 큰 뜻 카드(유지 구간)가 가로로 넘치지 않고 위쪽 HUD 줄과 겹치지 않으며, 긴 뜻·키워드 많은 최악 데이터에서도 같다. intro=0 은 연출 요소가 전혀 없다', { skip: SKIP }, async () => {
+  const many = Array.from({ length: 8 }, (_, i) => '아주길게늘어놓은키워드' + (i + 1)).join(', ');
+  resetState();
+  state.rows = [RICH(81, 'extraordinary', LONG_MEAN, { meanings: [{ definition: LONG_MEAN }, { definition: many }] }), RICH(82, 'beautiful', LONG_NOSPACE, { meanings: [{ definition: '아름다운, 예쁜, 멋진, 훌륭한, 근사한, 고운, 아리따운' }] }), RICH(83, 'environment', '환경', { meanings: [{ definition: '환경, 주변 상황, 자연환경, 생태계, 둘레' }] })];
+  for (const width of [320, 360, 390]) {
+    const page = await openI({ width, ids: [81, 82, 83] });
+    for (let k = 0; k < 3; k++) {
+      const a = await introInfo(page);
+      assert.equal(a.active, true);
+      // 카드는 transform 으로 확대돼 블록 상자가 넓어지므로, 글자가 실제로 차지하는 범위(Range)로 넘침을 본다
+      assert.deepEqual(await page.eval(`(() => { const b = document.getElementById('box').getBoundingClientRect(), bad = []; for (const id of ['meaning', 'sub']) { const e = document.getElementById(id); if (e.hidden) continue; const g = document.createRange(); g.selectNodeContents(e); const r = g.getBoundingClientRect(); if (r.left < b.left - 0.5 || r.right > b.right + 0.5) bad.push(id + ' ' + Math.round(r.left - b.left) + '~' + Math.round(r.right - b.left)); } return bad; })()`), [], `${width}px ${a.word_} 유지 구간 글자 범위`);
+      const hud = await page.eval("(() => { const u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')), b = document.getElementById('box').getBoundingClientRect(); const rows = [...document.querySelectorAll('#hud .row')].map(r => (r.getBoundingClientRect().bottom - b.top) / u); return Math.max(...rows); })()");
+      assert.ok(a.box.top >= hud - 0.5, `${width}px 카드 위 ${a.box.top} 가 HUD 줄 아래 끝 ${hud.toFixed(1)} 보다 아래`);
+      assert.ok(a.box.bottom <= 440, '카드는 땅 위 영역');
+      await advance(page, 'G.state === "pop"', {});
+      if (await page.eval('SpellRun.G.wi + 1 >= SpellRun.G.words.length')) break;
+      await advance(page, 'G.state === "run" && G.wi > ' + (await page.eval('SpellRun.G.wi')), {});
+    }
+    assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+    await page.close();
+  }
+  state.rows = ROWS_I;
+  const off = await openI({ query: 'intro=0' });
+  const o = await introInfo(off);
+  assert.deepEqual([o.active, o.hidden, o.tf, /\bintro\b/.test(o.cls)], [false, 0, '', false]);
+  assert.equal(await off.eval("document.getElementById('tune').hidden"), false, 'intro=0 은 조정값 사용 중');
+  await off.close();
+  const dflt = await openI({ query: 'intro=1&introhold=1.3' });
+  assert.equal(await dflt.eval("document.getElementById('tune').hidden"), true, '기본값과 같으면 표시 없음'); await dflt.close();
+  const hold = await openI({ query: 'introhold=2.5' });
+  const h = await introInfo(hold); assert.ok(h.tl.total <= 2.6 + 1e-9 && Math.abs(h.tl.hold - 2.1) < 1e-9, '큰 값은 대기 시간 안으로 줄인다: ' + JSON.stringify(h.tl));
+  await hold.close();
 });

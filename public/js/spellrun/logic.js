@@ -76,7 +76,16 @@ function buildConfig(v) {
   HIGH_SLOT_PROB: 0.2,    // 첫 칸을 뺀 칸이 높은 칸이 될 확률
   HIGH_MAX: 2,            // 한 단어의 높은 칸 최대 개수
   HIGH_GRAB_H: 160,       // 높은 칸은 이 높이 이상일 때만 "공중"으로 본다(px). JUMP_PEAK(118)보다 높아 한 번 점프로는 닿지 않는다
-  HIGH_BONUS: 100         // 높은 칸 획득 가산점(속도·콤보 배율 이전에 더한다)
+  HIGH_BONUS: 100,        // 높은 칸 획득 가산점(속도·콤보 배율 이전에 더한다)
+  // 작업323: 새 단어 시작 연출(큰 뜻 → 축소 이동 → 글자 칸 등장). 연출 전체는 항상 새 단어 대기 시간(WORD_START_DELAY + 첫 단어 FIRST_WORD_EXTRA) 이내다.
+  INTRO_ENABLED: true,    // 주소 옵션 intro=0 이면 연출 없이 작업322 방식
+  INTRO_HOLD: 1.3,        // 큰 뜻을 그대로 보여 주는 시간(초). 글자 칸은 숨김. 첫 단어는 FIRST_WORD_EXTRA, 보스는 BOSS_INTRO_EXTRA 만큼 더 길다
+  INTRO_SHRINK: 0.5,      // 축소·이동 시간(초). 이 안에서 글자 칸이 왼쪽부터 하나씩 나타난다
+  FIRST_WORD_EXTRA: 0.4,  // 첫 단어의 추가 대기(초). 기존 값 그대로
+  BOSS_INTRO_EXTRA: 0.4,  // 보스 단어의 큰 뜻 유지 추가 시간(초). 일반 단어는 불변
+  INTRO_SLOT_STEP: 0.04,  // 글자 칸 하나가 나타나는 간격(초)
+  INTRO_SLOT_MAX: 0.4,    // 모든 칸이 나타나는 데 걸리는 최대 시간(초)
+  INTRO_SCALE: 1.3        // 큰 뜻 카드의 최대 확대 배율(한 줄이 폭을 넘지 않는 범위에서)
   };
   if (v.hp) cfg.HP = v.hp;
   if (v.startdelay) cfg.WORD_START_DELAY = v.startdelay;
@@ -85,6 +94,8 @@ function buildConfig(v) {
   if (v.heartevery) cfg.HEART_EVERY = v.heartevery;
   if (v.dj !== undefined) cfg.DJ_ENABLED = !!v.dj;
   if (v.maxcombo) cfg.COMBO_MAX_SPEED = v.maxcombo;
+  if (v.intro !== undefined) cfg.INTRO_ENABLED = !!v.intro;
+  if (v.introhold) cfg.INTRO_HOLD = v.introhold;
   return cfg;
 }
 const CONFIG = buildConfig();
@@ -92,7 +103,8 @@ const CONFIG = buildConfig();
 // 작업318-5: 주소 옵션(?pace=1.1&hp=7&startdelay=2.6&popsec=2&highprob=0.3&heartevery=3&dj=1). 허용 범위를 벗어나거나 숫자가 아니면 무시(기본값).
 const OPTION_RULES = {
   pace: { min: 0.7, max: 1.8, def: DEFAULT_PACE }, hp: { min: 1, max: 10, int: true, def: 5 }, startdelay: { min: 0.5, max: 6, def: 2.2 },
-  popsec: { min: 0.5, max: 5, def: 1.6 }, highprob: { min: 0, max: 1, def: 0.2 }, heartevery: { min: 1, max: 10, int: true, def: 3 }, dj: { min: 0, max: 1, int: true, def: 1 }, maxcombo: { min: 3, max: 12, int: true, def: 5 }
+  popsec: { min: 0.5, max: 5, def: 1.6 }, highprob: { min: 0, max: 1, def: 0.2 }, heartevery: { min: 1, max: 10, int: true, def: 3 }, dj: { min: 0, max: 1, int: true, def: 1 }, maxcombo: { min: 3, max: 12, int: true, def: 5 },
+  intro: { min: 0, max: 1, int: true, def: 1 }, introhold: { min: 0.5, max: 3, def: 1.3 }
 };
 // 반환 { values: 유효한 값(기본값과 같아도 포함), applied: 기본값과 다른 옵션 이름 }
 function parseOptions(search) {
@@ -139,6 +151,7 @@ function configure(values) { return Object.assign(CONFIG, buildConfig(values)); 
 // 화면 배치(논리 px, 360x640 기준). 글자 칸 줄 아래 끝은 높은 칸(2단 점프) 타일 위쪽보다 위에 있어야 한다.
 const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TILE_H: 58, WORD_AVAIL_W: 332,
   HUD_SHIFT: 24,        // 작업322: 대표 뜻·보조 줄·글자 칸 줄을 위쪽 HUD 줄에서 이만큼(논리 px) 아래로 내린다(한 곳에서 조정)
+  INTRO_CENTER_Y: 250,  // 작업323: 큰 뜻 카드의 가운데 높이(논리 px). 위쪽 HUD 줄 아래, 땅 위의 빈 공간
   CONTENT_BOTTOM_Y: 266 // 글자 칸 줄 아래 끝의 한계: 높은 칸 타일 윗변(HIGH_TILE_Y - TILE_H/2 = 276)보다 위(여유 포함)
 };
 
@@ -401,6 +414,27 @@ function planHighSlots(nSlots, rng, cfg) {
   return out;
 }
 
+// ---- 작업323: 새 단어 시작 연출 ----
+// 타임라인: 큰 뜻 유지(hold) → 축소·이동(shrink). 전체(hold+shrink)는 새 단어 대기 시간(delay) 이하로 맞춘다(옵션이 커도 hold 를 줄인다).
+// o: { first: 첫 단어, boss: 보스 단어 }
+function introTimeline(cfg, o) {
+  cfg = cfg || CONFIG; o = o || {};
+  const delay = cfg.WORD_START_DELAY + (o.first ? cfg.FIRST_WORD_EXTRA : 0);
+  const shrink = Math.min(cfg.INTRO_SHRINK, delay);
+  const want = cfg.INTRO_HOLD + (o.first ? cfg.FIRST_WORD_EXTRA : 0) + (o.boss ? cfg.BOSS_INTRO_EXTRA : 0);
+  const hold = Math.max(0, Math.min(want, delay - shrink));
+  return { delay: delay, hold: hold, shrink: shrink, total: hold + shrink };
+}
+// 경과 시간(게임 시간) t → { phase: 'hold'|'shrink'|'done', p: 축소 진행률 0~1, e: 부드러운 감속(easeOutCubic) 진행률, visible: 보이는 칸 수(0~nKids) }
+function introState(t, tl, nKids, cfg) {
+  cfg = cfg || CONFIG;
+  if (t >= tl.total) return { phase: 'done', p: 1, e: 1, visible: nKids };
+  if (t <= tl.hold) return { phase: 'hold', p: 0, e: 0, visible: 0 };
+  const p = Math.max(0, Math.min(1, (t - tl.hold) / tl.shrink));
+  const step = Math.min(cfg.INTRO_SLOT_STEP, cfg.INTRO_SLOT_MAX / Math.max(1, nKids));
+  return { phase: 'shrink', p: p, e: 1 - Math.pow(1 - p, 3), visible: Math.min(nKids, Math.floor((t - tl.hold) / step) + 1) };
+}
+
 // ---- 작업318-1: 글자 칸 줄 폭 배분 ----
 // items: 칸 목록 [{ n: 글자 수, chunk: 조각 칸 여부 }] 과 고정 글자 { fixed: true }. 실제 CSS 와 같은 식으로 줄 전체 폭을 센다.
 function wordWidth(items, cw, cellGap, slotGap, chunkPad) {
@@ -544,7 +578,7 @@ return {
   speedLevel: speedLevel, speedMult: speedMult, gapSec: gapSec, leadSec: leadSec, speedAfterHit: speedAfterHit, speedAfterFail: speedAfterFail,
   targetSpeed: targetSpeed, planHearts: planHearts, pickHeartSlot: pickHeartSlot, jumpHeight: jumpHeight, judge: judge, buildRound: buildRound,
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
-  buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
+  introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };

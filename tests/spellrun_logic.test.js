@@ -660,3 +660,58 @@ test('322-2. 키워드 줄이기: "…" 없이 키워드 단위로만, 쉼표가
   assert.ok(!L.keywords('가'.repeat(30) + ', ' + '나'.repeat(30), 10).includes('…'));
   assert.deepEqual(L.splitKeywords(' 가，나; 다 , 라 '), ['가', '나', '다', '라']);
 });
+
+// ───────── 작업323: 새 단어 시작 연출 ─────────
+test('323-1. 연출 타임라인: 일반 1.3+0.5, 첫 단어 +0.4, 보스 +0.4 가 모두 새 단어 대기 시간 이하이고, 옵션이 커도 항상 대기 시간 이하다', () => {
+  const C = CONFIG;
+  assert.deepEqual([C.INTRO_ENABLED, C.INTRO_HOLD, C.INTRO_SHRINK, C.FIRST_WORD_EXTRA, C.BOSS_INTRO_EXTRA, C.INTRO_SLOT_STEP, C.INTRO_SLOT_MAX], [true, 1.3, 0.5, 0.4, 0.4, 0.04, 0.4]);
+  const n = L.introTimeline(C, {}), f = L.introTimeline(C, { first: true }), b = L.introTimeline(C, { boss: true });
+  assert.deepEqual([n.hold, n.shrink, n.total, n.delay], [1.3, 0.5, 1.8, 2.2], '일반 단어는 대기 시간을 늘리지 않는다');
+  assert.ok(Math.abs(f.hold - 1.7) < 1e-9 && f.total <= f.delay && f.delay === 2.6, '첫 단어: 추가 0.4초 안에서 더 길게');
+  assert.ok(Math.abs(b.hold - 1.7) < 1e-9 && b.total <= b.delay + 1e-9 && b.delay === 2.2, '보스: 큰 뜻 유지 +0.4, 그래도 대기 시간 이내');
+  assert.ok(b.hold > n.hold && n.hold === L.introTimeline(C, {}).hold, '보스에만 더한다');
+  for (const hold of [0.5, 1, 1.3, 2, 3]) for (const delay of [0.5, 1, 2.2, 3, 6]) for (const o of [{}, { first: true }, { boss: true }]) {
+    const c = L.buildConfig({ introhold: hold, startdelay: delay }), t = L.introTimeline(c, o);
+    assert.ok(t.total <= t.delay + 1e-9 && t.hold >= 0 && t.shrink > 0, JSON.stringify([hold, delay, o, t]));
+    assert.ok(t.total <= c.WORD_START_DELAY + (o.first ? c.FIRST_WORD_EXTRA : 0) + 1e-9, '첫 타일 등장(대기 시간) 전에 끝난다');
+  }
+});
+
+test('323-1. 연출 단계: 경과 시간에 따라 진행률·보이는 칸 수가 단조 증가하고 끝에 최종값(진행률 1, 모든 칸 보임)에 도달하며, 칸은 왼쪽부터 0.4초 안에 모두 나타난다', () => {
+  for (const n of [1, 2, 5, 7, 12]) for (const o of [{}, { first: true }, { boss: true }]) {
+    const tl = L.introTimeline(CONFIG, o);
+    let prev = { p: 0, e: 0, visible: 0 }, firstAll = null, firstVisible = null;
+    for (let t = 0; t <= tl.total + 0.2; t += 0.005) {
+      const s = L.introState(t, tl, n);
+      assert.ok(s.p >= prev.p && s.e >= prev.e && s.visible >= prev.visible, '단조 증가 ' + t);
+      assert.ok(s.p >= 0 && s.p <= 1 && s.e >= 0 && s.e <= 1 && s.visible >= 0 && s.visible <= n);
+      if (t <= tl.hold) assert.deepEqual([s.phase, s.p, s.visible], ['hold', 0, 0], '유지 구간에는 글자 칸이 보이지 않는다');
+      if (firstVisible === null && s.visible > 0) firstVisible = t;
+      if (firstAll === null && s.visible === n) firstAll = t;
+      prev = s;
+    }
+    assert.deepEqual([prev.phase, prev.p, prev.e, prev.visible], ['done', 1, 1, n], '끝에 최종값');
+    assert.ok(firstVisible >= tl.hold && firstVisible <= tl.hold + 0.01, '축소가 시작될 때 첫 칸');
+    assert.ok(firstAll - tl.hold <= CONFIG.INTRO_SLOT_MAX + 0.01 && firstAll <= tl.total, `모든 칸이 0.4초 이내·연출 안에: n=${n} ${firstAll - tl.hold}`);
+  }
+  // 칸당 약 0.04초
+  const tl = L.introTimeline(CONFIG, {});
+  assert.equal(L.introState(tl.hold + 0.001, tl, 7).visible, 1); assert.equal(L.introState(tl.hold + 0.045, tl, 7).visible, 2); assert.equal(L.introState(tl.hold + 0.3, tl, 7).visible, 7);
+  // 감속: 초반 진행이 빠르고 끝에서 느려진다
+  const early = L.introState(tl.hold + tl.shrink * 0.25, tl, 5).e - L.introState(tl.hold, tl, 5).e, late = L.introState(tl.hold + tl.shrink * 0.999, tl, 5).e - L.introState(tl.hold + tl.shrink * 0.749, tl, 5).e;
+  assert.ok(early > late * 3, 'easeOut');
+});
+
+test('323-4. 연출 옵션: intro(0|1, 기본 1)·introhold(0.5~3.0, 기본 1.3) 범위·저장·표시 규칙', () => {
+  const po = q => L.parseOptions(q);
+  assert.deepEqual(po('?intro=0&introhold=2').values, { intro: 0, introhold: 2 }); assert.deepEqual(po('?intro=0&introhold=2').applied, ['intro', 'introhold']);
+  assert.deepEqual(po('?intro=1&introhold=1.3').applied, [], '기본값과 같으면 표시 없음');
+  for (const bad of ['intro=2', 'intro=-1', 'intro=x', 'intro=0.5', 'introhold=0.4', 'introhold=3.1', 'introhold=x', 'introhold=']) assert.deepEqual(po('?' + bad).values, {}, bad);
+  assert.deepEqual(po('?introhold=0.5').values, { introhold: 0.5 }); assert.deepEqual(po('?introhold=3').values, { introhold: 3 });
+  assert.equal(L.buildConfig({ intro: 0 }).INTRO_ENABLED, false); assert.equal(L.buildConfig({ intro: 1 }).INTRO_ENABLED, true); assert.equal(L.buildConfig().INTRO_ENABLED, true);
+  assert.equal(L.buildConfig({ introhold: 2.5 }).INTRO_HOLD, 2.5);
+  assert.deepEqual(L.resolveOptions('', JSON.stringify({ intro: 0, introhold: 2 })).values, { intro: 0, introhold: 2 }, '저장 방식 동일');
+  assert.deepEqual(L.resolveOptions('', JSON.stringify({ introhold: 9, intro: 5 })).values, {});
+  assert.deepEqual(L.resolveOptions('?intro=1', JSON.stringify({ intro: 0 })).values, { intro: 1 }, '주소가 저장값을 덮어쓴다');
+  const d = L.buildConfig(); for (const k of Object.keys(CONFIG)) assert.deepEqual(d[k], CONFIG[k], k);
+});

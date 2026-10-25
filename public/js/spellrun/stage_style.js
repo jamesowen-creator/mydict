@@ -66,6 +66,11 @@
 .sr-box .word{display:flex;justify-content:center;align-items:flex-end;gap:calc(var(--sg,5) * var(--u));margin-top:calc(18 * var(--u));--cw:32;--fs:30;--cg:3}   /* 위쪽 18: 보조 줄과 조각 칸 표시(×N)·높은 칸 삼각형이 겹치지 않게 */
 .sr-box .slot{position:relative;display:flex;gap:calc(var(--cg,3) * var(--u))}
 .sr-box .slot.high::after{content:"";position:absolute;left:50%;top:calc(-13 * var(--u));margin-left:calc(-6 * var(--u));border:calc(6 * var(--u)) solid transparent;border-top:0;border-bottom:calc(9 * var(--u)) solid var(--gold-deep)}
+.sr-box .hintbox{width:100%;display:flex;flex-direction:column;gap:calc(4 * var(--u));transform-origin:50% 50%}
+.sr-box .hintbox.intro{position:relative;z-index:3}
+.sr-box .hintbox.intro .meaning{text-shadow:0 0 calc(3 * var(--u)) #fff,0 0 calc(3 * var(--u)) #fff,calc(1 * var(--u)) 0 0 #fff,calc(-1 * var(--u)) 0 0 #fff,0 calc(1 * var(--u)) 0 #fff,0 calc(-1 * var(--u)) 0 #fff}   /* 연출 중에만: 하늘·구름 위 가독성(끝나면 작업322 모양 그대로) */
+.sr-box .word > .iv{animation:sr-slotin .22s cubic-bezier(.2,1.3,.4,1)}
+@keyframes sr-slotin{0%{transform:scale(.55);opacity:0}100%{transform:none;opacity:1}}
 .sr-box .sub{
   width:100%;text-align:center;font-family:var(--f-body);font-weight:700;font-size:calc(var(--sfs,12) * var(--u));line-height:1.3;color:var(--ink);
   word-break:keep-all;overflow-wrap:normal;margin-top:calc(2 * var(--u));
@@ -184,7 +189,7 @@
 .sr-box .legend .k::before{background:#eef0f6}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @media (prefers-reduced-motion:reduce){
-.sr-box .popword.go .pl,.sr-box .slot.cur .cell,.sr-box .slot.done .cell.pop,.sr-box .slot.bad,.sr-box .popword.go,.sr-box .banner.go,.sr-box .meaning.enter{animation:sr-none}
+.sr-box .word > .iv,.sr-box .popword.go .pl,.sr-box .slot.cur .cell,.sr-box .slot.done .cell.pop,.sr-box .slot.bad,.sr-box .popword.go,.sr-box .banner.go,.sr-box .meaning.enter{animation:sr-none}
 }
 `;
   var s = document.createElement('style');
