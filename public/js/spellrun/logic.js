@@ -101,6 +101,13 @@ function buildConfig(v) {
   // 작업327: 그림·예고 표시(판정과 배치에는 영향 없음)
   ART_LONG_K: 1.4,        // 바닥 장애물 그림의 긴 변 = OBST_W x 이 값(흰 테두리 제외). pace 로 OBST_W 가 줄면 같은 비율로 줄어든다
   PIT_ART_K: 1.25,        // 구덩이 그림 폭 = PIT_W x 이 값(판정 폭은 PIT_W 그대로)
+  // 작업328: 하트 규칙(체력과 무관)·가속 아이템
+  HP_FULL_BONUS: 100,     // 체력이 가득일 때 하트를 먹으면 체력 대신 받는 점수(주소 옵션 hpfullbonus)
+  SPEED_ITEM_ENABLED: true, // 주소 옵션 speeditem=0 이면 가속 아이템 없음
+  SPEED_EVERY: 4,         // 약 이 개수의 일반 단어마다 가속 아이템 1개(주소 옵션 speedevery). 난수 없이 판 순번·단어 순번의 해시로 정한다
+  BOOST_SEC: 5,           // 가속 효과 시간(초, 주소 옵션 boostsec)
+  BOOST_FACTOR: 1.3,      // 가속 중 목표 속도 배율(SPEED_MAX 를 넘지 않는다)
+  BOOST_SCORE_MULT: 1.5,  // 가속 중 완성한 단어의 완성 점수 배율
   WARN_SEC: T(0.78)       // 예고 표시가 보이는 최소 시간(최고 속도 기준, 거리로 계산). 기본 pace 1.3 에서 0.6초이고 pace 에 반비례(다른 시간 값과 같은 방식)
   };
   if (v.hp) cfg.HP = v.hp;
@@ -114,6 +121,10 @@ function buildConfig(v) {
   if (v.introhold) cfg.INTRO_HOLD = v.introhold;
   if (v.obs !== undefined) cfg.OBST_ENABLED = !!v.obs;
   if (v.obsprob !== undefined) cfg.OBSTACLE_PROB = v.obsprob;
+  if (v.hpfullbonus !== undefined) cfg.HP_FULL_BONUS = v.hpfullbonus;
+  if (v.speeditem !== undefined) cfg.SPEED_ITEM_ENABLED = !!v.speeditem;
+  if (v.speedevery) cfg.SPEED_EVERY = v.speedevery;
+  if (v.boostsec) cfg.BOOST_SEC = v.boostsec;
   // 빠른 pace 에서는 같은 px 폭이 더 짧은 시간에 지나가 점프 창도 같은 비율로 짧아지므로, 최저 속도에서도 여유 창이 남도록 폭을 줄인다(기본 pace 1.3 에서는 줄지 않는다)
   const fitW = (base, H) => Math.max(8, Math.min(base, Math.floor(cfg.SPEED_MIN * (airWindow(cfg, H).len - cfg.OBST_MIN_WINDOW - 0.01) - 2 * cfg.OBST_FOOT)));
   cfg.OBST_W = fitW(cfg.OBST_W, cfg.OBST_H);
@@ -127,7 +138,8 @@ const OPTION_RULES = {
   pace: { min: 0.7, max: 1.8, def: DEFAULT_PACE }, hp: { min: 1, max: 10, int: true, def: 5 }, startdelay: { min: 0.5, max: 6, def: 2.2 },
   popsec: { min: 0.5, max: 5, def: 1.6 }, highprob: { min: 0, max: 1, def: 0.2 }, heartevery: { min: 1, max: 10, int: true, def: 3 }, dj: { min: 0, max: 1, int: true, def: 1 }, maxcombo: { min: 3, max: 12, int: true, def: 5 },
   intro: { min: 0, max: 1, int: true, def: 1 }, ttsdebug: { min: 0, max: 1, int: true, def: 0 }, introhold: { min: 0.5, max: 3, def: 1.3 },
-  obs: { min: 0, max: 1, int: true, def: 1 }, obsprob: { min: 0, max: 1, def: 0.5 }
+  obs: { min: 0, max: 1, int: true, def: 1 }, obsprob: { min: 0, max: 1, def: 0.5 },
+  hpfullbonus: { min: 0, max: 1000, int: true, def: 100 }, speeditem: { min: 0, max: 1, int: true, def: 1 }, speedevery: { min: 1, max: 10, int: true, def: 4 }, boostsec: { min: 1, max: 10, def: 5 }
 };
 // 반환 { values: 유효한 값(기본값과 같아도 포함), applied: 기본값과 다른 옵션 이름 }
 function parseOptions(search) {
@@ -437,6 +449,37 @@ function planHighSlots(nSlots, rng, cfg) {
   return out;
 }
 
+// ---- 작업328: 하트 규칙 변경 · 가속 아이템 ----
+// 하트를 먹었을 때: 체력이 가득이 아니면 체력 +HEART_HEAL(점수 0), 가득이면 체력은 그대로 두고 점수 HP_FULL_BONUS. 체력 조건은 "나오는가"가 아니라 "먹었을 때 무엇을 주는가"에만 쓴다.
+function heartEffect(hp, cfg) {
+  cfg = cfg || CONFIG;
+  if (hp < cfg.HP) return { hp: Math.min(cfg.HP, hp + cfg.HEART_HEAL), score: 0, full: false };
+  return { hp: hp, score: cfg.HP_FULL_BONUS, full: true };
+}
+// 난수 없는 정수 해시(FNV-1a). 작업327 의 그림 종류 선택과 같은 접근
+function hashInt(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h >>> 0;
+}
+// 가속 아이템 계획: 이 단어에 나오면 아이템이 놓일 묶음 번호, 아니면 null. 난수를 쓰지 않는다.
+// o: { roundSeq: 판 순번, regularIdx: 보스가 아닌 단어 중 순번(0부터), boss, review, hasHeart, hasObst, nSlots }
+// 일반 단어 SPEED_EVERY 개씩 묶은 그룹마다 하나(그룹 안의 자리는 판 순번·그룹 번호의 해시). 보스·복습 판·하트가 있는 단어·장애물이 있는 단어에는 없다. 묶음은 첫 묶음을 뺀 곳.
+function planSpeedItem(o, cfg) {
+  cfg = cfg || CONFIG;
+  if (!cfg.SPEED_ITEM_ENABLED || o.boss || o.review || o.hasHeart || o.hasObst || o.nSlots < 2) return null;
+  const e = cfg.SPEED_EVERY, g = Math.floor(o.regularIdx / e);
+  if (o.regularIdx % e !== hashInt('speed:' + o.roundSeq + ':' + g) % e) return null;
+  return 1 + hashInt('speedslot:' + o.roundSeq + ':' + o.regularIdx) % (o.nSlots - 1);
+}
+// 가속 중의 목표 속도: 원래 목표 속도 x BOOST_FACTOR, 단 SPEED_MAX 를 넘지 않는다(장애물 안전 간격은 SPEED_MAX 기준이다)
+function boostTarget(target, boosting, cfg) {
+  cfg = cfg || CONFIG;
+  return boosting ? Math.min(cfg.SPEED_MAX, target * cfg.BOOST_FACTOR) : target;
+}
+// 가속 중 완성한 단어의 완성 점수
+function boostWordBonus(bonus, boosting, cfg) { cfg = cfg || CONFIG; return boosting ? Math.round(bonus * cfg.BOOST_SCORE_MULT) : bonus; }
+
 // ---- 작업326: 장애물(바닥 상자·구덩이) ----
 // 1단 점프의 높이가 H 를 넘는 구간 [a, b] (점프 시작 후 초). 점프 높이는 jumpHeight 와 같은 포물선이라 길이는 JUMP_TIME * sqrt(1 - H / PEAK).
 function airWindow(cfg, H) {
@@ -745,7 +788,7 @@ return {
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
-  OBSTACLE_ART: OBSTACLE_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
+  heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };
 });

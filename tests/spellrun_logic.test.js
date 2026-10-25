@@ -1040,3 +1040,117 @@ test('327-4. 예고 표시 구간: 거리 ≥ SPEED_MAX × WARN_SEC(0.6초), 기
   }
   assert.ok(L.obstacleWarnDistance(CONFIG, 'box') / CONFIG.SPEED_MAX >= 0.6, '최고 속도에서 ' + (L.obstacleWarnDistance(CONFIG, 'box') / CONFIG.SPEED_MAX).toFixed(3) + '초');
 });
+
+// ───────── 작업328: 하트 규칙 변경 · 가속 아이템 ─────────
+test('328-1. 하트: 체력이 가득이 아니면 +1(점수 0), 가득이면 체력 그대로 + 점수 보너스(기본 100, 옵션 hpfullbonus)', () => {
+  const C = CONFIG;
+  assert.equal(C.HP_FULL_BONUS, 100);
+  assert.deepEqual(L.heartEffect(3, C), { hp: 4, score: 0, full: false });
+  assert.deepEqual(L.heartEffect(C.HP - 1, C), { hp: C.HP, score: 0, full: false }, '체력 4 → 5 는 체력 +1');
+  assert.deepEqual(L.heartEffect(C.HP, C), { hp: C.HP, score: 100, full: true }, '가득이면 체력 불변 + 100점');
+  assert.equal(L.heartEffect(1, C).hp, 2);
+  const c250 = L.buildConfig({ hpfullbonus: 250 }); assert.equal(L.heartEffect(c250.HP, c250).score, 250); assert.equal(L.heartEffect(2, c250).score, 0);
+  const c0 = L.buildConfig({ hpfullbonus: 0 }); assert.equal(L.heartEffect(c0.HP, c0).score, 0);
+  const c7 = L.buildConfig({ hp: 7 }); assert.deepEqual(L.heartEffect(7, c7), { hp: 7, score: 100, full: true }); assert.equal(L.heartEffect(6, c7).hp, 7);
+  assert.equal(L.buildConfig().HEART_EVERY, 3, '나오는 빈도 규칙(heartevery)은 그대로');
+});
+
+test('328-0/2. 난수 호출 순서 불변: planHearts 는 그룹마다 1번, pickHeartSlot 은 칸이 둘 이상이면 1번, planObstacle 은 확률→자리→종류 순(327)', () => {
+  let calls = 0; const rec = () => { calls++; return 0.5; };
+  L.planHearts(9, rec, CONFIG); assert.equal(calls, 3, '9단어 / 3 = 3그룹');
+  calls = 0; L.pickHeartSlot(5, rec); assert.equal(calls, 1); calls = 0; L.pickHeartSlot(1, rec); assert.equal(calls, 0);
+  calls = 0; L.planObstacle(5, new Set(), null, false, rec, L.buildConfig({ obsprob: 1 })); assert.equal(calls, 3);
+  // 가속 아이템 계획은 난수를 쓰지 않는다
+  const orig = Math.random; Math.random = () => { throw new Error('난수 사용 금지'); };
+  try { for (let i = 0; i < 50; i++) L.planSpeedItem({ roundSeq: 1, regularIdx: i, boss: false, review: false, hasHeart: false, hasObst: false, nSlots: 5 }, CONFIG); } finally { Math.random = orig; }
+  assert.equal(CONFIG.OBST_W, 28); assert.equal(CONFIG.OBST_H, 28); assert.equal(CONFIG.PIT_W, 36);
+});
+
+test('328-2. 가속 아이템 계획: 난수 없음·같은 입력 같은 결과, 일반 단어 약 4개에 1번, 보스·복습·하트·장애물 단어에는 없고, 묶음은 첫 묶음 이후', () => {
+  const C = CONFIG, base = { boss: false, review: false, hasHeart: false, hasObst: false, nSlots: 5 };
+  assert.equal(C.SPEED_ITEM_ENABLED, true); assert.equal(C.SPEED_EVERY, 4); assert.equal(C.BOOST_SEC, 5);
+  let n = 0, hit = 0; const slots = new Set();
+  for (let round = 1; round <= 40; round++) for (let i = 0; i < 8; i++) {   // 판당 일반 단어 8개(그룹 4 → 완전한 그룹 2개)
+    const o = Object.assign({ roundSeq: round, regularIdx: i }, base), r = L.planSpeedItem(o, C);
+    assert.deepEqual(L.planSpeedItem(o, C), r, '같은 입력 → 같은 결과'); n++;
+    if (r !== null) { hit++; slots.add(r); assert.ok(r >= 1 && r <= 4, '첫 묶음 이후: ' + r); }
+  }
+  assert.equal(hit, 80, '완전한 그룹마다 정확히 1개: ' + hit + '/' + n); assert.ok(slots.size >= 3, '묶음 자리가 다양하다: ' + [...slots]);
+  for (let round = 1; round <= 40; round++) { let k = 0; for (let i = 0; i < 4; i++) if (L.planSpeedItem(Object.assign({ roundSeq: round, regularIdx: i }, base), C) !== null) k++; assert.equal(k, 1, '그룹 안에 정확히 1개'); }
+  // 제외 조건
+  const every1 = L.buildConfig({ speedevery: 1 });
+  const any = Object.assign({ roundSeq: 3, regularIdx: 0 }, base); assert.notEqual(L.planSpeedItem(any, every1), null, 'speedevery=1 이면 매 단어');
+  for (const ex of [{ boss: true }, { review: true }, { hasHeart: true }, { hasObst: true }, { nSlots: 1 }]) assert.equal(L.planSpeedItem(Object.assign({}, any, ex), every1), null, JSON.stringify(ex));
+  assert.equal(L.planSpeedItem(any, L.buildConfig({ speedevery: 1, speeditem: 0 })), null, 'speeditem=0 이면 없음');
+  // 판 순번이 달라지면 자리가 달라질 수 있다(고정 패턴이 아님)
+  const pat = r => [0, 1, 2, 3].map(i => L.planSpeedItem(Object.assign({ roundSeq: r, regularIdx: i }, base), C) !== null ? 1 : 0).join('');
+  assert.ok(new Set([1, 2, 3, 4, 5, 6, 7, 8].map(pat)).size >= 3, '판마다 그룹 안 위치가 다르다');
+});
+
+test('328-2. 가속 속도: 목표 속도는 SPEED_MAX 를 넘지 않고, 어떤 입력에서도 실제 속도가 SPEED_MAX 이하이며, 끝나면 원래 목표로 돌아온다', () => {
+  const C = CONFIG;
+  assert.equal(C.BOOST_FACTOR, 1.3); assert.equal(C.BOOST_SCORE_MULT, 1.5);
+  assert.equal(L.boostTarget(200, false, C), 200, '가속이 아니면 그대로');
+  assert.ok(Math.abs(L.boostTarget(200, true, C) - 260) < 1e-9);
+  assert.equal(L.boostTarget(C.SPEED_MAX, true, C), C.SPEED_MAX, '이미 최고 속도면 그대로');
+  for (let t = 0; t <= C.SPEED_MAX * 3; t += 3.7) assert.ok(L.boostTarget(t, true, C) <= C.SPEED_MAX || t > C.SPEED_MAX, 't=' + t);
+  for (let t = C.SPEED_MIN; t <= C.SPEED_MAX; t += 1) assert.ok(L.boostTarget(t, true, C) <= C.SPEED_MAX && L.boostTarget(t, true, C) >= t, 't=' + t);
+  // 시뮬레이션: 목표 속도가 변하는 모든 경우(가속 시작·종료·콤보 램프·실패)에서 속도가 SPEED_MAX 를 넘지 않는다
+  const rnd = mulberry(328); let worst = 0;
+  for (let run = 0; run < 300; run++) {
+    let speed = C.SPEED_MIN + rnd() * (C.SPEED_MAX - C.SPEED_MIN), base = C.SPEED_MIN + rnd() * (C.SPEED_MAX - C.SPEED_MIN), combo = Math.floor(rnd() * 8), boost = 0;
+    for (let step = 0; step < 60 * 20; step++) {
+      if (rnd() < 0.01) { base = L.speedAfterHit(base, rnd() < 0.3, C); combo++; }
+      if (rnd() < 0.004) { base = L.speedAfterFail(base, C); combo = 0; }
+      if (rnd() < 0.008) boost = C.BOOST_SEC;
+      if (rnd() < 0.003) { speed = L.afterObstacleHit({ hp: 5, speed: speed, speedBase: base, combo: combo }, C).speed; base = L.afterObstacleHit({ hp: 5, speed: speed, speedBase: base, combo: combo }, C).speedBase; boost = 0; }
+      const target = L.boostTarget(L.targetSpeed(base, combo, C), boost > 0, C), dt = 1 / 60;
+      boost = Math.max(0, boost - dt);
+      const dv = target - speed, m = C.SPEED_ACCEL * dt; speed += Math.abs(dv) <= m ? dv : Math.sign(dv) * m;
+      worst = Math.max(worst, speed); assert.ok(speed <= C.SPEED_MAX + 1e-9, `run ${run}: 속도 ${speed} > ${C.SPEED_MAX}`);
+    }
+  }
+  assert.ok(worst > C.SPEED_MAX - 5, '시험이 최고 속도 근처까지 갔다: ' + worst.toFixed(1));
+  // 효과 종료 후 원래 속도로 복귀(기본 속도 누적은 그대로)
+  let speed = 200; const base = 200, T = L.targetSpeed(base, 0, C); let boost = C.BOOST_SEC, t = 0;
+  while (t < 20) { const target = L.boostTarget(T, boost > 0, C); boost = Math.max(0, boost - 1 / 60); const dv = target - speed, m = C.SPEED_ACCEL / 60; speed += Math.abs(dv) <= m ? dv : Math.sign(dv) * m; t += 1 / 60; if (t < 3) assert.ok(speed >= 200 - 1e-9); }
+  assert.ok(Math.abs(speed - 200) < 1e-6, '끝나면 원래 속도: ' + speed);
+  // 가속 중에도 후보 사이 시간 간격이 점프 체공(글자 획득 구간)보다 길다: 간격 px 는 가속 전 목표 속도로 정해진다
+  const grab = L.airWindow(C, C.GRAB_H).len;
+  for (let v = C.SPEED_MIN; v <= C.SPEED_MAX; v += 1) { const gapPx = v * L.gapSec(v, C), vb = Math.min(C.SPEED_MAX, v * C.BOOST_FACTOR); assert.ok(gapPx / vb > grab, `v=${v}: 가속 중 간격 ${(gapPx / vb).toFixed(3)}초 > ${grab.toFixed(3)}`); }
+});
+
+test('328-2. 가속 점수: 가속 중 완성한 단어의 완성 점수만 x1.5, 장애물 안전 간격(여유 창)은 가속과 무관하게 SPEED_MIN~SPEED_MAX 전 구간에서 그대로', () => {
+  const C = CONFIG;
+  assert.equal(L.boostWordBonus(300, true, C), 450); assert.equal(L.boostWordBonus(300, false, C), 300); assert.equal(L.boostWordBonus(1500, true, C), 2250); assert.equal(L.boostWordBonus(201, true, C), 302);
+  for (const kind of OBST_KINDS) { const lay = L.obstacleLayout(C, kind); for (let s = C.SPEED_MIN; s <= C.SPEED_MAX; s++) assert.ok(L.obstacleWindow(C, lay, s).width >= C.OBST_MIN_WINDOW); }
+});
+
+test('328-3. 옵션 hpfullbonus(0~1000 정수, 기본 100)·speeditem(0|1, 기본 1)·speedevery(1~10 정수, 기본 4)·boostsec(1~10, 기본 5): 범위 밖 무시, 저장 방식 동일, 기본값이면 표시 없음', () => {
+  const po = q => L.parseOptions(q);
+  assert.deepEqual(po('?hpfullbonus=250').values, { hpfullbonus: 250 }); assert.deepEqual(po('?hpfullbonus=250').applied, ['hpfullbonus']); assert.deepEqual(po('?hpfullbonus=100').applied, []);
+  assert.deepEqual(po('?hpfullbonus=0').values, { hpfullbonus: 0 }); assert.deepEqual(po('?hpfullbonus=1000').values, { hpfullbonus: 1000 });
+  assert.deepEqual(po('?speeditem=0').applied, ['speeditem']); assert.deepEqual(po('?speeditem=1').applied, []);
+  assert.deepEqual(po('?speedevery=2').values, { speedevery: 2 }); assert.deepEqual(po('?speedevery=4').applied, []); assert.deepEqual(po('?boostsec=3').applied, ['boostsec']); assert.deepEqual(po('?boostsec=5').applied, []); assert.deepEqual(po('?boostsec=2.5').values, { boostsec: 2.5 });
+  for (const bad of ['hpfullbonus=1001', 'hpfullbonus=-1', 'hpfullbonus=1.5', 'hpfullbonus=x', 'speeditem=2', 'speeditem=0.5', 'speedevery=0', 'speedevery=11', 'speedevery=2.5', 'boostsec=0', 'boostsec=0.5', 'boostsec=11', 'boostsec=x']) assert.deepEqual(po('?' + bad).values, {}, bad);
+  assert.deepEqual(L.resolveOptions('', JSON.stringify({ hpfullbonus: 300, speeditem: 0, speedevery: 2, boostsec: 3 })).values, { hpfullbonus: 300, speeditem: 0, speedevery: 2, boostsec: 3 }, '저장값 사용');
+  assert.deepEqual(L.resolveOptions('', JSON.stringify({ hpfullbonus: 5000, speedevery: 99 })).values, {}, '저장값도 범위 규칙');
+  const c = L.buildConfig({ hpfullbonus: 300, speeditem: 0, speedevery: 2, boostsec: 3 });
+  assert.equal(c.HP_FULL_BONUS, 300); assert.equal(c.SPEED_ITEM_ENABLED, false); assert.equal(c.SPEED_EVERY, 2); assert.equal(c.BOOST_SEC, 3);
+  const e = L.buildConfig(); assert.equal(e.HP_FULL_BONUS, 100); assert.equal(e.SPEED_ITEM_ENABLED, true); assert.equal(e.SPEED_EVERY, 4); assert.equal(e.BOOST_SEC, 5);
+});
+
+test('328-1. 하트 단어에서 장애물이 줄어드는 정도(측정): 하트 제외 규칙은 328 이전부터 계획 단계에서 정적으로 적용되어 있어 체력 조건 제거로 장애물 비율이 달라지지 않는다', () => {
+  const C = L.buildConfig({ obsprob: 0.5 }), rnd = mulberry(3281);
+  const N = 6000; let withHeart = 0, noHeart = 0, heartWords = 0, obstOnHeart = 0;
+  for (let i = 0; i < N; i++) {
+    const n = 2 + Math.floor(rnd() * 5), highs = L.planHighSlots(n, rnd, C), isHeart = rnd() < 1 / 3, hs = isHeart ? L.pickHeartSlot(n, rnd) : null;
+    const a = L.planObstacle(n, highs, hs, false, mulberry(i + 7), C), b = L.planObstacle(n, highs, null, false, mulberry(i + 7), C);
+    if (a) withHeart++; if (b) noHeart++; if (isHeart) { heartWords++; if (a) obstOnHeart++; }
+  }
+  const r1 = withHeart / N, r0 = noHeart / N;
+  console.log(`장애물 비율: 하트 규칙 포함 ${(r1 * 100).toFixed(1)}% / 하트 없다고 가정 ${(r0 * 100).toFixed(1)}% (하트 단어 ${heartWords}개 중 장애물 ${obstOnHeart}개)`);
+  assert.ok(r1 < r0 && r1 > 0.2, '하트 제외로 줄지만 충분히 남는다');
+  // 328 이전: 같은 정적 규칙(체력과 무관)이었으므로 같은 결과 — planObstacle 은 그대로
+  assert.deepEqual(L.planObstacle(6, new Set(), 4, false, () => 0.999, L.buildConfig({ obsprob: 1 })), { slot: 2, kind: 'pit' });
+});

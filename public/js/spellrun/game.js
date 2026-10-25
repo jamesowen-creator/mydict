@@ -12,7 +12,7 @@ try { if (OPT.reset) localStorage.removeItem(L.OPTION_KEY); else if (OPT.save) l
 
 L.configure(OPT.values);                       // CONFIG 를 한 번에 다시 만든다(pace 는 속도·간격·점프 시간에 같은 비율로 반영)
 const CONFIG = L.CONFIG;
-const { OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
+const { heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
 
 const W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, RUNNER_X = 72, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;
 const FALL_SEC = 0.55, STUMBLE_SEC = 0.5, FALL_DEPTH = 46;   // 작업326: 연출 시간(초)·구덩이에 빠지는 깊이(논리 px)
@@ -325,7 +325,7 @@ syncSndButtons();
 const G = {
   state: 'idle', words: [], wi: 0, plan: null, si: 0, mist: [],
   hp: 0, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
-  speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
+  speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, speedPending: false, speedSlot: 0, boost: 0, roundSeq: 0, boostMax: 0, speedMaxSeen: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
   tiles: [], parts: [], floats: [],
   packActive: false, packId: 0, spawnT: 0,
   runPhase: 0, prevH: 0, rising: true, cleared: false, spriteDraws: 0, spriteFrame: -1, spriteAngle: 0,
@@ -460,6 +460,7 @@ function startRound(reviewOnly) {
     regular: regular, bossMode: false, introT: 0, repeatT: 0, repeatWord: '',
     state: 'run', words: pool, wi: 0, mist: pool.map(() => 0),
     hp: CONFIG.HP, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
+    roundSeq: G.roundSeq + 1, boost: 0, speedPending: false, speedMaxSeen: 0,
     speed: CONFIG.SPEED_MIN, speedTarget: CONFIG.SPEED_MIN, speedBase: CONFIG.SPEED_MIN, shownMult: 0, heartWords: planHearts(regular), tiles: [], parts: [], floats: [],
     packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
     obstacles: [], obst: null, obstSeq: 0, invuln: 0, stumble: 0, fall: 0, obstHits: 0,
@@ -479,6 +480,9 @@ function loadWord(i) {
   G.plan.slots.forEach((sl, k) => { sl.high = highs.has(k); });
   const ob = planObstacle(G.plan.slots.length, highs, G.heartPending ? G.heartSlot : null, boss);   // 작업326: 꺼져 있거나 보스면 null(난수를 쓰지 않는다)
   G.obst = ob ? { slot: ob.slot, kind: ob.kind, done: false } : null;
+  // 작업328: 가속 아이템(난수 없이 판 순번·단어 순번 해시로 결정. 하트 우선, 보스·복습·장애물 단어에는 없음)
+  const sIdx = planSpeedItem({ roundSeq: G.roundSeq, regularIdx: G.words.slice(0, i).filter(x => !x.boss).length, boss: boss, review: G.review, hasHeart: G.heartPending, hasObst: !!G.obst, nSlots: G.plan.slots.length });
+  G.speedPending = sIdx !== null; G.speedSlot = sIdx === null ? 0 : sIdx;
   G.packActive = false; G.spawnT = CONFIG.WORD_START_DELAY + (i === 0 ? CONFIG.FIRST_WORD_EXTRA : 0);
   renderWord(); renderProgress();
   startIntro(i, boss);
@@ -529,9 +533,13 @@ function spawnPack() {
   let heartPlaced = false;
   G.packId++; G.packActive = true;
   // 하트: 체력이 줄었고 하트가 나올 칸이면, 묶음 앞에 한 칸 간격을 두고 둔다(점프해야 먹는다)
-  if (G.heartPending && G.si >= G.heartSlot && G.hp < CONFIG.HP && !slot.high) {   // 높은 칸 묶음 앞에는 하트를 두지 않는다(점프 시점이 겹치지 않게)
+  if (G.heartPending && G.si >= G.heartSlot && !slot.high) {   // 작업328: 체력 조건 없음(가득이어도 나온다). 높은 칸 묶음 앞에는 두지 않는다(점프 시점이 겹치지 않게)
     G.heartPending = false; heartPlaced = true;
     G.tiles.push({ id: -G.packId, kind: 'heart', x: x0, w: 46, text: '', correct: false, chunk: false, state: 'live', t: 0, age: 0, checked: false, ok: false, color: '' });
+    x0 += gap;
+  } else if (G.speedPending && G.si >= G.speedSlot && !slot.high) {   // 작업328: 가속 아이템도 하트와 같은 방식(묶음 앞 한 칸 간격)
+    G.speedPending = false;
+    G.tiles.push({ id: -G.packId, kind: 'speed', x: x0, w: 46, text: '', correct: false, chunk: false, state: 'live', t: 0, age: 0, checked: false, ok: false, color: '' });
     x0 += gap;
   }
   // 작업326: 이 묶음 앞에 장애물이 계획돼 있으면(단어당 한 번, 첫 등장 때만) 첫 글자를 안전 간격(D1)까지 늘리고 그 사이에 둔다
@@ -562,6 +570,7 @@ function resolve(t) {
   const hh = curH();
   const air = hh > CONFIG.GRAB_H;
   if (t.kind === 'heart') { if (air) onHeart(t); return; }
+  if (t.kind === 'speed') { if (air) onSpeedItem(t); return; }
   // 높은 칸은 HIGH_GRAB_H 이상일 때만 "공중"으로 본다(한 번 점프로는 닿지 않는다). 일반 칸 판정은 그대로
   const r = judge(t.correct, t.high ? hh >= CONFIG.HIGH_GRAB_H : air);
   if (r === 'pass') return;
@@ -570,11 +579,21 @@ function resolve(t) {
 }
 function onHeart(t) {
   t.state = 'taken'; t.t = 0; t.ok = true;
-  G.hp = Math.min(CONFIG.HP, G.hp + CONFIG.HEART_HEAL);
+  const r = heartEffect(G.hp);   // 작업328: 체력이 가득이면 체력은 그대로 두고 점수 보너스
+  G.hp = r.hp; G.score += r.score;
   sfx.heart();
   burst(RUNNER_X + 8, TILE_Y, '#ff4d5e', 14);
-  floatText(RUNNER_X + 70, GROUND - 235, '체력 +' + CONFIG.HEART_HEAL, GOOD, 22);
-  renderHearts();
+  if (r.full) { if (r.score > 0) floatText(RUNNER_X + 70, GROUND - 235, '+' + r.score, '#e07b00', 22); }
+  else floatText(RUNNER_X + 70, GROUND - 235, '체력 +' + CONFIG.HEART_HEAL, GOOD, 22);
+  renderHearts(); renderScore();
+}
+// 작업328: 가속 아이템을 먹으면 BOOST_SEC 초 동안 목표 속도가 x BOOST_FACTOR(SPEED_MAX 이하)가 되고 완성 점수에 배율이 붙는다. 기본 속도 누적(speedBase)은 건드리지 않는다.
+function onSpeedItem(t) {
+  t.state = 'taken'; t.t = 0; t.ok = true;
+  G.boost = CONFIG.BOOST_SEC; G.boostMax = CONFIG.BOOST_SEC;
+  sfx.heart();
+  burst(RUNNER_X + 8, TILE_Y, '#38bdf8', 14);
+  floatText(RUNNER_X + 70, GROUND - 235, '빨라요!', '#0b7fc0', 22);
 }
 function onHit(t) {
   t.state = 'taken'; t.t = 0; t.ok = true;
@@ -615,7 +634,7 @@ function onFail(t, kind) {
 }
 // 작업326: 장애물에 맞았다(상자에 걸림·구덩이에 빠짐). 체력 -1, 속도 즉시 감소(이후 가속도로 목표 속도까지 회복). 콤보·점수·실수 기록(mist)은 건드리지 않는다.
 function onObstacleHit(ob) {
-  ob.hit = true; G.obstHits++;
+  ob.hit = true; G.obstHits++; G.boost = 0;   // 작업328: 장애물에 맞으면 가속 효과는 즉시 끝난다
   const r = afterObstacleHit({ hp: G.hp, speed: G.speed, speedBase: G.speedBase, combo: G.combo });
   G.hp = r.hp; G.speed = r.speed; G.speedBase = r.speedBase; G.speedTarget = r.speedTarget;
   G.invuln = CONFIG.OBST_INVULN_SEC;
@@ -633,7 +652,7 @@ function completeWord() {
   const perfect = G.mist[G.wi] === 0;
   const isBoss = !!w.boss;
   const isFinal = G.wi + 1 >= G.words.length;
-  const bonus = CONFIG.WORD_BONUS + (perfect ? CONFIG.PERFECT_BONUS : 0) + (isBoss ? CONFIG.BOSS_BONUS : 0);
+  const bonus = boostWordBonus(CONFIG.WORD_BONUS + (perfect ? CONFIG.PERFECT_BONUS : 0) + (isBoss ? CONFIG.BOSS_BONUS : 0), G.boost > 0);   // 작업328: 가속 중이면 완성 점수 배율
   G.score += bonus;
   floatText(RUNNER_X + 40, GROUND - 200, '+' + bonus, '#e07b00', 28);
   burst(RUNNER_X + 20, GROUND - 120, GOLD, isBoss ? 60 : 30);
@@ -781,8 +800,11 @@ function step(dt) {
     if (G.repeatT <= 0) { pronounce(G.repeatWord, { slow: true, queue: true }); G.repeatWord = ''; }
   }
   if (G.state === 'idle' || G.state === 'over') { G.dist += 60 * dt; updateFx(dt); return; }
-  const dv = G.speedTarget - G.speed, maxDv = CONFIG.SPEED_ACCEL * dt;
+  G.boost = Math.max(0, G.boost - dt);
+  const dv = boostTarget(G.speedTarget, G.boost > 0) - G.speed, maxDv = CONFIG.SPEED_ACCEL * dt;   // 작업328: 가속 중에는 목표 속도가 올라가지만 SPEED_MAX 를 넘지 않는다
   G.speed += Math.abs(dv) <= maxDv ? dv : Math.sign(dv) * maxDv;
+  if (G.speed > CONFIG.SPEED_MAX) G.speed = CONFIG.SPEED_MAX;   // 안전 장치: 장애물 안전 간격은 SPEED_MAX 기준
+  if (G.speed > G.speedMaxSeen) G.speedMaxSeen = G.speed;
   const shown = Math.round(speedMult(G.speed) * 10) / 10;
   if (shown !== G.shownMult) { G.shownMult = shown; els.speedTag.textContent = '속도 ×' + shown.toFixed(1); }
   G.dist += G.speed * dt;
@@ -971,6 +993,42 @@ function drawObstWarn() {
   if (!obstWarnActive() || Math.floor(G.time * 6) % 2) return;
   warnTriangle(W - 24, GROUND - 34, 1.15, GOLD, BAD);
 }
+function drawSpeedItem(t) {   // 작업328: 번개 모양(하트와 구분되는 하늘색). 선과 도형으로만 그린다
+  let a = 1, sc = 1;
+  if (t.state === 'fade') { a = 1 - t.t / 0.3; sc = 1 - 0.2 * Math.min(1, t.t / 0.3); }
+  else if (t.state === 'taken') { a = 1 - t.t / 0.35; sc = 1 + 0.7 * Math.min(1, t.t / 0.35); }
+  if (a <= 0) return;
+  const bob = t.state === 'live' ? Math.sin(G.time * 5 + t.x * 0.02) * 4 : 0;
+  if (t.state === 'live') { ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(t.x, GROUND + 10, 20, 6, 0, 0, Math.PI * 2); ctx.fill(); }
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, a, t.age / 0.2));
+  ctx.translate(t.x, TILE_Y + bob); ctx.scale(sc, sc);
+  ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 16;
+  ctx.fillStyle = '#1fa8ee'; ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fill();   // 동그란 하늘색 바탕
+  ctx.shadowBlur = 0; ctx.lineWidth = 3.5; ctx.strokeStyle = INK; ctx.stroke();
+  ctx.fillStyle = '#fff6b0'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';   // 번개
+  ctx.beginPath(); ctx.moveTo(5, -17); ctx.lineTo(-10, 3); ctx.lineTo(-1, 3); ctx.lineTo(-5, 17); ctx.lineTo(11, -4); ctx.lineTo(2, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+// 가속 효과 표시: 러너 뒤 속도선(움직임 줄이기에서는 생략)과 남은 시간 막대(도로 왼쪽 아래의 얇은 막대 + 작은 번개)
+function drawBoost() {
+  if (G.boost <= 0 || G.state === 'over' || G.state === 'idle') return;
+  ctx.save();
+  if (!reduce) {
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    for (let k = 0; k < 6; k++) {
+      const ph = (G.time * 3 + k * 0.37) % 1, y = GROUND - 14 - ((k * 37) % 70), x1 = RUNNER_X - 34 - ph * 60;
+      ctx.globalAlpha = 1 - ph; ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x1 - 26, y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  const bw = 112, bx = 38, by = GROUND + 24, p = Math.max(0, Math.min(1, G.boost / (G.boostMax || CONFIG.BOOST_SEC)));
+  ctx.fillStyle = 'rgba(255,255,255,.25)'; rr(bx, by, bw, 7, 3.5); ctx.fill();
+  ctx.fillStyle = '#38bdf8'; rr(bx, by, Math.max(7, bw * p), 7, 3.5); ctx.fill();
+  ctx.fillStyle = '#fff6b0'; ctx.strokeStyle = INK; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(26, by - 6); ctx.lineTo(19, by + 4); ctx.lineTo(23.5, by + 4); ctx.lineTo(21, by + 13); ctx.lineTo(30, by + 1); ctx.lineTo(25.5, by + 1); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
 function drawHeartItem(t) {
   let a = 1, sc = 1;
   if (t.state === 'fade') { a = 1 - t.t / 0.3; sc = 1 - 0.2 * Math.min(1, t.t / 0.3); }
@@ -999,6 +1057,7 @@ function drawHeartItem(t) {
 }
 function drawTile(t) {
   if (t.kind === 'heart') { drawHeartItem(t); return; }
+  if (t.kind === 'speed') { drawSpeedItem(t); return; }
   const h = TILE_H;
   let a = 1, sc = 1;
   if (t.state === 'fade') { a = 1 - t.t / 0.3; sc = 1 - 0.2 * Math.min(1, t.t / 0.3); }
@@ -1175,6 +1234,7 @@ function draw() {
   for (const t of G.tiles) drawTile(t);
   drawRunnerFx();
   drawObstWarn();
+  drawBoost();
   drawFx();
   ctx.restore();
   if (G.hurt > 0) {
@@ -1241,6 +1301,10 @@ function showGame(words, excluded) {
   els.startExcluded.textContent = excluded + '개 제외(구절·특수문자)';
   els.speechNote.hidden = hasSpeech();
   els.djRule.hidden = !CONFIG.DJ_ENABLED;
+  if (CONFIG.SPEED_ITEM_ENABLED && !$('speedRule')) {   // 작업328: 가속 아이템이 켜져 있을 때만 규칙 줄을 넣는다(speeditem=0 이면 화면 구성이 이전과 같다)
+    const li = document.createElement('li'); li.id = 'speedRule'; li.textContent = '번개를 먹으면 잠시 빨라지고 점수가 올라요. 하트는 체력이 가득이면 점수로 바뀌어요.';
+    els.djRule.parentNode.insertBefore(li, els.djRule.nextSibling);
+  }
   if (CONFIG.OBST_ENABLED && CONFIG.OBSTACLE_PROB > 0 && !$('obsRule')) {   // 작업326: 장애물이 나올 수 있을 때만 규칙 줄을 넣는다(obs=0·obsprob=0 이면 화면 구성이 이전과 같다)
     const li = document.createElement('li'); li.id = 'obsRule'; li.textContent = '길에 놓인 장애물과 구덩이는 점프로 넘으세요. 걸리면 체력이 1 줄고 속도가 느려집니다(콤보와 점수는 그대로).';
     els.djRule.parentNode.insertBefore(li, els.djRule.nextSibling);

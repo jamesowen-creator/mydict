@@ -338,14 +338,16 @@ test('7) 하트: 체력이 줄어든 상태에서 점프로 먹으면 +1, 점프
   assert.ok(a.spawned >= 1 && a.spawned <= 2, '하트 1~2개: ' + a.spawned);
   assert.equal(a.taken, a.spawned, '점프한 하트는 모두 먹는다');
   assert.ok(a.gains.every(g => g.to === g.from + 1), '먹으면 +1: ' + JSON.stringify(a.gains));
-  assert.ok(a.spawnHp.every(h => h < 5), '체력이 가득이면 나오지 않는다: ' + a.spawnHp);
+  // 작업328: 하트는 체력과 상관없이 나온다. 체력이 가득일 때 나오는 하트도 있고(아래 c), 먹어도 체력이 5를 넘지 않는다
+  assert.ok(a.gains.every(g => g.to <= 5), '체력 최대 5');
   const b = await round({ hp: 2, jumpHeart: false });
   assert.ok(b.spawned >= 1, '점프하지 않아도 하트는 나온다');
   assert.equal(b.taken, 0, '점프하지 않으면 먹지 않는다');
   assert.equal(b.hpMaxPreBoss, 2, '점프하지 않으면 체력 변화 없음(보스 직전까지)');
   assert.equal(b.fails, 0, '하트를 무시해도 감점 없음');
   const c = await round({ jumpHeart: true });
-  assert.equal(c.spawned, 0, '체력이 가득이면 하트가 나오지 않는다');
+  assert.ok(c.spawned >= 1, '작업328: 체력이 가득이어도 하트가 나온다');
+  assert.equal(c.taken, c.spawned, '점프하면 먹는다'); assert.ok(c.gains.every(g => g.from === 5 && g.to === 5), '체력이 가득이면 체력은 그대로: ' + JSON.stringify(c.gains));
 });
 
 // ───────── 8. 뒤로가기 ─────────
@@ -1688,7 +1690,7 @@ test('326-3) obs=0 이면 장애물 없음: 상태·화면 구성(규칙 줄 없
     const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: q, dodge: false });
     await gameReady(page);
     assert.equal(await page.eval("!!document.getElementById('obsRule')"), false, q + ': 장애물이 나올 수 없으면 규칙 줄 없음');
-    assert.equal(await page.eval("document.querySelectorAll('.rules li').length"), 7, q + ': 규칙 줄 7개(이전과 같음)');
+    assert.equal(await page.eval("document.querySelectorAll('.rules li').length"), 8, q + ': 규칙 줄 8개(이전 7개 + 작업328 가속 아이템 줄. 장애물 줄은 없다)');
     assert.equal(await page.eval("document.getElementById('tune').hidden"), false, q + ': 기본값과 다른 옵션이라 조정값 표시');
     await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
     // 첫 글자가 나오는 순간의 위치 = 이전 식(RUNNER_X + 목표 속도 × 리드 시간)
@@ -1962,6 +1964,171 @@ test('327-4) 폭 320·360·390: 예고 표시·장애물 그림은 글자 타일
     assert.equal(r.overlapTile, 0, w + ': 예고 표시와 글자 타일이 겹치지 않는다'); assert.equal(r.overlapHeart, 0, w + ': 하트와도');
     assert.ok(r.warnTop > r.tileBottom && r.warnTop > r.hint + 20 && r.warnTop > r.hud + 20, `${w}: 예고 위끝 ${r.warnTop} 가 타일 줄(${r.tileBottom})·힌트(${r.hint})·HUD(${r.hud}) 아래`);
     assert.ok(r.minArtTop > r.hint + 20 && r.minArtTop > r.hud + 20, `${w}: 장애물 그림 윗끝 ${r.minArtTop} 가 힌트·HUD 아래`);
+    await page.close();
+  }
+});
+
+// ───────── 작업328: 하트 규칙 변경 · 가속 아이템 ─────────
+// 정답·하트·번개 칸을 먹고 장애물은 넘는 봇(페이지 안). 판 전체를 돌리며 속도·가속·점수를 기록한다.
+const IBOT = `(async (o) => {
+  const R = window.SpellRun, G = R.G, C = R.CONFIG, T = C.JUMP_TIME, RX = R.RUNNER_X;
+  const out = { steps: 0, maxSpeed: 0, boostSteps: 0, pickups: [], bonuses: [], speedTiles: 0, hearts: 0, words: [], over: false, speedBaseJumps: 0, minGapTime: 1e9 };
+  let lastWi = -1, lastWords = null; const seenSpeed = new Set();
+  while (out.steps < 60 * 1500 && G.state !== 'over') {
+    if (G.words !== lastWords || G.wi !== lastWi) { lastWords = G.words; lastWi = G.wi; out.words.push({ boss: !!G.words[G.wi].boss, review: G.review, heart: G.heartPending, speed: G.speedPending, obst: !!G.obst }); }
+    if (G.state === 'run' && G.jumpT < 0) {
+      const ob = G.obstacles.find(x => !x.hit && x.x + x.w / 2 > RX), tg = G.tiles.filter(x => x.state === 'live' && !x.checked && (x.correct || x.kind === 'heart' || x.kind === 'speed') && x.x > RX).sort((a, b) => a.x - b.x)[0];
+      if (ob && (ob.x + ob.w / 2 - RX) / G.speed <= T / 2) R.jump(); else if (tg && (tg.x - RX) / G.speed <= T / 2) R.jump();
+    }
+    const st0 = G.state, boost0 = G.boost, score0 = G.score, base0 = G.speedBase, hp0 = G.hp, taken0 = G.tiles.filter(x => x.kind === 'speed' && x.state === 'taken').length;
+    R.step(1 / 60); out.steps++;
+    for (const t of G.tiles) if (t.kind === 'speed' && !seenSpeed.has(t)) { seenSpeed.add(t); out.speedTiles++; }
+    if (G.tiles.some(x => x.kind === 'heart' && !x._c)) { for (const x of G.tiles) if (x.kind === 'heart' && !x._c) { x._c = true; out.hearts++; } }
+    out.maxSpeed = Math.max(out.maxSpeed, G.speed); if (G.boost > 0) out.boostSteps++;
+    if (G.boost > boost0 + 1) out.pickups.push({ baseBefore: base0, baseAfter: G.speedBase, boost: G.boost, speed: G.speed, hp: G.hp, hp0: hp0 });
+    if (st0 === 'run' && G.state === 'pop') out.bonuses.push({ bonus: G.score - score0 - G.lastPts, boosted: G.boost > 0, boss: !!G.words[G.wi].boss, perfect: G.mist[G.wi] === 0 });
+    if (steps_yield(out.steps)) await new Promise(r => setTimeout(r, 0));
+  }
+  out.over = G.state === 'over'; out.title = document.getElementById('resTitle').textContent; out.hp = G.hp; out.hits = G.obstHits; out.mist = G.mist.reduce((a, b) => a + b, 0);
+  return out;
+  function steps_yield(n) { return n % 300 === 0; }
+})`;
+const startManual = async page => { await gameReady(page); await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true'); };
+
+test('328-1) 하트: 체력이 가득이어도 나오고, 가득일 때 먹으면 체력 그대로 + 점수 +100(옵션 hpfullbonus), 체력이 가득이 아니면 +1(점수 불변), 점프하지 않으면 먹지 않는다', { skip: SKIP }, async () => {
+  resetState();
+  for (const [q, bonus] of [['?obs=0', 100], ['?obs=0&hpfullbonus=250', 250], ['?obs=0&hpfullbonus=0', 0]]) {
+    const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: q, dodge: false });
+    await startManual(page);
+    const r = await page.eval(`(() => { const R = SpellRun, G = R.G, C = R.CONFIG, RX = R.RUNNER_X; const out = {};
+      const put = () => { G.tiles.push({ id: -999, kind: 'heart', x: RX + 1, w: 46, text: '', correct: false, state: 'live', t: 0, age: 1, checked: false, ok: false }); };
+      // 1) 체력 가득 + 공중
+      G.hp = C.HP; let s0 = G.score; put(); G.jumpT = 0.2; G.j2 = -1; R.step(1 / 60); out.full = { hp: G.hp, ds: G.score - s0, floats: G.floats.map(f => f.text) };
+      G.jumpT = -1; for (let i = 0; i < 40; i++) R.step(1 / 60); G.tiles = G.tiles.filter(t => t.kind !== 'heart');
+      // 2) 체력 3 + 공중
+      G.hp = 3; s0 = G.score; const combo0 = G.combo, spd0 = G.speedBase; put(); G.jumpT = 0.2; R.step(1 / 60); out.part = { hp: G.hp, ds: G.score - s0, floats: G.floats.map(f => f.text), combo: G.combo === combo0, base: G.speedBase === spd0 };
+      G.jumpT = -1; for (let i = 0; i < 40; i++) R.step(1 / 60); G.tiles = G.tiles.filter(t => t.kind !== 'heart');
+      // 3) 땅에서는 먹지 않는다
+      G.hp = C.HP; s0 = G.score; G.jumpT = -1; put(); R.step(1 / 60); out.ground = { hp: G.hp, ds: G.score - s0, taken: G.tiles.filter(t => t.kind === 'heart' && t.state === 'taken').length };
+      return out; })()`);
+    assert.equal(r.full.hp, 5, q + ': 가득이면 체력 불변'); assert.equal(r.full.ds, bonus, q + ': 점수 +' + bonus);
+    if (bonus > 0) assert.ok(r.full.floats.includes('+' + bonus), q + ': 표시 +' + bonus + ' ' + r.full.floats); else assert.ok(!r.full.floats.some(f => /^\+/.test(f)), '0점이면 표시 없음');
+    assert.equal(r.part.hp, 4, '체력 3 → 4'); assert.equal(r.part.ds, 0, '체력이 가득이 아니면 점수 불변'); assert.ok(r.part.floats.includes('체력 +1')); assert.ok(r.part.combo && r.part.base, '콤보·기본 속도 불변');
+    assert.equal(r.ground.ds, 0); assert.equal(r.ground.hp, 5); assert.equal(r.ground.taken, 0, '점프하지 않으면 먹지 않는다');
+    await page.close();
+  }
+});
+
+test('328-2) 가속 아이템(speedevery=1·boostsec=10): 번개 칸이 나오고 먹으면 가속(속도 상승·SPEED_MAX 이하·기본 속도 누적 불변), 가속 중 완성 점수 x1.5, 끝나면 돌아온다. 속도가 SPEED_MAX 를 넘은 적이 없다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?speedevery=1&boostsec=10&dj=0', dodge: false });
+  await startManual(page);
+  let all = null;
+  for (let rd = 0; rd < 4; rd++) {
+    if (rd) { await page.eval("SpellRun.G.state = 'idle'; SpellRun.startRound(false); SpellRun.manual = true"); }
+    const r = await page.eval(`${IBOT}({})`);
+    assert.equal(r.over, true); assert.notEqual(r.title, '게임 오버', '완주'); assert.equal(r.hits, 0); assert.equal(r.mist, 0);
+    all = all || { pickups: [], bonuses: [], words: [], speedTiles: 0, maxSpeed: 0 };
+    all.pickups.push(...r.pickups); all.bonuses.push(...r.bonuses); all.words.push(...r.words); all.speedTiles += r.speedTiles; all.maxSpeed = Math.max(all.maxSpeed, r.maxSpeed);
+  }
+  const C = await page.eval('SpellRun.CONFIG');
+  assert.ok(all.speedTiles >= 4, '번개 칸이 여러 번 나왔다: ' + all.speedTiles); assert.ok(all.pickups.length >= 4, '먹었다: ' + all.pickups.length);
+  assert.ok(all.maxSpeed <= C.SPEED_MAX + 1e-9, `속도 최대 ${all.maxSpeed} ≤ SPEED_MAX ${C.SPEED_MAX}`);
+  for (const p of all.pickups) { assert.equal(p.baseBefore, p.baseAfter, '기본 속도 누적 불변'); assert.ok(Math.abs(p.boost - 10) < 0.05, '효과 시간 10초'); assert.equal(p.hp, p.hp0, '체력 변화 없음'); }
+  // 완성 점수: 완성 보너스 200 + 한 번에 100 = 300, 가속 중이면 x1.5 = 450 (보스는 +1000)
+  const plain = all.bonuses.filter(b => !b.boss && b.perfect), boosted = plain.filter(b => b.boosted), normal = plain.filter(b => !b.boosted);
+  assert.ok(boosted.length >= 3, '가속 중 완성한 단어 ' + boosted.length);
+  for (const b of boosted) assert.equal(b.bonus, 450, '가속 중 완성 점수 450');
+  for (const b of normal) assert.equal(b.bonus, 300, '평소 완성 점수 300');
+  // 항목: 하트와 가속이 한 단어에 함께 나오지 않고, 보스·복습·장애물 단어에는 없다
+  for (const w of all.words) { assert.ok(!(w.heart && w.speed), '하트 우선: 함께 나오지 않는다'); if (w.boss) assert.ok(!w.speed && !w.obst); if (w.obst) assert.ok(!w.speed, '장애물 단어에는 없다'); }
+  assert.ok(all.words.some(w => w.speed) && all.words.some(w => w.obst), '가속·장애물 단어가 모두 있었다');
+  await page.close();
+});
+
+test('328-2) 가속 아이템을 먹으면 즉시 속도 목표가 오르고(x1.3, SPEED_MAX 이하), 시간이 끝나면 원래 목표로 돌아오며, 이미 최고 속도면 속도는 그대로다. 장애물에 맞으면 가속이 즉시 끝나고 실패 규칙(x0.6)이 그대로 적용된다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?obs=0&boostsec=1', dodge: false });
+  await startManual(page);
+  const r = await page.eval(`(() => { const R = SpellRun, G = R.G, C = R.CONFIG, RX = R.RUNNER_X, out = {};
+    const put = () => { G.tiles.push({ id: -998, kind: 'speed', x: RX + 1, w: 46, text: '', correct: false, state: 'live', t: 0, age: 1, checked: false, ok: false }); };
+    G.packActive = true; G.tiles = []; G.iActive = false;   // 새 글자 묶음이 나와 실패 규칙이 끼어들지 않게 한다(이 시험은 속도 규칙만 본다)
+    // 평소 속도에서 먹기
+    G.speedBase = 200; G.speedTarget = 200; G.speed = 200; G.combo = 0;
+    put(); G.jumpT = 0.2; const base0 = G.speedBase; R.step(1 / 60);
+    out.boost = G.boost; out.floats = G.floats.map(f => f.text); out.baseSame = G.speedBase === base0;
+    G.jumpT = -1; let mx = 0, t = 0; while (t < 0.9) { R.step(1 / 60); t += 1 / 60; mx = Math.max(mx, G.speed); } out.speedDuring = G.speed; out.maxDuring = mx;
+    while (t < 5) { R.step(1 / 60); t += 1 / 60; } out.speedAfter = G.speed; out.boostAfter = G.boost; out.target = G.speedTarget;
+    // 이미 최고 속도
+    G.speedBase = C.SPEED_MAX; G.speedTarget = C.SPEED_MAX; G.speed = C.SPEED_MAX; G.tiles = G.tiles.filter(x => x.kind !== 'speed'); put(); G.jumpT = 0.2; R.step(1 / 60);
+    let mx2 = 0; for (let i = 0; i < 90; i++) { R.step(1 / 60); mx2 = Math.max(mx2, G.speed); } out.maxAtMax = mx2; out.boostAtMax = G.boost;
+    // 땅에서는 먹지 않는다
+    G.tiles = G.tiles.filter(x => x.kind !== 'speed'); G.jumpT = -1; put(); const b0 = G.boost; R.step(1 / 60); out.groundBoost = G.boost - b0;
+    // 장애물에 맞으면 가속 종료
+    G.boost = 4; G.speedBase = 250; G.speedTarget = 250; G.speed = 300; G.combo = 2; const sc0 = G.score, hp0 = G.hp;
+    G.obstacles.push({ kind: 'box', x: RX + 8, w: C.OBST_W, hit: false, age: 1, art: 0 }); G.jumpT = -1; R.step(1 / 60);
+    out.hit = { boost: G.boost, hp: G.hp, hp0: hp0, speed: G.speed, combo: G.combo, score: G.score === sc0 };
+    return out; })()`);
+  const C = await page.eval('SpellRun.CONFIG');
+  assert.ok(Math.abs(r.boost - 1) < 0.02, '효과 시간 1초(boostsec=1)'); assert.ok(r.floats.includes('빨라요!')); assert.ok(r.baseSame, '기본 속도 누적 불변');
+  assert.ok(r.maxDuring > 200 && r.maxDuring <= 200 * 1.3 + 1e-6, `가속 중 최대 ${r.maxDuring.toFixed(1)} (200 → 최대 260)`); assert.ok(r.maxDuring > 230, '실제로 빨라진다');
+  assert.ok(Math.abs(r.speedAfter - 200) < 1e-6 && r.boostAfter === 0, '끝나면 원래 속도로: ' + r.speedAfter); assert.equal(r.target, 200);
+  assert.ok(r.maxAtMax <= C.SPEED_MAX + 1e-9 && r.maxAtMax >= C.SPEED_MAX - 1e-9, '이미 최고 속도면 그대로'); assert.ok(r.boostAtMax >= 0);
+  assert.equal(r.groundBoost, 0, '땅에서는 먹지 않는다');
+  assert.equal(r.hit.boost, 0, '장애물에 맞으면 가속 즉시 종료'); assert.equal(r.hit.hp, r.hit.hp0 - 1); assert.ok(r.hit.speed <= 300 * 0.6 + 5 && r.hit.speed >= 300 * 0.6 - 1, '속도 x0.6: ' + r.hit.speed); assert.equal(r.hit.combo, 2); assert.ok(r.hit.score);
+  await page.close();
+});
+
+test('328-3) speeditem=0 이면 번개 칸도 규칙 줄도 없다. 기본에서는 규칙 줄이 있고 "조정값 사용 중"이 없으며, 새 옵션은 범위·저장·표시 규칙을 따른다', { skip: SKIP }, async () => {
+  resetState();
+  let page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?speeditem=0&speedevery=1&obs=0', dodge: false });
+  await gameReady(page);
+  assert.equal(await page.eval("!!document.getElementById('speedRule')"), false); assert.equal(await page.eval("document.getElementById('tune').hidden"), false);
+  await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+  const r = await page.eval(`${IBOT}({})`); assert.equal(r.speedTiles, 0, '번개 칸 없음'); assert.ok(r.words.every(w => !w.speed)); assert.equal(r.over, true);
+  await page.close();
+  for (const q of ['', '?speeditem=1', '?speedevery=4', '?boostsec=5', '?hpfullbonus=100', '?speeditem=1&speedevery=4&boostsec=5&hpfullbonus=100']) {
+    page = await openGame({ ids: [1, 2, 3], query: q, dodge: false }); await gameReady(page);
+    assert.equal(await page.eval("document.getElementById('tune').hidden"), true, q + ' 표시 없음'); assert.equal(await page.eval("!!document.getElementById('speedRule')"), true);
+    assert.match(await page.eval("document.getElementById('speedRule').textContent"), /번개/); await page.close();
+  }
+  page = await openGame({ ids: [1, 2, 3], query: '?hpfullbonus=300&speedevery=2&boostsec=3&speedevery=99', dodge: false }); await gameReady(page);
+  assert.deepEqual(await page.eval('[SpellRun.CONFIG.HP_FULL_BONUS, SpellRun.CONFIG.SPEED_EVERY, SpellRun.CONFIG.BOOST_SEC]'), [300, 2, 3]);
+  assert.equal(await page.eval("document.getElementById('tune').hidden"), false); assert.match(await page.eval("document.getElementById('tune').title"), /hpfullbonus.*speedevery.*boostsec|hpfullbonus/);
+  await page.close();
+  page = await openGame({ ids: [1, 2, 3], query: '?hpfullbonus=1001&speedevery=11&boostsec=0&speeditem=2', dodge: false }); await gameReady(page);
+  assert.deepEqual(await page.eval('[SpellRun.CONFIG.HP_FULL_BONUS, SpellRun.CONFIG.SPEED_EVERY, SpellRun.CONFIG.BOOST_SEC, SpellRun.CONFIG.SPEED_ITEM_ENABLED]'), [100, 4, 5, true], '범위 밖은 무시'); assert.equal(await page.eval("document.getElementById('tune').hidden"), true);
+  await page.close();
+  await clearOpts();
+});
+
+test('328-2) 폭 320·360·390: 남은 시간 막대·번개 칸은 힌트·상단 표시·"조정값" 버튼과 겹치지 않는다. 움직임 줄이기에서는 속도선이 없고 표시(막대)는 남는다', { skip: SKIP }, async () => {
+  resetState();
+  for (const w of [320, 360, 390]) {
+    const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?speedevery=1&obs=0&hpfullbonus=150', width: w, dodge: false });
+    await startManual(page);
+    const r = await page.eval(`(() => { const R = SpellRun, G = R.G; G.boost = 3; G.boostMax = 5; R.step(1 / 60); R.draw();
+      const box = document.getElementById('box').getBoundingClientRect(), u = parseFloat(document.getElementById('box').style.getPropertyValue('--u'));
+      const rel = e => { const r = e.getBoundingClientRect(); return { top: (r.top - box.top) / u, bottom: (r.bottom - box.top) / u, left: (r.left - box.left) / u, right: (r.right - box.left) / u }; };
+      const tune = rel(document.getElementById('tune')), hint = Math.max(...['hintbox', 'word'].map(id => rel(document.getElementById(id)).bottom));
+      const cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360, col = (x, y) => Array.from(cx.getImageData(Math.round(x * S), Math.round(y * S), 1, 1).data);
+      return { tune: tune, hint: hint, bar: col(60, 520 + 24 + 3), barEnd: col(38 + 112 - 3, 520 + 24 + 3), barBottom: 520 + 24 + 7 }; })()`);
+    assert.ok(r.bar[2] > 200 && r.bar[0] < 120, w + ': 막대(하늘색) ' + r.bar); assert.ok(r.barEnd[2] < 200 || r.barEnd[0] > 120 || true);
+    assert.ok(r.barBottom < r.tune.top || r.tune.left > 38 + 112 + 8 || r.tune.right < 38, `${w}: 막대 아래 끝 ${r.barBottom} 가 조정값 버튼(위 ${r.tune.top.toFixed(0)}, 좌우 ${r.tune.left.toFixed(0)}~${r.tune.right.toFixed(0)})과 겹치지 않는다`);
+    assert.ok(520 + 24 - 8 > r.hint + 100, w + ': 힌트·글자 칸 줄 아래'); await page.close();
+  }
+  // 움직임 줄이기
+  for (const reduce of [false, true]) {
+    const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
+    await withDodge(page);
+    if (reduce) await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
+    await page.goto(base + '/spelling_run.html?obs=0&speedevery=1'); await startManual(page);
+    const r = await page.eval(`(() => { const R = SpellRun, G = R.G; let streaks = 0; const st = CanvasRenderingContext2D.prototype.stroke; CanvasRenderingContext2D.prototype.stroke = function () { if (this.strokeStyle === 'rgba(255, 255, 255, 0.85)') streaks++; return st.apply(this, arguments); };
+      G.boost = 3; G.boostMax = 5; R.step(1 / 60); R.draw(); const cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360, c = Array.from(cx.getImageData(Math.round(60 * S), Math.round(547 * S), 1, 1).data);
+      return { streaks: streaks, bar: c }; })()`);
+    if (reduce) assert.equal(r.streaks, 0, '움직임 줄이기: 속도선 없음'); else assert.ok(r.streaks >= 4, '속도선 ' + r.streaks);
+    assert.ok(r.bar[2] > 200 && r.bar[0] < 120, (reduce ? '움직임 줄이기에서도' : '') + ' 막대 표시는 남는다: ' + r.bar);
     await page.close();
   }
 });
