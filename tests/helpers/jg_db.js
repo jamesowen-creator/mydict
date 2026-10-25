@@ -27,8 +27,8 @@ function createJgDb() {
           if (db.saved.has(key)) {
             const row = db.saved.get(key), next = JSON.parse(result);
             row.last_used_at = ++db.clock;
-            const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);   // 작업317: ruby(ja·zh)뿐 아니라 structure(en) 키로도 옛 형식을 새 결과로 갱신
-            if ((!has(row.result, 'ruby') && has(next, 'ruby')) || (!has(row.result, 'structure') && has(next, 'structure'))) row.result = next;
+            const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);   // 작업318: ruby(ja·zh)뿐 아니라 units(en) 키로도 옛 형식을 새 결과로 갱신(서버 SQL 과 같은 조건)
+            if ((!has(row.result, 'ruby') && has(next, 'ruby')) || (!has(row.result, 'units') && has(next, 'units'))) row.result = next;
           } else { const t = ++db.clock; db.saved.set(key, { id: db.nextId++, user_id, sentence_hash, sentence, result: JSON.parse(result), lang, created_at: t, last_used_at: t }); }
           return { rows: [] };
         }

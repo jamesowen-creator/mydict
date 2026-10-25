@@ -50,9 +50,9 @@ test('ja·en 보존: 프롬프트·OCR 프롬프트·max_tokens·입력 상한·
   assert.equal(sha(J.SYSTEM_PROMPT), '68ed391be5ef08b07eb274ce91c4bdc92bc4aa394d13126ee8fd3f2cae6231f6');
   assert.equal(sha(J.systemPrompt(true)), 'e351936c1c0421f5313685cf39fd75e3db65373f4190647c183e6c8b024e7196');
   assert.equal(sha(J.OCR_SYSTEM_PROMPT), '073bff5ba64d1b83a124a1398771960f1a5d8499a62e7a78a86e326c62352a06');
-  assert.equal(sha(J.EN_SYSTEM_PROMPT), '2c0dd4f17f60e8724e97369f5c74bd870e3dbad16f526a7858bd2c3dcdcda851');
+  assert.equal(sha(J.EN_SYSTEM_PROMPT), 'b9e21f88849b19a74c321ec6c93f85d05c0a0149d949144fc6c12a7c824a6f37');   // 작업318: 영어 프롬프트가 새 형식(units)으로 바뀐 값
   assert.equal(sha(J.EN_OCR_SYSTEM_PROMPT), '71d5ce325d6e54e36ef8c63c0377b0d9f5ec771130e1ffc83c41f027c4477666');
-  assert.equal(J.LANGS.ja.maxTokens, 3000); assert.equal(J.LANGS.en.maxTokens, 4800);
+  assert.equal(J.LANGS.ja.maxTokens, 3000); assert.equal(J.LANGS.en.maxTokens, 3600);   // 작업318: 4800 → 3600
   assert.equal(J.LANGS.ja.maxSentence, 200); assert.equal(J.LANGS.en.maxSentence, 300);
   assert.equal(J.hashSentence('猫が好き'), '761264922e80a0fb05a47ef3847e78f5a4b60c9c5102c4d44d86ead5e4fa97e7');
   assert.equal(J.hashSentence('Hello', 'en'), sha('en:Hello'));
@@ -160,7 +160,7 @@ test('level: HSK 1~6(숫자·문자열·"HSK 3" 표기)만 "1"~"6" 으로 저장
   for (const bad of [0, 7, '0', '7', 'A1', 'N5', 'B2', '', 'HSK', 'HSK7', 3.5, [], {}, undefined, true]) assert.equal(lv(bad), null, String(bad));
   const noKey = { ...g }; delete noKey.level;
   assert.equal(J.validateAiResult({ ...ZH_GOOD, grammar: [noKey] }, 'zh-Hans').result.grammar[0].level, null);
-  assert.deepEqual(J.validateAiResult({ ...ZH_GOOD, grammar: [{ ...g, level: '1' }] }, 'en').invalid, true, 'en 은 CEFR 밖이면 invalid(그대로)');
+  assert.equal(J.validateAiResult({ ...ZH_GOOD, grammar: [{ ...g, level: '1' }] }, 'en').result.units, null, '작업318: en 은 더 이상 level 을 검증하지 않는다(units 형식, grammar 는 무시)');
   assert.deepEqual(J.validateAiResult({ ok: true, translation: 't', grammar: [{ name: 'n', meaning: 'm', form: 'f', contrast: 'c', jlpt: 'N9' }] }, 'ja'), { invalid: true });
 });
 
@@ -237,7 +237,7 @@ test('저장된 중국어 캐시의 병음은 읽을 때 다시 검증한다(입
 // ───── 키 ─────
 test('같은 한자 문장이 ja·zh-Hans·zh-Hant·en 에서 서로 다른 캐시·저장 항목이 된다(ja 해시는 그대로)', async t => {
   const S = '学校';   // 일본어(한자)·중국어에서 모두 통과, 영어는 로마자를 섞어야 통과하므로 'x 学校' 를 따로
-  const a = await setup((p) => JSON.stringify(isZh(p) ? { ...ZH_GOOD, ruby: [{ text: S, reading: 'xué xiào' }] } : /영어 문법/.test(p.system) ? { ok: true, translation: 't', structure: null, points: [] } : { ok: true, translation: 't', grammar: [{ name: 'n', meaning: 'm', form: 'f', contrast: 'c', jlpt: null }], ruby: [{ text: S, reading: 'がっこう' }] }));
+  const a = await setup((p) => JSON.stringify(isZh(p) ? { ...ZH_GOOD, ruby: [{ text: S, reading: 'xué xiào' }] } : /영어 문장을 해석/.test(p.system) ? { ok: true, translation: 't', structure: null, points: [] } : { ok: true, translation: 't', grammar: [{ name: 'n', meaning: 'm', form: 'f', contrast: 'c', jlpt: null }], ruby: [{ text: S, reading: 'がっこう' }] }));
   t.after(() => a.t.close());
   for (const lang of ['ja', 'zh-Hans', 'zh-Hant']) assert.equal((await a.post(S, lang)).status, 200, lang);
   assert.equal((await a.post('xyz ' + S, 'en')).status, 200);
@@ -290,7 +290,7 @@ test('하루 한도는 모든 언어 합산(ja·en·간체·번체 분석 + 중�
   process.env.JGRAMMAR_DAILY_CAP = '4';
   t.after(() => { delete process.env.JGRAMMAR_DAILY_CAP; });
   const a = await setup((p) => (Array.isArray(p.messages[0].content) ? JSON.stringify({ sentences: ['我爱你。'] })
-    : JSON.stringify(isZh(p) ? ZH_GOOD : /영어 문법/.test(p.system) ? { ok: true, translation: 't', structure: null, points: [] } : { ok: true, translation: 't', grammar: [{ name: 'n', meaning: 'm', form: 'f', contrast: 'c', jlpt: null }], ruby: [] })));
+    : JSON.stringify(isZh(p) ? ZH_GOOD : /영어 문장을 해석/.test(p.system) ? { ok: true, translation: 't', structure: null, points: [] } : { ok: true, translation: 't', grammar: [{ name: 'n', meaning: 'm', form: 'f', contrast: 'c', jlpt: null }], ruby: [] })));
   t.after(() => a.t.close());
   assert.equal((await a.post('ねこがすき', 'ja')).status, 200);
   assert.equal((await a.post('Hello there.', 'en')).status, 200);

@@ -74,7 +74,7 @@
   .g-label { margin-top: var(--sp-12); font-size: var(--fs-12); font-weight: 700; color: var(--color-text-sub); }
   .g-text { font-size: var(--fs-14); line-height: 1.6; }
   /* 작업317: 영어 문장 구조 — 박스 없이 들여쓰기 목록. 자식은 왼쪽 가는 선과 들여쓰기로 구분하고, 긴 text·note 는 줄바꿈한다 */
-  #result.no-structure .structure { display: none; }
+  .u-item .g-name, .u-item .g-meaning, .u-item .g-text { overflow-wrap: anywhere; }   /* 작업318: 영어 의미 단위 목록의 긴 text·meaning 은 줄바꿈 */
   #result > .picks-title { padding-top: var(--sp-16); }
   .s-node { padding-top: var(--sp-8); }
   .s-head { font-size: var(--fs-12); font-weight: 700; color: var(--color-text-sub); overflow-wrap: anywhere; }
@@ -196,9 +196,10 @@
 
   // ── 작업JG-6: 저장한 문장. 설명이 정상 반환되면 서버가 본인 목록에 저장한다. 목록 조회·열기는 AI 를 부르지 않는다(저장된 결과를 그대로 표시). ──
   var savedBox = $('saved');
-  function validResult(r) { return r && typeof r.translation === 'string' && (Array.isArray(r.grammar) || isNewEn(r)); }
-  // 작업317: 영어 새 형식 = structure 키가 있는 결과(배열 또는 null). 키가 없는 영어 결과는 옛 형식(문법 항목 목록)으로 그대로 표시한다
-  function isNewEn(r) { return lang === 'en' && !!r && Object.prototype.hasOwnProperty.call(r, 'structure') && Array.isArray(r.points); }
+  function validResult(r) { return r && typeof r.translation === 'string' && (Array.isArray(r.grammar) || isNewEn(r) || isEnUnits(r)); }
+  // 작업318: 영어 형식 판별은 units 키부터. units 키가 있으면 형식 3(의미 단위. 배열 또는 null), 없고 structure 키가 있으면 형식 2(작업317), 둘 다 없으면 형식 1(문법 항목 목록). 옛 형식은 변환하지 않고 기존 방식으로 표시한다
+  function isEnUnits(r) { return lang === 'en' && !!r && Object.prototype.hasOwnProperty.call(r, 'units') && (r.units === null || Array.isArray(r.units)); }
+  function isNewEn(r) { return lang === 'en' && !!r && !Object.prototype.hasOwnProperty.call(r, 'units') && Object.prototype.hasOwnProperty.call(r, 'structure') && Array.isArray(r.points); }   // 형식 2(작업317)
   function dateText(v) { var d = new Date(v); return isNaN(d) ? '' : d.getFullYear() + '. ' + (d.getMonth() + 1) + '. ' + d.getDate() + '.'; }
   function authHeaders() { return { 'Authorization': 'Bearer ' + (token() || '') }; }
 
@@ -310,7 +311,7 @@
 
   // 작업JG-7: 원문 위에 후리가나. ruby(조각 배열)가 입력 문장과 정확히 맞고 형식이 올바를 때만 쓰고, 아니면(없음·null·옛 형식·어긋남) 원문만 보여 준다.
   // AI 응답은 innerHTML 없이 요소를 만들어 textContent 로만 넣는다.
-  var FURIGANA_KEY = 'jgrammar_furigana', PINYIN_KEY = 'jgrammar_pinyin', STRUCTURE_KEY = 'jgrammar_structure';
+  var FURIGANA_KEY = 'jgrammar_furigana', PINYIN_KEY = 'jgrammar_pinyin';   // 작업318: 구조 끄기/켜기(jgrammar_structure)는 없어졌다. 기기에 남은 값은 무해하므로 정리하지 않는다
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 저장이 안 돼도 동작한다 */ } }
   // ── 읽어주기(듣기): 브라우저 내장 speechSynthesis 만 쓴다. 읽을 텍스트는 서버로 보내지 않고, 사용자가 링크를 눌렀을 때만 읽는다(자동 재생 없음). ──
@@ -518,17 +519,29 @@
       tg.addEventListener('click', function () { var off = !result.classList.contains('no-furigana'); result.classList.toggle('no-furigana', off); lsSet(readingKey, off ? 'off' : 'on'); sync(); });
       sync(); tools.appendChild(tg);
     }
-    var newEn = isNewEn(r), hasStructure = newEn && Array.isArray(r.structure) && r.structure.length > 0;
-    result.classList.toggle('no-structure', lsGet(STRUCTURE_KEY) === 'off');   // 구조 끄기는 문장 구조 목록만 숨긴다
-    if (hasStructure) {   // structure 가 null·없는 결과에서는 링크를 숨긴다
-      var st = el('button', 'btn text furi-toggle'); st.type = 'button';
-      var syncSt = function () { var off = result.classList.contains('no-structure'); st.textContent = off ? '구조 켜기' : '구조 끄기'; st.setAttribute('aria-pressed', off ? 'false' : 'true'); };
-      st.addEventListener('click', function () { var off = !result.classList.contains('no-structure'); result.classList.toggle('no-structure', off); lsSet(STRUCTURE_KEY, off ? 'off' : 'on'); syncSt(); });
-      syncSt(); tools.appendChild(st);
-    }
-    if (tools.firstChild.firstChild || hasReading || hasStructure) result.appendChild(tools);
+    var enUnits = isEnUnits(r), newEn = isNewEn(r), hasStructure = newEn && Array.isArray(r.structure) && r.structure.length > 0;   // enUnits: 형식 3, newEn: 형식 2(구조는 토글 없이 항상 표시)
+    if (tools.firstChild.firstChild || hasReading) result.appendChild(tools);
     if (sentence) result.appendChild(renderSource(sentence, ruby));
     result.appendChild(el('p', 'translation', r.translation));
+    if (enUnits) {   // 작업318: 형식 3 — 의미 단위 목록과 전체 흐름. units 가 null 이면 번역만, flow 가 null 이면 전체 흐름 줄만 생략
+      if (Array.isArray(r.units) && r.units.length) {
+        result.appendChild(el('h2', 'picks-title', '의미 단위'));
+        r.units.forEach(function (u) {
+          if (!u || typeof u.text !== 'string' || typeof u.meaning !== 'string' || typeof u.role !== 'string') return;
+          var item = el('article', 'g-item u-item');
+          item.appendChild(el('h3', 'g-name', u.text));
+          item.appendChild(el('p', 'g-meaning', u.meaning));
+          item.appendChild(el('p', 'g-label', '역할'));
+          item.appendChild(el('p', 'g-text', u.role));
+          if (typeof u.reason === 'string' && u.reason !== '') { item.appendChild(el('p', 'g-label', '이유')); item.appendChild(el('p', 'g-text', u.reason)); }
+          result.appendChild(item);
+        });
+        if (typeof r.flow === 'string' && r.flow !== '') { result.appendChild(el('h2', 'picks-title', '전체 흐름')); result.appendChild(el('p', 'g-text', r.flow)); }
+      }
+      result.appendChild(el('p', 'disclaimer', cur().disclaimer));
+      result.hidden = false;
+      return;
+    }
     if (hasStructure) result.appendChild(renderStructure(r.structure));
     var items = newEn ? r.points : r.grammar;
     if (newEn && items.length) result.appendChild(el('h2', 'picks-title', '알아둘 문법'));   // points 가 비면 소제목 포함 전체를 그리지 않는다

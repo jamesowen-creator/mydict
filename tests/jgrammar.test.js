@@ -993,7 +993,7 @@ test('권한 없음은 기존 순서대로 403 — 옛 형식 캐시가 있어�
 
 test('저장 SQL: 저장 항목 결과는 "옛 형식이고 새 결과에 ruby 키가 있을 때만" 바뀌도록 조건이 걸려 있다', () => {
   const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'lib', 'jgrammar.js'), 'utf8');
-  // 작업317: ruby 조건은 그대로 두고 영어용 structure 조건을 OR 로 더했다
-  assert.match(src, /result = CASE WHEN \(NOT \(jgrammar_saved\.result \? 'ruby'\) AND \(EXCLUDED\.result \? 'ruby'\)\)\s+OR \(NOT \(jgrammar_saved\.result \? 'structure'\) AND \(EXCLUDED\.result \? 'structure'\)\) THEN EXCLUDED\.result ELSE jgrammar_saved\.result END/);
+  // 작업318: ruby 조건은 그대로 두고 영어용 조건을 structure 에서 units(형식 3) 로 바꿨다
+  assert.match(src, /result = CASE WHEN \(NOT \(jgrammar_saved\.result \? 'ruby'\) AND \(EXCLUDED\.result \? 'ruby'\)\)\s+OR \(NOT \(jgrammar_saved\.result \? 'units'\) AND \(EXCLUDED\.result \? 'units'\)\) THEN EXCLUDED\.result ELSE jgrammar_saved\.result END/);
   assert.match(src, /UPDATE jgrammar_cache SET result = \$2, model = \$3 WHERE sentence_hash = \$1/);
 });

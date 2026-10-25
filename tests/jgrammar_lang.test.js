@@ -20,17 +20,13 @@ const JA_GOOD = {
   grammar: [{ name: '助詞「が」', meaning: '대상을 나타냅니다.', form: '猫が好き', contrast: '「は」와 다릅니다.', jlpt: 'N5' }],
   ruby: [{ text: '猫', reading: 'ねこ' }, { text: 'が好き' }],
 };
-// 작업317: 영어 새 형식(structure + points). 옛 형식(문법 항목 목록)은 EN_OLD
-const EN_STRUCT = [
-  { kind: '주어 (subject)', role: '주어', text: 'She', note: '문장의 주인공을 나타냅니다.' },
-  { kind: '동사구 (verb phrase)', role: '서술', text: 'has lived in Seoul since 2020.', note: '현재완료로 지금까지 이어지는 상태를 말합니다.', children: [
-    { kind: '동사구 (verb phrase)', role: '서술', text: 'has lived', note: '현재완료 시제의 동사입니다.' },
-    { kind: '전치사구 (prepositional phrase)', role: '수식어', text: 'in Seoul', note: '장소를 나타내며 lived 를 꾸밉니다.' },
-    { kind: '전치사구 (prepositional phrase)', role: '수식어', text: 'since 2020', note: '시작 시점을 나타냅니다.' },
-  ] },
+// 작업318: 영어 새 형식(형식 3: units + flow). 옛 형식(문법 항목 목록)은 EN_OLD
+const EN_UNITS = [
+  { text: 'She has lived', meaning: '그녀는 살아왔다', role: '주절. 문장의 중심이 되는 사실', reason: '과거부터 지금까지 이어지는 상태를 나타낸다' },
+  { text: 'in Seoul', meaning: '서울에서', role: '장소를 알려 주는 말', reason: '' },
+  { text: 'since 2020.', meaning: '2020년부터', role: '시작 시점을 알려 주는 말', reason: 'since 는 시작 시점을 나타낸다' },
 ];
-const EN_POINT = { name: '현재완료(계속)', meaning: '과거에 시작해 지금까지 이어지는 상태를 나타냅니다.', form: 'has lived', contrast: '단순 과거 lived 는 지금은 끝난 일을 말합니다.', level: 'B1' };
-const EN_GOOD = { ok: true, translation: '그녀는 2020년부터 서울에 살고 있다.', structure: EN_STRUCT, points: [EN_POINT] };
+const EN_GOOD = { ok: true, translation: '그녀는 2020년부터 서울에 살고 있다.', units: EN_UNITS, flow: '그녀가 살아왔다 → 서울에서 → 2020년부터' };
 const EN_OLD = {   // 작업317 이전 형식(structure 키 없음)
   ok: true, translation: '그녀는 2020년부터 서울에 살고 있다.',
   grammar: [
@@ -44,7 +40,7 @@ const BOTH_SENTENCE = 'Hello あいう';   // 로마자 5 ≥ 비로마자 3 →
 async function setup(handler) {
   const db = createJgDb();
   const anthropic = createAnthropicMock();
-  anthropic.handler = handler || (params => JSON.stringify(/영어 문법/.test(params.system) ? EN_GOOD : JA_GOOD));
+  anthropic.handler = handler || (params => JSON.stringify(/영어 문장을 해석/.test(params.system) ? EN_GOOD : JA_GOOD));
   const t = await startApp(['routes/jgrammar.js'], { db, anthropic });
   const secret = process.env.JWT_SECRET || 'mydict-jwt-secret';
   const post = (sentence, lang, user = 1) => t.call('POST', '/api/jgrammar/explain', lang === undefined ? { sentence } : { sentence, lang }, { user });
@@ -150,20 +146,19 @@ test('영어 입력 오류는 AI·캐시·사용량을 건드리지 않는다(AP
 });
 
 // ───── 영어 분석 ─────
-test('영어 분석: 정상 응답(ruby·jlpt 없음, structure·points, grammar 빈 배열)·Haiku·en 프롬프트·max_tokens·사용량 이벤트 jgrammar, 캐시 키에 언어 포함, 다음 요청은 캐시', async t => {
+test('영어 분석: 정상 응답(ruby·jlpt 없음, units·flow, 호환 키 structure null·points 빈 배열·grammar 빈 배열)·Haiku·en 프롬프트·max_tokens·사용량 이벤트 jgrammar, 캐시 키에 언어 포함, 다음 요청은 캐시', async t => {
   const a = await setup();
   t.after(() => a.t.close());
   const r = await a.post(EN_SENTENCE, 'en');
   assert.equal(r.status, 200); assert.equal(r.body.cached, false);
   assert.equal(r.body.result.translation, EN_GOOD.translation);
-  assert.deepEqual(r.body.result.points.map(g => g.level), ['B1']);
-  assert.ok(Array.isArray(r.body.result.structure) && r.body.result.structure.length === 2);
-  assert.deepEqual(r.body.result.grammar, [], '옛 코드가 새 형식 결과를 읽어도 깨지지 않게 grammar 는 빈 배열');
+  assert.equal(r.body.result.units.length, 3); assert.equal(r.body.result.flow, EN_GOOD.flow);
+  assert.deepEqual(r.body.result.grammar, [], '옛 코드가 새 형식 결과를 읽어도 깨지지 않게 호환 키(grammar 빈 배열)'); assert.equal(r.body.result.structure, null); assert.deepEqual(r.body.result.points, []);
   assert.ok(!('ruby' in r.body.result), 'ruby 키 없음');
   const call = a.anthropic.calls[0];
   assert.equal(call.model, J.MODEL); assert.equal(call.model, 'claude-haiku-4-5-20251001');
   assert.equal(call.system, J.EN_SYSTEM_PROMPT);
-  assert.equal(call.max_tokens, J.EN_MAX_TOKENS); assert.equal(J.EN_MAX_TOKENS, 4800);
+  assert.equal(call.max_tokens, J.EN_MAX_TOKENS); assert.equal(J.EN_MAX_TOKENS, 3600);
   assert.ok(!/ruby/.test(call.system), '영어 프롬프트는 ruby 를 요청하지 않는다');
   assert.match(call.messages[0].content, new RegExp('"문장": "' + EN_SENTENCE.replace(/\./g, '\\.') + '"'));
   assert.deepEqual(a.db.usage.map(u => u.event_type), ['jgrammar']);
@@ -176,12 +171,12 @@ test('영어 분석: 정상 응답(ruby·jlpt 없음, structure·points, grammar
   assert.equal(a.anthropic.calls.length, 1);
 });
 
-test('영어 프롬프트 규칙: 문장 보정 금지·구조 규칙·A1·A2 제외·모르면 null·영어가 아니면 사유만, 설명은 한국어, 상한 숫자', () => {
+test('영어 프롬프트 규칙: 문장 보정 금지·의미 단위 규칙·문법 용어 나열 금지·모르면 reason 비움·영어가 아니면 사유만, 설명은 한국어, 상한 숫자', () => {
   const p = J.EN_SYSTEM_PROMPT;
-  for (const frag of ['영어 문법', 'structure', 'points', '이어 붙이면', '구두점', '생략된 단어', 'note 에서 설명', '더 쪼개지 말고', 'A1·A2 수준 문법은 넣지 않습니다', '단어 뜻풀이', '빈 배열', '"B1","B2","C1","C2"', 'null', '지어내지 않습니다',
-    '바꾸거나 보정하지 않습니다', '{"ok":false,"reason"', '데이터', '한국어', '최상위 노드는 10개 이하', '3단계 이하', '30개 이하', '0~3개', '"children"']) assert.ok(p.includes(frag), frag);
+  for (const frag of ['영어 문장을 해석', 'units', '의미 단위', '이어 붙이면', '구두점은 앞 단위', '연결어', '생략된 단어', 'reason 에서 설명', '문법 용어를 나열하거나', '단어 뜻풀이', '화살표',
+    '바꾸거나 보정하지 않습니다', '{"ok":false,"reason"', '데이터', '한국어', '15개 이하', '"flow"', '빈 문자열']) assert.ok(p.includes(frag), frag);
   assert.ok(!/ruby|jlpt|JLPT|후리가나/.test(p), '일본어 전용 요소 없음');
-  assert.ok(!p.includes('"grammar"'), '영어 프롬프트는 grammar(문법 항목 목록)를 요구하지 않는다');
+  assert.ok(!p.includes('"grammar"') && !/points|CEFR|structure/.test(p), '영어 프롬프트는 grammar·points·CEFR·structure 를 요구하지 않는다');
 });
 
 test('영어 형식 오류: 1회 재시도 후 성공하면 저장, 두 번 다 틀리면 502 이고 캐시·저장 없음', async t => {
@@ -198,19 +193,11 @@ test('영어 형식 오류: 1회 재시도 후 성공하면 저장, 두 번 다 
   assert.equal(b.db.cache.size, 0); assert.equal(b.db.saved.size, 0);
 });
 
-test('영어 응답 검증: translation·points 형식 오류는 invalid, 수준 때문에 빼는 points 는 형식 오류가 아니다, 거절(ok:false)은 사유', () => {
-  const g = EN_POINT;
+test('영어 응답 검증: translation 형식 오류만 invalid, units·flow 오류는 null 로 두고 번역은 정상, 거절(ok:false)은 사유(상세 시험은 jgrammar_units.test.js)', () => {
   const v = (o) => J.validateAiResult(o, 'en', EN_SENTENCE);
-  assert.ok(v(EN_GOOD).result);
-  assert.deepEqual(v({ ...EN_GOOD, points: [] }).result.points, [], '0개 정상');
-  const bad = [
-    { ...EN_GOOD, translation: 'a'.repeat(201) }, { ...EN_GOOD, translation: '' }, { ok: true, structure: EN_STRUCT, points: [] },
-    { ...EN_GOOD, points: undefined }, { ...EN_GOOD, points: 'x' }, { ...EN_GOOD, points: [null] },
-    { ...EN_GOOD, points: [{ ...g, name: '' }] }, { ...EN_GOOD, points: [{ ...g, name: 'a'.repeat(61) }] }, { ...EN_GOOD, points: [{ ...g, meaning: 'a'.repeat(201) }] },
-    { ...EN_GOOD, points: [{ ...g, form: 'a'.repeat(121) }] }, { ...EN_GOOD, points: [{ ...g, contrast: 'a'.repeat(301) }] }, { ...EN_GOOD, points: [{ ...g, contrast: undefined }] },
-    { ...EN_GOOD, points: [g, { ...g, form: 5 }] },
-  ];
-  for (const b of bad) assert.deepEqual(v(b), { invalid: true });
+  assert.ok(v(EN_GOOD).result); assert.equal(v(EN_GOOD).result.units.length, 3);
+  for (const b of [{ ...EN_GOOD, translation: 'a'.repeat(201) }, { ...EN_GOOD, translation: '' }, { ok: true, units: EN_UNITS }, { ...EN_GOOD, translation: 5 }]) assert.deepEqual(v(b), { invalid: true });
+  assert.equal(v({ ...EN_GOOD, units: [] }).result.units, null); assert.equal(v({ ...EN_GOOD, units: [] }).result.translation, EN_GOOD.translation); assert.equal(v({ ok: true, translation: 't' }).result.units, null);
   assert.deepEqual(J.validateAiResult({ ...JA_GOOD, grammar: [{ ...JA_GOOD.grammar[0], jlpt: 'B1' }] }, 'ja'), { invalid: true }, 'ja 는 여전히 JLPT 만');
   assert.deepEqual(v({ ok: false, reason: '영어 문장이 아닙니다.' }), { rejected: '영어 문장이 아닙니다.' });
   assert.deepEqual(v({ ok: false }), { rejected: J.EN_MSG.notSentence });
@@ -231,9 +218,9 @@ test('영어에는 ruby 가 없다: 모델이 ruby 를 보내도 결과에 넣�
   const r = await a.post(EN_SENTENCE, 'en');
   assert.ok(!('ruby' in r.body.result)); assert.ok(!('ruby' in a.db.cache.get(J.hashSentence(EN_SENTENCE, 'en')).result));
   assert.ok(!('ruby' in [...a.db.saved.values()][0].result));
-  // 한자가 들어 있는 새 형식 영어 캐시(structure null) → 그대로 캐시 응답, AI 호출 없음
+  // 한자가 들어 있는 새 형식 영어 캐시(units null) → 그대로 캐시 응답, AI 호출 없음
   const mixed = 'Hello 学校';
-  a.db.cache.set(J.hashSentence(mixed, 'en'), { sentence: mixed, result: { translation: 't', structure: null, points: [], grammar: [] }, model: 'x', lang: 'en' });
+  a.db.cache.set(J.hashSentence(mixed, 'en'), { sentence: mixed, result: { translation: 't', units: null, flow: null, structure: null, points: [], grammar: [] }, model: 'x', lang: 'en' });
   const calls = a.anthropic.calls.length;
   const c = await a.post(mixed, 'en');
   assert.equal(c.status, 200); assert.equal(c.body.cached, true); assert.ok(!('ruby' in c.body.result));
@@ -244,7 +231,7 @@ test('영어에는 ruby 가 없다: 모델이 ruby 를 보내도 결과에 넣�
 
 // ───── 키: 언어별 분리 ─────
 test('같은 문장이 ja 와 en 에서 서로 다른 캐시·저장 항목이 된다(각각 AI 1번씩, 각 언어의 프롬프트)', async t => {
-  const a = await setup(p => JSON.stringify(/영어 문법/.test(p.system) ? EN_GOOD : { ...JA_GOOD, ruby: [{ text: 'Hello あいう' }] }));
+  const a = await setup(p => JSON.stringify(/영어 문장을 해석/.test(p.system) ? EN_GOOD : { ...JA_GOOD, ruby: [{ text: 'Hello あいう' }] }));
   t.after(() => a.t.close());
   const rj = await a.post(BOTH_SENTENCE, 'ja'), re = await a.post(BOTH_SENTENCE, 'en');
   assert.equal(rj.status, 200); assert.equal(re.status, 200);
@@ -306,7 +293,7 @@ test('저장 삭제는 본인 항목만(언어 무관), 남의 항목·없는 id
 test('하루 한도는 언어와 무관하게 합산(ja 분석 + en 분석 + en OCR), 영어 OCR 도 포함', async t => {
   process.env.JGRAMMAR_DAILY_CAP = '3';
   t.after(() => { delete process.env.JGRAMMAR_DAILY_CAP; });
-  const a = await setup((p) => (Array.isArray(p.messages[0].content) ? JSON.stringify({ sentences: ['Hello there.'] }) : JSON.stringify(/영어 문법/.test(p.system) ? EN_GOOD : JA_GOOD)));
+  const a = await setup((p) => (Array.isArray(p.messages[0].content) ? JSON.stringify({ sentences: ['Hello there.'] }) : JSON.stringify(/영어 문장을 해석/.test(p.system) ? EN_GOOD : JA_GOOD)));
   t.after(() => a.t.close());
   assert.equal((await a.post('猫が好き', 'ja')).status, 200);
   assert.equal((await a.post(EN_SENTENCE, 'en')).status, 200);
