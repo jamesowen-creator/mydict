@@ -1603,10 +1603,10 @@ test('326-2) 점프로 넘으면 체력·속도·콤보가 그대로다. 점프�
   // 회복: 다음 1.5초 동안 속도가 목표 속도로 올라온다(내려가지 않음). 같은 장애물에 다시 맞지 않는다(체력 그대로)
   const rec = await page.eval(`(() => { const R = SpellRun, G = R.G, C = R.CONFIG; const hp0 = G.hp, o = []; let prev = G.speed, mono = true, t = 0, reach = -1; const target = G.speedTarget;
     while (t < 1.5) { const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.kind !== 'heart' && x.x > R.RUNNER_X).sort((p, q) => p.x - q.x)[0]; if (G.state === 'run' && G.jumpT < 0 && tg && (tg.x - R.RUNNER_X) / G.speed <= C.JUMP_TIME / 2) R.jump();   // 글자는 계속 정상 플레이
-      R.step(1 / 60); t += 1 / 60; if (G.speed < prev - 1e-6 && G.hp === hp0) mono = false; prev = G.speed; if (reach < 0 && G.speed >= G.speedTarget - 1) reach = t; if (G.state !== 'run') break; }
+      R.step(1 / 60); t += 1 / 60; if (G.speed < prev - 1e-6 && G.hp === hp0) mono = false; prev = G.speed; if (reach < 0 && G.speed >= G.speedTarget - 1) reach = t; if (G.state === 'over' || G.state === 'ending') break; }   // 작업339: 단어가 끝나 완성 연출(pop)로 넘어가도 1.5초를 끝까지 잰다(예전에는 run 이 아니면 중단해서 가끔 회복 전에 끝났다)
     return { hp0: hp0, hp: G.hp, hits: G.obstHits, mono: mono, reach: reach, target: target, speed: G.speed }; })()`);
   assert.equal(rec.hits, 1, '한 장애물에 한 번만'); assert.equal(rec.hp, rec.hp0, '회복하는 동안 체력 변화 없음');
-  assert.ok(rec.mono, '속도는 올라가기만 한다'); assert.ok(rec.reach > 0 && rec.reach < 1.5, '1.5초 안에 목표 속도로 회복: ' + rec.reach.toFixed(2) + '초');
+  assert.ok(rec.mono, '속도는 올라가기만 한다'); assert.ok(rec.reach > 0 && rec.reach < 1.5, '1.5초 안에 목표 속도로 회복: ' + rec.reach.toFixed(2) + '초 ' );
   await page.close();
 
   // (다) 구덩이/상자 각각 한 번씩 맞는 경우를 모두 본다(맞은 종류 기록): 두 종류 모두 같은 효과
@@ -2154,7 +2154,7 @@ const RBOT = `(async (o) => {
   return out;
 })`;
 
-test('329-1) 체력이 낮을 때만 나온다: 낮은 체력에서 힌트·천사가 번갈아 나오고, 체력이 기준을 넘으면 다음 단어부터 나오지 않으며, 보스·복습·장애물·하트·가속 단어에는 없다', { skip: SKIP }, async () => {
+test('329-1) 체력이 낮을 때만 나온다: 낮은 체력에서 힌트·천사가 나오고, 체력이 기준을 넘으면 다음 단어부터 나오지 않으며, 보스·복습·장애물·하트·가속 단어에는 없다', { skip: SKIP }, async () => {
   resetState();
   // 체력 5(가득)에서는 아예 나오지 않는다
   let page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?rescueevery=1&dj=0', dodge: false });
@@ -2171,7 +2171,7 @@ test('329-1) 체력이 낮을 때만 나온다: 낮은 체력에서 힌트·천�
   assert.ok(early.some(w => w.rescue), '체력이 낮은 동안 나온다');
   for (const w of r.words) { if (w.rescue) { assert.ok(w.hpAtLoad >= 1 && w.hpAtLoad <= 2, '체력 기준 이하: ' + w.hpAtLoad); assert.ok(!w.boss && !w.review && !w.obst && !w.heart && !w.speed, '제외 조건: ' + JSON.stringify(w)); } }
   assert.ok(late.every(w => !w.rescue || w.hpAtLoad <= 2), '체력이 회복된 뒤(기준 초과)에는 없다');
-  const rescueWords = r.words.filter(w => w.rescue); assert.ok(rescueWords.length >= 2); rescueWords.forEach((w, i) => assert.equal(w.kind, i % 2 === 0 ? 'hint' : 'angel', '번갈아'));
+  const rescueWords = r.words.filter(w => w.rescue); assert.ok(rescueWords.length >= 2); rescueWords.forEach(w => assert.ok(['hint', 'angel'].includes(w.kind), '작업339: 힌트·천사는 단어 해시로 정한다(번갈아 나오지 않는다): ' + w.kind));
   await page.close();
   // 장애물·하트가 있는 기본 구성에서도 제외 규칙이 지켜진다(체력 2 로 시작)
   page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?rescueevery=1&dj=0&speedevery=1&obsprob=1&heartevery=2', dodge: false });
@@ -2188,9 +2188,9 @@ test('329-1) 체력이 낮을 때만 나온다: 낮은 체력에서 힌트·천�
   assert.equal(await page.eval("!!document.getElementById('rescueRule')"), true); assert.match(await page.eval("document.getElementById('rescueRule').textContent"), /힌트나 천사/); assert.equal(await page.eval("document.getElementById('tune').hidden"), true);
   await page.close();
   // 새 옵션: 범위·표시
-  page = await openGame({ ids: [1, 2, 3], query: '?itemhp=0.6&rescueevery=2&itemhp=9&rescueevery=11', dodge: false }); await gameReady(page);
-  assert.deepEqual(await page.eval('[SpellRun.CONFIG.ITEM_HP, SpellRun.CONFIG.RESCUE_EVERY]'), [0.6, 2]); assert.equal(await page.eval("document.getElementById('tune').hidden"), false); await page.close();
-  page = await openGame({ ids: [1, 2, 3], query: '?itemhp=0.4&rescueevery=3&rescue=1', dodge: false }); await gameReady(page);
+  page = await openGame({ ids: [1, 2, 3], query: '?itemhp=0.4&rescueevery=3&itemhp=9&rescueevery=11', dodge: false }); await gameReady(page);
+  assert.deepEqual(await page.eval('[SpellRun.CONFIG.ITEM_HP, SpellRun.CONFIG.RESCUE_EVERY]'), [0.4, 3]); assert.equal(await page.eval("document.getElementById('tune').hidden"), false); await page.close();
+  page = await openGame({ ids: [1, 2, 3], query: '?itemhp=0.6&rescueevery=2&rescue=1', dodge: false }); await gameReady(page);
   assert.equal(await page.eval("document.getElementById('tune').hidden"), true, '기본값만 있으면 표시 없음'); await page.close();
   await clearOpts();
 });
@@ -2250,8 +2250,8 @@ test('329-3) 천사: 먹으면 틀린 타일이 반짝이며(0.5초 이내) 사�
     // 정답은 평소처럼 점프로 먹는다: 점수·콤보는 기존 규칙(+글자 점수), 체력 불변
     const c = await page.eval(`(() => { const R = SpellRun, G = R.G, RX = R.RUNNER_X; const si0 = G.si, sc0 = G.score, cb0 = G.combo, hp0 = G.hp; let n = 0;
       while (n++ < 900 && G.si === si0 && G.state === 'run') { const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.x > RX).sort((p, q) => p.x - q.x)[0]; if (G.jumpT < 0 && tg && (tg.x - RX) / G.speed <= R.CONFIG.JUMP_TIME / 2) R.jump(); R.step(1 / 60); }
-      return { ate: G.si - si0, dscore: G.score - sc0, dcombo: G.combo - cb0, hp: G.hp, hp0: hp0, lastPts: G.lastPts, rescue: G.rescue }; })()`);
-    assert.equal(c.ate, 1, '점프로 정답을 먹었다'); assert.equal(c.dcombo, 1); assert.equal(c.dscore, c.lastPts, '점수는 기존 글자 점수 그대로'); assert.equal(c.hp, c.hp0); assert.equal(c.rescue, null);
+      return { ate: G.si - si0, dscore: G.score - sc0, dcombo: G.combo - cb0, hp: G.hp, hp0: hp0, lastPts: G.lastPts, rescue: G.rescue, state: G.state }; })()`);
+    assert.equal(c.ate, 1, '점프로 정답을 먹었다'); assert.equal(c.dcombo, 1); assert.ok(c.dscore === c.lastPts || (c.state === 'pop' && c.dscore > c.lastPts), '점수는 기존 글자 점수 그대로(그 칸이 단어의 마지막 칸이면 완성 보너스가 더해진다): ' + c.dscore + ' / ' + c.lastPts);   // 작업339: 단어가 한 칸뿐이면 같은 걸음에 완성 보너스가 붙어 가끔 실패하던 단언을 바로잡음 assert.equal(c.hp, c.hp0); assert.equal(c.rescue, null);
     assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
     await page.close();
   }

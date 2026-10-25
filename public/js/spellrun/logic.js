@@ -110,8 +110,8 @@ function buildConfig(v) {
   BOOST_SCORE_MULT: 1.5,  // 가속 중 완성한 단어의 완성 점수 배율
   // 작업329: 구조 아이템(힌트·천사). 체력이 낮을 때만 나온다. 난수 없이 판 순번·단어 순번 해시로 정한다
   RESCUE_ENABLED: true,   // 주소 옵션 rescue=0 이면 힌트·천사 없음
-  ITEM_HP: 0.4,           // 현재 체력 <= HP x 이 값(그리고 1 이상)일 때만 나온다(주소 옵션 itemhp)
-  RESCUE_EVERY: 3,        // 체력이 낮은 동안 약 이 개수의 단어마다 1개(주소 옵션 rescueevery). 힌트와 천사가 번갈아 나온다
+  ITEM_HP: 0.6,           // 현재 체력 <= HP x 이 값(그리고 1 이상)일 때만 나온다(주소 옵션 itemhp). 작업339: 0.4 → 0.6(기본 체력 5면 3 이하)
+  RESCUE_EVERY: 2,        // 체력이 낮은 동안 약 이 개수의 단어마다 1개(주소 옵션 rescueevery). 작업339: 3 → 2. 힌트·천사는 단어 해시로 정한다(번갈아 나오지 않는다)
   ANGEL_SEC: 0.5,         // 천사가 틀린 타일을 지우는 연출 시간(초)
   // 작업332: 생존 모드(체력 0까지 계속). 기본 모드에는 영향이 없다. 하트·보스·난이도는 난수 없이 단어 순번·판 순번 해시로 정한다
   SURV_CHIPS: 8,          // 생존 모드 결과 화면에 칩으로 보이는 틀린 단어 수(최근 것 위주, 전체 개수는 숫자로)
@@ -165,7 +165,7 @@ const OPTION_RULES = {
   obs: { min: 0, max: 1, int: true, def: 1 }, obsprob: { min: 0, max: 1, def: 0.5 },
   hpfullbonus: { min: 0, max: 1000, int: true, def: 100 }, speeditem: { min: 0, max: 1, int: true, def: 1 }, speedevery: { min: 1, max: 10, int: true, def: 4 }, boostsec: { min: 1, max: 10, def: 5 },
   survheart: { min: 0, max: 5, int: true, def: 3 }, survramp: { min: 0, max: 0.2, def: 0.05 },
-  rescue: { min: 0, max: 1, int: true, def: 1 }, itemhp: { min: 0, max: 1, def: 0.4 }, rescueevery: { min: 1, max: 10, int: true, def: 3 }
+  rescue: { min: 0, max: 1, int: true, def: 1 }, itemhp: { min: 0, max: 1, def: 0.6 }, rescueevery: { min: 1, max: 10, int: true, def: 2 }
 };
 // 반환 { values: 유효한 값(기본값과 같아도 포함), applied: 기본값과 다른 옵션 이름 }
 function parseOptions(search) {
@@ -489,13 +489,20 @@ function hashInt(str) {
   return h >>> 0;
 }
 // 가속 아이템 계획: 이 단어에 나오면 아이템이 놓일 묶음 번호, 아니면 null. 난수를 쓰지 않는다.
-// o: { roundSeq: 판 순번, regularIdx: 보스가 아닌 단어 중 순번(0부터), boss, review, hasHeart, hasObst, nSlots }
+// o: { roundSeq: 판 순번, regularIdx: 보스가 아닌 단어 중 순번(0부터), boss, review, hasHeart, hasObst, nSlots, groupTaken: 이 그룹의 번개가 이미 앞 단어에 붙었으면 그 그룹 번호, isHeartAt(j): 일반 단어 순번 j 가 하트 단어인가, regularCount: 일반 단어 총수(생존 모드는 생략) }
+// 작업339: 그룹에서 고른 단어가 제외 대상이면 같은 그룹의 다음 후보로 옮긴다. 하트 단어는 판이 시작될 때(생존 모드는 해시로) 미리 알 수 있어 후보에서 빼고 해시로 시작 후보를 고르고, 장애물·구조 아이템·한 칸짜리 단어처럼 단어를 불러와야 아는 제외는 시작 후보부터 앞으로(되돌아가지 않고) 가며 첫 후보에 붙인다. 그룹당 최대 1개, 난수 없음.
 // 일반 단어 SPEED_EVERY 개씩 묶은 그룹마다 하나(그룹 안의 자리는 판 순번·그룹 번호의 해시). 보스·복습 판·하트가 있는 단어·장애물이 있는 단어에는 없다. 묶음은 첫 묶음을 뺀 곳.
 function planSpeedItem(o, cfg) {
   cfg = cfg || CONFIG;
   if (!cfg.SPEED_ITEM_ENABLED || o.boss || o.review || o.hasHeart || o.hasObst || o.nSlots < 2) return null;
-  const e = cfg.SPEED_EVERY, g = Math.floor(o.regularIdx / e);
-  if (o.regularIdx % e !== hashInt('speed:' + o.roundSeq + ':' + g) % e) return null;
+  const e = cfg.SPEED_EVERY, g = Math.floor(o.regularIdx / e), base = g * e;
+  if (o.groupTaken === g) return null;   // 이 그룹의 번개는 이미 앞 단어에 붙었다
+  const last = Math.min(base + e - 1, (o.regularCount === undefined ? Infinity : o.regularCount) - 1);
+  const cands = [];
+  for (let j = base; j <= last; j++) if (!(o.isHeartAt && o.isHeartAt(j))) cands.push(j);
+  if (!cands.length) return null;
+  const start = cands[hashInt('speed:' + o.roundSeq + ':' + g) % cands.length];
+  if (o.regularIdx < start) return null;
   return 1 + hashInt('speedslot:' + o.roundSeq + ':' + o.regularIdx) % (o.nSlots - 1);
 }
 // ---- 작업332: 생존 모드 ----
@@ -557,14 +564,16 @@ function runState(s, cfg) {
 }
 
 // 작업329: 구조 아이템 계획. 체력이 기준 이하일 때(1 이상)만, 난수 없이.
-// o: { roundSeq, regularIdx, hp, boss, review, hasHeart, hasObst, nSlots, rescueCount: 이번 판에서 이미 계획된 구조 아이템 수 }
+// o: { roundSeq, regularIdx, hp, boss, review, hasHeart, hasObst, nSlots }  (작업339: 힌트·천사는 단어 해시로 정한다)
 // 반환 { slot: 아이템이 놓일 묶음 번호(첫 묶음 이후), kind: 'hint' | 'angel'(번갈아) } 또는 null. 우선순위: 하트 > 구조 > 가속(호출하는 쪽에서 구조가 정해지면 가속 계획에 hasHeart 를 넘긴다)
 function rescueLow(hp, cfg) { cfg = cfg || CONFIG; return hp >= 1 && hp <= cfg.HP * cfg.ITEM_HP + 1e-9; }
+// 해시의 하위 비트 섞기(FNV 의 마지막 비트는 글자 비트의 XOR 라서, 같은 모양의 다른 해시와 짝수 나머지로 비교하면 서로 완전히 연동된다: 계획 여부(% RESCUE_EVERY)와 종류가 같은 순번 글자로 만들어져 힌트만 나오는 문제가 있었다)
+function mix32(h) { h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; return h >>> 0; }
 function planRescue(o, cfg) {
   cfg = cfg || CONFIG;
   if (!cfg.RESCUE_ENABLED || o.boss || o.review || o.hasHeart || o.hasObst || o.nSlots < 2 || !rescueLow(o.hp, cfg)) return null;
   if (hashInt('rescue:' + o.roundSeq + ':' + o.regularIdx) % cfg.RESCUE_EVERY !== 0) return null;
-  return { slot: 1 + hashInt('rescueslot:' + o.roundSeq + ':' + o.regularIdx) % (o.nSlots - 1), kind: (o.rescueCount || 0) % 2 === 0 ? 'hint' : 'angel' };
+  return { slot: 1 + hashInt('rescueslot:' + o.roundSeq + ':' + o.regularIdx) % (o.nSlots - 1), kind: mix32(hashInt('rescuekind:' + o.roundSeq + ':' + o.regularIdx)) % 2 === 0 ? 'hint' : 'angel' };   // 작업339: 판 안의 순번이 아니라 단어 해시로 구분
 }
 // 가속 중의 목표 속도: 원래 목표 속도 x BOOST_FACTOR, 단 SPEED_MAX 를 넘지 않는다(장애물 안전 간격은 SPEED_MAX 기준이다)
 function boostTarget(target, boosting, cfg) {

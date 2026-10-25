@@ -1066,25 +1066,72 @@ test('328-0/2. 난수 호출 순서 불변: planHearts 는 그룹마다 1번, pi
   assert.equal(CONFIG.OBST_W, 28); assert.equal(CONFIG.OBST_H, 28); assert.equal(CONFIG.PIT_W, 36);
 });
 
-test('328-2. 가속 아이템 계획: 난수 없음·같은 입력 같은 결과, 일반 단어 약 4개에 1번, 보스·복습·하트·장애물 단어에는 없고, 묶음은 첫 묶음 이후', () => {
-  const C = CONFIG, base = { boss: false, review: false, hasHeart: false, hasObst: false, nSlots: 5 };
+// 작업339: 번개 계획은 게임(loadWord)처럼 그룹 상태(groupTaken)를 이어 가며 단어를 차례로 부른다
+function speedRun(seq, count, o, cfg) {
+  const out = []; let taken = -1;
+  for (let i = 0; i < count; i++) {
+    const w = Object.assign({ roundSeq: seq, regularIdx: i, boss: false, review: false, hasHeart: false, hasObst: false, nSlots: 5, groupTaken: taken, regularCount: count }, typeof o === 'function' ? o(i) : o);
+    const r = L.planSpeedItem(w, cfg || CONFIG);
+    if (r !== null) taken = Math.floor(i / (cfg || CONFIG).SPEED_EVERY);
+    out.push(r);
+  }
+  return out;
+}
+test('328-2. 가속 아이템 계획: 난수 없음·같은 입력 같은 결과, 일반 단어 4개 그룹마다 정확히 1개, 보스·복습·하트·장애물 단어에는 없고, 묶음은 첫 묶음 이후', () => {
+  const C = CONFIG;
   assert.equal(C.SPEED_ITEM_ENABLED, true); assert.equal(C.SPEED_EVERY, 4); assert.equal(C.BOOST_SEC, 5);
   let n = 0, hit = 0; const slots = new Set();
-  for (let round = 1; round <= 40; round++) for (let i = 0; i < 8; i++) {   // 판당 일반 단어 8개(그룹 4 → 완전한 그룹 2개)
-    const o = Object.assign({ roundSeq: round, regularIdx: i }, base), r = L.planSpeedItem(o, C);
-    assert.deepEqual(L.planSpeedItem(o, C), r, '같은 입력 → 같은 결과'); n++;
-    if (r !== null) { hit++; slots.add(r); assert.ok(r >= 1 && r <= 4, '첫 묶음 이후: ' + r); }
+  for (let round = 1; round <= 40; round++) {
+    const r = speedRun(round, 8, {}); assert.deepEqual(speedRun(round, 8, {}), r, '같은 입력 → 같은 결과');
+    for (const g of [0, 1]) assert.equal(r.slice(g * 4, g * 4 + 4).filter(x => x !== null).length, 1, '그룹마다 정확히 1개(제외가 없으면)');
+    n += 8; r.forEach(x => { if (x !== null) { hit++; slots.add(x); assert.ok(x >= 1 && x <= 4, '첫 묶음 이후: ' + x); } });
   }
-  assert.equal(hit, 80, '완전한 그룹마다 정확히 1개: ' + hit + '/' + n); assert.ok(slots.size >= 3, '묶음 자리가 다양하다: ' + [...slots]);
-  for (let round = 1; round <= 40; round++) { let k = 0; for (let i = 0; i < 4; i++) if (L.planSpeedItem(Object.assign({ roundSeq: round, regularIdx: i }, base), C) !== null) k++; assert.equal(k, 1, '그룹 안에 정확히 1개'); }
-  // 제외 조건
+  assert.equal(hit, 80, hit + '/' + n); assert.ok(slots.size >= 3, '묶음 자리가 다양하다: ' + [...slots]);
+  // 제외 조건(한 단어씩 부를 때)
   const every1 = L.buildConfig({ speedevery: 1 });
-  const any = Object.assign({ roundSeq: 3, regularIdx: 0 }, base); assert.notEqual(L.planSpeedItem(any, every1), null, 'speedevery=1 이면 매 단어');
+  const any = { roundSeq: 3, regularIdx: 0, boss: false, review: false, hasHeart: false, hasObst: false, nSlots: 5 }; assert.notEqual(L.planSpeedItem(any, every1), null, 'speedevery=1 이면 매 단어');
   for (const ex of [{ boss: true }, { review: true }, { hasHeart: true }, { hasObst: true }, { nSlots: 1 }]) assert.equal(L.planSpeedItem(Object.assign({}, any, ex), every1), null, JSON.stringify(ex));
   assert.equal(L.planSpeedItem(any, L.buildConfig({ speedevery: 1, speeditem: 0 })), null, 'speeditem=0 이면 없음');
-  // 판 순번이 달라지면 자리가 달라질 수 있다(고정 패턴이 아님)
-  const pat = r => [0, 1, 2, 3].map(i => L.planSpeedItem(Object.assign({ roundSeq: r, regularIdx: i }, base), C) !== null ? 1 : 0).join('');
+  const pat = r => speedRun(r, 4, {}).map(x => (x !== null ? 1 : 0)).join('');
   assert.ok(new Set([1, 2, 3, 4, 5, 6, 7, 8].map(pat)).size >= 3, '판마다 그룹 안 위치가 다르다');
+});
+
+test('339-2. 번개 보정: 제외 단어에는 없고 그룹당 최대 1개이며, 고른 단어가 제외 대상이면 같은 그룹의 다음 후보로 옮긴다(하트 단어는 후보에서 빠지고, 모두 제외되면 그 그룹은 없음). 난수 없음', () => {
+  const C = CONFIG, orig = Math.random; Math.random = () => { throw new Error('난수 사용 금지'); };
+  try {
+    // 제외 없는 기준: 그룹마다 시작 후보에 붙는다
+    for (let seq = 1; seq <= 30; seq++) {
+      const base = speedRun(seq, 4, {}); const s = base.findIndex(x => x !== null); assert.ok(s >= 0);
+      // 시작 후보에 장애물이 있으면 바로 다음 후보로 옮긴다(끝 후보라면 없음)
+      const moved = speedRun(seq, 4, i => ({ hasObst: i === s }));
+      assert.equal(moved[s], null, '제외 단어에는 번개 없음');
+      if (s < 3) { assert.notEqual(moved[s + 1], null, 'seq ' + seq + ': 시작 ' + s + ' 가 제외되면 다음 단어 ' + (s + 1) + ' 로 이동'); assert.equal(moved.filter(x => x !== null).length, 1, '그룹당 최대 1개'); }
+      else assert.equal(moved.filter(x => x !== null).length, 0, '마지막 후보가 제외되면 그 그룹은 없음');
+      // 시작 이후 모두 제외 → 없음. 시작 이전 단어가 제외돼도 시작에는 영향 없음
+      assert.equal(speedRun(seq, 4, i => ({ hasObst: i >= s })).filter(x => x !== null).length, 0, '후보가 모두 제외되면 없음');
+      assert.equal(speedRun(seq, 4, i => ({ hasObst: i < s }))[s], base[s], '시작 이전의 제외는 영향 없음');
+    }
+    // 하트 단어는 미리 알 수 있어 후보에서 빠진다: 시작 후보가 하트 단어가 되지 않는다
+    for (let seq = 1; seq <= 30; seq++) for (let h = 0; h < 4; h++) {
+      const r = speedRun(seq, 4, i => ({ hasHeart: i === h, isHeartAt: j => j === h }));
+      assert.equal(r[h], null, '하트 단어에는 없음'); assert.equal(r.filter(x => x !== null).length, 1, 'seq ' + seq + ' 하트 ' + h + ': 그래도 그룹당 1개');
+    }
+    // 그룹 전체가 하트·제외뿐이면 없음 / 일반 단어 수보다 큰 그룹 구성(마지막 그룹이 짧아도 1개 이하)
+    assert.equal(speedRun(1, 4, i => ({ hasHeart: true, isHeartAt: () => true })).filter(x => x !== null).length, 0);
+    for (let n = 1; n <= 11; n++) { const r = speedRun(5, n, {}); const groups = Math.ceil(n / 4); for (let g = 0; g < groups; g++) assert.ok(r.slice(g * 4, g * 4 + 4).filter(x => x !== null).length <= 1); }
+    // 다른 그룹 크기(speedevery) 에서도 같은 규칙
+    for (const e of [1, 2, 3, 6, 10]) { const cfg = L.buildConfig({ speedevery: e }); const r = speedRun(7, e * 3, {}, cfg); for (let g = 0; g < 3; g++) assert.equal(r.slice(g * e, g * e + e).filter(x => x !== null).length, 1, 'speedevery=' + e); }
+  } finally { Math.random = orig; }
+  // 효과: 실제 비율 비교(옛 방식은 제외된 그룹이 통째로 사라짐). 장애물 30%·하트 25%·구조 5% 정도의 제외를 임의로 주고 그룹당 번개율을 센다
+  const R = mulberry(339); let groups = 0, got = 0, oldGot = 0;
+  for (let seq = 1; seq <= 600; seq++) {
+    const ex = Array.from({ length: 8 }, () => ({ hasObst: R() < 0.3, hasHeartRandom: R() < 0.25 }));
+    const heartAt = j => ex[j].hasHeartRandom;
+    const r = speedRun(seq, 8, i => ({ hasObst: ex[i].hasObst, hasHeart: heartAt(i), isHeartAt: heartAt }));
+    for (const g of [0, 1]) { groups++; if (r.slice(g * 4, g * 4 + 4).some(x => x !== null)) got++; const oldIdx = L.hashInt('speed:' + seq + ':' + g) % 4, j = g * 4 + oldIdx; if (!ex[j].hasObst && !ex[j].hasHeartRandom) oldGot++; }
+  }
+  console.log('번개 그룹 성공률: 새 방식 ' + (got / groups * 100).toFixed(0) + '% / 옛 방식 ' + (oldGot / groups * 100).toFixed(0) + '%');
+  assert.ok(got / groups > 0.8 && oldGot / groups < 0.6 && got > oldGot * 1.4, '새 방식이 훨씬 높다');
 });
 
 test('328-2. 가속 속도: 목표 속도는 SPEED_MAX 를 넘지 않고, 어떤 입력에서도 실제 속도가 SPEED_MAX 이하이며, 끝나면 원래 목표로 돌아온다', () => {
@@ -1157,26 +1204,30 @@ test('328-1. 하트 단어에서 장애물이 줄어드는 정도(측정): 하�
 
 // ───────── 작업329: 구조 아이템(힌트·천사) ─────────
 test('329-1. 구조 아이템 조건: 체력 기준 경계(1 이상, HP x itemhp 이하), 난수 없음, 번갈아, 하트·장애물·보스·복습 단어에는 없고 가속 아이템과 겹치지 않는다', () => {
-  const C = CONFIG, base = { roundSeq: 2, hp: 2, boss: false, review: false, hasHeart: false, hasObst: false, nSlots: 5, rescueCount: 0 };
-  assert.equal(C.RESCUE_ENABLED, true); assert.equal(C.ITEM_HP, 0.4); assert.equal(C.RESCUE_EVERY, 3);
-  // 경계: HP 5 x 0.4 = 2 → 체력 2 는 나오고 3 은 아니다, 0 은 아니다
-  assert.equal(L.rescueLow(1, C), true); assert.equal(L.rescueLow(2, C), true); assert.equal(L.rescueLow(3, C), false); assert.equal(L.rescueLow(5, C), false); assert.equal(L.rescueLow(0, C), false, '체력 0 은 아니다');
-  const c10 = L.buildConfig({ hp: 10 }); assert.equal(L.rescueLow(4, c10), true); assert.equal(L.rescueLow(5, c10), false);
+  const C = CONFIG, base = { roundSeq: 2, hp: 2, boss: false, review: false, hasHeart: false, hasObst: false, nSlots: 5 };
+  assert.equal(C.RESCUE_ENABLED, true); assert.equal(C.ITEM_HP, 0.6); assert.equal(C.RESCUE_EVERY, 2);   // 작업339: 0.4·3 → 0.6·2
+  // 경계: HP 5 x 0.6 = 3 → 체력 3 은 나오고 4 는 아니다, 0 은 아니다
+  assert.equal(L.rescueLow(1, C), true); assert.equal(L.rescueLow(2, C), true); assert.equal(L.rescueLow(3, C), true); assert.equal(L.rescueLow(4, C), false); assert.equal(L.rescueLow(5, C), false); assert.equal(L.rescueLow(0, C), false, '체력 0 은 아니다');
+  const c10 = L.buildConfig({ hp: 10 }); assert.equal(L.rescueLow(6, c10), true); assert.equal(L.rescueLow(7, c10), false);
   assert.equal(L.rescueLow(1, L.buildConfig({ itemhp: 0 })), false, 'itemhp=0 이면 나오지 않는다'); assert.equal(L.rescueLow(5, L.buildConfig({ itemhp: 1 })), true); assert.equal(L.rescueLow(1, L.buildConfig({ itemhp: 0.2 })), true); assert.equal(L.rescueLow(2, L.buildConfig({ itemhp: 0.2 })), false);
   const every1 = L.buildConfig({ rescueevery: 1 });
   const ok = Object.assign({ regularIdx: 0 }, base);
   assert.ok(L.planRescue(ok, every1), 'rescueevery=1 이면 매 단어(조건 충족 시)');
-  assert.equal(L.planRescue(Object.assign({}, ok, { hp: 3 }), every1), null, '기준 초과');
+  assert.equal(L.planRescue(Object.assign({}, ok, { hp: 4 }), every1), null, '기준 초과'); assert.ok(L.planRescue(Object.assign({}, ok, { hp: 3 }), every1), '체력 3 은 기준 이하(0.6)');
   assert.equal(L.planRescue(Object.assign({}, ok, { hp: 0 }), every1), null);
   for (const ex of [{ boss: true }, { review: true }, { hasHeart: true }, { hasObst: true }, { nSlots: 1 }]) assert.equal(L.planRescue(Object.assign({}, ok, ex), every1), null, JSON.stringify(ex));
   assert.equal(L.planRescue(ok, L.buildConfig({ rescueevery: 1, rescue: 0 })), null, 'rescue=0');
-  // 번갈아 + 묶음은 첫 묶음 이후
-  const kinds = [0, 1, 2, 3, 4, 5].map(i => L.planRescue(Object.assign({}, ok, { rescueCount: i }), every1).kind); assert.deepEqual(kinds, ['hint', 'angel', 'hint', 'angel', 'hint', 'angel']);
+  // 작업339: 힌트·천사는 단어 해시로 정한다(판 안의 순번에 의존하지 않음). 한 판에서 구조 아이템이 한 번만 나와도 천사가 될 수 있다. 묶음은 첫 묶음 이후
+  const kind = (seq, i) => { const r = L.planRescue(Object.assign({}, ok, { roundSeq: seq, regularIdx: i }), C); return r ? r.kind : null; };   // 기본 설정(rescueevery 2): 실제로 구조 아이템이 계획된 단어만 센다(계획 여부와 종류가 연동되면 한 종류만 나온다)
+  assert.equal(kind(4, 3), kind(4, 3), '같은 입력 → 같은 종류'); assert.ok(L.planRescue(Object.assign({}, ok, { rescueCount: 0 }), every1).kind === L.planRescue(Object.assign({}, ok, { rescueCount: 7 }), every1).kind, '구조 아이템 순번(rescueCount)은 영향 없음');
+  let angelFirst = 0, hints = 0, angels = 0; for (let seq = 1; seq <= 400; seq++) for (let i = 0; i < 8; i++) { const k = kind(seq, i); if (k === 'angel') { angels++; if (i === 0) angelFirst++; } else if (k === 'hint') hints++; }
+  assert.ok(angelFirst > 40, '그 판의 첫 단어에서도 천사가 나올 수 있다: ' + angelFirst + '/400'); assert.ok(angels > 300 && hints > 300, '계획된 구조 아이템 ' + (angels + hints) + '개 중 천사 ' + angels + ', 힌트 ' + hints);
+  const byIdx = [0, 1, 2, 3, 4, 5, 6, 7].map(i => { let a = 0, h = 0; for (let seq = 1; seq <= 600; seq++) { const k = kind(seq, i); if (k === 'angel') a++; else if (k === 'hint') h++; } return a / (a + h); }); byIdx.forEach((p, i) => assert.ok(p > 0.4 && p < 0.6, '단어 순번 ' + i + ' 의 천사 비율 ' + p.toFixed(2))); assert.ok(angels / (angels + hints) > 0.42 && angels / (angels + hints) < 0.58, '천사 비율이 힌트와 비슷하다: ' + (angels / (angels + hints)).toFixed(3));
   for (let i = 0; i < 60; i++) { const r = L.planRescue(Object.assign({}, ok, { regularIdx: i, roundSeq: i % 7 }), every1); assert.ok(r.slot >= 1 && r.slot <= 4); }
   // 빈도: 약 3단어에 1번, 같은 입력 같은 결과, 난수 없음
   let n = 0, hit = 0; const orig = Math.random; Math.random = () => { throw new Error('난수 사용 금지'); };
   try { for (let round = 1; round <= 60; round++) for (let i = 0; i < 9; i++) { const o = Object.assign({}, base, { roundSeq: round, regularIdx: i }), r = L.planRescue(o, C); assert.deepEqual(L.planRescue(o, C), r); n++; if (r) hit++; } } finally { Math.random = orig; }
-  assert.ok(hit / n > 0.25 && hit / n < 0.42, '약 1/3: ' + (hit / n).toFixed(3));
+  assert.ok(hit / n > 0.42 && hit / n < 0.58, '약 1/2(rescueevery 2): ' + (hit / n).toFixed(3));
   // 우선순위: 구조가 정해진 단어에는 가속 아이템이 없다(호출하는 쪽이 hasHeart 로 넘긴다) — 가속 계획이 hasHeart=true 면 null
   assert.equal(L.planSpeedItem({ roundSeq: 1, regularIdx: 0, boss: false, review: false, hasHeart: true, hasObst: false, nSlots: 5 }, L.buildConfig({ speedevery: 1 })), null);
   // 기존 난수 호출 횟수 불변, 장애물 규칙 불변
@@ -1186,10 +1237,10 @@ test('329-1. 구조 아이템 조건: 체력 기준 경계(1 이상, HP x itemhp
   for (const kind of OBST_KINDS) { const lay = L.obstacleLayout(C, kind); for (let s = C.SPEED_MIN; s <= C.SPEED_MAX; s++) assert.ok(L.obstacleWindow(C, lay, s).width >= C.OBST_MIN_WINDOW); }
 });
 
-test('329-5. 옵션 itemhp(0~1, 기본 0.4)·rescueevery(1~10 정수, 기본 3)·rescue(0|1, 기본 1): 범위 밖 무시, 저장 방식 동일, 기본값이면 표시 없음', () => {
+test('329-5. 옵션 itemhp(0~1, 기본 0.6)·rescueevery(1~10 정수, 기본 2)·rescue(0|1, 기본 1): 범위 밖 무시, 저장 방식 동일, 기본값이면 표시 없음', () => {
   const po = q => L.parseOptions(q);
-  assert.deepEqual(po('?itemhp=0.6').values, { itemhp: 0.6 }); assert.deepEqual(po('?itemhp=0.6').applied, ['itemhp']); assert.deepEqual(po('?itemhp=0.4').applied, []); assert.deepEqual(po('?itemhp=0').values, { itemhp: 0 }); assert.deepEqual(po('?itemhp=1').values, { itemhp: 1 });
-  assert.deepEqual(po('?rescueevery=2').applied, ['rescueevery']); assert.deepEqual(po('?rescueevery=3').applied, []); assert.deepEqual(po('?rescue=0').applied, ['rescue']); assert.deepEqual(po('?rescue=1').applied, []);
+  assert.deepEqual(po('?itemhp=0.4').values, { itemhp: 0.4 }); assert.deepEqual(po('?itemhp=0.4').applied, ['itemhp']); assert.deepEqual(po('?itemhp=0.6').applied, []);   // 작업339: 기본값이 0.6 assert.deepEqual(po('?itemhp=0').values, { itemhp: 0 }); assert.deepEqual(po('?itemhp=1').values, { itemhp: 1 });
+  assert.deepEqual(po('?rescueevery=3').applied, ['rescueevery']); assert.deepEqual(po('?rescueevery=2').applied, []);   // 작업339: 기본값이 2 assert.deepEqual(po('?rescue=0').applied, ['rescue']); assert.deepEqual(po('?rescue=1').applied, []);
   for (const bad of ['itemhp=1.1', 'itemhp=-0.1', 'itemhp=x', 'rescueevery=0', 'rescueevery=11', 'rescueevery=2.5', 'rescue=2', 'rescue=0.5', 'rescue=']) assert.deepEqual(po('?' + bad).values, {}, bad);
   assert.deepEqual(L.resolveOptions('', JSON.stringify({ itemhp: 0.7, rescueevery: 5, rescue: 0 })).values, { itemhp: 0.7, rescueevery: 5, rescue: 0 }); assert.deepEqual(L.resolveOptions('', JSON.stringify({ itemhp: 9, rescueevery: 99 })).values, {});
   const c = L.buildConfig({ itemhp: 0.7, rescueevery: 5, rescue: 0 }); assert.equal(c.ITEM_HP, 0.7); assert.equal(c.RESCUE_EVERY, 5); assert.equal(c.RESCUE_ENABLED, false);

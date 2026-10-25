@@ -329,7 +329,7 @@ syncSndButtons();
 const G = {
   state: 'idle', words: [], wi: 0, plan: null, si: 0, mist: [],
   hp: 0, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
-  speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, survival: false, supply: null, startTime: 0, speedPending: false, speedSlot: 0, rescuePending: false, rescueSlot: 0, rescueKind: 'hint', rescueCount: 0, rescue: null, angels: [], boost: 0, roundSeq: 0, boostMax: 0, speedMaxSeen: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
+  speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, survival: false, supply: null, startTime: 0, speedPending: false, speedSlot: 0, rescuePending: false, rescueSlot: 0, rescueKind: 'hint', speedGroupTaken: -1, rescue: null, angels: [], boost: 0, roundSeq: 0, boostMax: 0, speedMaxSeen: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
   tiles: [], parts: [], floats: [],
   packActive: false, packId: 0, spawnT: 0,
   runPhase: 0, prevH: 0, rising: true, cleared: false, spriteDraws: 0, spriteFrame: -1, spriteAngle: 0,
@@ -474,7 +474,7 @@ function startRound(reviewOnly) {
     regular: regular, bossMode: false, introT: 0, repeatT: 0, repeatWord: '',
     state: 'run', words: pool, wi: 0, mist: pool.map(() => 0),
     hp: CONFIG.HP, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
-    roundSeq: G.roundSeq + 1, boost: 0, speedPending: false, speedMaxSeen: 0, rescuePending: false, rescueCount: 0, rescue: null, angels: [],
+    roundSeq: G.roundSeq + 1, boost: 0, speedPending: false, speedMaxSeen: 0, rescuePending: false, speedGroupTaken: -1, rescue: null, angels: [],
     speed: CONFIG.SPEED_MIN, speedTarget: CONFIG.SPEED_MIN, speedBase: CONFIG.SPEED_MIN, shownMult: 0, heartWords: surv ? new Set() : planHearts(regular), tiles: [], parts: [], floats: [],
     packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
     obstacles: [], obst: null, obstSeq: 0, invuln: 0, stumble: 0, fall: 0, obstHits: 0,
@@ -500,9 +500,11 @@ function loadWord(i) {
   // 작업328: 가속 아이템(난수 없이 판 순번·단어 순번 해시로 결정. 하트 우선, 보스·복습·장애물 단어에는 없음)
   const regIdx = G.words.slice(0, i).filter(x => !x.boss).length;
   // 작업329: 구조 아이템(힌트·천사)은 체력이 낮을 때만. 우선순위 하트 > 구조 > 가속이라 구조가 정해지면 가속은 이 단어에 없다. 이 단어의 체력은 단어를 불러올 때 정한다(회복해서 기준을 넘으면 다음 단어부터 없다)
-  const rs = planRescue({ roundSeq: G.roundSeq, regularIdx: regIdx, hp: G.hp, boss: boss, review: G.review, hasHeart: G.heartPending, hasObst: !!G.obst, nSlots: G.plan.slots.length, rescueCount: G.rescueCount });
-  G.rescuePending = !!rs; if (rs) { G.rescueSlot = rs.slot; G.rescueKind = rs.kind; G.rescueCount++; }
-  const sIdx = planSpeedItem({ roundSeq: G.roundSeq, regularIdx: regIdx, boss: boss, review: G.review, hasHeart: G.heartPending || !!rs, hasObst: !!G.obst, nSlots: G.plan.slots.length });
+  const rs = planRescue({ roundSeq: G.roundSeq, regularIdx: regIdx, hp: G.hp, boss: boss, review: G.review, hasHeart: G.heartPending, hasObst: !!G.obst, nSlots: G.plan.slots.length, });
+  G.rescuePending = !!rs; if (rs) { G.rescueSlot = rs.slot; G.rescueKind = rs.kind; }
+  const sIdx = planSpeedItem({ roundSeq: G.roundSeq, regularIdx: regIdx, boss: boss, review: G.review, hasHeart: G.heartPending || !!rs, hasObst: !!G.obst, nSlots: G.plan.slots.length,
+    groupTaken: G.speedGroupTaken, isHeartAt: G.survival ? (j => survHeartWord(j, G.roundSeq)) : (j => G.heartWords.has(j)), regularCount: G.survival ? undefined : G.regular });   // 작업339: 제외 대상이면 같은 그룹의 다음 후보로
+  if (sIdx !== null) G.speedGroupTaken = Math.floor(regIdx / CONFIG.SPEED_EVERY);
   G.speedPending = sIdx !== null; G.speedSlot = sIdx === null ? 0 : sIdx;
   G.packActive = false; G.spawnT = CONFIG.WORD_START_DELAY + (i === 0 ? CONFIG.FIRST_WORD_EXTRA : 0);
   renderWord(); renderProgress();
