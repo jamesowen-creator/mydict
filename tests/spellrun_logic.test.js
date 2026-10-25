@@ -763,3 +763,29 @@ test('321-2. 2단 점프 회전: 두 번째 점프 동안 0→360° 단조 증�
   assert.equal(L.sparkleAlpha(apex), 1); assert.equal(L.sparkleAlpha(-1), 0); assert.equal(L.sparkleAlpha(apex + 0.2), 0); assert.equal(L.sparkleAlpha(0.001) < 0.1, true);
   assert.ok(L.sparkleAlpha(apex - 0.06) > 0.4 && L.sparkleAlpha(apex - 0.06) < 0.6);
 });
+
+// ───────── 작업325: 발음 출처 문구 · ttsdebug 옵션 ─────────
+test('325-2. 발음 출처 문구: 서버(HIT/MISS/헤더 없음)와 내장 음성의 사유(401·403·503·시간 초과·재생 거부·서버 오류)', () => {
+  const t = L.ttsSourceLabel;
+  assert.equal(t({ engine: 'server', cache: 'HIT' }), '서버 음성(캐시 있음)');
+  assert.equal(t({ engine: 'server', cache: 'MISS' }), '서버 음성(새로 생성)');
+  assert.equal(t({ engine: 'server', cache: '' }), '서버 음성'); assert.equal(t({ engine: 'server' }), '서버 음성', '헤더가 없으면 서버 음성만');
+  assert.equal(t({ engine: 'builtin', status: 401 }), '내장 음성: 로그인 필요(401)');
+  assert.equal(t({ engine: 'builtin', status: 403 }), '내장 음성: 권한 없음(403)');
+  assert.equal(t({ engine: 'builtin', status: 503 }), '내장 음성: 서버 키 없음(503)');
+  assert.equal(t({ engine: 'builtin', reason: 'timeout' }), '내장 음성: 시간 초과');
+  assert.equal(t({ engine: 'builtin', reason: 'play' }), '내장 음성: 재생 거부');
+  assert.equal(t({ engine: 'builtin', status: 500 }), '내장 음성: 서버 오류'); assert.equal(t({ engine: 'builtin' }), '내장 음성: 서버 오류');
+  assert.equal(t({ engine: 'none' }), '재생 안 됨');
+  assert.equal(t({ engine: 'builtin', status: 403, reason: 'timeout' }), '내장 음성: 권한 없음(403)', '상태 코드가 우선');
+  assert.equal(t(), '내장 음성: 서버 오류');
+});
+
+test('325-2. ttsdebug 옵션: 0|1(기본 0), 범위 밖은 무시, 저장 방식 동일, 기본값과 같으면 표시 없음', () => {
+  const po = q => L.parseOptions(q);
+  assert.deepEqual(po('?ttsdebug=1').values, { ttsdebug: 1 }); assert.deepEqual(po('?ttsdebug=1').applied, ['ttsdebug']);
+  assert.deepEqual(po('?ttsdebug=0').applied, [], '기본값과 같으면 표시 없음');
+  for (const bad of ['ttsdebug=2', 'ttsdebug=-1', 'ttsdebug=x', 'ttsdebug=', 'ttsdebug=0.5']) assert.deepEqual(po('?' + bad).values, {}, bad);
+  assert.deepEqual(L.resolveOptions('', JSON.stringify({ ttsdebug: 1 })).values, { ttsdebug: 1 }); assert.deepEqual(L.resolveOptions('?ttsdebug=0', JSON.stringify({ ttsdebug: 1 })).values, { ttsdebug: 0 });
+  const d = L.buildConfig({ ttsdebug: 1 }), e = L.buildConfig(); for (const k of Object.keys(e)) assert.deepEqual(d[k], e[k], 'CONFIG 에는 영향 없음: ' + k);
+});

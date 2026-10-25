@@ -21,7 +21,8 @@ const FL = '"Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 const HEART = 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z';
 
 const IDS_KEY = 'spellrun_ids';       // 사전 단어장이 넣어 준 선택 단어 id 배열(sessionStorage)
-const TTS_TIMEOUT_MS = 8000;          // 서버 발음 응답을 기다리는 최대 시간. 넘으면 내장 음성으로 대신한다
+const TTS_TIMEOUT_MS = 8000;          // 서버 발음 응답을 기다리는 최대 시간. 넘으면 그 호출을 내장 음성으로 대신한다(작업325)
+let ttsTimeoutMs = TTS_TIMEOUT_MS;   // 시험용 훅(API.setTtsTimeout)으로만 바뀐다
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
 
 const $ = id => document.getElementById(id);
@@ -188,30 +189,46 @@ function speakBuiltin(text, rate, queue, onResult) {
 
 // 서버 발음 오디오는 하나의 <audio> 요소로 재생한다(iOS는 사용자 탭에서 한 번 재생한 요소만 이후 자동 재생을 허용한다).
 const player = new Audio();
-const audioCache = new Map();   // 단어 → 오디오 주소(Promise). 실패한 단어도 그대로 두어 같은 단어를 다시 요청하지 않는다
+const audioCache = new Map();   // 단어 → 오디오 주소(Promise). 작업325: 실패한 요청은 지워 다음 호출에서 다시 시도한다(실패가 방문 동안 반복되지 않게)
+const audioMeta = new Map();    // 단어 → 서버 응답 헤더 X-TTS-Cache(HIT/MISS). 점검 옵션 ttsdebug 의 출처 문구용
 let serverTtsOff = false;       // 401·403·503을 받으면 이번 방문에서는 서버 발음을 더 부르지 않는다
+let serverTtsStatus = 0;        // 위 상태 코드(출처 문구용)
+// 작업325: 점검 옵션 ttsdebug=1 일 때만 발음 출처를 화면 한쪽에 작게 보인다. 꺼져 있으면 DOM·표시·동작은 이전과 같다.
+const ttsDebug = OPT.values.ttsdebug === 1;
+let ttsSrcEl = null;
+function showTtsSource(label) {
+  API.lastTtsSource = label;
+  if (!ttsDebug) return;
+  if (!ttsSrcEl) { ttsSrcEl = document.createElement('div'); ttsSrcEl.className = 'ttssrc'; ttsSrcEl.id = 'ttsSrc'; box.appendChild(ttsSrcEl); }
+  ttsSrcEl.textContent = label;
+}
 function authHeaders() {
   let t = null; try { t = localStorage.getItem('mydict_token'); } catch (e) {}
   return t ? { Authorization: 'Bearer ' + t } : {};
 }
 function getServerAudio(word) {
   if (audioCache.has(word)) return audioCache.get(word);
-  if (serverTtsOff) return Promise.reject(new Error('서버 발음 사용 안 함'));
+  if (serverTtsOff) { const e = new Error('서버 발음 사용 안 함'); e.status = serverTtsStatus; return Promise.reject(e); }
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TTS_TIMEOUT_MS);
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, ttsTimeoutMs);
   const p = fetch('/api/tts', {
     method: 'POST',
     headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
     body: JSON.stringify({ text: word, lang: 'en' }),
     signal: ctrl.signal
   }).then(res => {
-    if (!res.ok) { if (res.status === 401 || res.status === 403 || res.status === 503) serverTtsOff = true; throw new Error('TTS ' + res.status); }
+    if (!res.ok) { if (res.status === 401 || res.status === 403 || res.status === 503) { serverTtsOff = true; serverTtsStatus = res.status; } const e = new Error('TTS ' + res.status); e.status = res.status; throw e; }
+    audioMeta.set(word, (res.headers && res.headers.get('X-TTS-Cache')) || '');
     return res.blob();
   }).then(blob => {
     if (!blob.size) throw new Error('빈 오디오');
     return URL.createObjectURL(blob);
+  }).catch(err => {
+    if (timedOut) { const e = new Error('TTS 시간 초과'); e.code = 'timeout'; throw e; }   // 서버 응답 시간 초과(8초). 재생이 끊긴 AbortError 와 구분한다
+    throw err;
   }).finally(() => clearTimeout(timer));
-  p.catch(() => {});
+  p.catch(() => { if (audioCache.get(word) === p) audioCache.delete(word); });   // 실패한 요청은 캐시에서 지운다
   audioCache.set(word, p);
   return p;
 }
@@ -225,7 +242,9 @@ function playUrl(url, rate, queue) {
         player.preservesPitch = true; player.webkitPreservesPitch = true; player.mozPreservesPitch = true;   // 느리게 재생해도 음높이 유지
       } catch (e) {}
       const pr = player.play();
-      if (pr && pr.then) pr.then(resolve, reject); else resolve();
+      // AbortError = 다음 소리가 바로 이어 받아 재생이 끊긴 것(대체하지 않음). 그 밖의 거부(자동 재생 제한 등)는 code 'play' 로 표시해 내장 음성으로 대체한다
+      if (pr && pr.then) pr.then(resolve, e => reject(e && e.name === 'AbortError' ? e : Object.assign(new Error('재생 거부: ' + ((e && e.name) || '')), { code: 'play' })));
+      else resolve();
     };
     if (queue && !player.paused && !player.ended) {
       let fired = false;
@@ -236,17 +255,26 @@ function playUrl(url, rate, queue) {
   });
 }
 // 단어 하나 발음. slow=true이면 0.6배속(같은 오디오를 다시 재생하므로 서버 호출이 늘지 않는다).
+// onResult(ok, why, source): source 는 발음 출처 문구(예: "서버 음성(캐시 있음)", "내장 음성: 권한 없음(403)")
 function pronounce(word, opts, onResult) {
   opts = opts || {};
   const slow = !!opts.slow, rate = slow ? CONFIG.FINAL_SLOW_RATE : 1;
-  const report = (ok, why) => { if (onResult) onResult(ok, why); };
+  const report = (ok, why, src) => { if (onResult) onResult(ok, why, src); };
   if (!SND.on) { report(false, '소리 끔'); return; }
-  const fallback = () => speakBuiltin(word, slow ? CONFIG.FINAL_SLOW_RATE : undefined, !!opts.queue, report);
-  if (serverTtsOff && !audioCache.has(word)) { fallback(); return; }
-  getServerAudio(word).then(url => playUrl(url, rate, !!opts.queue)).then(() => report(true), err => {
+  const fallback = info => speakBuiltin(word, slow ? CONFIG.FINAL_SLOW_RATE : undefined, !!opts.queue, (ok, why) => {
+    const label = L.ttsSourceLabel(ok ? Object.assign({ engine: 'builtin' }, info) : { engine: 'none' });
+    showTtsSource(label); report(ok, why, label);
+  });
+  if (serverTtsOff && !audioCache.has(word)) { fallback({ status: serverTtsStatus }); return; }
+  const fresh = !audioCache.has(word);
+  getServerAudio(word).then(url => playUrl(url, rate, !!opts.queue)).then(() => {
+    const label = L.ttsSourceLabel({ engine: 'server', cache: fresh ? (audioMeta.get(word) || '') : '' });   // 다시 재생하는 오디오는 캐시 여부를 말하지 않는다
+    showTtsSource(label); report(true, undefined, label);
+  }, err => {
     if (err && err.name === 'AbortError') { report(true); return; }   // 다음 소리가 바로 이어 받아 재생이 끊긴 것(실패 아님). 내장 음성으로 겹쳐 읽지 않는다
-    API.lastTtsError = String((err && err.message) || err); fallback();
-  });   // 서버 발음 실패 이유는 테스트 훅에 남긴다
+    API.lastTtsError = String((err && err.message) || err);   // 서버 발음 실패 이유는 테스트 훅에 남긴다
+    fallback({ status: err && err.status, reason: err && err.code });
+  });
 }
 // 시작·재도전 버튼을 누른 순간 호출: 소리 재생 권한(자동 재생 제한)을 미리 확보한다
 function primeAudio() {
@@ -686,9 +714,9 @@ $('ttsTest').addEventListener('click', () => {
   const st = $('ttsStatus');
   st.textContent = '재생 중...';
   primeAudio();
-  pronounce('hello', {}, (ok, why) => {
-    st.textContent = ok ? '재생이 시작되었습니다. 소리가 들리지 않으면 기기 음량과 무음 모드를 확인하세요.'
-                        : '재생되지 않았습니다 (' + why + '). 이 환경에서는 단어 발음이 나오지 않을 수 있습니다.';
+  pronounce('hello', {}, (ok, why, src) => {
+    st.textContent = (ok ? '재생이 시작되었습니다. 소리가 들리지 않으면 기기 음량과 무음 모드를 확인하세요.'
+                        : '재생되지 않았습니다 (' + why + '). 이 환경에서는 단어 발음이 나오지 않을 수 있습니다.') + (ttsDebug && src ? ' [' + src + ']' : '');
   });
 });
 els.resChips.addEventListener('click', e => {
@@ -1104,7 +1132,7 @@ function frame(ts) {
 }
 
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
-const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y };
+const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y };
 window.SpellRun = API;
 boot();
 })();

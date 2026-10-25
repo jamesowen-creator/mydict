@@ -28,8 +28,8 @@ const ROWS = [
 ];
 
 let srv, base, browser;
-const state = { me: null, rows: ROWS, tts: 200, requests: [] };
-const resetState = () => { state.me = { id: 7, email: 'u@x', name: '테스터', role: 'user', can_wordbook: true, perm_jgrammar: false }; state.rows = ROWS; state.tts = 200; state.requests.length = 0; };
+const state = { me: null, rows: ROWS, tts: 200, ttsDelay: 0, ttsHeader: null, requests: [] };
+const resetState = () => { state.me = { id: 7, email: 'u@x', name: '테스터', role: 'user', can_wordbook: true, perm_jgrammar: false }; state.rows = ROWS; state.tts = 200; state.ttsDelay = 0; state.ttsHeader = null; state.requests.length = 0; };
 test.before(async () => {
   if (SKIP) return;
   resetState();
@@ -46,7 +46,9 @@ test.before(async () => {
         if (u === '/api/wordbook' && req.method === 'GET') return json(200, state.rows);
         if (u === '/api/tts' && req.method === 'POST') {
           if (state.tts !== 200) return json(state.tts, { error: '모의 TTS 오류' });
-          res.writeHead(200, { 'Content-Type': 'audio/wav' }); return res.end(WAV);
+          const send = () => { res.writeHead(200, Object.assign({ 'Content-Type': 'audio/wav' }, state.ttsHeader ? { 'X-TTS-Cache': state.ttsHeader } : {})); res.end(WAV); };
+          if (state.ttsDelay) return setTimeout(send, state.ttsDelay);   // 작업325: 서버가 느린 상황 모의
+          return send();
         }
         json(404, { ok: false });
       });
@@ -1376,4 +1378,124 @@ test('321-2) 로딩 실패(시트 요청 차단): 기존 도형 캐릭터로 그
   assert.deepEqual([p.ready, p.draws], [false, 0], '스프라이트로는 한 번도 그리지 않았다(기존 그림으로 대체)');
   assert.deepEqual(page.errors.filter(e => !/Failed to load resource|ERR_BLOCKED/.test(e)), [], '오류 없음');
   await page.close();
+});
+
+// ───────── 작업325: 발음 시간 초과 대체 · 출처 표시 ─────────
+const sayWord = (page, word, opts) => page.eval(`new Promise(r => SpellRun.pronounce(${JSON.stringify(word)}, ${JSON.stringify(opts || {})}, (ok, why, src) => r({ ok, why, src })))`);
+// 헤드리스 Chrome 은 사용자 동작 없이 오디오 재생을 거부하므로, 서버 음성이 "재생되는" 상황은 play() 를 성공으로 바꿔 만든다
+const OKPLAY = "HTMLMediaElement.prototype.play = function () { return Promise.resolve(); }; 0";
+const spokenTexts = page => page.eval('window.__speech.spoken.map(s => s.text)');
+
+test('325-1) 서버 응답 시간 초과는 그 호출을 내장 음성으로 대체하고, 실패한 단어는 다시 요청하면 서버를 재시도한다(실패가 방문 동안 반복되지 않음)', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3], speech: true });
+  await gameReady(page);
+  await page.eval(OKPLAY);
+  await page.eval('SpellRun.setTtsTimeout(250)');
+  state.ttsDelay = 900;                      // 서버가 시간 제한보다 느림
+  const a = await sayWord(page, 'apple');
+  assert.equal(a.ok, true); assert.equal(a.src, '내장 음성: 시간 초과');
+  assert.deepEqual(await spokenTexts(page), ['apple'], '시간 초과 → 내장 음성으로 읽는다');
+  assert.equal(ttsCalls().length, 1);
+  // 같은 단어를 다시: 서버가 정상으로 돌아오면 재시도해서 서버 음성
+  state.ttsDelay = 0; state.ttsHeader = 'MISS';
+  const b = await sayWord(page, 'apple');
+  assert.equal(b.src, '서버 음성(새로 생성)'); assert.equal(ttsCalls().length, 2, '실패한 단어는 서버를 다시 부른다');
+  assert.deepEqual(await spokenTexts(page), ['apple'], '두 번째는 내장 음성을 쓰지 않았다');
+  // 성공한 단어는 다시 요청하지 않는다(기존 동작), 천천히 재생도 서버 호출 추가 없음
+  const c = await sayWord(page, 'apple', { slow: true });
+  assert.equal(ttsCalls().length, 2); assert.equal(c.src, '서버 음성', '다시 재생하는 오디오는 캐시 여부를 말하지 않는다');
+  assert.deepEqual(JSON.parse(ttsCalls()[0].body), { text: 'apple', lang: 'en' }, '요청 인자 그대로'); assert.ok(ttsCalls().every(r => /^Bearer /.test(r.auth || '')));
+  await page.close();
+});
+
+test('325-1) "이어받아 끊긴" AbortError(재생 중단)는 대체하지 않고, 재생 거부(NotAllowedError)는 내장 음성으로 대체한다. 서버 오류(500)는 그 호출만 대체하고 다음에 재시도한다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3], speech: true });
+  await gameReady(page);
+  // 재생이 AbortError 로 끊김 → 겹쳐 읽지 않는다
+  await page.eval(OKPLAY);
+  await page.eval("window.__origPlay = HTMLMediaElement.prototype.play; HTMLMediaElement.prototype.play = function () { return Promise.reject(new DOMException('interrupted', 'AbortError')); }; 0");
+  const a = await sayWord(page, 'book');
+  assert.equal(a.ok, true); assert.deepEqual(await spokenTexts(page), [], '이어받아 끊긴 경우는 내장 음성으로 대체하지 않는다');
+  // 재생 거부(자동 재생 제한 등) → 내장 음성
+  await page.eval("HTMLMediaElement.prototype.play = function () { return Promise.reject(new DOMException('blocked', 'NotAllowedError')); }; 0");
+  const b = await sayWord(page, 'water');
+  assert.equal(b.src, '내장 음성: 재생 거부'); assert.deepEqual(await spokenTexts(page), ['water']);
+  await page.eval('HTMLMediaElement.prototype.play = window.__origPlay; 0');
+  // 서버 오류 500: 그 호출만 대체, 다음 호출은 서버를 다시 부른다(서버 발음을 끄지 않는다)
+  state.tts = 500;
+  const c = await sayWord(page, 'happy');
+  assert.equal(c.src, '내장 음성: 서버 오류');
+  state.tts = 200;
+  const d = await sayWord(page, 'happy');
+  assert.equal(d.src, '서버 음성'); assert.equal(ttsCalls().filter(r => JSON.parse(r.body).text === 'happy').length, 2);
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+  await page.close();
+});
+
+test('325-2) 발음 출처 문구(ttsdebug=1): 서버 HIT/MISS/헤더 없음, 401·403·503, 시간 초과를 화면 한쪽 작은 글자로 보이고 발음 테스트 결과에도 같이 보인다', { skip: SKIP }, async () => {
+  resetState();
+  const shown = page => page.eval("(() => { const e = document.getElementById('ttsSrc'); return e ? e.textContent : null; })()");
+  // 서버 성공: HIT / MISS / 헤더 없음
+  let page = await openQ({ ids: [1, 2, 3], query: 'ttsdebug=1' });
+  await page.eval(OKPLAY);
+  await page.eval('SpellRun.manual = true; 0');
+  assert.equal(await shown(page), null, '발음이 재생되기 전에는 표시 없음');
+  assert.equal(await page.eval("document.getElementById('tune').hidden"), false, 'ttsdebug=1 은 조정값 사용 중');
+  state.ttsHeader = 'HIT'; assert.equal((await sayWord(page, 'apple')).src, '서버 음성(캐시 있음)'); assert.equal(await shown(page), '서버 음성(캐시 있음)');
+  state.ttsHeader = 'MISS'; assert.equal((await sayWord(page, 'book')).src, '서버 음성(새로 생성)'); assert.equal(await shown(page), '서버 음성(새로 생성)');
+  state.ttsHeader = null; assert.equal((await sayWord(page, 'water')).src, '서버 음성', '헤더가 없으면 서버 음성만');
+  const st = await page.eval("(() => { const e = document.getElementById('ttsSrc'), r = e.getBoundingClientRect(), b = document.getElementById('box').getBoundingClientRect(), c = getComputedStyle(e); return { fs: parseFloat(c.fontSize), inside: r.left >= b.left && r.right <= b.right && r.top >= b.top && r.bottom <= b.bottom, pe: c.pointerEvents }; })()");
+  assert.ok(st.fs <= 14 && st.inside && st.pe === 'none', '작은 글자·상자 안·클릭을 가로채지 않음: ' + JSON.stringify(st));
+  // 시작 화면의 발음 테스트에도 출처가 같이 보인다
+  state.ttsHeader = 'HIT';
+  await page.click('#ttsTest');
+  await page.waitFor("document.getElementById('ttsStatus').textContent.includes('[서버 음성(캐시 있음)]')", 4000);
+  await page.close();
+  // 401·403·503: 서버 발음을 끄고 내장 음성(출처에 사유)
+  for (const [code, label] of [[401, '내장 음성: 로그인 필요(401)'], [403, '내장 음성: 권한 없음(403)'], [503, '내장 음성: 서버 키 없음(503)']]) {
+    resetState(); state.tts = code;
+    const p2 = await browser.newPage({ width: 390, height: 844, token: jwt() });
+    await p2.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
+    await p2.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
+    await p2.goto(base + '/spelling_run.html?ttsdebug=1');
+    await gameReady(p2);
+    await p2.eval(OKPLAY);
+    assert.equal((await sayWord(p2, 'apple')).src, label, String(code));
+    assert.equal(await shown(p2), label);
+    assert.equal((await sayWord(p2, 'book')).src, label, '이후에도 같은 사유(서버를 다시 부르지 않음)'); assert.equal(ttsCalls().length, 1, '서버 요청은 한 번만');
+    await p2.close();
+  }
+  // 시간 초과
+  resetState(); state.ttsDelay = 800;
+  const p3 = await browser.newPage({ width: 390, height: 844, token: jwt() });
+  await p3.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
+  await p3.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
+  await p3.goto(base + '/spelling_run.html?ttsdebug=1');
+  await gameReady(p3);
+  await p3.eval(OKPLAY);
+  await p3.eval('SpellRun.setTtsTimeout(200)');
+  assert.equal((await sayWord(p3, 'apple')).src, '내장 음성: 시간 초과'); assert.equal(await shown(p3), '내장 음성: 시간 초과');
+  await p3.close();
+});
+
+test('325-2) ttsdebug=0(기본)이면 표시도 요소도 없고 동작이 같다: 출처 문구 요소가 만들어지지 않고 발음 테스트 글에 출처가 붙지 않으며 조정값 표시도 없다', { skip: SKIP }, async () => {
+  resetState(); state.ttsHeader = 'HIT';
+  const page = await openGame({ ids: [1, 2, 3], speech: true });
+  await gameReady(page);
+  await page.eval(OKPLAY);
+  assert.equal(await page.eval("document.getElementById('tune').hidden"), true);
+  const before = await page.eval('document.getElementById("box").querySelectorAll("*").length');
+  const r = await sayWord(page, 'apple');
+  assert.equal(r.ok, true);
+  assert.equal(await page.eval("document.getElementById('ttsSrc')"), null, '요소 없음');
+  assert.equal(await page.eval('document.getElementById("box").querySelectorAll("*").length'), before, 'DOM 변화 없음');
+  assert.equal(await page.eval("document.querySelector('.ttssrc')"), null);
+  await page.click('#ttsTest');
+  await page.waitFor("document.getElementById('ttsStatus').textContent.includes('재생이 시작')", 4000);
+  assert.ok(!(await page.text('#ttsStatus')).includes('['), '발음 테스트 글에 출처 없음');
+  const p2 = await openQ({ ids: [1, 2, 3], query: 'ttsdebug=0' });
+  assert.equal(await p2.eval("document.getElementById('tune').hidden"), true, '기본값과 같으면 표시 없음');
+  await p2.close(); await page.close();
 });

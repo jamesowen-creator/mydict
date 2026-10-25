@@ -104,7 +104,7 @@ const CONFIG = buildConfig();
 const OPTION_RULES = {
   pace: { min: 0.7, max: 1.8, def: DEFAULT_PACE }, hp: { min: 1, max: 10, int: true, def: 5 }, startdelay: { min: 0.5, max: 6, def: 2.2 },
   popsec: { min: 0.5, max: 5, def: 1.6 }, highprob: { min: 0, max: 1, def: 0.2 }, heartevery: { min: 1, max: 10, int: true, def: 3 }, dj: { min: 0, max: 1, int: true, def: 1 }, maxcombo: { min: 3, max: 12, int: true, def: 5 },
-  intro: { min: 0, max: 1, int: true, def: 1 }, introhold: { min: 0.5, max: 3, def: 1.3 }
+  intro: { min: 0, max: 1, int: true, def: 1 }, ttsdebug: { min: 0, max: 1, int: true, def: 0 }, introhold: { min: 0.5, max: 3, def: 1.3 }
 };
 // 반환 { values: 유효한 값(기본값과 같아도 포함), applied: 기본값과 다른 옵션 이름 }
 function parseOptions(search) {
@@ -449,6 +449,17 @@ function sparkleAlpha(j2, cfg) {
   return Math.max(0, 1 - Math.abs(j2 - jumpV0(cfg) / jumpG(cfg)) / 0.12);
 }
 
+// ---- 작업325: 발음 출처 문구(점검 옵션 ttsdebug) ----
+// o: { engine: 'server'|'builtin'|'none', cache: 'HIT'|'MISS'|'', status: 서버 응답 코드, reason: 'timeout'|'play'|'' }
+function ttsSourceLabel(o) {
+  o = o || {};
+  if (o.engine === 'server') return '서버 음성' + (o.cache === 'HIT' ? '(캐시 있음)' : o.cache === 'MISS' ? '(새로 생성)' : '');
+  if (o.engine === 'none') return '재생 안 됨';
+  const why = o.status === 401 ? '로그인 필요(401)' : o.status === 403 ? '권한 없음(403)' : o.status === 503 ? '서버 키 없음(503)'
+    : o.reason === 'timeout' ? '시간 초과' : o.reason === 'play' ? '재생 거부' : '서버 오류';
+  return '내장 음성: ' + why;
+}
+
 // ---- 작업323: 새 단어 시작 연출 ----
 // 타임라인: 큰 뜻 유지(hold) → 축소·이동(shrink). 전체(hold+shrink)는 새 단어 대기 시간(delay) 이하로 맞춘다(옵션이 커도 hold 를 줄인다).
 // o: { first: 첫 단어, boss: 보스 단어 }
@@ -613,7 +624,7 @@ return {
   speedLevel: speedLevel, speedMult: speedMult, gapSec: gapSec, leadSec: leadSec, speedAfterHit: speedAfterHit, speedAfterFail: speedAfterFail,
   targetSpeed: targetSpeed, planHearts: planHearts, pickHeartSlot: pickHeartSlot, jumpHeight: jumpHeight, judge: judge, buildRound: buildRound,
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
-  PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
+  ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };

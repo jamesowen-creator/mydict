@@ -76,6 +76,7 @@
   word-break:keep-all;overflow-wrap:normal;margin-top:calc(2 * var(--u));
   text-shadow:0 0 calc(3 * var(--u)) #fff,0 0 calc(3 * var(--u)) #fff,calc(1 * var(--u)) 0 0 #fff,calc(-1 * var(--u)) 0 0 #fff,0 calc(1 * var(--u)) 0 #fff,0 calc(-1 * var(--u)) 0 #fff;   /* 하늘색 배경·구름 위에서도 읽히도록 흰 외곽 */
 }
+.sr-box .ttssrc{position:absolute;right:calc(8 * var(--u));bottom:calc(6 * var(--u));max-width:62%;text-align:right;font-size:calc(10 * var(--u));font-weight:700;line-height:1.3;color:#fff;text-shadow:0 0 calc(3 * var(--u)) #14204a,0 0 calc(3 * var(--u)) #14204a;pointer-events:none;z-index:6}   /* 점검 옵션 ttsdebug=1 일 때만 JS 가 만든다 */
 .sr-box .tune{position:absolute;left:0;bottom:0;min-height:44px;padding:0 calc(10 * var(--u));margin:0;background:none;border:0;font-family:var(--f-body);font-size:calc(11 * var(--u));font-weight:700;color:var(--gold);text-decoration:underline;cursor:pointer;z-index:5}
 .sr-box .slot.chunk{
   padding:0 calc(4 * var(--u));margin-top:calc(2 * var(--u));
