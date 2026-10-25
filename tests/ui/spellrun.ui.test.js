@@ -412,8 +412,8 @@ const OVERFLOW = `(() => {
     if (el.scrollWidth > el.clientWidth + 1 && !el.classList.contains('clip')) bad.push(name + ' 가로 넘침 ' + el.scrollWidth + '>' + el.clientWidth);
   };
   const $ = id => document.getElementById(id);
-  ['meaning', 'word', 'hint', 'pop', 'popWord', 'popPron', 'popMean', 'popEx', 'resTitle', 'resScore', 'resChips'].forEach(id => chk($(id), id));
-  document.querySelectorAll('#word .slot, #word .cell, #hint > *, #popWord .pl, #resChips .chip').forEach((e, i) => chk(e, e.className + i));
+  ['meaning', 'sub', 'word', 'pop', 'popWord', 'popPron', 'popMean', 'popEx', 'resTitle', 'resScore', 'resChips'].forEach(id => chk($(id), id));
+  document.querySelectorAll('#word .slot, #word .cell, #popWord .pl, #resChips .chip').forEach((e, i) => chk(e, e.className + i));
   return bad;
 })()`;
 // 수동 진행: 조건이 될 때까지 완벽 봇(1회 점프)으로 step 을 돌린다
@@ -510,59 +510,68 @@ test('318-1) 리사이즈·회전 때 다시 계산된다: 폭을 320 으로 줄
   await page.close();
 });
 
-test('318-2) 힌트: 대표 뜻·품사·빈칸 예문·다른 뜻·쓰임 설명이 우선순위대로 보이고, 정답 단어(활용형·대소문자 포함)는 DOM 어디에도 그대로 나타나지 않는다', { skip: SKIP }, async () => {
+// 작업322: 상세 힌트 박스는 없다. 상단 한글 힌트 = 대표 뜻(.meaning) + 보조 한 줄(.sub, 다른 뜻 키워드)
+const hudInfo = page => page.eval(`(() => { const G = SpellRun.G, w = G.words[G.wi], u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')), b = document.getElementById('box').getBoundingClientRect();
+  const y = id => { const e = document.getElementById(id); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return { top: (r.top - b.top) / u, bottom: (r.bottom - b.top) / u, fs: parseFloat(getComputedStyle(e).fontSize) / u, h: r.height / u }; };
+  const sub = document.getElementById('sub');
+  return { word: w.word, meaning: document.getElementById('meaning').textContent, sub: sub.hidden ? null : sub.textContent, subShadow: getComputedStyle(sub).textShadow, subBg: getComputedStyle(sub).backgroundColor, subBorder: getComputedStyle(sub).borderTopWidth,
+    hint: document.getElementById('hint'), boxes: document.querySelectorAll('.hint, .h-pos, .h-alt, .h-note, .h-ex').length, row1: y('hud') && null,
+    meanY: y('meaning'), subY: y('sub'), wordY: y('word'), progY: (() => { const r = document.getElementById('progress').getBoundingClientRect(); return { bottom: (r.bottom - b.top) / u }; })() }; })()`);
+
+test('322-1/2) 상세 힌트 박스(흰 배경·품사·품사별 다른 뜻·쓰임 설명)는 DOM에도 없고, 대표 뜻 아래 보조 한 줄(다른 뜻 키워드)만 있으며 정답은 가려진다', { skip: SKIP }, async () => {
   resetState(); state.rows = HINT_ROWS;
   const page = await openQ({ ids: [21, 22, 23, 24, 25, 26, 27, 28] });
   await page.click('#startBtn');
   await page.waitFor("SpellRun.G.state === 'run'", 4000);
-  const forms = await page.eval('(() => { const out = {}; SpellRun.G.words.forEach(w => { out.__ = 1; }); return 1; })()');
-  const seenWords = [];
+  const seen = [];
   for (let k = 0; k < 8; k++) {
-    const d = await page.eval(`(() => { const G = SpellRun.G, w = G.words[G.wi]; const h = document.getElementById('hint');
-      return { word: w.word, meaning: document.getElementById('meaning').textContent, hint: h.hidden ? '' : [...h.children].filter(c => !c.hidden).map(c => c.className + '|' + c.textContent), hintHidden: h.hidden, html: document.getElementById('hud').innerHTML }; })()`);
-    seenWords.push(d.word);
-    const text = d.meaning + ' ' + (Array.isArray(d.hint) ? d.hint.join(' ') : '');
+    const d = await hudInfo(page);
+    seen.push(d.word);
+    assert.equal(d.hint, null, '#hint 요소가 없다'); assert.equal(d.boxes, 0, '.hint/.h-pos/.h-alt/.h-note/.h-ex 요소 없음');
+    assert.equal(await page.eval("[...document.querySelectorAll('#hud *')].filter(e => { const c = getComputedStyle(e).backgroundColor; return /rgba?\\(255, 255, 255, 0\\.\\d+\\)/.test(c) && e.id !== 'snd'; }).length"), 0, '흰 반투명 배경 박스 없음');
+    const text = d.meaning + ' ' + (d.sub || '');
     const re = new RegExp('(?<![A-Za-z])' + d.word + '(s|es|ed|d|ing|ly|er|ers|est)?(?![A-Za-z])', 'i');
-    assert.ok(!re.test(text), `${d.word}: 힌트에 정답이 보임: ${text}`);
-    assert.ok(!re.test(d.html.replace(/<[^>]+>/g, ' ')), `${d.word}: HUD DOM 에 정답이 보임`);
-    const hl = Array.isArray(d.hint) ? d.hint : [];
-    assert.ok(!hl.some(x => x.startsWith('h-ex')), '작업320: 힌트에는 예문이 없다');
-    assert.ok(!text.includes('…'), '"…" 로 자르지 않는다: ' + text);
-    if (d.word === 'happy') {
-      assert.deepEqual(hl.map(x => x.split('|')[0]), ['h-pos', 'h-alt', 'h-note'], '품사 → 다른 뜻 → 쓰임 설명');
-      assert.ok(hl[0].endsWith('형용사') && hl[1].endsWith('형용사 만족스러운') && hl[2].includes('＿＿ 는 기분이 좋을 때 쓴다.'), JSON.stringify(hl));
-    }
-    if (d.word === 'extraordinary') assert.deepEqual(hl.map(x => x.split('|')[0]).filter(c => c === 'h-alt').length <= 3, true);
-    if (d.word === 'window' || d.word === 'friend') assert.ok(!hl.some(x => x.startsWith('h-note')), '쓰임 설명이 없는 오래된 데이터는 있는 항목만');
+    assert.ok(!re.test(text), d.word + ': 힌트에 정답이 보임: ' + text);
+    assert.ok(!text.includes('…'));
+    // 보조 줄: 배경·테두리 박스 없음, 흰 외곽(그림자)으로 가독성, 대표 뜻보다 확실히 작고 10px 이상
+    if (d.sub !== null) {
+      assert.equal(d.subBg, 'rgba(0, 0, 0, 0)'); assert.equal(d.subBorder, '0px'); assert.match(d.subShadow, /rgb\(255, 255, 255\)/);
+      assert.ok(d.subY.fs >= 10 - 0.01 && d.subY.fs <= 12.01 && d.subY.fs < d.meanY.fs - 4, `보조 줄 글자 ${d.subY.fs} / 대표 뜻 ${d.meanY.fs}`);
+      assert.ok(d.subY.top >= d.meanY.bottom - 0.5 && d.wordY.top >= d.subY.bottom + 12, '대표 뜻 → 보조 줄 → (조각 표시 자리) → 글자 칸 순서');
+    } else assert.ok(d.wordY.top - d.meanY.bottom >= 10 && d.wordY.top - d.meanY.bottom <= 30, '보조 줄이 없으면 대표 뜻과 글자 칸 사이가 어색하게 비지 않는다: ' + (d.wordY.top - d.meanY.bottom));
+    if (d.word === 'happy') assert.equal(d.sub, '만족스러운', '대표 뜻 키워드는 빠지고 다른 뜻만');
+    if (d.word === 'window' || d.word === 'friend' || d.word === 'music') assert.equal(d.sub, null, '다른 뜻이 없는 옛 데이터는 보조 줄 없음');
     await advance(page, 'G.state === "pop"', {});
     if (await page.eval('SpellRun.G.wi + 1 >= SpellRun.G.words.length')) break;
     await advance(page, 'G.state === "run" && G.wi > ' + (await page.eval('SpellRun.G.wi')), {});
   }
-  assert.ok(seenWords.length >= 7, '여러 단어 확인: ' + seenWords);
-  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), [], '오래된 데이터에서도 오류 없음');
+  assert.ok(seen.length >= 7, '여러 단어 확인: ' + seen);
   assert.equal(state.requests.filter(r => !/\/api\/(me|wordbook|tts)$/.test(r.url) && r.url.startsWith('/api/')).length, 0, '힌트용 AI/API 호출 없음');
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
   await page.close();
 });
 
-test('318-2) 힌트는 단어가 진행되는 동안 고정(움직이지 않음)이고, 글자 칸 줄 아래·높은 칸 타일 위쪽보다 위에 있다(360×640 논리 크기·320px 폭)', { skip: SKIP }, async () => {
+test('322-3) 힌트 묶음(대표 뜻 + 보조 줄)과 글자 칸 줄은 HUD 줄에서 내려와 있고(HUD_SHIFT), 글자 칸 줄 아래 끝은 높은 칸 타일 윗변(276)보다 위이며 고정이다(320·360·390, 360×640 논리)', { skip: SKIP }, async () => {
   resetState(); state.rows = HINT_ROWS;
-  for (const width of [320, 360]) {
-    const page = await openQ({ ids: [21, 24, 22], query: 'dj=1&highprob=1', width });
+  const shift = (await (async () => { const L = require('../../public/js/spellrun/logic.js'); return L.LAYOUT.HUD_SHIFT; })());
+  for (const width of [320, 360, 390]) {
+    const page = await openQ({ ids: [21, 24, 22], width });
+    await page.eval('Math.random = () => 0.0001');   // 조각 칸(×N 표시)이 가장 많은 경우
     await page.click('#startBtn');
     await page.waitFor("SpellRun.G.state === 'run'", 4000);
-    const geo = () => page.eval(`(() => { const u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')), b = document.getElementById('box').getBoundingClientRect();
-      const y = id => { const r = document.getElementById(id).getBoundingClientRect(); return { top: (r.top - b.top) / u, bottom: (r.bottom - b.top) / u }; };
-      return { word: y('word'), hint: y('hint'), hintHidden: document.getElementById('hint').hidden, u }; })()`);
-    const g1 = await geo();
-    await advance(page, 'G.time > 3', {});
-    const g2 = await geo();
-    assert.deepEqual([g1.hint.top, g1.hint.bottom], [g2.hint.top, g2.hint.bottom], '진행 중 위치 고정');
-    assert.ok(!g1.hintHidden);
-    assert.ok(g1.hint.top >= g1.word.bottom - 0.5, '글자 칸 줄과 겹치지 않음: ' + JSON.stringify(g1));
-    const highTop = await page.eval('(SpellRun.HIGH_Y - 29 - 3)');   // 높은 칸 타일 윗변(bob 3 포함, 논리 px)
-    assert.ok(g1.hint.bottom <= highTop - 8, `힌트 아래 ${g1.hint.bottom.toFixed(1)} 가 높은 칸 타일 윗변 ${highTop} 보다 8 이상 위: ` + width);
-    // 일반 타일 영역(TILE_Y-29)과도 겹치지 않음
-    assert.ok(g1.hint.bottom < (await page.eval('SpellRun.TILE_Y - 29')));
+    for (let k = 0; k < 3; k++) {
+      const d = await hudInfo(page);
+      assert.ok(d.meanY.top - d.progY.bottom >= shift - 1, `${width}px 위쪽 HUD 줄과 대표 뜻 사이 ${(d.meanY.top - d.progY.bottom).toFixed(1)} >= HUD_SHIFT ${shift}`);
+      assert.ok(d.wordY.bottom <= 266, `${width}px ${d.word}: 글자 칸 줄 아래 끝 ${d.wordY.bottom.toFixed(1)} <= 266`);
+      assert.ok(d.wordY.bottom + 10 <= 276, '높은 칸 타일 윗변(276)과 10 이상 간격');
+      assert.ok(d.wordY.top - (d.subY ? d.subY.bottom : d.meanY.bottom) >= 10, '조각 칸 표시(×N)·삼각형이 들어갈 자리');
+      assert.deepEqual(await page.eval(OVERFLOW), [], `${width}px ${d.word}`);
+      const t0 = d.wordY.top; await advance(page, 'G.time > G.time - 1 && true', {});
+      assert.equal((await hudInfo(page)).wordY.top, t0, '진행 중 고정');
+      await advance(page, 'G.state === "pop"', {});
+      if (await page.eval('SpellRun.G.wi + 1 >= SpellRun.G.words.length')) break;
+      await advance(page, 'G.state === "run" && G.wi > ' + (await page.eval('SpellRun.G.wi')), {});
+    }
     await page.close();
   }
 });
@@ -862,28 +871,36 @@ const WORDS12 = ['apple', 'book', 'water', 'happy', 'window', 'music', 'friend',
 const ROWS12 = WORDS12.map((w, i) => RICH(61 + i, w, '뜻' + (i + 1), { meanings: [{ pos: 'noun', definition: '뜻' + (i + 1), example: 'This is a ' + w + '.' }] }));
 const IDS12 = WORDS12.map((_, i) => 61 + i);
 
-test('320-1) 힌트: 예문이 없고 "…" 로 잘린 글이 없으며(최악 데이터), 다른 뜻은 최대 3줄, 넘침 없음, 글자 칸 줄·높은 칸 타일과 겹치지 않는다(320·360)', { skip: SKIP }, async () => {
-  resetState(); state.rows = HINT_ROWS;
+test('322-2) 최악 데이터(긴 뜻·키워드 많음·공백 없는 긴 키워드)에서 보조 줄은 "…" 없이 키워드 단위로 줄고 가로 넘침·겹침이 없다(320·360·390)', { skip: SKIP }, async () => {
+  const many = Array.from({ length: 10 }, (_, i) => '아주길게늘어놓은다른뜻키워드' + (i + 1)).join(', ');
+  state.rows = [
+    RICH(81, 'extraordinary', LONG_MEAN, { meanings: [{ pos: 'adjective', definition: LONG_MEAN }, { pos: 'adjective', definition: many }, { pos: 'noun', definition: '가나다라마바사아자차카타파하가나다라마바사아자차카타파하' }] }),
+    RICH(82, 'beautiful', LONG_NOSPACE, { meanings: [{ definition: '아름다운, 예쁜, 멋진, 훌륭한, 근사한, 고운, 아리따운, 곱디고운' }] }),
+    RICH(83, 'environment', '환경', { meanings: [{ definition: '환경, 주변 상황, 자연환경, 생태계, 둘레, 사정, 분위기' }] }),
+  ];
   for (const width of [320, 360, 390]) {
-    const page = await openQ({ ids: [21, 22, 24], width });
+    const page = await openQ({ ids: [81, 82, 83], width });
     await page.eval('Math.random = () => 0.0001');
     await page.click('#startBtn');
     await page.waitFor("SpellRun.G.state === 'run'", 4000);
     for (let k = 0; k < 3; k++) {
-      const d = await page.eval(`(() => { const u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')), b = document.getElementById('box').getBoundingClientRect(), h = document.getElementById('hint'), w = document.getElementById('word').getBoundingClientRect();
-        const kids = [...h.children].filter(c => !c.hidden);
-        return { word: SpellRun.G.words[SpellRun.G.wi].word, text: document.getElementById('hud').textContent, cls: kids.map(c => c.className), clipped: kids.some(c => getComputedStyle(c).textOverflow === 'ellipsis' || c.classList.contains('clip')),
-          bottom: h.hidden ? 0 : (h.getBoundingClientRect().bottom - b.top) / u, wordBottom: (w.bottom - b.top) / u, hintTop: h.hidden ? 0 : (h.getBoundingClientRect().top - b.top) / u }; })()`);
-      assert.ok(!d.text.includes('…') && !d.clipped, `${width}px ${d.word}: "…" 잘림 없음`);
-      assert.ok(!d.cls.includes('h-ex'), '예문 없음'); assert.ok(d.cls.filter(c => c === 'h-alt').length <= 3);
+      const d = await hudInfo(page);
+      assert.ok(!(d.meaning + (d.sub || '')).includes('…'), `${width}px ${d.word}: "…" 잘림 없음`);
       assert.deepEqual(await page.eval(OVERFLOW), [], `${width}px ${d.word}`);
-      if (d.bottom) { assert.ok(d.hintTop >= d.wordBottom - 0.5, '글자 칸 줄과 겹치지 않음'); assert.ok(d.bottom <= 258 + 0.5, `${width}px 힌트 아래 ${d.bottom} <= 258(높은 칸 타일 윗변 276 보다 위)`); }
+      if (d.sub) {
+        assert.ok(d.subY.h <= d.subY.fs * 1.3 * 2 + 1, '보조 줄은 두 줄 이내');
+        const items = d.sub.split(' · '), all = await page.eval('SpellRun.G.words[SpellRun.G.wi].hint.subs');
+        assert.deepEqual(items, all.slice(0, items.length), '앞에서부터 키워드 단위로만 남는다(중간 키워드나 글자를 자르지 않음)');
+        assert.ok(all.length <= 6);
+      }
+      assert.ok(d.wordY.bottom <= 266);
       await advance(page, 'G.state === "pop"', {});
       if (await page.eval('SpellRun.G.wi + 1 >= SpellRun.G.words.length')) break;
       await advance(page, 'G.state === "run" && G.wi > ' + (await page.eval('SpellRun.G.wi')), {});
     }
     await page.close();
   }
+  state.rows = HINT_ROWS;
 });
 
 // 실제 입력 이벤트(CDP Input.*)로 점프를 넣는다. SpellRun 훅(R.jump)을 쓰지 않는다.

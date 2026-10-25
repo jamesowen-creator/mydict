@@ -136,8 +136,11 @@ function resolveOptions(search, storedRaw) {
 }
 function configure(values) { return Object.assign(CONFIG, buildConfig(values)); }
 
-// 화면 배치(논리 px, 360x640 기준). 힌트 아래 끝은 높은 칸(2단 점프) 타일 위쪽보다 위에 있어야 한다.
-const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TILE_H: 58, HINT_BOTTOM_Y: 340, HINT_BOTTOM_Y_DJ: 258, WORD_AVAIL_W: 332 };
+// 화면 배치(논리 px, 360x640 기준). 글자 칸 줄 아래 끝은 높은 칸(2단 점프) 타일 위쪽보다 위에 있어야 한다.
+const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TILE_H: 58, WORD_AVAIL_W: 332,
+  HUD_SHIFT: 24,        // 작업322: 대표 뜻·보조 줄·글자 칸 줄을 위쪽 HUD 줄에서 이만큼(논리 px) 아래로 내린다(한 곳에서 조정)
+  CONTENT_BOTTOM_Y: 266 // 글자 칸 줄 아래 끝의 한계: 높은 칸 타일 윗변(HIGH_TILE_Y - TILE_H/2 = 276)보다 위(여유 포함)
+};
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz';
 const CONFUSABLE = (() => {
@@ -424,7 +427,6 @@ function fitWord(items, availW, opt) {
 }
 
 // ---- 작업318-2/3: 힌트 만들기와 정답 가리기 ----
-const POS_KO = { noun: '명사', verb: '동사', adjective: '형용사', adverb: '부사', preposition: '전치사', conjunction: '접속사', pronoun: '대명사', interjection: '감탄사', phrase: '구', idiom: '관용어' };
 const MASK = '＿＿';
 function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 // 정답 단어와 그 활용형(접미 변화). 불규칙 활용(ran 등)은 만들지 못한다.
@@ -464,32 +466,23 @@ function keywords(s, max) {
   }
   return out || s;
 }
-// 첫 문장(문장 부호/종결에서 끊음). 길면 줄이지 않고 비운다(한 줄에 안 들어가는 설명은 쓰지 않는다).
-function firstSentence(s, max) {
-  s = txt(s);
-  if (!s) return '';
-  const m = s.match(/^.*?[.!?。](?=\s|$)/);
-  const one = (m ? m[0] : s).trim();
-  return Array.from(one).length <= max ? one : '';
-}
+// 쉼표 단위 키워드로 나눈다
+function splitKeywords(s) { return txt(s).split(/\s*[,，;；、]\s*/).filter(Boolean); }
 // row: 단어장 행 { data, example_sentence }, word: 소문자 단어, main: 대표 뜻.
-// 반환 { hint: { meaning, pos, alts, note }(모두 정답이 가려진 값, 없는 항목은 ''/[]), pop: { pron, meaning, example, ranges }(가리지 않은 값 + 강조 위치) }
-// 작업320: 힌트에서 예문을 뺐다(예문은 완성 팝업에서만). 다른 뜻은 최대 3개, "품사 뜻키워드" 형태.
+// 반환 { hint: { meaning, subs }(정답이 가려진 값. subs 는 다른 뜻 키워드 배열, 최대 6개), pop: { pron, meaning, example, ranges }(가리지 않은 값 + 강조 위치) }
+// 작업322: 상세 힌트 박스(품사·품사별 다른 뜻·쓰임 설명)를 없애고 보조 한 줄(다른 뜻 키워드)만 남겼다.
+// 보조 줄: meanings[].definition(없으면 core_meaning)의 쉼표 키워드에서 대표 뜻에 이미 있는 것과 중복을 빼고 앞에서 최대 6개.
 function buildHint(row, word, main) {
   const d = row && row.data && typeof row.data === 'object' ? row.data : {};
   const meanings = Array.isArray(d.meanings) ? d.meanings.filter(function (m) { return m && typeof m === 'object'; }) : [];
-  const m0 = meanings[0] || {};
-  const posOf = function (m) { const raw = txt(m.pos); return POS_KO[raw.toLowerCase()] || (raw.length <= 8 ? raw : ''); };
-  const pos = posOf(m0);
-  const alts = [];
-  for (let i = 1; i < meanings.length && alts.length < 3; i++) {
-    const def = keywords(txt(meanings[i].definition) || txt(meanings[i].core_meaning), 28);
-    if (!def || def === main || alts.some(function (a) { return a.def === def; })) continue;
-    const p = posOf(meanings[i]);
-    alts.push({ def: def, text: (p ? p + ' ' : '') + def });
+  const have = new Set(splitKeywords(main));
+  const subs = [];
+  for (const m of meanings) {
+    for (const k of splitKeywords(txt(m.definition) || txt(m.core_meaning))) {
+      if (have.has(k)) continue;
+      have.add(k); subs.push(k);
+    }
   }
-  let note = '';
-  for (const m of meanings) { note = firstSentence(txt(m.usage_note) || txt(m.nuance), 60); if (note) break; }
   const cands = [txt(row && row.example_sentence)]
     .concat(meanings.map(function (m) { return txt(m.example); }))
     .concat((Array.isArray(d.usages) ? d.usages : []).map(function (u) { return u && typeof u === 'object' ? txt(u.example) : ''; }))
@@ -498,7 +491,7 @@ function buildHint(row, word, main) {
   const popExample = found || cands[0] || '';
   const mk = function (t) { return maskText(t, word); };
   return {
-    hint: { meaning: mk(main), pos: mk(pos), alts: alts.map(function (a) { return mk(a.text); }), note: mk(note) },
+    hint: { meaning: mk(main), subs: subs.slice(0, 6).map(mk) },
     pop: { pron: txt(d.pronunciation), meaning: main, example: popExample, ranges: popExample ? findWordRanges(popExample, word) : [] }
   };
 }
@@ -553,6 +546,6 @@ return {
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
-  wordWidth: wordWidth, fitWord: fitWord, POS_KO: POS_KO, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, firstSentence: firstSentence
+  wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };
 });

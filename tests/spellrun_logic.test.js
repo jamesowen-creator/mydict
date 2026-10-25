@@ -395,61 +395,60 @@ test('318-1. 글자 칸 줄 폭 배분: 칸 수 1~7, 조각 칸·고정 글자 �
   assert.ok(all.width <= avail && all.cw < 16);
 });
 
-test('318-2. 힌트 만들기: 대표 뜻·품사·빈칸 예문·다른 뜻(최대 2)·쓰임 설명, 단어장 필드만 사용, 정답과 활용형은 ＿＿ 로 가린다', () => {
-  const row = {
-    example_sentence: 'She runs every morning.',
-    data: { pronunciation: '/rʌn/', short_meaning: '달리다', meanings: [
-      { pos: 'verb', definition: '달리다', usage_note: '아침 운동처럼 규칙적으로 run 하는 상황에서 쓴다.', example: 'He ran home.' },
-      { pos: 'verb', definition: '운영하다' }, { definition: '흐르다' }, { definition: '출마하다' }, { definition: '달리다' } ] },
-  };
-  const h = L.buildHint(row, 'run', '달리다');
-  assert.equal(h.hint.meaning, '달리다'); assert.equal(h.hint.pos, '동사');
-  assert.ok(!('example' in h.hint), '작업320: 힌트에는 예문이 없다');
-  assert.deepEqual(h.hint.alts, ['동사 운영하다', '흐르다', '출마하다'], '다른 뜻은 최대 3개, 품사별 한 줄');
-  assert.equal(h.hint.note, '아침 운동처럼 규칙적으로 ＿＿ 하는 상황에서 쓴다.', '활용형/정답은 쓰임 설명에서도 가린다');
-  assert.equal(h.pop.example, 'She runs every morning.');
-  assert.deepEqual(h.pop, { pron: '/rʌn/', meaning: '달리다', example: 'She runs every morning.', ranges: [[4, 8]] }, '완성 화면용은 가리지 않고 강조 위치만');
-  // 활용형: -s -es -ed -ing -ly -er -est, e 탈락, y→i, 자음 중복
+test('322-2. 정답 가리기: 활용형(-s -es -ed -ing -ly -er -est, e 탈락, y→i, 자음 중복)·대소문자·아포스트로피, 다른 단어 안의 철자는 가리지 않는다', () => {
   const cases = [['happy', 'Happily, the happier one was happiest.'], ['make', 'Making it, she maked and makes makers.'], ['stop', 'It stopped, stopping the stopper.'], ['watch', 'He watches it.'], ['quick', 'Quickly now, quicker, quickest.'], ['study', 'She studies and studied.']];
   for (const [w, text] of cases) {
-    const masked = L.maskText(text, w);
-    assert.ok(masked.includes('＿＿'), w);
+    assert.ok(L.maskText(text, w).includes('＿＿'), w);
     for (const form of L.wordForms(w)) assert.ok(!L.maskText(`x ${form} y`, w).includes(form), `${w}: ${form}`);
-    assert.ok(!L.maskText(text.toUpperCase(), w).toLowerCase().includes(w + ' '), '대소문자 무시');
   }
   assert.equal(L.maskText('Running, RUN and Runs', 'run'), '＿＿, ＿＿ and ＿＿');
-  assert.equal(L.maskText('The runway and a rerun', 'run'), 'The runway and a rerun', '다른 단어 안에 든 철자는 가리지 않는다');
+  assert.equal(L.maskText('The runway and a rerun', 'run'), 'The runway and a rerun');
   assert.equal(L.maskText("It is 5 o'clock now", "o'clock"), 'It is 5 ＿＿ now');
-  assert.equal(L.maskText("It is 5 o’clock now", "o'clock"), 'It is 5 ＿＿ now', '곧은/굽은 아포스트로피');
+  assert.equal(L.maskText("It is 5 o’clock now", "o'clock"), 'It is 5 ＿＿ now');
   assert.equal(L.maskText('이 run을 보라', 'run'), '이 ＿＿을 보라', '한글 조사가 붙어도');
-  // 한계(보고서): 불규칙 활용은 가리지 못한다
-  assert.equal(L.maskText('He ran home.', 'run'), 'He ran home.');
+  assert.equal(L.maskText('He ran home.', 'run'), 'He ran home.', '한계: 불규칙 활용은 가리지 못한다');
 });
 
-test('318-2. 힌트: 예문에서 단어를 찾지 못하면 예문 생략, 필드가 없는 오래된 데이터도 있는 항목만, 어떤 필드에서도 정답이 그대로 남지 않는다', () => {
-  const none = L.buildHint({ data: { short_meaning: '사과' } }, 'apple', '사과');
-  assert.deepEqual(none.hint, { meaning: '사과', pos: '', alts: [], note: '' });
-  assert.deepEqual(none.pop, { pron: '', meaning: '사과', example: '', ranges: [] });
-  const missing = L.buildHint({ example_sentence: 'He ran fast.', data: { meanings: [{ pos: 'verb', definition: '달리다' }] } }, 'run', '달리다');
-  assert.ok(!('example' in missing.hint));
-  assert.equal(missing.pop.example, 'He ran fast.', '완성 화면에는 강조 없이 그대로'); assert.deepEqual(missing.pop.ranges, []);
-  // 다른 예문 후보에서 찾는다: example_sentence 에 없으면 meanings[].example, 그다음 옛 스키마 usages[].example
+test('322-2. 보조 줄 구성: 대표 뜻의 키워드는 빼고 중복 제거, 앞에서 최대 6개, 품사·쓰임 설명·예문은 넣지 않으며 정답은 가려진다. 상세 박스 필드는 더 이상 만들지 않는다', () => {
+  const row = { example_sentence: 'She runs every morning.', data: { pronunciation: '/rʌn/', short_meaning: '달리다, 뛰다', meanings: [
+    { pos: 'verb', definition: '달리다, 뛰다, 질주하다', usage_note: '아침 운동처럼 run 하는 상황에서 쓴다.', example: 'He ran home.' },
+    { pos: 'verb', definition: '운영하다, 관리하다, 경영하다' }, { pos: 'noun', definition: '달리기, 질주하다, 연속' }, { definition: '흐르다, run 하다' }, { definition: '출마하다，작동하다' }, { definition: '이어지다' }] } };
+  const h = L.buildHint(row, 'run', '달리다, 뛰다');
+  assert.deepEqual(Object.keys(h.hint).sort(), ['meaning', 'subs'], '품사·다른 뜻 줄·쓰임 설명·예문 필드 없음');
+  assert.equal(h.hint.meaning, '달리다, 뛰다');
+  assert.deepEqual(h.hint.subs, ['질주하다', '운영하다', '관리하다', '경영하다', '달리기', '연속'], '대표 뜻 키워드 제외, 중복(질주하다) 한 번, 최대 6개');
+  const all = JSON.stringify(h.hint);
+  assert.ok(!all.includes('동사') && !all.includes('명사') && !all.includes('아침 운동') && !all.includes('…') && !all.includes('She runs'));
+  // 정답 가리기 유지: 보조 줄 키워드와 대표 뜻의 정답 철자(활용형 포함)
+  const m = L.buildHint({ data: { meanings: [{ definition: 'run 하다, 달리다' }, { definition: 'running 중인, 운영하다' }] } }, 'run', 'runs 와 달리다');
+  assert.equal(m.hint.meaning, '＿＿ 와 달리다'); assert.ok(m.hint.subs.every(k => !/run/i.test(k)), JSON.stringify(m.hint.subs));
+  // 완성 팝업 데이터(IPA·뜻·예문·강조 위치)는 그대로
+  assert.deepEqual(h.pop, { pron: '/rʌn/', meaning: '달리다, 뛰다', example: 'She runs every morning.', ranges: [[4, 8]] });
+  // 비는 경우: meanings 없음·정의 없음·전부 대표 뜻과 같음 → 빈 배열(줄 없음)
+  for (const row2 of [null, undefined, {}, { data: null }, { data: { meanings: 'x' } }, { data: { meanings: [null, 5, { definition: 7 }] } }, { data: { meanings: [{ definition: '사과' }] } }]) {
+    assert.deepEqual(L.buildHint(row2, 'apple', '사과').hint.subs, [], JSON.stringify(row2));
+  }
+  // core_meaning 만 있는 옛 데이터, 7개 이상이어도 6개
+  assert.deepEqual(L.buildHint({ data: { meanings: [{ core_meaning: '가, 나' }] } }, 'x1', '다').hint.subs, ['가', '나']);
+  assert.equal(L.buildHint({ data: { meanings: [{ definition: 'a1,a2,a3,a4,a5,a6,a7,a8' }] } }, 'zz', '대표').hint.subs.length, 6);
+  // 예문 후보 선택(완성 팝업용): 단어가 들어 있는 예문을 우선, 없으면 첫 예문 그대로(강조 없음), 옛 스키마 usages
+  const missing = L.buildHint({ example_sentence: 'He ran fast.', data: { meanings: [{ definition: '달리다' }] } }, 'run', '달리다');
+  assert.equal(missing.pop.example, 'He ran fast.'); assert.deepEqual(missing.pop.ranges, []);
   const alt = L.buildHint({ example_sentence: 'Nothing here.', data: { meanings: [{ definition: '길', example: 'Take the road.' }], usages: [{ example: 'A road trip.' }] } }, 'road', '길');
-  assert.deepEqual(alt.pop.example, 'Take the road.', '완성 화면용 예문은 다른 후보에서도 찾는다'); assert.deepEqual(alt.pop.ranges, [[9, 13]]);
-  const legacy = L.buildHint({ data: { short_meaning: '길', usages: [{ example: 'A road trip.' }, null, 'x'] } }, 'road', '길');
-  assert.equal(legacy.pop.example, 'A road trip.');
-  // 이상한 값(문자열 아닌 필드·null·빈 배열)에도 예외 없음
-  for (const row of [null, undefined, {}, { data: null }, { data: { meanings: 'x' } }, { data: { meanings: [null, 5, { pos: 5, definition: 7, example: {} }] } }, { data: { meanings: [] , usages: 'x' }, example_sentence: 5 }]) {
-    assert.doesNotThrow(() => L.buildHint(row, 'road', '길'));
-  }
-  // 모든 힌트 문자열에 정답(활용형 포함)이 남지 않는다
-  const words = ['book', 'happy', 'make', 'stop', 'environment', 'water', 'friend'];
-  for (const w of words) {
+  assert.equal(alt.pop.example, 'Take the road.'); assert.deepEqual(alt.pop.ranges, [[9, 13]]);
+  assert.equal(L.buildHint({ data: { usages: [{ example: 'A road trip.' }, null, 'x'] } }, 'road', '길').pop.example, 'A road trip.');
+  for (const row3 of [null, { data: { meanings: [null, 5, { pos: 5, definition: 7, example: {} }] } }, { data: { meanings: [], usages: 'x' }, example_sentence: 5 }]) assert.doesNotThrow(() => L.buildHint(row3, 'road', '길'));
+  // 어떤 필드에서도 정답(활용형 포함)이 남지 않는다
+  for (const w of ['book', 'happy', 'make', 'stop', 'environment', 'water', 'friend']) {
     const text = `${w} ${w}s ${w}es ${w}ed ${w}ing ${w}ly ${w}er ${w}est ${w.toUpperCase()}`;
-    const h = L.buildHint({ example_sentence: text, data: { meanings: [{ pos: 'noun', definition: text, usage_note: text, example: text }, { definition: text }, { definition: text + '2' }] } }, w, text).hint;
-    const all = [h.meaning, h.pos, ...h.alts, h.note].join(' ');
-    for (const f of [w, ...L.wordForms(w)]) assert.ok(!all.toLowerCase().includes(f.toLowerCase()) || f.length < 3, `${w}: '${f}' 가 힌트에 남음`);
+    const hh = L.buildHint({ data: { meanings: [{ definition: text }, { definition: text + ', ' + text + '2' }] } }, w, text).hint;
+    const joined = [hh.meaning, ...hh.subs].join(' ').toLowerCase();
+    for (const f of [w, ...L.wordForms(w)]) assert.ok(!joined.includes(f.toLowerCase()) || f.length < 3, `${w}: '${f}' 가 남음`);
   }
+  assert.equal(L.POS_KO, undefined); assert.equal(L.firstSentence, undefined, '상세 박스용 도구 제거');
+  assert.equal(L.LAYOUT.HINT_BOTTOM_Y, undefined); assert.equal(L.LAYOUT.HINT_BOTTOM_Y_DJ, undefined);
+  assert.ok(L.LAYOUT.HUD_SHIFT >= 20 && L.LAYOUT.HUD_SHIFT <= 30, '내리는 거리 20~30');
+  assert.ok(L.LAYOUT.CONTENT_BOTTOM_Y < L.LAYOUT.HIGH_TILE_Y - L.LAYOUT.TILE_H / 2, '내용 아래 끝 한계는 높은 칸 타일 윗변(276)보다 위');
 });
 
 test('318-4. 높은 칸 계획: 꺼져 있으면 없음, 첫 칸 제외·최대 2개·전부 높은 칸 없음·확률 반영, 조각 칸과 무관', () => {
@@ -654,23 +653,10 @@ test('320-2. 2단 점프 기본 켜짐: dj 없음=켜짐(표시 없음), dj=0=�
   assert.ok(withHigh >= 1, '25단어 중 높은 칸이 있는 단어 ' + withHigh);
 });
 
-test('320-1. 힌트: 예문 없음, 다른 뜻 최대 3개(품사 + 쉼표 키워드), 쓰임 설명은 첫 문장 한 줄, "…" 로 자르지 않고 항목 단위로만 줄이며 정답은 계속 가린다', () => {
-  const row = { example_sentence: 'She runs every morning.', data: { short_meaning: '달리다, 뛰다, 운영하다, 관리하다, 흐르다, 출마하다, 작동하다, 계속되다, 이어지다', meanings: [
-    { pos: 'verb', definition: '달리다', usage_note: 'run 은 빠르게 움직일 때 쓴다. 두 번째 문장은 버린다.' },
-    { pos: 'verb', definition: '운영하다, 관리하다, 경영하다, 감독하다, 책임지다, 이끌다' }, { pos: 'noun', definition: '달리기, 질주' }, { pos: 'noun', definition: '연속, 시리즈' }, { pos: 'noun', definition: '더 있는 뜻' }] } };
-  const main = L.keywords(row.data.short_meaning, 40);
-  assert.ok(Array.from(main).length <= 40 && !main.endsWith(',') && !main.includes('…') && row.data.short_meaning.startsWith(main), '대표 뜻은 항목 단위로만 줄어든다: ' + main);
-  const h = L.buildHint(row, 'run', main).hint;
-  assert.ok(!('example' in h));
-  assert.equal(h.alts.length, 3);
-  assert.ok(h.alts[0].startsWith('동사 운영하다') && h.alts[1] === '명사 달리기, 질주' && h.alts[2] === '명사 연속, 시리즈', JSON.stringify(h.alts));
-  assert.ok(h.alts[0].length <= 4 + 28 && !h.alts[0].endsWith(','));
-  assert.equal(h.note, '＿＿ 은 빠르게 움직일 때 쓴다.', '첫 문장만, 정답은 가림');
-  for (const t of [h.meaning, h.pos, ...h.alts, h.note]) assert.ok(!t.includes('…') && !/\brun(s|ning)?\b/i.test(t), t);
-  // 한 줄에 안 들어갈 만큼 긴 쓰임 설명(첫 문장 60자 초과)은 자르지 않고 쓰지 않는다
-  const longNote = '가'.repeat(70) + '.';
-  assert.equal(L.buildHint({ data: { meanings: [{ usage_note: longNote }] } }, 'run', 'x').hint.note, '');
-  assert.equal(L.keywords('가나다라마바사아자차카타파하', 5), '가나다라마바사아자차카타파하', '쉼표가 없으면 중간을 자르지 않는다');
+test('322-2. 키워드 줄이기: "…" 없이 키워드 단위로만, 쉼표가 없으면 자르지 않는다', () => {
+  assert.equal(L.keywords('달리다, 뛰다, 운영하다, 관리하다, 흐르다, 출마하다, 작동하다', 20), '달리다, 뛰다, 운영하다, 관리하다');
+  assert.equal(L.keywords('가나다라마바사아자차카타파하', 5), '가나다라마바사아자차카타파하');
   assert.equal(L.keywords('가나다, 라마바, 사아자', 8), '가나다, 라마바');
-  assert.equal(L.firstSentence('끝 부호 없는 설명', 60), '끝 부호 없는 설명');
+  assert.ok(!L.keywords('가'.repeat(30) + ', ' + '나'.repeat(30), 10).includes('…'));
+  assert.deepEqual(L.splitKeywords(' 가，나; 다 , 라 '), ['가', '나', '다', '라']);
 });

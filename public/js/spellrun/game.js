@@ -28,7 +28,7 @@ const $ = id => document.getElementById(id);
 const box = $('box'), stage = $('stage'), cv = $('cv'), ctx = cv.getContext('2d');
 const els = {
   hud: $('hud'), hearts: $('hearts'), score: $('score'), combo: $('combo'), progress: $('progress'),
-  hint: $('hint'), popPron: $('popPron'), popEx: $('popEx'), tune: $('tune'), djRule: $('djRule'),
+  sub: $('sub'), popPron: $('popPron'), popEx: $('popEx'), tune: $('tune'), djRule: $('djRule'),
   meaning: $('meaning'), speedTag: $('speedTag'), word: $('word'), pop: $('pop'), popTag: $('popTag'), popWord: $('popWord'), popMean: $('popMean'), popNote: $('popNote'),
   start: $('start'), startBtn: $('startBtn'), startInfo: $('startInfo'), startExcluded: $('startExcluded'), speechNote: $('speechNote'),
   result: $('result'), resTitle: $('resTitle'), resScore: $('resScore'), resDone: $('resDone'), resCombo: $('resCombo'),
@@ -75,36 +75,27 @@ function fitFont(el, max, min, linesFor) {
   el.style.overflowWrap = 'anywhere';   // 하한에서도 넘치는 공백 없는 아주 긴 글자만 마지막 수단으로 끊는다
   return min;
 }
+box.style.setProperty('--hs', LAYOUT.HUD_SHIFT);   // 대표 뜻·보조 줄·글자 칸 줄을 HUD 줄에서 내리는 거리(논리 px)
 const unitPx = () => parseFloat(box.style.getPropertyValue('--u')) || 1;
-// 힌트 항목: 대표 뜻(.meaning)은 따로 맞추고, 품사·예문·다른 뜻·쓰임 설명은 공간이 부족하면 뒤에서부터 생략한다
-function renderHint(w) {
-  const h = (w && w.hint) || {};
-  els.hint.textContent = '';
-  const add = (cls, text) => { if (!text) return; const d = document.createElement('div'); d.className = cls; d.textContent = text; els.hint.appendChild(d); };
-  add('h-pos', h.pos);
-  (h.alts || []).forEach(a => add('h-alt', a));   // 다른 뜻: 품사별로 한 줄씩(최대 3)
-  add('h-note', h.note);
-  els.hint.hidden = !els.hint.children.length;
-}
-function fitHint() {
-  if (els.hint.hidden) return;
-  const limit = CONFIG.DJ_ENABLED ? LAYOUT.HINT_BOTTOM_Y_DJ : LAYOUT.HINT_BOTTOM_Y;
-  Array.from(els.hint.children).forEach(c => {
-    c.hidden = false;
-    if (c.classList.contains('h-pos')) { c.style.fontSize = ''; return; }
-    fitFont(c, 11, 8.5, px => (px > 9.5 ? 1 : 2));   // 글자를 줄이고, 그래도 안 되면 두 줄까지. 그다음은 "…" 로 자르지 않고 그 항목을 생략한다
-    if (!fitsIn(c, 2)) c.hidden = true;
-  });
-  const bottom = () => (els.hint.getBoundingClientRect().bottom - box.getBoundingClientRect().top) / unitPx();
-  const kids = Array.from(els.hint.children);
-  for (let i = kids.length - 1; i >= 0 && bottom() > limit; i--) kids[i].hidden = true;   // 뒤(쓰임 설명 → 다른 뜻 → 품사)부터 항목 단위로 생략
-  if (kids.every(c => c.hidden)) els.hint.hidden = true;
+// 상단 한글 힌트: 대표 뜻(.meaning, 큰 글자)과 그 아래 보조 한 줄(.sub, 다른 뜻 키워드). 정답은 logic.js 가 이미 ＿＿ 로 가렸다.
+// 보조 줄은 글자를 줄이고(하한 10px) 그래도 안 되면 두 줄까지, 그다음은 "…" 없이 키워드 단위로 뒤에서부터 뺀다. 키워드가 없으면 줄 자체가 없다.
+function fitSub(items) {
+  els.sub.hidden = !items.length;
+  if (!items.length) return;
+  const limit = LAYOUT.CONTENT_BOTTOM_Y;
+  const bottom = () => (els.word.getBoundingClientRect().bottom - box.getBoundingClientRect().top) / unitPx();
+  for (let n = items.length; n > 0; n--) {
+    els.sub.textContent = items.slice(0, n).join(' · ');
+    fitFont(els.sub, 12, 10, px => (px > 10.5 ? 1 : 2));
+    if (fitsIn(els.sub, 2) && bottom() <= limit) return;
+  }
+  els.sub.hidden = true; els.sub.textContent = '';
 }
 function fitHud() {
   if (els.hud.hidden || !G.plan) return;
   fitFont(els.meaning, 28, 14, px => (px > 22 ? 1 : 2));   // 한 줄을 먼저 시도하고, 22 이하부터 두 줄까지 허용
-  els.hint.hidden = false; renderHint(G.words[G.wi]);
-  fitHint();
+  const h = (G.words[G.wi] && G.words[G.wi].hint) || {};
+  fitSub(h.subs || []);
 }
 function fitPop() {
   if (els.pop.hidden) return;

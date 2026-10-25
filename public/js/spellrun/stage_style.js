@@ -61,18 +61,16 @@
 @keyframes sr-meaningin{0%{transform:scale(.6);opacity:0}100%{transform:none;opacity:1}}
 .sr-box .meaning{
   width:100%;font-family:var(--f-display);font-size:calc(var(--mfs,28) * var(--u));line-height:1.15;text-align:center;
-  word-break:keep-all;overflow-wrap:normal;margin-top:calc(4 * var(--u));
+  word-break:keep-all;overflow-wrap:normal;margin-top:calc((4 + var(--hs,24)) * var(--u));
 }
-.sr-box .word{display:flex;justify-content:center;align-items:flex-end;gap:calc(var(--sg,5) * var(--u));margin-top:calc(6 * var(--u));--cw:32;--fs:30;--cg:3}
+.sr-box .word{display:flex;justify-content:center;align-items:flex-end;gap:calc(var(--sg,5) * var(--u));margin-top:calc(18 * var(--u));--cw:32;--fs:30;--cg:3}   /* 위쪽 18: 보조 줄과 조각 칸 표시(×N)·높은 칸 삼각형이 겹치지 않게 */
 .sr-box .slot{position:relative;display:flex;gap:calc(var(--cg,3) * var(--u))}
 .sr-box .slot.high::after{content:"";position:absolute;left:50%;top:calc(-13 * var(--u));margin-left:calc(-6 * var(--u));border:calc(6 * var(--u)) solid transparent;border-top:0;border-bottom:calc(9 * var(--u)) solid var(--gold-deep)}
-.sr-box .hint{
-  width:100%;display:flex;flex-direction:column;align-items:center;gap:calc(2 * var(--u));margin-top:calc(6 * var(--u));padding:calc(4 * var(--u)) calc(8 * var(--u));box-sizing:border-box;
-  background:rgba(255,255,255,.72);border-radius:calc(10 * var(--u));color:var(--ink);text-align:center;word-break:keep-all;overflow-wrap:normal;
+.sr-box .sub{
+  width:100%;text-align:center;font-family:var(--f-body);font-weight:700;font-size:calc(var(--sfs,12) * var(--u));line-height:1.3;color:var(--ink);
+  word-break:keep-all;overflow-wrap:normal;margin-top:calc(2 * var(--u));
+  text-shadow:0 0 calc(3 * var(--u)) #fff,0 0 calc(3 * var(--u)) #fff,calc(1 * var(--u)) 0 0 #fff,calc(-1 * var(--u)) 0 0 #fff,0 calc(1 * var(--u)) 0 #fff,0 calc(-1 * var(--u)) 0 #fff;   /* 하늘색 배경·구름 위에서도 읽히도록 흰 외곽 */
 }
-.sr-box .hint > *{max-width:100%;line-height:1.3}
-.sr-box .hint .h-pos{font-weight:700;font-size:calc(11 * var(--u));color:var(--ink-soft)}
-.sr-box .hint .h-alt,.sr-box .hint .h-note{font-weight:500;font-size:calc(var(--hfs,12) * var(--u) * .92);color:var(--ink-soft)}
 .sr-box .tune{position:absolute;left:0;bottom:0;min-height:44px;padding:0 calc(10 * var(--u));margin:0;background:none;border:0;font-family:var(--f-body);font-size:calc(11 * var(--u));font-weight:700;color:var(--gold);text-decoration:underline;cursor:pointer;z-index:5}
 .sr-box .slot.chunk{
   padding:0 calc(4 * var(--u));margin-top:calc(2 * var(--u));
