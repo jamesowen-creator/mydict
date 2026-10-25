@@ -97,7 +97,11 @@ function buildConfig(v) {
   OBST_SLOW_FACTOR: 0.6,  // 맞았을 때 현재 속도에 곱하는 배율
   OBST_INVULN_SEC: 0.8,   // 맞은 직후 이 시간 동안은 장애물에 다시 맞지 않는다
   OBST_MIN_WINDOW: 0.15,  // 장애물을 틀린 글자 없이 넘는 점프 시작 시각 구간(여유 창)의 최소 길이(초)
-  OBST_NEXT_MARGIN: 0.1   // 장애물 점프 뒤 다음 묶음 첫 글자를 위한 점프를 준비할 최소 여유(초)
+  OBST_NEXT_MARGIN: 0.1,  // 장애물 점프 뒤 다음 묶음 첫 글자를 위한 점프를 준비할 최소 여유(초)
+  // 작업327: 그림·예고 표시(판정과 배치에는 영향 없음)
+  ART_LONG_K: 1.4,        // 바닥 장애물 그림의 긴 변 = OBST_W x 이 값(흰 테두리 제외). pace 로 OBST_W 가 줄면 같은 비율로 줄어든다
+  PIT_ART_K: 1.25,        // 구덩이 그림 폭 = PIT_W x 이 값(판정 폭은 PIT_W 그대로)
+  WARN_SEC: T(0.78)       // 예고 표시가 보이는 최소 시간(최고 속도 기준, 거리로 계산). 기본 pace 1.3 에서 0.6초이고 pace 에 반비례(다른 시간 값과 같은 방식)
   };
   if (v.hp) cfg.HP = v.hp;
   if (v.startdelay) cfg.WORD_START_DELAY = v.startdelay;
@@ -501,6 +505,27 @@ function planObstacle(nSlots, highSet, heartSlot, boss, rng, cfg) {
   const slot = cand[Math.floor(rng() * cand.length)];
   return { slot: slot, kind: rng() < 0.5 ? 'box' : 'pit' };
 }
+// ---- 작업327: 바닥 장애물 그림(시트 spellrun_obstacles_sheet.png 1024x256, 256 칸 4개: 돌무더기·통나무·콘·가시덤불) ----
+// 물체 크기(w,h)는 흰 테두리(BORDER) 제외 추정값이고, 화면에서는 시트의 알파로 실제 값을 재서 바꿔 쓴다. 물체 바닥은 칸 아래에서 FOOT_Y 지점이다.
+const OBSTACLE_ART = { URL: '/img/spellrun/spellrun_obstacles_sheet.png', SHEET_W: 1024, SHEET_H: 256, CELL: 256, BORDER: 11, FOOT_Y: 237,
+  OBJECTS: [{ name: 'rocks', w: 202, h: 134 }, { name: 'log', w: 187, h: 136 }, { name: 'cone', w: 158, h: 180 }, { name: 'bush', w: 214, h: 150 }] };
+// 종류 고르기: 난수를 쓰지 않는다(장애물 배치 난수 흐름을 바꾸지 않기 위해). 단어·장애물이 놓이는 묶음 번호·이번 판의 장애물 순번으로 만든 해시(FNV-1a)를 4로 나눈 나머지
+function obstacleArtIndex(word, slot, seq) {
+  const str = String(word) + ':' + slot + ':' + seq;
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h % OBSTACLE_ART.OBJECTS.length;
+}
+// 그림 배율: 물체의 긴 변이 OBST_W x ART_LONG_K 가 되게 한다
+function obstacleArtScale(cfg, obj) { cfg = cfg || CONFIG; return cfg.OBST_W * cfg.ART_LONG_K / Math.max(obj.w, obj.h); }
+// 시트에서 idx 칸을 그릴 위치. cx: 판정 중심 x, groundY: 땅 선 y. obj: { w, h, foot(선택) }. top: 흰 테두리까지 포함한 그림 윗끝 y
+function obstacleArtRect(cfg, idx, cx, groundY, obj) {
+  cfg = cfg || CONFIG;
+  const A = OBSTACLE_ART, o = obj || A.OBJECTS[idx], k = obstacleArtScale(cfg, o), foot = o.foot || A.FOOT_Y;
+  return { sx: idx * A.CELL, sy: 0, sw: A.CELL, sh: A.CELL, dx: cx - A.CELL / 2 * k, dy: groundY - foot * k, dw: A.CELL * k, dh: A.CELL * k, k: k, top: groundY - (o.h + A.BORDER) * k, side: Math.max(o.w, o.h) * k };
+}
+// 예고 표시: 장애물이 정해진 순간(앞 묶음 정답을 먹은 뒤)부터 장애물 앞쪽 끝이 러너에 닿을 때까지 보인다. 최고 속도에서의 거리(px) = 묶음 대기 동안 간 거리 + 앞쪽 거리
+function obstacleWarnDistance(cfg, kind) { cfg = cfg || CONFIG; return cfg.SPEED_MAX * cfg.PACK_DELAY + obstacleLayout(cfg, kind).Do - cfg.OBST_FOOT; }
 // 맞았을 때의 효과(순수): 체력 -1, 현재 속도 x OBST_SLOW_FACTOR, 기본 누적 속도에서 SPEED_DROP_FAIL 만큼 뺀 뒤 목표 속도 다시 계산. 콤보·점수는 그대로
 function afterObstacleHit(s, cfg) {
   cfg = cfg || CONFIG;
@@ -720,7 +745,7 @@ return {
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
-  airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
+  OBSTACLE_ART: OBSTACLE_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };
 });

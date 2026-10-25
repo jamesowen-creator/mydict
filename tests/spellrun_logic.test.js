@@ -980,3 +980,63 @@ test('326-4. 음성 대조: 간격을 늘리지 않고 기본 리드 거리에 �
   assert.ok(L.obstacleWindow(C, short, v).width < C.OBST_MIN_WINDOW, '늘리지 않으면 ' + L.obstacleWindow(C, short, v).width.toFixed(3));
   assert.ok(L.obstacleWindow(C, lay, v).width >= C.OBST_MIN_WINDOW);
 });
+
+// ───────── 작업327: 장애물 그림·예고 표시 ─────────
+test('327-2. 판정 수치 불변: OBST_W 28·OBST_H 28·PIT_W 36·PIT_CLEAR_H 2·발 폭 6, 326의 간격(앞·뒤·D1)과 여유 창 그대로', () => {
+  const C = CONFIG;
+  assert.equal(C.OBST_W, 28); assert.equal(C.OBST_H, 28); assert.equal(C.PIT_W, 36); assert.equal(C.PIT_CLEAR_H, 2); assert.equal(C.OBST_FOOT, 6);
+  assert.equal(C.OBST_SLOW_FACTOR, 0.6); assert.equal(C.OBST_INVULN_SEC, 0.8); assert.equal(C.OBST_MIN_WINDOW, 0.15); assert.equal(C.OBST_NEXT_MARGIN, 0.1);
+  const box = L.obstacleLayout(C, 'box'), pit = L.obstacleLayout(C, 'pit');
+  assert.ok(Math.abs(box.D1 - 346.9) < 0.1 && Math.abs(box.Do - 175.0) < 0.1 && Math.abs(box.post - 143.8) < 0.1, JSON.stringify(box));
+  assert.ok(Math.abs(pit.D1 - 346.9) < 0.1 && Math.abs(pit.Do - 171.0) < 0.1 && Math.abs(pit.post - 139.8) < 0.1, JSON.stringify(pit));
+  for (const lay of [box, pit]) for (let s = C.SPEED_MIN; s <= C.SPEED_MAX; s++) assert.ok(L.obstacleWindow(C, lay, s).width >= 0.16 - 1e-9);
+  assert.equal(L.buildConfig({ pace: 1.8 }).OBST_W, 18, 'pace 축소 규칙 그대로');
+});
+
+test('327-2. 그림 종류 선택: 4종이 모두 나올 수 있고, 같은 입력은 같은 결과이며, 난수를 쓰지 않는다(장애물 배치 난수 소비 불변)', () => {
+  const N = L.OBSTACLE_ART.OBJECTS.length; assert.equal(N, 4);
+  assert.deepEqual(L.OBSTACLE_ART.OBJECTS.map(o => o.name), ['rocks', 'log', 'cone', 'bush']);
+  const seen = new Set(), counts = [0, 0, 0, 0];
+  for (const w of ['apple', 'book', 'environment', 'water', 'happy', 'window', 'music', 'friend']) for (let slot = 1; slot < 6; slot++) for (let seq = 0; seq < 10; seq++) {
+    const a = L.obstacleArtIndex(w, slot, seq); assert.ok(Number.isInteger(a) && a >= 0 && a < N); assert.equal(L.obstacleArtIndex(w, slot, seq), a, '같은 입력 → 같은 결과'); seen.add(a); counts[a]++;
+  }
+  assert.equal(seen.size, 4, '4종 모두'); assert.ok(counts.every(c => c > 20), '고르게 나온다: ' + counts);
+  const orig = Math.random; Math.random = () => { throw new Error('난수 사용 금지'); };
+  try { L.obstacleArtIndex('apple', 2, 3); } finally { Math.random = orig; }
+  // 배치 난수 소비 순서: 확률 → 자리 → 종류(상자/구덩이), 정확히 3번. 327 에서 달라지지 않았다
+  const C = L.buildConfig({ obsprob: 1 }), seq = [0.1, 0.0, 0.9]; let i = 0, calls = 0;
+  const rec = () => { calls++; return seq[i++]; };
+  const r = L.planObstacle(5, new Set(), null, false, rec, C);
+  assert.equal(calls, 3); assert.deepEqual(r, { slot: 1, kind: 'pit' });
+  calls = 0; i = 0; assert.equal(L.planObstacle(5, new Set(), null, false, () => { calls++; return 0.99; }, L.buildConfig()), null); assert.equal(calls, 1, '확률에서 탈락하면 1번만');
+});
+
+test('327-2. 그림 크기 규칙: 물체의 긴 변 = OBST_W × 1.4(pace 로 줄면 같은 비율), 바닥은 땅 선, 가로 중앙은 판정 중심', () => {
+  const C = CONFIG, A = L.OBSTACLE_ART;
+  assert.equal(C.ART_LONG_K, 1.4);
+  for (let idx = 0; idx < 4; idx++) {
+    const o = A.OBJECTS[idx], r = L.obstacleArtRect(C, idx, 100, 520);
+    assert.ok(Math.abs(Math.max(o.w, o.h) * r.k - 28 * 1.4) < 1e-9, o.name + ' 긴 변 39.2px'); assert.ok(Math.abs(r.side - 39.2) < 1e-9);
+    assert.ok(Math.abs(r.dy + A.FOOT_Y * r.k - 520) < 1e-9, '물체 바닥이 땅 선'); assert.ok(Math.abs(r.dx + 128 * r.k - 100) < 1e-9, '가로 중앙'); assert.equal(r.sx, idx * 256);
+    assert.ok(r.dw === 256 * r.k && r.dh === 256 * r.k);
+    for (const pace of [0.7, 1.3, 1.8]) {
+      const c = L.buildConfig({ pace: pace }), rr = L.obstacleArtRect(c, idx, 100, 520);
+      assert.ok(Math.abs(Math.max(o.w, o.h) * rr.k - c.OBST_W * 1.4) < 1e-9, `pace ${pace} ${o.name}`);
+      assert.ok(Math.abs(rr.k / r.k - c.OBST_W / 28) < 1e-9, 'OBST_W 에 비례');
+    }
+  }
+  // 크기감: 돌무더기·통나무·덤불은 높이가 판정 높이(28) 안팎, 콘은 더 높다
+  const hOf = idx => L.obstacleArtRect(C, idx, 0, 0).k * A.OBJECTS[idx].h;
+  assert.ok(hOf(0) > 22 && hOf(0) < 32 && hOf(1) > 22 && hOf(1) < 32 && hOf(3) > 22 && hOf(3) < 32, [hOf(0), hOf(1), hOf(3)].join());
+  assert.ok(hOf(2) > C.OBST_H, '콘은 판정보다 높다: ' + hOf(2));
+  assert.equal(C.PIT_ART_K, 1.25);
+});
+
+test('327-4. 예고 표시 구간: 거리 ≥ SPEED_MAX × WARN_SEC(0.6초), 기본·pace 달라도', () => {
+  assert.equal(CONFIG.WARN_SEC, 0.6);
+  for (const pace of [0.7, 1.0, 1.3, 1.8]) {
+    const c = L.buildConfig({ pace: pace });
+    for (const kind of ['box', 'pit']) assert.ok(L.obstacleWarnDistance(c, kind) >= c.SPEED_MAX * c.WARN_SEC, `pace ${pace} ${kind}: ${L.obstacleWarnDistance(c, kind).toFixed(1)} ≥ ${(c.SPEED_MAX * c.WARN_SEC).toFixed(1)}`);
+  }
+  assert.ok(L.obstacleWarnDistance(CONFIG, 'box') / CONFIG.SPEED_MAX >= 0.6, '최고 속도에서 ' + (L.obstacleWarnDistance(CONFIG, 'box') / CONFIG.SPEED_MAX).toFixed(3) + '초');
+});

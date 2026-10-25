@@ -83,10 +83,11 @@ const SPEECH = `(() => {
 })();`;
 
 // 게임 페이지를 직접 연다. ids 가 있으면 sessionStorage 에 넣고, token=false 면 로그인 토큰 없이 연다.
-async function openGame({ ids, token = true, width = 390, height = 844, speech = false, query = '', dodge = true } = {}) {
+async function openGame({ ids, token = true, width = 390, height = 844, speech = false, query = '', dodge = true, blockObst = false } = {}) {
   state.requests.length = 0;
   const page = await browser.newPage({ width, height, token: token ? jwt() : null });
   await withDodge(page, dodge);
+  if (blockObst) { await page.send('Network.enable'); await page.send('Network.setBlockedURLs', { urls: ['*spellrun_obstacles_sheet*'] }); }
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); } catch (e) {}" });   // 작업319: 저장된 주소 옵션이 다른 시험으로 새지 않게 비운다
   if (!token) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('mydict_token'); } catch (e) {}" });   // 같은 Chrome 프로필을 쓰는 앞선 시험이 남긴 토큰 제거
   if (speech) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
@@ -1317,7 +1318,7 @@ test('321-1) 시트 파일: public/img/spellrun/spellrun_penguin_sheet.png 가 �
   const f = path.join(PUB, 'img', 'spellrun', 'spellrun_penguin_sheet.png');
   const b = fs.readFileSync(f);
   assert.equal(b.subarray(1, 4).toString(), 'PNG'); assert.equal(b.readUInt32BE(16), 1728); assert.equal(b.readUInt32BE(20), 288); assert.equal(b[25], 6, 'RGBA(투명)');
-  assert.deepEqual(fs.readdirSync(path.dirname(f)), ['spellrun_penguin_sheet.png'], '시트 한 장만');
+  assert.deepEqual(fs.readdirSync(path.dirname(f)).filter(x => /penguin/.test(x)), ['spellrun_penguin_sheet.png'], '펭귄 시트 한 장만(작업327 에서 같은 폴더에 장애물 시트가 추가됨)');
   assert.ok(!fs.readdirSync(PUB, { recursive: true }).some(x => /penguin_frames\.zip|frame_[1-6]\.png/.test(String(x))), 'zip·개별 프레임 없음');
   resetState();
   const page = await openGame({ ids: [1, 2, 3] });
@@ -1561,6 +1562,11 @@ test('326-2) 장애물이 나타난다(obsprob=1): 상자·구덩이가 둘 다 
   await page.eval('SpellRun.manual = true');
   assert.equal(await page.eval("document.getElementById('obsRule') && document.getElementById('obsRule').textContent.length > 10"), true, '시작 화면 규칙에 장애물 설명');
   const r = await page.eval(`${OBOT}({ dodge: true, offset: 0 })`);
+  for (let i = 0; i < 8 && !(r.kinds.box > 0 && r.kinds.pit > 0); i++) {   // 종류도 난수로 정해지므로 두 종류가 모두 나올 때까지 판을 거듭한다
+    await page.eval("SpellRun.G.state = 'idle'; SpellRun.startRound(false); SpellRun.manual = true");
+    const r2 = await page.eval(`${OBOT}({ dodge: true, offset: 0 })`);
+    r.kinds.box += r2.kinds.box; r.kinds.pit += r2.kinds.pit; r.obstSeen += r2.obstSeen; r.plans.push(...r2.plans);
+  }
   assert.equal(r.over, true); assert.ok(r.obstSeen >= 3, '장애물이 여러 번 나온다: ' + r.obstSeen);
   assert.ok(r.kinds.box > 0 && r.kinds.pit > 0, '상자와 구덩이 모두: ' + JSON.stringify(r.kinds));
   for (const p of r.plans) { if (p.obst) { assert.ok(p.obst.slot >= 1 && p.obst.slot <= p.n - 1, `장애물 자리 ${p.obst.slot} / ${p.n}칸: 첫 묶음 앞·마지막 묶음 뒤 아님`); assert.ok(!p.boss); } }
@@ -1603,7 +1609,7 @@ test('326-2) 점프로 넘으면 체력·속도·콤보가 그대로다. 점프�
 
   // (다) 구덩이/상자 각각 한 번씩 맞는 경우를 모두 본다(맞은 종류 기록): 두 종류 모두 같은 효과
   const kinds = new Set();
-  for (let i = 0; i < 12 && kinds.size < 2; i++) {
+  for (let i = 0; i < 40 && kinds.size < 2; i++) {
     const p = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: O_Q, dodge: false });
     await gameReady(p); await p.click('#startBtn'); await p.waitFor("SpellRun.G.state === 'run'", 4000); await p.eval('SpellRun.manual = true');
     const r = await p.eval(`${OBOT}({ dodge: false, stopOnHit: true })`);
@@ -1655,7 +1661,9 @@ test('326-1) 배치 규칙(페이지 안): 보스 단어에는 없고, 높은 �
   const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?obsprob=1&highprob=0.5&heartevery=1', dodge: false });
   await gameReady(page);
   const plans = [];
-  for (const review of [false, false, true]) {
+  const variety = () => plans.length >= 15 && plans.some(p => p.boss) && plans.some(p => p.review) && plans.some(p => p.highs.length) && plans.some(p => p.heart !== null && p.obst);
+  for (let ri = 0; ri < 14 && (ri < 3 || !variety()); ri++) {   // 배치가 난수라 여러 경우가 모두 나올 때까지 판을 거듭한다
+    const review = ri === 2 || ri > 2 && ri % 2 === 1;
     if (review) await page.eval("(() => { for (const w of ['apple', 'book', 'environment', 'water', 'happy']) SpellRun.missedSet.add(w); })()");
     await page.eval(`SpellRun.startRound(${review})`); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
     const r = await page.eval(`${OBOT}({ dodge: true, offset: 0 })`);
@@ -1743,9 +1751,9 @@ test('326-2) 폭 320·360·390: 장애물(경고 표지 윗끝)은 상단 힌트
   }
 });
 
-test('326-2) 그림: 상자·구덩이·경고 표지가 캔버스에 실제로 그려지고(색이 있는 픽셀), 글자 타일 색과 구분된다. 연출 중에도 오류가 없다', { skip: SKIP }, async () => {
+test('326-2) 그림(시트를 못 불러온 대체 그림): 상자·구덩이·경고 표지가 캔버스에 실제로 그려지고(색이 있는 픽셀), 글자 타일 색과 구분된다. 연출 중에도 오류가 없다', { skip: SKIP }, async () => {
   resetState();
-  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: O_Q, dodge: false });
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: O_Q, dodge: false, blockObst: true });   // 작업327: 시트가 있으면 상자 대신 그림이 나오므로, 코드 그림(대체) 검사는 시트를 막고 한다
   await gameReady(page);
   await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
   const px = await page.eval(`(() => { const R = SpellRun, G = R.G, cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360; const seenKinds = {};
@@ -1770,4 +1778,190 @@ test('326-2) 그림: 상자·구덩이·경고 표지가 캔버스에 실제로 
   assert.ok(!TILE.some(t => near(px.box.face, t)), '상자 색은 글자 타일 색과 다르다: ' + px.box.face);
   assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
   await page.close();
+});
+
+// ───────── 작업327: 장애물 그림 교체·예고 표시·구덩이 ─────────
+// drawImage 호출을 가로채 장애물 시트 그림의 인자를 모은다(페이지 안). 호출 전에 설치한다.
+const SPY_ART = `(() => { const P = CanvasRenderingContext2D.prototype, orig = P.drawImage; window.__art = []; P.drawImage = function (img, ...a) { if (img && img.src && /obstacles_sheet/.test(img.src)) window.__art.push(a.slice(0, 8)); return orig.call(this, img, ...a); }; })()`;
+// 장애물 하나가 화면에 있는 순간까지 정답 글자 + 장애물 넘기 봇으로 진행해, 조건(문자열 식)이 참이 되면 멈춘다
+const RUN_UNTIL = (cond, max) => `(async () => { const R = SpellRun, G = R.G, C = R.CONFIG; let n = 0;
+  while (n++ < ${max || 60 * 600} && G.state !== 'over' && !(${cond})) {
+    if (G.state === 'run' && G.jumpT < 0) {
+      const ob = G.obstacles.find(x => !x.hit && x.x + x.w / 2 > R.RUNNER_X), tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.kind !== 'heart' && x.x > R.RUNNER_X).sort((a, b) => a.x - b.x)[0];
+      if (ob && (ob.x + ob.w / 2 - R.RUNNER_X) / G.speed <= C.JUMP_TIME / 2) R.jump(); else if (tg && (tg.x - R.RUNNER_X) / G.speed <= C.JUMP_TIME / 2) R.jump();
+    }
+    R.step(1 / 60); if (n % 300 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+  return n < ${max || 60 * 600} && G.state !== 'over'; })()`;
+
+test('327-1) 시트 파일: public/img/spellrun/spellrun_obstacles_sheet.png 1024×256 RGBA 한 장만 있고(zip·개별 파일 없음), 페이지가 그 주소를 1회만 요청한다', { skip: SKIP }, async () => {
+  const f = path.join(PUB, 'img', 'spellrun', 'spellrun_obstacles_sheet.png');
+  const b = fs.readFileSync(f);
+  assert.equal(b.subarray(1, 4).toString(), 'PNG'); assert.equal(b.readUInt32BE(16), 1024); assert.equal(b.readUInt32BE(20), 256); assert.equal(b[24], 8); assert.equal(b[25], 6, 'RGBA');
+  assert.deepEqual(fs.readdirSync(path.dirname(f)).sort(), ['spellrun_obstacles_sheet.png', 'spellrun_penguin_sheet.png'], '시트 두 장(펭귄·장애물)만');
+  assert.ok(!fs.readdirSync(PUB, { recursive: true }).some(x => /obstacles_frames\.zip|obstacle_[1-4]_[a-z]+\.png/.test(String(x))), 'zip·개별 파일 없음');
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3] });
+  await gameReady(page);
+  await page.waitFor('SpellRun.obstArt().ready', 4000);
+  const reqs = await page.eval("performance.getEntriesByType('resource').filter(e => /obstacle/.test(e.name)).map(e => new URL(e.name).pathname)");
+  assert.deepEqual(reqs, ['/img/spellrun/spellrun_obstacles_sheet.png'], '시트 요청 1회');
+  const objs = await page.eval('SpellRun.obstArt().objs');
+  const est = [[202, 134], [187, 136], [158, 180], [214, 150]];
+  objs.forEach((o, i) => { assert.ok(Math.abs(o.w - est[i][0]) <= 3 && Math.abs(o.h - est[i][1]) <= 3, `알파로 잰 ${o.name} 크기 ${o.w}×${o.h} ≈ 추정 ${est[i]}`); assert.ok(Math.abs(o.foot - 237) <= 2, o.name + ' 바닥 ' + o.foot); });
+  await page.close();
+});
+
+test('327-2) 시트가 로딩되면 4종(돌무더기·통나무·콘·가시덤불)이 장애물마다 정해져 그려지고, 크기·바닥·중심 규칙을 따르며, 지나가는 동안 바뀌지 않는다. 판정 크기는 326 그대로다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?obsprob=1&dj=0', dodge: false });
+  await gameReady(page);
+  await page.waitFor('SpellRun.obstArt().ready', 4000);
+  await page.eval(SPY_ART);
+  await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+  const out = await page.eval(`(async () => { const R = SpellRun, G = R.G, C = R.CONFIG, arts = new Set(), checks = []; let seq = [];
+    for (let round = 0; round < 12 && !(arts.size === 4 && round >= 3); round++) {   // 4종이 모두 나올 때까지(난수로 정해진 배치를 따르므로 판 수는 가변)
+      if (round) { G.state = 'idle'; R.startRound(false); R.manual = true; }
+      let n = 0;
+      while (n++ < 60 * 400 && G.state !== 'over') {
+        if (G.state === 'run' && G.jumpT < 0) {
+          const ob = G.obstacles.find(x => !x.hit && x.x + x.w / 2 > R.RUNNER_X), tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.kind !== 'heart' && x.x > R.RUNNER_X).sort((a, b) => a.x - b.x)[0];
+          if (ob && (ob.x + ob.w / 2 - R.RUNNER_X) / G.speed <= C.JUMP_TIME / 2) R.jump(); else if (tg && (tg.x - R.RUNNER_X) / G.speed <= C.JUMP_TIME / 2) R.jump();
+        }
+        R.step(1 / 60);
+        for (const o of G.obstacles) if (o.kind === 'box') {
+          if (!o._seen) { o._seen = true; o._art0 = o.art; arts.add(o.art); seq.push(o.art); }
+          if (o.art !== o._art0) checks.push('종류가 바뀜');
+          if (o.x > 40 && o.x < 330 && !o._drawn) { window.__art.length = 0; R.draw(); const a = window.__art[window.__art.length - 1];
+            if (a) { o._drawn = true; checks.push({ art: o.art, a: a, cx: o.x + o.w / 2, w: o.w }); } }
+        }
+        if (n % 300 === 0) await new Promise(r => setTimeout(r, 0));
+      }
+    }
+    return { arts: [...arts], checks: checks, objs: R.obstArt().objs, W: C.OBST_W, H: C.OBST_H, PW: C.PIT_W, seqLen: seq.length }; })()`);
+  assert.deepEqual(out.arts.sort(), [0, 1, 2, 3], '4종 모두 그려졌다: ' + out.arts);
+  assert.ok(!out.checks.includes('종류가 바뀜'), '그림은 지나가는 동안 바뀌지 않는다');
+  const draws = out.checks.filter(c => typeof c === 'object');
+  assert.ok(draws.length >= 4);
+  for (const c of draws) {
+    const [sx, sy, sw, sh, dx, dy, dw, dh] = c.a, o = out.objs[c.art], k = out.W * 1.4 / Math.max(o.w, o.h);
+    assert.equal(sx, c.art * 256); assert.equal(sy, 0); assert.equal(sw, 256); assert.equal(sh, 256);
+    assert.ok(Math.abs(dw - 256 * k) < 0.01 && Math.abs(dh - 256 * k) < 0.01, `크기 ${dw} ≈ ${256 * k} (긴 변 ${Math.max(o.w, o.h) * k} = ${out.W * 1.4})`);
+    assert.ok(Math.abs(dy + o.foot * k - 520) < 0.01, '물체 바닥이 땅 선(520)'); assert.ok(Math.abs(dx + 128 * k - c.cx) < 0.01, '가로 중앙');
+  }
+  assert.deepEqual([out.W, out.H, out.PW], [28, 28, 36], '판정 크기 그대로');
+  await page.close();
+});
+
+test('327-2) 로딩 실패(시트 요청 차단): 기존 코드 상자로 그려지고(시트 그림 호출 0), 한 판이 끝까지 진행되며 오류가 없다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
+  await withDodge(page);
+  await page.send('Network.enable');
+  await page.send('Network.setBlockedURLs', { urls: ['*spellrun_obstacles_sheet*'] });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
+  await page.goto(base + '/spelling_run.html?obsprob=1&dj=0');
+  await gameReady(page);
+  await page.eval(SPY_ART);
+  assert.equal(await page.eval('SpellRun.obstArt().ready'), false);
+  await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+  const seen = await page.eval(`(async () => { const R = SpellRun, G = R.G; let drawn = 0, boxes = 0;
+    for (let rd = 0; rd < 8 && !boxes; rd++) { if (rd) { G.state = 'idle'; R.startRound(false); R.manual = true; }
+    await ${RUN_UNTIL("(() => { for (const o of G.obstacles) if (o.kind === 'box' && o.x > 60 && o.x < 330 && !o._d) { o._d = true; R.draw(); boxes++; } return false; })()")};
+    }
+    return { boxes: boxes, art: window.__art.length, over: G.state === 'over', title: document.getElementById('resTitle').textContent, hp: G.hp, hits: G.obstHits }; })()`);
+  assert.ok(seen.boxes >= 1, '상자 장애물이 나왔다 ' + JSON.stringify(seen)); assert.equal(seen.art, 0, '시트 그림 호출 없음(코드 상자로 대체)');
+  assert.equal(seen.over, true); assert.notEqual(seen.title, '게임 오버'); assert.equal(seen.hits, 0);
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource|ERR_BLOCKED/.test(e)), [], '오류 없음');
+  await page.close();
+});
+
+test('327-3) 구덩이: 판정 폭 36 은 그대로이고 그림은 1.25배 넓게(45px), 입구 양쪽에 노랑 줄무늬·흰 가장자리, 안쪽은 아래로 갈수록 어둡다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?obsprob=1&dj=0', dodge: false });
+  await gameReady(page);
+  await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+  let px = null;
+  for (let i = 0; i < 8 && !px; i++) {
+    px = await page.eval(`(async () => { const R = SpellRun, G = R.G, cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360;
+      const col = (x, y) => Array.from(cx.getImageData(Math.round(x * S), Math.round(y * S), 1, 1).data);
+      const found = await ${RUN_UNTIL("G.obstacles.some(o => o.kind === 'pit' && o.x > 200 && o.x < 300)", 60 * 120)};
+      if (!found) return null;
+      const o = G.obstacles.find(o => o.kind === 'pit' && o.x > 200 && o.x < 300); R.draw();
+      const mid = o.x + o.w / 2, dw = o.w * R.CONFIG.PIT_ART_K;
+      return { w: o.w, dw: dw, top: col(mid, 530), deep: col(mid, 620), stripe: Array.from({ length: 11 }, (_, i) => col(mid - dw / 2 - 21 + i * 2, 515)), border: Array.from({ length: 9 }, (_, i) => col(mid - dw / 2 - 10, 508 + i * 0.5)), outL: col(mid - dw / 2 - 26, 560), inL: col(mid - dw / 2 + 4, 560) }; })()`);
+    if (!px) { await page.eval("SpellRun.startRound(false); SpellRun.manual = true"); }
+  }
+  assert.ok(px, '구덩이가 나왔다'); assert.equal(px.w, 36); assert.ok(Math.abs(px.dw - 45) < 1e-9, '그림 폭 36×1.25');
+  const lum = c => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  assert.ok(lum(px.deep) < lum(px.top), '아래로 갈수록 어둡다: ' + px.top + ' → ' + px.deep);
+  assert.ok(lum(px.deep) < 12, '깊은 곳은 거의 검정'); assert.ok(lum(px.inL) < lum(px.outL), '구멍 안이 도로보다 어둡다: ' + px.inL + ' vs ' + px.outL);
+  assert.ok(px.stripe.some(c => c[0] > 230 && c[1] > 150 && c[2] < 80), '입구 줄무늬에 노랑: ' + JSON.stringify(px.stripe)); assert.ok(px.stripe.some(c => lum(c) < 60), '노랑/검정 줄무늬(어두운 줄도 있다)');
+  assert.ok(px.border.some(c => c[0] > 220 && c[1] > 220 && c[2] > 220), '흰 가장자리 선: ' + JSON.stringify(px.border));
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+  await page.close();
+});
+
+test('327-4) 예고 표시: 장애물이 정해진 뒤 새 묶음이 나오기 전부터 장애물 앞쪽 끝이 러너에 닿을 때까지만 보이고(0.6초 이상), 오른쪽 가장자리에서 깜빡이는 삼각형이며, obs=0 이면 없다. 판정에는 영향이 없다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?obsprob=1&dj=0', dodge: false });
+  await gameReady(page);
+  await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+  const r = await page.eval(`(async () => { const R = SpellRun, G = R.G, C = R.CONFIG, cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360, RX = R.RUNNER_X;
+    const periods = []; let cur = null, bad = [], pix = null;
+    for (let n = 0; n < 60 * 500 && G.state !== 'over'; n++) {
+      if (G.state === 'run' && G.jumpT < 0) {
+        const ob = G.obstacles.find(x => !x.hit && x.x + x.w / 2 > RX), tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.kind !== 'heart' && x.x > RX).sort((a, b) => a.x - b.x)[0];
+        if (ob && (ob.x + ob.w / 2 - RX) / G.speed <= C.JUMP_TIME / 2) R.jump(); else if (tg && (tg.x - RX) / G.speed <= C.JUMP_TIME / 2) R.jump();
+      }
+      R.step(1 / 60);
+      const on = R.obstWarnActive(), frontAhead = G.obstacles.some(o => !o.hit && o.x > RX + C.OBST_FOOT), pending = !!(G.obst && !G.obst.done && G.obst.slot === G.si && !G.packActive && G.state === 'run');
+      if (on !== (pending || frontAhead)) bad.push('활성 조건 불일치');
+      if (on) { if (!cur) cur = { t: 0, speed: G.speed }; cur.t += 1 / 60;
+        if (!pix) { G.time = 0; R.draw(); pix = Array.from(cx.getImageData(Math.round((360 - 24 + 6) * S), Math.round((520 - 34 + 5) * S), 1, 1).data); } }
+      else if (cur) { periods.push(cur); cur = null; }
+      if (n % 300 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+    return { periods: periods, bad: bad, pix: pix, hp: G.hp, hits: G.obstHits, tileTop: R.TILE_Y + 29 }; })()`);
+  assert.ok(r.periods.length >= 3, '예고가 여러 번 나왔다: ' + r.periods.length);
+  for (const p of r.periods) assert.ok(p.t >= 0.6 - 0.05, `예고 ${p.t.toFixed(2)}초(속도 ${p.speed.toFixed(0)}) ≥ 0.6`);
+  assert.deepEqual(r.bad, []); assert.equal(r.hits, 0, '예고 표시는 판정에 영향이 없다(넘기 봇은 한 번도 안 맞음)');
+  assert.ok(r.pix && r.pix[3] === 255 && r.pix[0] > 200 && r.pix[1] > 120, '오른쪽 가장자리에 노랑 삼각형: ' + r.pix);
+  await page.close();
+  // obs=0: 예고 없음
+  const p2 = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?obs=0', dodge: false });
+  await gameReady(p2); await p2.click('#startBtn'); await p2.waitFor("SpellRun.G.state === 'run'", 4000); await p2.eval('SpellRun.manual = true');
+  assert.equal(await p2.eval(`(() => { let on = 0; for (let n = 0; n < 60 * 20; n++) { SpellRun.step(1 / 60); if (SpellRun.obstWarnActive()) on++; } return on; })()`), 0);
+  await p2.close();
+});
+
+test('327-4) 폭 320·360·390: 예고 표시·장애물 그림은 글자 타일 줄·하트·힌트·상단 표시와 겹치지 않는다', { skip: SKIP }, async () => {
+  resetState();
+  for (const w of [320, 360, 390]) {
+    const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?obsprob=1&dj=0', width: w, dodge: false });
+    await gameReady(page);
+    await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true; SpellRun.G.hp = 2');   // 체력을 줄여 두면 하트도 나온다
+    const r = await page.eval(`(async () => { const R = SpellRun, G = R.G, C = R.CONFIG, RX = R.RUNNER_X; const box = document.getElementById('box').getBoundingClientRect(), u = parseFloat(document.getElementById('box').style.getPropertyValue('--u'));
+      const bot = id => { const e = document.getElementById(id); return e && !e.hidden ? (e.getBoundingClientRect().bottom - box.top) / u : 0; };
+      let warnOn = 0, overlapTile = 0, overlapHeart = 0, maxTop = 1e9, artTops = [];
+      for (let n = 0; n < 60 * 300 && G.state !== 'over'; n++) {
+        if (G.state === 'run' && G.jumpT < 0) {
+          const ob = G.obstacles.find(x => !x.hit && x.x + x.w / 2 > RX), tg = G.tiles.filter(x => x.state === 'live' && !x.checked && (x.correct || x.kind === 'heart') && x.x > RX).sort((a, b) => a.x - b.x)[0];
+          if (ob && (ob.x + ob.w / 2 - RX) / G.speed <= C.JUMP_TIME / 2) R.jump(); else if (tg && (tg.x - RX) / G.speed <= C.JUMP_TIME / 2) R.jump();
+        }
+        R.step(1 / 60);
+        if (R.obstWarnActive()) { warnOn++;
+          // 표시 사각형(논리 px): x 360-24±17, y 520-34-15 ~ 520-34+12 → 아래 끝/위 끝이 타일·하트 줄과 겹치는지
+          const wx0 = 360 - 24 - 17, wy0 = 520 - 34 - 17;
+          for (const t of G.tiles) { const ty = t.kind === 'heart' ? R.TILE_Y : (t.high ? R.HIGH_Y : R.TILE_Y), half = t.kind === 'heart' ? 24 : 29 + 5, tw = t.w / 2;
+            if (t.x + tw > wx0 && t.x - tw < 360 && ty + half > wy0) { if (t.kind === 'heart') overlapHeart++; else overlapTile++; } } }
+        for (const o of G.obstacles) if (o.x > 0 && o.x < 360) artTops.push(R.obstTop(o));
+      }
+      return { warnOn: warnOn, overlapTile: overlapTile, overlapHeart: overlapHeart, minArtTop: Math.min(...artTops), hint: Math.max(bot('hintbox'), bot('word'), bot('sub'), bot('meaning')), hud: Math.max(...[...document.querySelectorAll('#hud .row')].map(e => (e.getBoundingClientRect().bottom - box.top) / u)), warnTop: 520 - 34 - 17, tileBottom: R.TILE_Y + 34 }; })()`);
+    assert.ok(r.warnOn > 60, w + ': 예고가 보인 프레임 ' + r.warnOn);
+    assert.equal(r.overlapTile, 0, w + ': 예고 표시와 글자 타일이 겹치지 않는다'); assert.equal(r.overlapHeart, 0, w + ': 하트와도');
+    assert.ok(r.warnTop > r.tileBottom && r.warnTop > r.hint + 20 && r.warnTop > r.hud + 20, `${w}: 예고 위끝 ${r.warnTop} 가 타일 줄(${r.tileBottom})·힌트(${r.hint})·HUD(${r.hud}) 아래`);
+    assert.ok(r.minArtTop > r.hint + 20 && r.minArtTop > r.hud + 20, `${w}: 장애물 그림 윗끝 ${r.minArtTop} 가 힌트·HUD 아래`);
+    await page.close();
+  }
 });
