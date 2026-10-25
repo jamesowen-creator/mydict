@@ -7,6 +7,11 @@ const session = require('express-session');
 
 const { initDB, createApiReadyGate } = require('./lib/db');
 
+// 작업334: 처리되지 않은 Promise 거부 하나가 서버 전체를 종료시키지 않게 로그만 남긴다(종료하지 않는다). 내용은 오류 이름·메시지만 남긴다.
+process.on('unhandledRejection', (reason) => {
+  console.error('unhandledRejection:', (reason && (reason.name || '')) + ' ' + (reason && reason.message ? reason.message : String(reason)));
+});
+
 const app = express();
 // Railway (and most PaaS) terminate TLS at an edge proxy and forward plain HTTP
 // internally. Without this, req.protocol always reports 'http', so passport's
