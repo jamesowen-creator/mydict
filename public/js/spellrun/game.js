@@ -59,6 +59,7 @@ function resize() {
   fitAll();   // 폭이 바뀌면(리사이즈·회전) 글자 맞춤을 다시 계산한다
 }
 window.addEventListener('resize', resize);
+try { if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { if (typeof fitAll === 'function') fitAll(); }); } catch (e) { /* 글꼴 이벤트가 없으면 무시 */ }   // 웹 글꼴이 늦게 로드돼 폭이 바뀌면 글자 맞춤을 다시 계산한다
 
 // ---------- 작업318-1: 폭을 재서 맞추는 글자 크기 ----------
 // 단계로 줄이지 않고 실제 폭을 재서 한 줄(또는 허용 줄 수)에 들어올 때까지 0.5px 씩 줄인다. 크기는 논리 px(×--u)라 화면 배율과 무관하게 같은 결과가 나온다.
@@ -81,8 +82,7 @@ function renderHint(w) {
   els.hint.textContent = '';
   const add = (cls, text) => { if (!text) return; const d = document.createElement('div'); d.className = cls; d.textContent = text; els.hint.appendChild(d); };
   add('h-pos', h.pos);
-  add('h-ex', h.example);
-  add('h-alt', h.alts && h.alts.length ? '다른 뜻: ' + h.alts.join(' · ') : '');
+  (h.alts || []).forEach(a => add('h-alt', a));   // 다른 뜻: 품사별로 한 줄씩(최대 3)
   add('h-note', h.note);
   els.hint.hidden = !els.hint.children.length;
 }
@@ -90,20 +90,14 @@ function fitHint() {
   if (els.hint.hidden) return;
   const limit = CONFIG.DJ_ENABLED ? LAYOUT.HINT_BOTTOM_Y_DJ : LAYOUT.HINT_BOTTOM_Y;
   Array.from(els.hint.children).forEach(c => {
-    c.hidden = false; c.classList.remove('clip');
-    if (c.classList.contains('h-ex')) {
-      const px = fitFont(c, 12, 9, () => 2);
-      if (!fitsIn(c, 2)) c.classList.add('clip');
-    } else if (c.classList.contains('h-pos')) {
-      c.style.fontSize = '';
-    } else {
-      fitFont(c, 11, 8.5, () => 1);
-      if (!fitsIn(c, 1)) c.classList.add('clip');
-    }
+    c.hidden = false;
+    if (c.classList.contains('h-pos')) { c.style.fontSize = ''; return; }
+    fitFont(c, 11, 8.5, px => (px > 9.5 ? 1 : 2));   // 글자를 줄이고, 그래도 안 되면 두 줄까지. 그다음은 "…" 로 자르지 않고 그 항목을 생략한다
+    if (!fitsIn(c, 2)) c.hidden = true;
   });
   const bottom = () => (els.hint.getBoundingClientRect().bottom - box.getBoundingClientRect().top) / unitPx();
   const kids = Array.from(els.hint.children);
-  for (let i = kids.length - 1; i >= 0 && bottom() > limit; i--) kids[i].hidden = true;   // 뒤(쓰임 설명 → 다른 뜻 → 예문 → 품사)부터 생략
+  for (let i = kids.length - 1; i >= 0 && bottom() > limit; i--) kids[i].hidden = true;   // 뒤(쓰임 설명 → 다른 뜻 → 품사)부터 항목 단위로 생략
   if (kids.every(c => c.hidden)) els.hint.hidden = true;
 }
 function fitHud() {
@@ -304,7 +298,7 @@ function renderScore() {
 function renderProgress() {
   const w = G.words[G.wi];
   els.progress.textContent = (w && w.boss) ? '보스 단어'
-    : '단어 ' + Math.min(G.wi + 1, G.regular) + ' / ' + G.regular + (G.review ? ' · 복습' : '');
+    : '단어 ' + (G.words.slice(0, G.wi + 1).filter(x => !x.boss).length) + ' / ' + G.regular + (G.review ? ' · 복습' : '');   // 보스 단어는 세지 않는다
   box.classList.toggle('boss', !!(w && w.boss));
 }
 // 글자 칸 줄 폭 배분(작업318-1): 칸 수와 칸별 글자 수(조각 칸은 폭이 큼)로 사용 가능한 폭을 나눈다. 계산은 logic.js(fitWord)
@@ -400,13 +394,12 @@ function updateFx(dt) {
 }
 
 // ---------- 라운드 진행 ----------
-// 정규 단어는 최대 10개(틀린 단어 우선), 보스는 선택 단어 중 8글자 이상이 있을 때만 1개(planRound). 복습 판에는 보스가 없다.
+// 한 판은 최대 10단어. 5번째·10번째(그 위치에 단어가 있을 때만) 단어가 보스이고 긴 단어부터 배정된다(planRound). 복습 판에는 보스가 없다.
 function startRound(reviewOnly) {
   const plan = planRound(VALID_WORDS, missedSet, CONFIG, Math.random, !!reviewOnly);
-  const pool = plan.regular.map(w => ({ word: w.word, meaning: w.meaning, hint: w.hint, pop: w.pop }));
+  const pool = plan.list.map((w, i) => Object.assign({ word: w.word, meaning: w.meaning, hint: w.hint, pop: w.pop }, plan.bossIdx.indexOf(i) >= 0 ? { boss: true } : {}));
   if (!pool.length) return;
-  const regular = pool.length;
-  if (plan.boss) pool.push({ word: plan.boss.word, meaning: plan.boss.meaning, hint: plan.boss.hint, pop: plan.boss.pop, boss: true });
+  const regular = plan.regular;
   primeAudio();
   els.bossBanner.hidden = true;
   Object.assign(G, {
@@ -424,7 +417,8 @@ function startRound(reviewOnly) {
 function loadWord(i) {
   const boss = !!G.words[i].boss;
   G.wi = i; G.plan = planSlots(G.words[i].word, Math.random, boss ? bossConfig() : CONFIG, G.words[i].syl); G.si = 0;
-  G.heartPending = !boss && G.heartWords.has(i);
+  G.bossMode = boss;   // 중간에 오는 보스 뒤에는 일반 배경으로 돌아간다
+  G.heartPending = !boss && G.heartWords.has(G.words.slice(0, i).filter(x => !x.boss).length);   // 하트 계획은 보스가 아닌 단어의 순번 기준
   G.heartSlot = pickHeartSlot(G.plan.slots.length);
   const highs = planHighSlots(G.plan.slots.length);   // 작업318-4: 2단 점프가 꺼져 있으면 빈 집합
   G.plan.slots.forEach((sl, k) => { sl.high = highs.has(k); });
@@ -632,7 +626,7 @@ function startSecondJump() {
 function jump() {
   if (G.state !== 'run' && G.state !== 'pop' && G.state !== 'intro') return;
   if (G.jumpT < 0) startJump();
-  else if (CONFIG.DJ_ENABLED && G.j2 < 0) startSecondJump();
+  else if (CONFIG.DJ_ENABLED && G.j2 < 0) { if (G.jumpT >= CONFIG.SECOND_JUMP_MIN) startSecondJump(); }   // 첫 점프 직후의 너무 빠른 입력(중복 이벤트)은 무시
   else G.jumpBuf = CONFIG.JUMP_BUFFER;
 }
 box.addEventListener('pointerdown', e => {
@@ -642,7 +636,7 @@ box.addEventListener('pointerdown', e => {
 });
 window.addEventListener('keydown', e => {
   if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
-    if (G.state === 'run' || G.state === 'pop' || G.state === 'intro') { e.preventDefault(); jump(); }
+    if (G.state === 'run' || G.state === 'pop' || G.state === 'intro') { e.preventDefault(); if (!e.repeat) jump(); }   // 키를 누르고 있어서 생기는 반복 입력은 점프로 세지 않는다
   }
 });
 els.startBtn.addEventListener('click', () => startRound(false));
@@ -936,9 +930,9 @@ function meaningOf(data) {
   const d = data && typeof data === 'object' ? data : null;
   if (!d) return '';
   const sm = typeof d.short_meaning === 'string' ? d.short_meaning.trim() : '';
-  if (sm) return sm.slice(0, 40);
+  if (sm) return L.keywords(sm, 40);   // 쉼표 나열은 항목 단위로만 줄인다(문장 중간을 자르지 않는다)
   const m0 = Array.isArray(d.meanings) && d.meanings[0] ? d.meanings[0].definition : '';
-  return typeof m0 === 'string' ? m0.trim().slice(0, 40) : '';
+  return typeof m0 === 'string' ? L.keywords(m0, 40) : '';
 }
 // 선택한 id의 행만 골라 출제 단어로 만든다. 영어가 아니거나 구절·특수문자거나 한 글자거나 뜻이 없으면 제외 개수에 센다. 소문자 기준 중복은 조용히 하나만 남긴다.
 function pickWords(rows, ids) {
@@ -982,9 +976,8 @@ function showGame(words, excluded) {
   $('gate').hidden = true;
   $('app').hidden = false;
   resize();
-  const hasBoss = words.some(w => letterCount(w.word) >= CONFIG.BOSS_MIN_LETTERS);
-  const regular = Math.min(CONFIG.WORDS_PER_ROUND, words.length - (hasBoss && CONFIG.BOSS_ENABLED ? 1 : 0));
-  els.startInfo.textContent = '이번 판 ' + regular + '단어' + (hasBoss && CONFIG.BOSS_ENABLED ? ' + 보스 1단어' : '') + ' · 체력 ' + CONFIG.HP;
+  const shape = L.roundShape(words.length);
+  els.startInfo.textContent = '이번 판 ' + shape.regular + '단어' + (shape.bosses ? ' + 보스 ' + shape.bosses + '단어' : '') + ' · 체력 ' + CONFIG.HP;
   els.startExcluded.hidden = excluded === 0;
   els.startExcluded.textContent = excluded + '개 제외(구절·특수문자)';
   els.speechNote.hidden = hasSpeech();

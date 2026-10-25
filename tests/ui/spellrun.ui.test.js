@@ -91,13 +91,17 @@ const ttsCalls = () => state.requests.filter(r => r.url === '/api/tts');
 // 완벽 봇: 정답 글자가 가까워지면 점프(시제품 smoke 와 같은 규칙). jumpHeart 이면 하트도 먹는다. 수동 진행 모드로 step() 을 직접 돌린다.
 const BOT = `(async (opts) => {
   const R = window.SpellRun, G = R.G, C = R.CONFIG;
-  const seen = new Set(), res = { spawned: 0, spawnHp: [], taken: 0, gains: [], hpMaxPreBoss: 0, hpMin: 99, fails: 0, regular: G.regular, over: false };
+  const seen = new Set(), res = { spawned: 0, spawnHp: [], taken: 0, gains: [], hpMaxPreBoss: 0, hpMin: 99, fails: 0, regular: G.regular, over: false }, firstBoss = G.words.findIndex(w => w.boss), T = C.JUMP_TIME;
   if (opts.hp !== undefined) G.hp = opts.hp;
   let steps = 0;
   while (steps < 60 * 900 && G.state !== 'over') {
     if (G.state === 'run') {
-      const near = G.tiles.filter(x => x.state === 'live' && !x.checked && (x.kind === 'heart' ? opts.jumpHeart : x.correct) && (x.x - R.RUNNER_X) / G.speed <= C.JUMP_TIME / 2 && (x.x - R.RUNNER_X) > 0);
-      if (near.length && G.jumpT < 0) R.jump();
+      const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && (x.kind === 'heart' ? opts.jumpHeart : x.correct) && x.x > R.RUNNER_X).sort((a, b) => a.x - b.x)[0];
+      if (tg) {
+        const tta = (tg.x - R.RUNNER_X) / G.speed;
+        if (tg.high) { if (G.jumpT < 0 && tta <= T) R.jump(); else if (G.jumpT >= 0 && G.j2 < 0 && tta <= T / 2) R.jump(); }   // 작업320: 높은 칸은 2단 점프
+        else if (G.jumpT < 0 && tta <= T / 2) R.jump();
+      }
     }
     const hpBefore = G.hp;
     R.step(1 / 60); steps++;
@@ -105,7 +109,7 @@ const BOT = `(async (opts) => {
     for (const t of seen) if (t.state === 'taken' && !t.counted) { t.counted = true; res.taken++; res.gains.push({ from: hpBefore, to: G.hp }); }
     if (G.hp < hpBefore) res.fails++;
     res.hpMin = Math.min(res.hpMin, G.hp);
-    if (G.state === 'run' && G.wi < G.regular) res.hpMaxPreBoss = Math.max(res.hpMaxPreBoss, G.hp);
+    if (G.state === 'run' && (firstBoss < 0 || G.wi < firstBoss)) res.hpMaxPreBoss = Math.max(res.hpMaxPreBoss, G.hp);
     if (steps % 300 === 0) await new Promise(r => setTimeout(r, 0));
   }
   res.over = G.state === 'over'; res.wordsDone = G.wordsDone; res.total = G.words.length; res.title = document.getElementById('resTitle').textContent;
@@ -149,8 +153,8 @@ test('1) 사전 단어장에서 영어 3개를 골라 "게임 시작"을 누르�
   await page.click('#startBtn');
   await page.waitFor("SpellRun.G.state === 'run'", 4000);
   assert.deepEqual(await page.eval('SpellRun.G.words.map(w => w.word).sort()'), ['apple', 'book', 'environment'], '선택한 단어만 출제');
-  assert.equal(await page.eval('SpellRun.G.words.filter(w => w.boss).map(w => w.word)[0]'), 'environment', '8글자 이상 단어는 보스');
-  assert.equal(await page.eval('SpellRun.G.regular'), 2);
+  assert.equal(await page.eval('SpellRun.G.words.filter(w => w.boss).length'), 0, '작업320: 선택 단어가 5개 미만이면 보스 없음');
+  assert.equal(await page.eval('SpellRun.G.regular'), 3);
   assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), [], '스크립트 오류');
   await page.close();
 });
@@ -162,7 +166,7 @@ test('2) 시작 버튼은 좌표 기준 실제 클릭으로 눌리고, 숨겨진
   await gameReady(page);
   for (const id of ['result', 'pop', 'bossBanner', 'hud']) assert.equal(await page.eval(`getComputedStyle(document.getElementById('${id}')).display`), 'none', id + ' 숨김');
   assert.equal(await page.eval("getComputedStyle(document.getElementById('gate')).display"), 'none');
-  assert.equal(await page.eval("document.getElementById('startInfo').textContent"), '이번 판 2단어 + 보스 1단어 · 체력 5');
+  assert.equal(await page.eval("document.getElementById('startInfo').textContent"), '이번 판 3단어 · 체력 5', '3단어는 보스 없음');
   const hit = await page.eval("(() => { const b = document.getElementById('startBtn').getBoundingClientRect(); const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return t && t.id; })()");
   assert.equal(hit, 'startBtn', '시작 버튼 중심점에 다른 요소가 없다');
   await page.click('#startBtn');   // page.click 은 좌표 위 요소가 대상이 아니면 실패한다
@@ -229,7 +233,7 @@ test('4) 구절·한국어 단어·뜻 없는 단어는 제외 개수에 세고,
   const p2 = await openGame({ ids: [1, 2, 11] });
   await gameReady(p2);
   assert.equal(await p2.eval("document.getElementById('startExcluded').hidden"), true);
-  assert.equal(await p2.eval("document.getElementById('startInfo').textContent"), '이번 판 3단어 · 체력 5', '8글자 이상이 없으면 보스 없음');
+  assert.equal(await p2.eval("document.getElementById('startInfo').textContent"), '이번 판 3단어 · 체력 5', '5개 미만이면 보스 없음');
   await p2.close();
   // 남은 단어가 3개 미만이면 시작하지 않고 안내
   const p3 = await openGame({ ids: [1, 5, 6, 10, 2] });
@@ -250,7 +254,7 @@ test('5) 완벽 봇으로 한 판을 끝내면 /api/tts 는 단어당 1회만, A
   const r = await page.eval(`${BOT}({ jumpHeart: false })`);
   assert.equal(r.over, true, '끝까지 진행');
   assert.equal(r.wordsDone, 3); assert.equal(r.total, 3);
-  assert.equal(r.title, '보스 격파!');
+  assert.equal(r.title, '3단어 완주', '보스 없는 판');
   assert.equal(r.fails, 0, '완벽 봇은 실패하지 않는다');
   await page.waitFor("!document.getElementById('result').hidden", 3000);
   await sleep(400);
@@ -284,8 +288,9 @@ test('6) /api/tts 가 503 이면 브라우저 내장 음성으로 넘어가 단�
   const spoken = await page.eval('window.__speech.spoken');
   assert.deepEqual([...new Set(spoken.map(s => s.text))].sort(), ['apple', 'book', 'environment'], '내장 음성으로 세 단어 모두 읽음');
   const last = spoken[spoken.length - 1];
-  assert.equal(last.text, 'environment'); assert.equal(last.rate, 0.6, '마지막 단어 두 번째는 0.6배속');
-  assert.equal(spoken.filter(s => s.text === 'environment').length, 2, '마지막 단어는 두 번 읽는다');
+  const lastWord = await page.eval('SpellRun.G.words[SpellRun.G.words.length - 1].word');
+  assert.equal(last.text, lastWord); assert.equal(last.rate, 0.6, '마지막 단어 두 번째는 0.6배속');
+  assert.equal(spoken.filter(s => s.text === lastWord).length, 2, '마지막 단어는 두 번 읽는다');
   assert.equal(ttsCalls().length, 1, '503을 받은 뒤에는 서버 발음을 더 부르지 않는다: ' + ttsCalls().length);
   assert.equal(await page.eval("document.getElementById('popNote').textContent"), '', '내장 음성이 시작됐으니 실패 안내는 없다');
   await page.close();
@@ -297,7 +302,7 @@ test('6) /api/tts 가 503 이면 브라우저 내장 음성으로 넘어가 단�
   await p2.click('#startBtn');
   await p2.waitFor("SpellRun.G.state === 'run'", 4000);
   await p2.eval('SpellRun.manual = true');
-  await p2.eval(`(async () => { const R = SpellRun, G = R.G, C = R.CONFIG; let n = 0; while (G.state !== 'pop' && n++ < 60 * 300) { if (G.state === 'run') { const t = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct)[0]; if (t && G.jumpT < 0 && (t.x - R.RUNNER_X) / G.speed <= C.JUMP_TIME / 2 && t.x > R.RUNNER_X) R.jump(); } R.step(1 / 60); } })()`);
+  await p2.eval(`(async () => { const R = SpellRun, G = R.G, C = R.CONFIG; let n = 0; while (G.state !== 'pop' && n++ < 60 * 300) { if (G.state === 'run') { const t = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct)[0]; if (t && t.x > R.RUNNER_X) { const tta = (t.x - R.RUNNER_X) / G.speed; if (t.high) { if (G.jumpT < 0 && tta <= C.JUMP_TIME) R.jump(); else if (G.jumpT >= 0 && G.j2 < 0 && tta <= C.JUMP_TIME / 2) R.jump(); } else if (G.jumpT < 0 && tta <= C.JUMP_TIME / 2) R.jump(); } } R.step(1 / 60); } })()`);
   await p2.waitFor("document.getElementById('popNote').textContent.includes('재생되지 않았습니다')", 4000);
   await p2.close();
 });
@@ -305,7 +310,7 @@ test('6) /api/tts 가 503 이면 브라우저 내장 음성으로 넘어가 단�
 // ───────── 7. 하트 ─────────
 test('7) 하트: 체력이 줄어든 상태에서 점프로 먹으면 +1, 점프하지 않으면 변화 없음, 체력이 가득이면 나오지 않는다', { skip: SKIP }, async () => {
   resetState();
-  const ids = [1, 2, 3, 4, 9, 11, 12];   // apple book environment water o'clock happy window → 보스 1 + 정규 6 → 하트 2개 계획
+  const ids = [1, 2, 3, 4, 9, 11, 12];   // apple book environment water o'clock happy window → 7단어: 5번째 보스 1 + 정규 6 → 하트 2개 계획
   async function round(opts) {
     const page = await openGame({ ids });
     await gameReady(page);
@@ -421,7 +426,7 @@ const ADVANCE = `(async (until, opts) => {
       const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.kind !== 'heart' && x.x > R.RUNNER_X).sort((a, b) => a.x - b.x)[0];
       if (tg) {
         const tta = (tg.x - R.RUNNER_X) / G.speed;
-        if (tg.high && opts && opts.double) { if (G.jumpT < 0 && tta <= T) R.jump(); else if (G.jumpT >= 0 && G.j2 < 0 && tta <= T / 2) R.jump(); }
+        if (tg.high && !(opts && opts.double === false)) { if (G.jumpT < 0 && tta <= T) R.jump(); else if (G.jumpT >= 0 && G.j2 < 0 && tta <= T / 2) R.jump(); }
         else if (G.jumpT < 0 && tta <= T / 2) R.jump();
       }
     }
@@ -521,14 +526,14 @@ test('318-2) 힌트: 대표 뜻·품사·빈칸 예문·다른 뜻·쓰임 설�
     assert.ok(!re.test(text), `${d.word}: 힌트에 정답이 보임: ${text}`);
     assert.ok(!re.test(d.html.replace(/<[^>]+>/g, ' ')), `${d.word}: HUD DOM 에 정답이 보임`);
     const hl = Array.isArray(d.hint) ? d.hint : [];
+    assert.ok(!hl.some(x => x.startsWith('h-ex')), '작업320: 힌트에는 예문이 없다');
+    assert.ok(!text.includes('…'), '"…" 로 자르지 않는다: ' + text);
     if (d.word === 'happy') {
-      assert.deepEqual(d.hint.map(x => x.split('|')[0]).slice(0, 2), ['h-pos', 'h-ex']);
-      assert.ok(d.hint[1].includes('＿＿'), '예문의 happier/happiest/Happily 는 가려진다: ' + d.hint[1]);
-      assert.ok(d.hint[0].endsWith('형용사'));
+      assert.deepEqual(hl.map(x => x.split('|')[0]), ['h-pos', 'h-alt', 'h-note'], '품사 → 다른 뜻 → 쓰임 설명');
+      assert.ok(hl[0].endsWith('형용사') && hl[1].endsWith('형용사 만족스러운') && hl[2].includes('＿＿ 는 기분이 좋을 때 쓴다.'), JSON.stringify(hl));
     }
-    if (d.word === 'music') assert.ok(hl.some(x => x.startsWith('h-ex|') && x.includes('＿＿')), 'example_sentence 열 사용');
-    if (d.word === 'ran') assert.ok(hl.some(x => x.startsWith('h-ex|He ＿＿ fast')), '예문 속 정답 자체도 가려진다');
-    if (d.word === 'window' || d.word === 'friend') assert.ok(!hl.some(x => x.startsWith('h-ex') || x.startsWith('h-note')), '예문·쓰임 설명이 없는 오래된 데이터는 있는 항목만');
+    if (d.word === 'extraordinary') assert.deepEqual(hl.map(x => x.split('|')[0]).filter(c => c === 'h-alt').length <= 3, true);
+    if (d.word === 'window' || d.word === 'friend') assert.ok(!hl.some(x => x.startsWith('h-note')), '쓰임 설명이 없는 오래된 데이터는 있는 항목만');
     await advance(page, 'G.state === "pop"', {});
     if (await page.eval('SpellRun.G.wi + 1 >= SpellRun.G.words.length')) break;
     await advance(page, 'G.state === "run" && G.wi > ' + (await page.eval('SpellRun.G.wi')), {});
@@ -542,7 +547,7 @@ test('318-2) 힌트: 대표 뜻·품사·빈칸 예문·다른 뜻·쓰임 설�
 test('318-2) 힌트는 단어가 진행되는 동안 고정(움직이지 않음)이고, 글자 칸 줄 아래·높은 칸 타일 위쪽보다 위에 있다(360×640 논리 크기·320px 폭)', { skip: SKIP }, async () => {
   resetState(); state.rows = HINT_ROWS;
   for (const width of [320, 360]) {
-    const page = await openQ({ ids: [21, 24, 27], query: 'dj=1&highprob=1', width });
+    const page = await openQ({ ids: [21, 24, 22], query: 'dj=1&highprob=1', width });
     await page.click('#startBtn');
     await page.waitFor("SpellRun.G.state === 'run'", 4000);
     const geo = () => page.eval(`(() => { const u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')), b = document.getElementById('box').getBoundingClientRect();
@@ -618,9 +623,9 @@ test('318-2/3) 시간 값: 단어 시작 대기 2.2초(첫 단어 +0.4), 팝업 
   await page.close();
 });
 
-test('318-4) ?dj 없음·dj=0 에서는 높은 칸이 나오지 않고 점프 규칙도 예전과 같다(공중에서 또 눌러도 2단 점프 없음, 점프 버퍼만)', { skip: SKIP }, async () => {
+test('318-4) ?dj=0 에서는 높은 칸이 나오지 않고 점프 규칙도 예전과 같다(공중에서 또 눌러도 2단 점프 없음, 점프 버퍼만)', { skip: SKIP }, async () => {
   resetState(); state.rows = HINT_ROWS;
-  for (const query of ['', 'dj=0&highprob=1']) {
+  for (const query of ['dj=0&highprob=1']) {   // 작업320: 옵션 없음은 이제 켜짐. 꺼지는 것은 dj=0 뿐
     const page = await openQ({ ids: [21, 22, 23, 24, 27], query });
     assert.equal(await page.eval('SpellRun.CONFIG.DJ_ENABLED'), false);
     assert.equal(await page.eval("document.getElementById('djRule').hidden"), true);
@@ -634,7 +639,7 @@ test('318-4) ?dj 없음·dj=0 에서는 높은 칸이 나오지 않고 점프 �
     // 공중에서 다시 눌러도 점프 버퍼만(2단 점프 없음)
     const j = await page.eval(`(() => { const R = SpellRun, G = R.G; G.state = 'run'; G.jumpT = -1; R.jump(); R.step(0.1); R.jump(); return { j2: G.j2, buf: G.jumpBuf, h: R.curH() }; })()`);
     assert.equal(j.j2, -1); assert.ok(j.buf > 0 && j.h <= 118.01);
-    assert.equal(await page.eval("document.getElementById('tune').hidden"), query === '', '옵션이 없으면 표시 없음 / dj=0·highprob=1 은 조정값 사용 중');
+    assert.equal(await page.eval("document.getElementById('tune').hidden"), false, 'dj=0 은 기본값과 달라 조정값 사용 중');
     await page.close();
   }
 });
@@ -727,22 +732,22 @@ test('318-5) 주소 옵션: 허용 항목은 적용되고 "조정값 사용 중"
   let page = await openQ({ ids: [1, 2, 3] });
   const base0 = await cfgOf(page);
   assert.deepEqual(await badge(page), { hidden: true, text: '조정값 사용 중', w: 0, title: '' }, '옵션 없음: 표시 없음');
-  assert.deepEqual([base0.hp, base0.sd, base0.pop, base0.fin, base0.he, base0.dj], [5, 2.2, 1.6, 3.2, 3, false]);
-  assert.equal(await page.eval("document.getElementById('startInfo').textContent"), '이번 판 2단어 + 보스 1단어 · 체력 5');
+  assert.deepEqual([base0.hp, base0.sd, base0.pop, base0.fin, base0.he, base0.dj], [5, 2.2, 1.6, 3.2, 3, true], '작업320: dj 기본 켜짐');
+  assert.equal(await page.eval("document.getElementById('startInfo').textContent"), '이번 판 3단어 · 체력 5');
   await page.close();
   page = await openQ({ ids: [1, 2, 3], query: 'pace=1.1&hp=7&startdelay=2.6&popsec=2&highprob=0.3&heartevery=4&dj=1' });
   const c = await cfgOf(page);
   assert.deepEqual([c.hp, c.sd, c.pop, c.fin, c.hp2, c.he, c.dj], [7, 2.6, 2, 4, 0.3, 4, true]);
   assert.ok(Math.abs(c.jt - 0.6 / 1.1) < 0.002 && c.smin === Math.round(130 * 1.1 * 100) / 100, 'pace 는 CONFIG 를 한 번에: ' + JSON.stringify(c));
   const b = await badge(page);
-  assert.equal(b.hidden, false); assert.equal(b.text, '조정값 사용 중'); assert.ok(b.w > 20 && b.title.includes('pace') && b.title.includes('dj'));
+  assert.equal(b.hidden, false); assert.equal(b.text, '조정값 사용 중'); assert.ok(b.w > 20 && b.title.includes('pace') && b.title.includes('highprob') && !b.title.includes('dj'), 'dj=1 은 기본값이라 조정값이 아니다: ' + b.title);
   assert.match(await page.eval("document.getElementById('startInfo').textContent"), /체력 7$/);
   assert.equal(await page.hasHorizontalScroll(), false);
   await page.close();
   // 범위 밖·숫자 아님은 무시(유효한 hp 만 적용)
   page = await openQ({ ids: [1, 2, 3], query: 'pace=9&hp=6&startdelay=abc&popsec=99&highprob=2&heartevery=0&dj=5&unknown=1' });
   const d = await cfgOf(page);
-  assert.deepEqual([d.hp, d.sd, d.pop, d.he, d.dj, d.jt, d.hp2], [6, 2.2, 1.6, 3, false, base0.jt, 0.2]);
+  assert.deepEqual([d.hp, d.sd, d.pop, d.he, d.dj, d.jt, d.hp2], [6, 2.2, 1.6, 3, true, base0.jt, 0.2]);
   assert.deepEqual(await page.eval('SpellRun.OPT.applied'), ['hp']);
   assert.equal((await badge(page)).hidden, false);
   await page.close();
@@ -799,9 +804,9 @@ test('319-1) 주소 값이 저장값을 항목 단위로 덮어쓰고, 기본값
     p = await openQ({ ids: [1, 2, 3] , keep: true });   // 옵션 없음 → 저장값(hp 9)
     assert.equal(await p.eval('SpellRun.CONFIG.HP'), 9); await p.close();
     await clearOpts();
-    p = await openQ({ ids: [1, 2, 3], query: 'hp=5&dj=0&pace=1.3' , keep: true });   // 전부 기본값과 같다
+    p = await openQ({ ids: [1, 2, 3], query: 'hp=5&dj=1&pace=1.3' , keep: true });   // 전부 기본값과 같다
     assert.equal(await p.eval("document.getElementById('tune').hidden"), true, '기본값과 같은 값만 있으면 표시 없음');
-    assert.deepEqual(JSON.parse(await lsOpts(p)), { hp: 5, dj: 0, pace: 1.3 });
+    assert.deepEqual(JSON.parse(await lsOpts(p)), { hp: 5, dj: 1, pace: 1.3 });
     await p.close();
     p = await openQ({ ids: [1, 2, 3] , keep: true });
     assert.equal(await p.eval("document.getElementById('tune').hidden"), true); await p.close();
@@ -811,7 +816,7 @@ test('319-1) 주소 값이 저장값을 항목 단위로 덮어쓰고, 기본값
 test('319-1) 해제: ?reset=1 로 열면 저장값이 지워지고 기본값, "조정값 사용 중"을 누르면 저장값을 지우고 다시 열린다(텍스트·44px 이상·박스·이모지 없음)', { skip: SKIP }, async () => {
   resetState(); await clearOpts();
   try {
-    let p = await openQ({ ids: [1, 2, 3], query: 'dj=1&hp=7' , keep: true });
+    let p = await openQ({ ids: [1, 2, 3], query: 'dj=0&hp=7' , keep: true });
     // 표시 모양
     const st = await p.eval("(() => { const e = document.getElementById('tune'), c = getComputedStyle(e), r = e.getBoundingClientRect(); return { tag: e.tagName, h: r.height, w: r.width, bg: c.backgroundColor, bd: c.borderTopWidth, deco: c.textDecorationLine, text: e.textContent, emoji: /\\p{Extended_Pictographic}/u.test(e.textContent) }; })()");
     assert.deepEqual([st.tag, st.bg, st.bd, st.deco, st.text, st.emoji], ['BUTTON', 'rgba(0, 0, 0, 0)', '0px', 'underline', '조정값 사용 중', false]);
@@ -819,15 +824,15 @@ test('319-1) 해제: ?reset=1 로 열면 저장값이 지워지고 기본값, "�
     await p.click('#tune');
     await p.waitFor("location.search === '?reset=1'", 6000);
     await p.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
-    assert.equal(await lsOpts(p), null, '저장값 삭제'); assert.equal(await p.eval('SpellRun.CONFIG.HP'), 5); assert.equal(await p.eval('SpellRun.CONFIG.DJ_ENABLED'), false);
+    assert.equal(await lsOpts(p), null, '저장값 삭제'); assert.equal(await p.eval('SpellRun.CONFIG.HP'), 5); assert.equal(await p.eval('SpellRun.CONFIG.DJ_ENABLED'), true, '해제 후 기본값(켜짐)');
     assert.equal(await p.eval("document.getElementById('tune').hidden"), true);
     await p.close();
-    p = await openQ({ ids: [1, 2, 3], query: 'dj=1' , keep: true }); await p.close();
+    p = await openQ({ ids: [1, 2, 3], query: 'dj=0' , keep: true }); await p.close();
     p = await openQ({ ids: [1, 2, 3], query: 'reset=1&hp=8' , keep: true });   // reset 이 우선: 다른 옵션도 무시
-    assert.equal(await lsOpts(p), null); assert.equal(await p.eval('SpellRun.CONFIG.HP'), 5); assert.equal(await p.eval('SpellRun.CONFIG.DJ_ENABLED'), false);
+    assert.equal(await lsOpts(p), null); assert.equal(await p.eval('SpellRun.CONFIG.HP'), 5); assert.equal(await p.eval('SpellRun.CONFIG.DJ_ENABLED'), true);
     await p.close();
     p = await openQ({ ids: [1, 2, 3] , keep: true });
-    assert.equal(await p.eval('SpellRun.CONFIG.DJ_ENABLED'), false, '이후에도 기본값'); await p.close();
+    assert.equal(await p.eval('SpellRun.CONFIG.DJ_ENABLED'), true, '이후에도 기본값'); await p.close();
   } finally { await clearOpts(); }
 });
 
@@ -850,4 +855,253 @@ test('319-1) localStorage 를 쓸 수 없으면(읽기·쓰기 예외) 예외 �
   assert.equal(await page.eval('SpellRun.CONFIG.HP'), 5);
   assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), [], '예외 없음');
   await page.close();
+});
+
+// ───────── 작업320: 힌트 정리 · 2단 점프 기본 켜짐(실제 입력) · 보스 구성 · 속도 램프 ─────────
+const WORDS12 = ['apple', 'book', 'water', 'happy', 'window', 'music', 'friend', 'school', 'family', 'garden', 'beautiful', 'environment'];
+const ROWS12 = WORDS12.map((w, i) => RICH(61 + i, w, '뜻' + (i + 1), { meanings: [{ pos: 'noun', definition: '뜻' + (i + 1), example: 'This is a ' + w + '.' }] }));
+const IDS12 = WORDS12.map((_, i) => 61 + i);
+
+test('320-1) 힌트: 예문이 없고 "…" 로 잘린 글이 없으며(최악 데이터), 다른 뜻은 최대 3줄, 넘침 없음, 글자 칸 줄·높은 칸 타일과 겹치지 않는다(320·360)', { skip: SKIP }, async () => {
+  resetState(); state.rows = HINT_ROWS;
+  for (const width of [320, 360, 390]) {
+    const page = await openQ({ ids: [21, 22, 24], width });
+    await page.eval('Math.random = () => 0.0001');
+    await page.click('#startBtn');
+    await page.waitFor("SpellRun.G.state === 'run'", 4000);
+    for (let k = 0; k < 3; k++) {
+      const d = await page.eval(`(() => { const u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')), b = document.getElementById('box').getBoundingClientRect(), h = document.getElementById('hint'), w = document.getElementById('word').getBoundingClientRect();
+        const kids = [...h.children].filter(c => !c.hidden);
+        return { word: SpellRun.G.words[SpellRun.G.wi].word, text: document.getElementById('hud').textContent, cls: kids.map(c => c.className), clipped: kids.some(c => getComputedStyle(c).textOverflow === 'ellipsis' || c.classList.contains('clip')),
+          bottom: h.hidden ? 0 : (h.getBoundingClientRect().bottom - b.top) / u, wordBottom: (w.bottom - b.top) / u, hintTop: h.hidden ? 0 : (h.getBoundingClientRect().top - b.top) / u }; })()`);
+      assert.ok(!d.text.includes('…') && !d.clipped, `${width}px ${d.word}: "…" 잘림 없음`);
+      assert.ok(!d.cls.includes('h-ex'), '예문 없음'); assert.ok(d.cls.filter(c => c === 'h-alt').length <= 3);
+      assert.deepEqual(await page.eval(OVERFLOW), [], `${width}px ${d.word}`);
+      if (d.bottom) { assert.ok(d.hintTop >= d.wordBottom - 0.5, '글자 칸 줄과 겹치지 않음'); assert.ok(d.bottom <= 258 + 0.5, `${width}px 힌트 아래 ${d.bottom} <= 258(높은 칸 타일 윗변 276 보다 위)`); }
+      await advance(page, 'G.state === "pop"', {});
+      if (await page.eval('SpellRun.G.wi + 1 >= SpellRun.G.words.length')) break;
+      await advance(page, 'G.state === "run" && G.wi > ' + (await page.eval('SpellRun.G.wi')), {});
+    }
+    await page.close();
+  }
+});
+
+// 실제 입력 이벤트(CDP Input.*)로 점프를 넣는다. SpellRun 훅(R.jump)을 쓰지 않는다.
+async function press(page, kind) {
+  const c = await page.eval("(() => { const r = document.getElementById('box').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height * 0.45 }; })()");
+  if (kind === 'touch') {
+    await page.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: c.x, y: c.y }] });
+    await page.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } else if (kind === 'mouse') {
+    await page.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: c.x, y: c.y, button: 'left', clickCount: 1 });
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c.x, y: c.y, button: 'left', clickCount: 1 });
+  } else {
+    const k = { Space: [' ', 32], ArrowUp: ['ArrowUp', 38], KeyW: ['w', 87] }[kind];
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', code: kind, key: k[0], windowsVirtualKeyCode: k[1] });
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', code: kind, key: k[0], windowsVirtualKeyCode: k[1] });
+  }
+}
+const stepFrames = (page, n) => page.eval(`(() => { for (let i = 0; i < ${n}; i++) SpellRun.step(1 / 60); })()`);
+// 높은 정답 칸 하나를 첫 점프 후 T 만에 도착하도록 두고 상태를 정리한다
+const setHigh = page => page.eval(`(() => { const R = SpellRun, G = R.G, C = R.CONFIG; R.manual = true;
+  G.state = 'run'; G.tiles.length = 0; G.packActive = true; G.packId++; G.jumpT = -1; G.j2 = -1; G.jumpBuf = 0; G.score = 0; G.combo = 0; G.hp = C.HP; G.si = 0; G.speed = G.speedTarget = G.speedBase = C.SPEED_MIN;
+  window.__pd = []; window.__pdt = window.__pd; const t = { id: G.packId, x: R.RUNNER_X + G.speed * (C.JUMP_TIME + 0.002), w: 58, text: G.plan.slots[0].text, correct: true, chunk: false, high: true, state: 'live', t: 0, age: 1, checked: false, ok: false, color: '#fff' };
+  G.tiles.push(t); window.__tile = t; return { speed: G.speed }; })()`);
+const tileInfo = page => page.eval(`({ state: __tile.state, ok: __tile.ok, score: SpellRun.G.score, hp: SpellRun.G.hp, j2: SpellRun.G.j2, jumpT: SpellRun.G.jumpT, pd: __pd.length, h: SpellRun.curH() })`);
+
+test('320-2) 옵션 없는 기본 상태(2단 점프 켜짐): 실제 입력(터치·마우스 pointerdown, Space·ArrowUp·W)을 두 번 보내면 2단 점프가 나가 높은 칸을 획득하고 가산점이 붙는다', { skip: SKIP }, async () => {
+  resetState(); state.rows = HINT_ROWS;
+  const page = await openQ({ ids: [21, 24, 22] });
+  assert.deepEqual(await page.eval('[SpellRun.CONFIG.DJ_ENABLED, SpellRun.OPT.applied.length, document.getElementById("tune").hidden, document.getElementById("djRule").hidden]'), [true, 0, true, false], '옵션 없이 켜짐, 표시 없음, 규칙 문구');
+  await page.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  await page.click('#startBtn');
+  await page.waitFor("SpellRun.G.state === 'run'", 4000);
+  await page.eval("document.getElementById('box').addEventListener('pointerdown', e => (window.__pd = window.__pd || []).push(e.pointerType), true); 0");
+  const results = {};
+  for (const kind of ['touch', 'mouse', 'Space', 'ArrowUp', 'KeyW']) {
+    await setHigh(page);
+    await press(page, kind);                    // 첫 점프
+    let a = await tileInfo(page);
+    assert.ok(a.jumpT >= 0 && a.j2 === -1, kind + ': 첫 입력은 첫 점프');
+    await stepFrames(page, 14);                 // ≈0.233초 = 꼭대기
+    await press(page, kind);                    // 공중에서 두 번째 입력 → 2단 점프
+    a = await tileInfo(page);
+    assert.ok(a.j2 >= 0, kind + ': 두 번째 입력은 2단 점프 (j2=' + a.j2 + ')');
+    await stepFrames(page, 20);
+    a = await tileInfo(page);
+    results[kind] = a;
+    assert.equal(a.state, 'taken', kind + ': 높은 칸 획득'); assert.ok(a.ok); assert.equal(a.hp, 5);
+    const exp = await page.eval(`(() => { const L = window.SpellRunLogic, C = SpellRun.CONFIG; return Math.round(L.slotPoints(SpellRun.G.plan.slots[0].text.length, 1, C, C.HIGH_BONUS) * L.speedMult(C.SPEED_MIN) * (SpellRun.G.words[SpellRun.G.wi].boss ? C.BOSS_MULT : 1)); })()`);
+    assert.equal(a.score, exp, kind + ': 가산점(+100)이 배율 이전에 더해진 점수');
+    if (kind === 'touch' || kind === 'mouse') { assert.equal(a.pd, 2, kind + ' 두 번 탭 = pointerdown 두 번(탭 하나가 두 번으로 세어지지 않음)'); assert.deepEqual(await page.eval('[...new Set(__pdt)]'), [kind], 'pointerType'); }
+    else assert.equal(a.pd, 0, '키 입력은 pointerdown 이 아니다');
+  }
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+  await page.close();
+});
+
+test('320-2) 첫 점프 직후의 너무 빠른 두 번째 입력은 무시되고, 같은 프레임의 중복 pointerdown 이나 터치+마우스 중복도 한 번으로 센다. 한 번 점프만 하면 높은 칸을 놓친다', { skip: SKIP }, async () => {
+  resetState(); state.rows = HINT_ROWS;
+  const page = await openQ({ ids: [21, 24, 22] });
+  await page.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  await page.click('#startBtn');
+  await page.waitFor("SpellRun.G.state === 'run'", 4000);
+  // 1) 너무 빠른 두 번째 입력(약 2프레임 = 0.033초 < SECOND_JUMP_MIN)
+  await setHigh(page);
+  await press(page, 'Space'); await stepFrames(page, 2); await press(page, 'Space');
+  let a = await tileInfo(page);
+  assert.equal(a.j2, -1, '너무 빠른 두 번째 입력은 무시'); assert.ok(a.jumpT >= 0);
+  await stepFrames(page, 4);                    // 충분히 지난 뒤에는 2단 점프
+  await press(page, 'Space'); a = await tileInfo(page);
+  assert.ok(a.j2 >= 0, '시간이 지난 뒤의 입력은 2단 점프');
+  // 2) 같은 틱의 중복 pointerdown (터치 + 합성 마우스 이벤트가 한 번의 탭에 둘 다 오는 환경을 흉내)
+  await setHigh(page);
+  await page.eval(`(() => { const b = document.getElementById('box'); const mk = t => new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: t }); b.dispatchEvent(mk('touch')); b.dispatchEvent(mk('mouse')); })()`);
+  a = await tileInfo(page);
+  assert.ok(a.jumpT >= 0 && a.j2 === -1, '한 번의 탭에 이중 이벤트가 와도 한 번 점프로만 센다');
+  // 3) 키를 누르고 있어서 생기는 반복 입력(e.repeat)은 점프로 세지 않는다
+  await setHigh(page);
+  await page.send('Input.dispatchKeyEvent', { type: 'keyDown', code: 'Space', key: ' ', windowsVirtualKeyCode: 32 });
+  await stepFrames(page, 14);
+  await page.send('Input.dispatchKeyEvent', { type: 'keyDown', code: 'Space', key: ' ', windowsVirtualKeyCode: 32, autoRepeat: true });
+  a = await tileInfo(page);
+  assert.equal(a.j2, -1, '키 반복은 2단 점프가 아니다');
+  await page.send('Input.dispatchKeyEvent', { type: 'keyUp', code: 'Space', key: ' ', windowsVirtualKeyCode: 32 });
+  // 4) 한 번 점프만 하면 높은 칸을 놓친다(체력 -1)
+  await setHigh(page);
+  await stepFrames(page, 0);
+  await page.eval("SpellRun.G.tiles[0].x = SpellRun.RUNNER_X + SpellRun.G.speed * (SpellRun.CONFIG.JUMP_TIME / 2 + 0.002)");
+  await press(page, 'Space'); await stepFrames(page, 20);
+  a = await tileInfo(page);
+  assert.ok(a.hp < 5 && a.state !== 'taken', '한 번 점프(최고 118px)로는 높은 칸에 닿지 않는다: ' + JSON.stringify(a));
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+  await page.close();
+});
+
+test('320-2) 옵션 없는 기본 상태로 20단어 이상(2판)을 돌리면 높은 칸이 나오고 2단 점프 봇이 가산점을 받는다. 저장값 dj=0 이면 나오지 않는다', { skip: SKIP }, async () => {
+  resetState(); state.rows = ROWS12;
+  const play = async query => {
+    const page = await openQ({ ids: IDS12, query });
+    await page.click('#startBtn');
+    await page.waitFor("SpellRun.G.state === 'run'", 4000);
+    const out = await page.eval(`(async () => { const R = SpellRun, G = R.G, C = R.CONFIG; R.manual = true; const T = C.JUMP_TIME;
+      const res = { rounds: 0, words: 0, highWords: 0, highTiles: 0, bonus: 0, fails: 0 }; const seen = new Set();
+      for (let round = 0; round < 2; round++) {
+        if (round > 0) { document.getElementById('againBtn').click(); }
+        res.rounds++; let steps = 0, lastWi = -1;
+        while (steps < 60 * 900 && G.state !== 'over') {
+          if (G.plan && lastWi !== G.wi) { lastWi = G.wi; res.words++; if (G.plan.slots.some(s => s.high)) res.highWords++; }
+          if (G.state === 'run') { const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.kind !== 'heart' && x.x > R.RUNNER_X).sort((a, b) => a.x - b.x)[0];
+            if (tg) { const tta = (tg.x - R.RUNNER_X) / G.speed;
+              if (tg.high) { if (G.jumpT < 0 && tta <= T) R.jump(); else if (G.jumpT >= 0 && G.j2 < 0 && tta <= T / 2) R.jump(); } else if (G.jumpT < 0 && tta <= T / 2) R.jump(); } }
+          const hp = G.hp; R.step(1 / 60); steps++;
+          for (const t of G.tiles) if (t.high && !seen.has(t)) { seen.add(t); res.highTiles++; }
+          for (const f of G.floats) if (/^2단 점프 \\+100$/.test(f.text) && !f.counted) { f.counted = true; res.bonus++; }
+          if (G.hp < hp) res.fails++;
+        }
+        await new Promise(r => setTimeout(r, 0));
+      }
+      return res; })()`);
+    await page.close();
+    return out;
+  };
+  const on = await play('');
+  assert.ok(on.words >= 20, '20단어 이상: ' + on.words);
+  assert.ok(on.highWords >= 1 && on.highTiles >= 1, '높은 칸이 나온다: ' + JSON.stringify(on));
+  assert.ok(on.bonus >= 1, '2단 점프 봇이 가산점을 받는다: ' + JSON.stringify(on));
+  assert.equal(on.fails, 0, '2단 점프 봇은 실수 없이: ' + JSON.stringify(on));
+  const off = await play('dj=0');
+  assert.deepEqual([off.highWords, off.highTiles, off.bonus], [0, 0, 0], 'dj=0 이면 나오지 않는다');
+});
+
+test('320-3) 보스 구성: 12단어 중 10단어 판에서 5번째·10번째가 보스(긴 단어 우선), 5번째 보스 뒤 6번째 단어로 정상 진행, 10번째 보스 뒤 결과', { skip: SKIP }, async () => {
+  resetState(); state.rows = ROWS12;
+  const page = await openQ({ ids: IDS12 });
+  assert.equal(await page.eval("document.getElementById('startInfo').textContent"), '이번 판 8단어 + 보스 2단어 · 체력 5');
+  await page.click('#startBtn');
+  await page.waitFor("SpellRun.G.state === 'run'", 4000);
+  const shape = await page.eval("({ n: SpellRun.G.words.length, boss: SpellRun.G.words.map((w, i) => w.boss ? i : -1).filter(i => i >= 0), bw: SpellRun.G.words.filter(w => w.boss).map(w => w.word), regular: SpellRun.G.regular, hearts: SpellRun.G.heartWords.size })");
+  assert.deepEqual([shape.n, shape.boss, shape.regular, shape.hearts], [10, [4, 9], 8, 2], '10단어, 5·10번째 보스, 하트는 보스 제외 8단어 기준 2개');
+  assert.deepEqual(shape.bw, ['environment', 'beautiful'], '긴 단어부터 보스 자리에 배정');
+  // 4번째 단어가 끝나면 보스 연출
+  await advance(page, 'G.state === "intro"', {});
+  assert.equal(await page.eval('SpellRun.G.wi'), 3);
+  assert.equal(await page.eval("!document.getElementById('bossBanner').hidden && SpellRun.G.bossMode"), true, '보스 배너와 보스 배경');
+  await advance(page, 'G.state === "run" && G.wi === 4', {});
+  assert.equal(await page.eval("SpellRun.G.words[4].boss && document.getElementById('progress').textContent"), '보스 단어');
+  assert.equal(await page.eval("document.getElementById('box').classList.contains('boss')"), true);
+  const hpAtBoss = await page.eval('SpellRun.G.hp');
+  await advance(page, 'G.state === "pop"', {});
+  assert.equal(await page.text('#popTag'), '보스 격파!');
+  assert.equal(await page.eval('SpellRun.G.repeatT'), 0, '중간 보스는 마지막 단어 재발음 없음');
+  await advance(page, 'G.state === "run" && G.wi === 5', {});
+  assert.equal(await page.eval("SpellRun.G.bossMode"), false, '보스가 끝나면 일반 배경'); assert.equal(await page.eval("document.getElementById('box').classList.contains('boss')"), false);
+  assert.equal(await page.text('#progress'), '단어 5 / 8', '보스는 세지 않는다');
+  assert.equal(await page.eval('SpellRun.G.words[5].boss'), undefined);
+  assert.ok(hpAtBoss >= 1);
+  // 마지막(10번째) 보스까지 끝내면 결과, 마지막 단어 규칙(재발음 예약)
+  await advance(page, 'G.state === "run" && G.wi === 9', {});
+  await advance(page, 'G.state === "pop"', {});
+  assert.equal(await page.eval('SpellRun.G.repeatT > 0'), true, '마지막 단어는 천천히 한 번 더 발음 예약');
+  assert.equal(await page.eval('SpellRun.G.popT'), 3.2, '마지막 단어 팝업 시간 그대로');
+  await advance(page, 'G.state === "over"', {});
+  assert.equal(await page.text('#resTitle'), '보스 격파!');
+  assert.equal(await page.eval('SpellRun.G.wordsDone'), 10);
+  assert.deepEqual(await page.eval(OVERFLOW), []);
+  // 복습 판: 보스 없음
+  await page.eval("SpellRun.missedSet.add('apple'); SpellRun.missedSet.add('book'); SpellRun.missedSet.add('water'); SpellRun.startRound(true)");
+  assert.deepEqual(await page.eval("[SpellRun.G.words.length, SpellRun.G.words.filter(w => w.boss).length]"), [3, 0], '복습 판에는 보스가 없다');
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+  await page.close();
+  // 5개 미만 / 5~9개
+  for (const [n, bosses] of [[4, 0], [5, 1], [9, 1]]) {
+    const p2 = await openQ({ ids: IDS12.slice(0, n) });
+    await p2.click('#startBtn'); await p2.waitFor("SpellRun.G.state === 'run'", 4000);
+    assert.deepEqual(await p2.eval("[SpellRun.G.words.length, SpellRun.G.words.map((w, i) => w.boss ? i : -1).filter(i => i >= 0)]"), [n, bosses ? [4] : []], n + '개');
+    await p2.close();
+  }
+});
+
+test('320-4) 속도 램프: 콤보에 따라 목표 속도가 25·50·75·100%로 오르고 실제 속도는 가속도로 따라가며(순간 점프 없음), 실패하면 콤보 0 과 기본 누적 속도로 내려간다. maxcombo 옵션', { skip: SKIP }, async () => {
+  resetState(); state.rows = ROWS12;
+  const page = await openQ({ ids: IDS12 });
+  await page.click('#startBtn');
+  await page.waitFor("SpellRun.G.state === 'run'", 4000);
+  const rec = await page.eval(`(async () => { const R = SpellRun, G = R.G, C = R.CONFIG, L = window.SpellRunLogic; R.manual = true; const T = C.JUMP_TIME;
+    const out = { rows: [], maxDv: 0, mism: [], steps: 0 }; let prevSpeed = G.speed, lastCombo = -1;
+    while (out.steps < 60 * 60 && G.state !== 'over' && out.rows.length < 40) {
+      if (G.state === 'run') { const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.kind !== 'heart' && x.x > R.RUNNER_X).sort((a, b) => a.x - b.x)[0];
+        if (tg) { const tta = (tg.x - R.RUNNER_X) / G.speed; if (tg.high) { if (G.jumpT < 0 && tta <= T) R.jump(); else if (G.jumpT >= 0 && G.j2 < 0 && tta <= T / 2) R.jump(); } else if (G.jumpT < 0 && tta <= T / 2) R.jump(); } }
+      R.step(1 / 60); out.steps++;
+      out.maxDv = Math.max(out.maxDv, Math.abs(G.speed - prevSpeed)); prevSpeed = G.speed;
+      if (G.combo !== lastCombo) { lastCombo = G.combo; out.rows.push([G.combo, G.speedTarget, G.speedBase]); if (Math.abs(G.speedTarget - L.targetSpeed(G.speedBase, G.combo)) > 1e-9) out.mism.push(G.combo); }
+    }
+    out.min = C.SPEED_MIN; out.max = C.SPEED_MAX; out.accel = C.SPEED_ACCEL; out.combos = out.rows.map(r => r[0]); out.maxCombo = G.maxCombo; return out; })()`);
+  assert.deepEqual(rec.mism, [], '목표 속도 = max(기본 누적 속도, 램프)');
+  assert.ok(rec.maxCombo >= 6, '콤보를 쌓았다: ' + rec.maxCombo);
+  assert.ok(rec.maxDv <= rec.accel / 60 + 1e-6, `실제 속도는 가속도로만 변한다(프레임당 최대 ${rec.maxDv.toFixed(3)} <= ${(rec.accel / 60).toFixed(3)})`);
+  const at = c => rec.rows.find(r => r[0] === c);
+  const span = rec.max - rec.min;
+  assert.equal(at(1)[1], at(1)[2], '콤보 1 은 램프 없음');
+  assert.ok(at(2)[1] >= rec.min + span * 0.25 - 1e-6 && at(2)[1] < at(3)[1] && at(3)[1] >= rec.min + span * 0.5 - 1e-6 && at(4)[1] >= rec.min + span * 0.75 - 1e-6 && at(4)[1] < at(5)[1], '콤보 2~4 에서 단계적으로 오른다: ' + JSON.stringify(rec.rows.slice(0, 6)));
+  assert.equal(at(5)[1], rec.max, '콤보 5 에서 최고 속도');
+  // 실패: 콤보가 쌓인 상태에서 정답을 놓친다 → 콤보 0, 목표 속도 = 기본 누적 속도, 실제 속도는 서서히 내려간다
+  const f = await page.eval(`(() => { const R = SpellRun, G = R.G, C = R.CONFIG; R.manual = true;
+    G.state = 'run'; G.tiles.length = 0; G.packActive = true; G.packId++; G.jumpT = -1; G.j2 = -1; G.combo = 6; G.speedBase = C.SPEED_MIN + 40; G.speedTarget = C.SPEED_MAX; G.speed = C.SPEED_MAX; G.hp = C.HP; G.si = 0;
+    G.tiles.push({ id: G.packId, x: R.RUNNER_X - 1, w: 58, text: G.plan.slots[0].text, correct: true, chunk: false, high: false, state: 'live', t: 0, age: 1, checked: false, ok: false, color: '#fff' });
+    R.step(1 / 60); const a = { combo: G.combo, target: G.speedTarget, base: G.speedBase, speed: G.speed, hp: G.hp }; for (let i = 0; i < 30; i++) R.step(1 / 60); a.after = G.speed; a.min = C.SPEED_MIN; a.max = C.SPEED_MAX; a.drop = C.SPEED_DROP_FAIL; return a; })()`);
+  assert.equal(f.combo, 0); assert.equal(f.hp, 4);
+  assert.equal(f.target, f.base, '램프가 풀리고 목표 속도가 기본 누적 속도로'); assert.equal(f.base, Math.max(f.min, f.min + 40 - f.drop));
+  assert.ok(f.speed > f.max - 5 && f.after < f.speed && f.after >= f.target, '실제 속도는 순간 점프 없이 서서히: ' + JSON.stringify(f));
+  await page.close();
+  // maxcombo 옵션: 8 이면 콤보 5 에서는 아직 최고 속도가 아니다
+  const p2 = await openQ({ ids: IDS12, query: 'maxcombo=8' });
+  assert.equal(await p2.eval('SpellRun.CONFIG.COMBO_MAX_SPEED'), 8);
+  assert.equal(await p2.eval("document.getElementById('tune').hidden"), false);
+  assert.deepEqual(await p2.eval("(() => { const L = window.SpellRunLogic, C = SpellRun.CONFIG; return [L.targetSpeed(C.SPEED_MIN, 5) < C.SPEED_MAX, L.targetSpeed(C.SPEED_MIN, 8) === C.SPEED_MAX]; })()"), [true, true]);
+  await p2.close();
+  const p3 = await openQ({ ids: IDS12, query: 'maxcombo=5' });
+  assert.equal(await p3.eval("document.getElementById('tune').hidden"), true, '기본값과 같으면 표시 없음'); await p3.close();
+  const p4 = await openQ({ ids: IDS12, query: 'maxcombo=2&dj=0' });
+  assert.equal(await p4.eval('SpellRun.CONFIG.COMBO_MAX_SPEED'), 5, '범위 밖은 무시'); assert.equal(await p4.eval('SpellRun.CONFIG.DJ_ENABLED'), false); await p4.close();
 });

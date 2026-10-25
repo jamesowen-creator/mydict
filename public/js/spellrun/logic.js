@@ -33,7 +33,8 @@ function buildConfig(v) {
   SPEED_UP_CHUNK: P(5),   // 조각을 맞힐 때 늘어나는 속도
   SPEED_DROP_FAIL: P(30), // 오답이나 놓침 한 번에 줄어드는 속도
   SPEED_ACCEL: P(120),    // 속도가 목표 속도로 바뀌는 빠르기 (px/초²)
-  COMBO_MAX_SPEED: 5,     // 이 콤보 이상이면 최고 속도로 달린다
+  COMBO_RAMP_START: 2,    // 작업320: 이 콤보부터 목표 속도가 서서히 오른다
+  COMBO_MAX_SPEED: 5,     // 이 콤보 이상이면 최고 속도로 달린다(주소 옵션 maxcombo). 시작 콤보부터 이 콤보까지 선형으로 오른다
   SPEED_SCORE_BONUS: 1.0, // 최고 속도일 때 점수 배율 가산 (1.0이면 최대 x2)
   GAP_SEC_SLOW: T(1.15),  // 최저 속도에서 후보 사이 시간 간격(초)
   GAP_SEC_FAST: T(0.72),  // 최고 속도에서 후보 사이 시간 간격(초). 점프 체공 시간보다 충분히 길어야 한다
@@ -60,7 +61,7 @@ function buildConfig(v) {
   FINAL_SLOW_RATE: 0.6,   // 두 번째 발음 속도
   // 보스 단어: 한 판의 마지막에 나오는 긴 단어 (복습 판에는 나오지 않는다)
   BOSS_ENABLED: true,
-  BOSS_MIN_LETTERS: 8,    // 보스 단어 최소 알파벳 수
+  BOSS_POSITIONS: [5, 10], // 작업320: 한 판에서 보스가 되는 단어 순서(1부터). 그 위치에 단어가 있을 때만(5개 미만이면 보스 없음). 글자 수 조건은 없다
   BOSS_CANDIDATES: 4,     // 보스 칸의 후보 수
   BOSS_CHUNK_PROB: 0.35,  // 보스 칸이 조각이 될 확률
   BOSS_MAX_SLOTS: 7,      // 보스 단어의 최대 칸 수
@@ -69,8 +70,9 @@ function buildConfig(v) {
   BOSS_MULT: 2,           // 보스 글자 점수 배율
   BOSS_BONUS: 1000,       // 보스 격파 보너스
   BOSS_INTRO_SEC: 1.8,    // 보스 등장 연출 시간(초)
-  // 작업318-4: 2단 점프. DJ_ENABLED 가 꺼져 있으면(기본) 높은 칸이 나오지 않고 점프 규칙도 그대로다.
-  DJ_ENABLED: false,
+  // 작업318-4: 2단 점프. 작업320: 기본 켜짐(?dj=0 일 때만 꺼진다). 꺼져 있으면 높은 칸이 나오지 않고 점프 규칙도 예전 그대로다.
+  DJ_ENABLED: true,
+  SECOND_JUMP_MIN: 0.08,  // 첫 점프 직후 이 시간(초)이 지나기 전의 두 번째 입력은 무시한다(중복 이벤트 방지)
   HIGH_SLOT_PROB: 0.2,    // 첫 칸을 뺀 칸이 높은 칸이 될 확률
   HIGH_MAX: 2,            // 한 단어의 높은 칸 최대 개수
   HIGH_GRAB_H: 160,       // 높은 칸은 이 높이 이상일 때만 "공중"으로 본다(px). JUMP_PEAK(118)보다 높아 한 번 점프로는 닿지 않는다
@@ -81,7 +83,8 @@ function buildConfig(v) {
   if (v.popsec) { cfg.POP_SEC = v.popsec; cfg.POP_SEC_FINAL = Math.round(v.popsec * 2 * 100) / 100; cfg.FINAL_REPEAT_SEC = v.popsec; }
   if (v.highprob !== undefined) cfg.HIGH_SLOT_PROB = v.highprob;
   if (v.heartevery) cfg.HEART_EVERY = v.heartevery;
-  if (v.dj) cfg.DJ_ENABLED = true;
+  if (v.dj !== undefined) cfg.DJ_ENABLED = !!v.dj;
+  if (v.maxcombo) cfg.COMBO_MAX_SPEED = v.maxcombo;
   return cfg;
 }
 const CONFIG = buildConfig();
@@ -89,7 +92,7 @@ const CONFIG = buildConfig();
 // 작업318-5: 주소 옵션(?pace=1.1&hp=7&startdelay=2.6&popsec=2&highprob=0.3&heartevery=3&dj=1). 허용 범위를 벗어나거나 숫자가 아니면 무시(기본값).
 const OPTION_RULES = {
   pace: { min: 0.7, max: 1.8, def: DEFAULT_PACE }, hp: { min: 1, max: 10, int: true, def: 5 }, startdelay: { min: 0.5, max: 6, def: 2.2 },
-  popsec: { min: 0.5, max: 5, def: 1.6 }, highprob: { min: 0, max: 1, def: 0.2 }, heartevery: { min: 1, max: 10, int: true, def: 3 }, dj: { min: 0, max: 1, int: true, def: 0 }
+  popsec: { min: 0.5, max: 5, def: 1.6 }, highprob: { min: 0, max: 1, def: 0.2 }, heartevery: { min: 1, max: 10, int: true, def: 3 }, dj: { min: 0, max: 1, int: true, def: 1 }, maxcombo: { min: 3, max: 12, int: true, def: 5 }
 };
 // 반환 { values: 유효한 값(기본값과 같아도 포함), applied: 기본값과 다른 옵션 이름 }
 function parseOptions(search) {
@@ -341,7 +344,15 @@ function speedAfterHit(target, isChunk, cfg) {
 }
 function speedAfterFail(target, cfg) { cfg = cfg || CONFIG; return Math.max(cfg.SPEED_MIN, target - cfg.SPEED_DROP_FAIL); }
 // 콤보가 COMBO_MAX_SPEED 이상이면 최고 속도, 아니면 기본 속도(맞히면 오르고 틀리면 줄어드는 값)
-function targetSpeed(base, combo, cfg) { cfg = cfg || CONFIG; return combo >= cfg.COMBO_MAX_SPEED ? cfg.SPEED_MAX : base; }
+// 작업320: 콤보 RAMP_START 부터 MAX_SPEED 콤보까지 (기본 2~5) 목표 속도가 선형으로 오른다(콤보 2=25%, 3=50%, 4=75%, 5 이상=100%).
+// 목표 속도 = max(기본 누적 속도, 램프 속도). 콤보 1 이하는 램프 영향 없음. 틀리면 콤보 0 이라 기본 누적 속도로 내려간다.
+function targetSpeed(base, combo, cfg) {
+  cfg = cfg || CONFIG;
+  if (combo < cfg.COMBO_RAMP_START) return base;
+  const span = cfg.COMBO_MAX_SPEED - cfg.COMBO_RAMP_START + 1;
+  const f = Math.min(1, (combo - cfg.COMBO_RAMP_START + 1) / span);
+  return Math.max(base, cfg.SPEED_MIN + f * (cfg.SPEED_MAX - cfg.SPEED_MIN));
+}
 // 하트가 나올 단어 번호: HEART_EVERY개씩 묶은 그룹마다 하나. 남는 단어(그룹을 못 채운 것)에는 나오지 않는다.
 function planHearts(regularCount, rng, cfg) {
   rng = rng || Math.random; cfg = cfg || CONFIG;
@@ -439,32 +450,55 @@ function findWordRanges(text, word) {
   while ((m = re.exec(s))) { out.push([m.index, m.index + m[0].length]); if (m[0].length === 0) re.lastIndex++; }
   return out;
 }
-const clip = function (s, n) { s = String(s).trim(); return Array.from(s).length > n ? Array.from(s).slice(0, n).join('').trim() : s; };
 const txt = function (v) { return typeof v === 'string' ? v.trim() : ''; };
+// 쉼표로 나열된 짧은 한글 키워드는 항목 단위로만 줄인다(max 글자 안에 드는 앞쪽 항목까지). 항목 하나가 길어도 중간을 자르지 않는다.
+function keywords(s, max) {
+  s = txt(s);
+  if (Array.from(s).length <= max) return s;
+  const items = s.split(/\s*[,，;；、]\s*/).filter(Boolean);
+  let out = '';
+  for (const it of items) {
+    const next = out ? out + ', ' + it : it;
+    if (out && Array.from(next).length > max) break;
+    out = next;
+  }
+  return out || s;
+}
+// 첫 문장(문장 부호/종결에서 끊음). 길면 줄이지 않고 비운다(한 줄에 안 들어가는 설명은 쓰지 않는다).
+function firstSentence(s, max) {
+  s = txt(s);
+  if (!s) return '';
+  const m = s.match(/^.*?[.!?。](?=\s|$)/);
+  const one = (m ? m[0] : s).trim();
+  return Array.from(one).length <= max ? one : '';
+}
 // row: 단어장 행 { data, example_sentence }, word: 소문자 단어, main: 대표 뜻.
-// 반환 { hint: { meaning, pos, example, alts, note }(모두 정답이 가려진 값, 없는 항목은 ''/[]), pop: { pron, meaning, example, ranges }(가리지 않은 값 + 강조 위치) }
+// 반환 { hint: { meaning, pos, alts, note }(모두 정답이 가려진 값, 없는 항목은 ''/[]), pop: { pron, meaning, example, ranges }(가리지 않은 값 + 강조 위치) }
+// 작업320: 힌트에서 예문을 뺐다(예문은 완성 팝업에서만). 다른 뜻은 최대 3개, "품사 뜻키워드" 형태.
 function buildHint(row, word, main) {
   const d = row && row.data && typeof row.data === 'object' ? row.data : {};
   const meanings = Array.isArray(d.meanings) ? d.meanings.filter(function (m) { return m && typeof m === 'object'; }) : [];
   const m0 = meanings[0] || {};
-  const posRaw = txt(m0.pos);
-  const pos = POS_KO[posRaw.toLowerCase()] || clip(posRaw, 8);
+  const posOf = function (m) { const raw = txt(m.pos); return POS_KO[raw.toLowerCase()] || (raw.length <= 8 ? raw : ''); };
+  const pos = posOf(m0);
   const alts = [];
-  for (let i = 1; i < meanings.length && alts.length < 2; i++) {
-    const a = clip(txt(meanings[i].definition) || txt(meanings[i].core_meaning), 24);
-    if (a && a !== main && !alts.includes(a)) alts.push(a);
+  for (let i = 1; i < meanings.length && alts.length < 3; i++) {
+    const def = keywords(txt(meanings[i].definition) || txt(meanings[i].core_meaning), 28);
+    if (!def || def === main || alts.some(function (a) { return a.def === def; })) continue;
+    const p = posOf(meanings[i]);
+    alts.push({ def: def, text: (p ? p + ' ' : '') + def });
   }
   let note = '';
-  for (const m of meanings) { note = clip(txt(m.usage_note) || txt(m.nuance), 70); if (note) break; }
+  for (const m of meanings) { note = firstSentence(txt(m.usage_note) || txt(m.nuance), 60); if (note) break; }
   const cands = [txt(row && row.example_sentence)]
     .concat(meanings.map(function (m) { return txt(m.example); }))
     .concat((Array.isArray(d.usages) ? d.usages : []).map(function (u) { return u && typeof u === 'object' ? txt(u.example) : ''; }))
-    .filter(Boolean).map(function (e) { return clip(e, 140); });
+    .filter(Boolean).map(function (e) { return Array.from(e).length > 140 ? Array.from(e).slice(0, 140).join('') : e; });
   const found = cands.find(function (e) { return findWordRanges(e, word).length > 0; });
   const popExample = found || cands[0] || '';
   const mk = function (t) { return maskText(t, word); };
   return {
-    hint: { meaning: mk(main), pos: mk(pos), example: found ? mk(found) : '', alts: alts.map(mk), note: mk(note) },
+    hint: { meaning: mk(main), pos: mk(pos), alts: alts.map(function (a) { return mk(a.text); }), note: mk(note) },
     pop: { pron: txt(d.pronunciation), meaning: main, example: popExample, ranges: popExample ? findWordRanges(popExample, word) : [] }
   };
 }
@@ -490,16 +524,25 @@ function bossConfig(cfg) {
 
 function letterCount(word) { return Array.from(word).filter(isAlpha).length; }
 
-// 한 판 구성: 보스는 선택 단어 중 알파벳이 BOSS_MIN_LETTERS 이상인 단어가 있을 때만 1개(복습 판에는 없음).
-// 보스로 뽑힌 단어는 정규 단어에서 빠진다. 정규 단어는 최대 WORDS_PER_ROUND개이고 직전 판에서 틀린 단어가 먼저다.
+// 한 판의 모양: 단어 수 n(최대 WORDS_PER_ROUND)과 보스 위치(0부터). 복습 판에는 보스가 없다. 선택 단어가 5개 미만이면 보스 없음, 5~9개면 5번째만, 10개 이상이면 5·10번째.
+function roundShape(count, cfg, reviewOnly) {
+  cfg = cfg || CONFIG;
+  const n = Math.min(cfg.WORDS_PER_ROUND, count);
+  const bossIdx = (reviewOnly || !cfg.BOSS_ENABLED) ? [] : cfg.BOSS_POSITIONS.filter(function (p) { return p <= n; }).map(function (p) { return p - 1; });
+  return { total: n, bossIdx: bossIdx, bosses: bossIdx.length, regular: n - bossIdx.length };
+}
+// 한 판 구성: 보스 자리에는 선택 단어 중 긴 단어부터(길이가 같으면 무작위) 배정하고, 나머지 자리는 직전 판에서 틀린 단어가 먼저다.
+// 반환 { list: 출제 순서의 단어 목록, bossIdx: 보스 위치, regular: 보스가 아닌 단어 수 }
 function planRound(words, missed, cfg, rng, reviewOnly) {
   cfg = cfg || CONFIG; rng = rng || Math.random;
-  var boss = null, pool = words;
-  if (!reviewOnly && cfg.BOSS_ENABLED) {
-    var longs = words.filter(function (w) { return letterCount(w.word) >= cfg.BOSS_MIN_LETTERS; });
-    if (longs.length) { boss = longs[Math.floor(rng() * longs.length)]; pool = words.filter(function (w) { return w !== boss; }); }
-  }
-  return { regular: buildRound(pool, missed, cfg, rng, reviewOnly), boss: boss };
+  const shape = roundShape(reviewOnly ? Math.min(words.filter(function (w) { return missed.has(w.word); }).length, cfg.WORDS_PER_ROUND) : words.length, cfg, reviewOnly);
+  if (!shape.bosses) { const list = buildRound(words, missed, cfg, rng, reviewOnly); return { list: list, bossIdx: [], regular: list.length }; }
+  const order = shuffle(words, rng).sort(function (x, y) { return letterCount(y.word) - letterCount(x.word); });   // 정렬은 안정 정렬이라 같은 길이는 섞인 순서 그대로(무작위)
+  const bosses = order.slice(0, shape.bosses);
+  const rest = buildRound(words.filter(function (w) { return bosses.indexOf(w) < 0; }), missed, cfg, rng, false).slice(0, shape.regular);
+  const list = []; let ri = 0;
+  for (let i = 0; i < shape.total; i++) { const k = shape.bossIdx.indexOf(i); list.push(k >= 0 ? bosses[k] : rest[ri++]); }
+  return { list: list, bossIdx: shape.bossIdx, regular: shape.regular };
 }
 
 return {
@@ -507,9 +550,9 @@ return {
   chunkProbFor: chunkProbFor, planSlots: planSlots, mutateChunk: mutateChunk, makeCandidates: makeCandidates, comboMult: comboMult, slotPoints: slotPoints,
   speedLevel: speedLevel, speedMult: speedMult, gapSec: gapSec, leadSec: leadSec, speedAfterHit: speedAfterHit, speedAfterFail: speedAfterFail,
   targetSpeed: targetSpeed, planHearts: planHearts, pickHeartSlot: pickHeartSlot, jumpHeight: jumpHeight, judge: judge, buildRound: buildRound,
-  letterCount: letterCount, planRound: planRound, bossConfig: bossConfig,
+  letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
-  wordWidth: wordWidth, fitWord: fitWord, POS_KO: POS_KO, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint
+  wordWidth: wordWidth, fitWord: fitWord, POS_KO: POS_KO, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, firstSentence: firstSentence
 };
 });

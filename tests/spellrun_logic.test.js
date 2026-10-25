@@ -248,7 +248,7 @@ ok(Math.abs(C.SPEED_MIN - 130 * 1.3) < 0.01 && Math.abs(C.SPEED_MAX - 280 * 1.3)
 // 간격(px)과 점프 거리는 그대로이고 시간만 짧아진다: 이전 px 간격과 같아야 한다
 ok(Math.abs(C.GAP_SEC_FAST * C.SPEED_MAX - 0.72 * 280) < 1.5 && Math.abs(C.GAP_SEC_SLOW * C.SPEED_MIN - 1.15 * 130) < 1.5, 'gap px unchanged');
 // 5콤보 이상이면 최고 속도
-ok(targetSpeed(C.SPEED_MIN, 4) === C.SPEED_MIN && targetSpeed(C.SPEED_MIN, C.COMBO_MAX_SPEED) === C.SPEED_MAX && targetSpeed(C.SPEED_MIN, 12) === C.SPEED_MAX && targetSpeed(200, 0) === 200, 'targetSpeed combo rule');
+ok(targetSpeed(C.SPEED_MIN, 0) === C.SPEED_MIN && targetSpeed(C.SPEED_MIN, 1) === C.SPEED_MIN && targetSpeed(C.SPEED_MIN, C.COMBO_MAX_SPEED) === C.SPEED_MAX && targetSpeed(C.SPEED_MIN, 12) === C.SPEED_MAX && targetSpeed(200, 0) === 200, 'targetSpeed combo rule');   // 작업320: 콤보 4 는 더 이상 기본 속도가 아니라 램프 75% (아래 320 시험)
 ok(C.COMBO_MAX_SPEED === 5, 'combo threshold is 5');
 ok(near(speedAfterFail(300), 300 - C.SPEED_DROP_FAIL) && speedAfterFail(C.SPEED_MIN + 1) === C.SPEED_MIN && speedAfterFail(C.SPEED_MIN) === C.SPEED_MIN, 'speedAfterFail floor');
 // 반복: 맞히면 오르고 틀리면 내려가며 항상 범위 안
@@ -313,34 +313,45 @@ ok(buildRound(WORDS.slice(0, 3), new Set()).length === 3, 'short list');
   assert.deepEqual(fails.slice(0, 8), [], '실패 ' + fails.length + '건');
 });
 
-test('8. 보스: 선택 단어 중 8글자 이상이 있을 때만 1개, 정규 단어와 겹치지 않는다(planRound)', () => {
+test('8. 보스(작업320): 5번째·10번째 단어, 5개 미만이면 없음, 5~9개면 5번째만, 긴 단어부터 배정, 복습 판에는 없음, 중복 없음', () => {
   const fails = [];
   const ok = (c, m) => { if (!c) fails.push(m); };
   ok(letterCount('ice-cream') === 8 && letterCount("o'clock") === 6, 'letterCount');
-  for (let n = 0; n < 500; n++) {
+  ok(CONFIG.BOSS_MIN_LETTERS === undefined && JSON.stringify(CONFIG.BOSS_POSITIONS) === '[5,10]', '글자 수 조건 제거, 위치 5·10');
+  for (let n = 0; n < 300; n++) {
     const r = planRound(WORDS, new Set());
-    ok(r.boss && letterCount(r.boss.word) >= CONFIG.BOSS_MIN_LETTERS, 'boss long enough');
-    ok(!r.regular.some(w => w.word === r.boss.word), 'boss not in regular');
-    ok(r.regular.length === CONFIG.WORDS_PER_ROUND && new Set(r.regular.map(w => w.word)).size === r.regular.length, 'regular size/unique');
+    ok(r.list.length === CONFIG.WORDS_PER_ROUND && new Set(r.list.map(w => w.word)).size === 10, 'size/unique');
+    ok(JSON.stringify(r.bossIdx) === '[4,9]' && r.regular === 8, 'boss at 5th/10th');
+    const longest = WORDS.map(w => letterCount(w.word)).sort((x, y) => y - x);
+    ok(letterCount(r.list[4].word) === longest[0] && letterCount(r.list[9].word) === longest[1], 'longest words get boss slots: ' + r.list[4].word + ',' + r.list[9].word);
   }
-  // 선택이 적어도(10개 이하) 긴 단어가 있으면 보스가 되고, 나머지가 정규 단어
-  const few = [WORDS.find(w => w.word === 'apple'), WORDS.find(w => w.word === 'book'), WORDS.find(w => w.word === 'environment')];
-  for (let n = 0; n < 100; n++) { const r = planRound(few, new Set()); ok(r.boss && r.boss.word === 'environment' && r.regular.length === 2, 'few: boss environment, 2 regular'); }
-  // 긴 단어가 하나도 없으면 보스 없음
-  const shortOnly = WORDS.filter(w => letterCount(w.word) < CONFIG.BOSS_MIN_LETTERS).slice(0, 5);
-  ok(planRound(shortOnly, new Set()).boss === null && planRound(shortOnly, new Set()).regular.length === 5, 'no boss without long word');
-  // 복습 판에는 보스가 없고, 틀린 단어만 나온다
-  const missed = new Set(['apple', 'environment']);
-  const rv = planRound(WORDS, missed, CONFIG, Math.random, true);
-  ok(rv.boss === null && rv.regular.length === 2 && rv.regular.every(w => missed.has(w.word)), 'review: no boss, only missed');
-  // 틀린 단어가 정규 단어에서 먼저 나온다
-  for (let n = 0; n < 200; n++) {
+  const take = k => WORDS.slice(0, k);
+  for (const [k, idx] of [[0, []], [1, []], [4, []], [5, [4]], [9, [4]], [10, [4, 9]], [11, [4, 9]]]) {
+    const r = planRound(take(k), new Set());
+    ok(JSON.stringify(r.bossIdx) === JSON.stringify(idx) && r.list.length === Math.min(10, k) && r.regular === r.list.length - idx.length, 'shape of ' + k);
+    const sh = L.roundShape(k);
+    ok(sh.total === r.list.length && sh.bosses === idx.length && sh.regular === r.regular, 'roundShape ' + k);
+  }
+  // 같은 길이는 무작위로 배정된다
+  const same = ['aaaaa', 'bbbbb', 'ccccc', 'ddddd', 'eeeee', 'fffff'].map(w => ({ word: w }));
+  const seen = new Set(); for (let n = 0; n < 200; n++) seen.add(planRound(same, new Set()).list[4].word);
+  ok(seen.size > 3, 'ties random');
+  // 틀린 단어는 보스가 아닌 자리에서 먼저 나온다
+  for (let n = 0; n < 100; n++) {
     const r = planRound(WORDS, new Set(['apple', 'book']));
-    ok(r.regular[0] && r.regular[1] && ['apple', 'book'].includes(r.regular[0].word) && ['apple', 'book'].includes(r.regular[1].word), 'missed first in planRound');
+    const regs = r.list.filter((_, i) => !r.bossIdx.includes(i));
+    ok(regs[0] && regs[1] && ['apple', 'book'].includes(regs[0].word) && ['apple', 'book'].includes(regs[1].word) || r.list.some((w, i) => r.bossIdx.includes(i) && ['apple', 'book'].includes(w.word)), 'missed first among regular');
   }
+  // 복습 판에는 보스가 없고 틀린 단어만 나온다
+  const missed = new Set(['apple', 'environment', 'window', 'music', 'friend', 'school']);
+  const rv = planRound(WORDS, missed, CONFIG, Math.random, true);
+  ok(rv.bossIdx.length === 0 && rv.list.length === 6 && rv.list.every(w => missed.has(w.word)) && rv.regular === 6, 'review: no boss, only missed');
+  // 하트 계획은 보스를 제외한 단어 수(regular) 기준
+  ok(planHearts(planRound(WORDS, new Set()).regular).size === 2, 'hearts over 8 regular = 2');
   const bc = bossConfig();
   ok(bc.CANDIDATES === 4 && bc.CHUNK_PROB === 0.35 && CONFIG.CANDIDATES === 3 && CONFIG.CHUNK_PROB === 0.2, 'bossConfig does not mutate CONFIG');
   ok(bc.MAX_SLOTS === CONFIG.BOSS_MAX_SLOTS && CONFIG.MAX_SLOTS === 6, 'bossConfig slots');
+  ok(CONFIG.BOSS_MULT === 2 && CONFIG.BOSS_BONUS === 1000 && CONFIG.BOSS_SPEED_BONUS === Math.round(20 * 1.3 * 100) / 100 && CONFIG.BOSS_HEAL === 1, '보스 효과 수치 그대로');
   for (let n = 0; n < 500; n++) for (const w of WORDS) for (const s of planSlots(w.word, Math.random, bc, w.syl).slots) {
     const c = makeCandidates(s.text, w.word, Math.random, bc);
     ok(c.length === 4 && c.filter(x => x.correct).length === 1 && new Set(c.map(x => x.text)).size === 4, 'boss candidates');
@@ -393,9 +404,10 @@ test('318-2. 힌트 만들기: 대표 뜻·품사·빈칸 예문·다른 뜻(최
   };
   const h = L.buildHint(row, 'run', '달리다');
   assert.equal(h.hint.meaning, '달리다'); assert.equal(h.hint.pos, '동사');
-  assert.equal(h.hint.example, 'She ＿＿ every morning.', '활용형(runs)도 가린다');
-  assert.deepEqual(h.hint.alts, ['운영하다', '흐르다'], '다른 뜻은 최대 2개');
-  assert.equal(h.hint.note, '아침 운동처럼 규칙적으로 ＿＿ 하는 상황에서 쓴다.');
+  assert.ok(!('example' in h.hint), '작업320: 힌트에는 예문이 없다');
+  assert.deepEqual(h.hint.alts, ['동사 운영하다', '흐르다', '출마하다'], '다른 뜻은 최대 3개, 품사별 한 줄');
+  assert.equal(h.hint.note, '아침 운동처럼 규칙적으로 ＿＿ 하는 상황에서 쓴다.', '활용형/정답은 쓰임 설명에서도 가린다');
+  assert.equal(h.pop.example, 'She runs every morning.');
   assert.deepEqual(h.pop, { pron: '/rʌn/', meaning: '달리다', example: 'She runs every morning.', ranges: [[4, 8]] }, '완성 화면용은 가리지 않고 강조 위치만');
   // 활용형: -s -es -ed -ing -ly -er -est, e 탈락, y→i, 자음 중복
   const cases = [['happy', 'Happily, the happier one was happiest.'], ['make', 'Making it, she maked and makes makers.'], ['stop', 'It stopped, stopping the stopper.'], ['watch', 'He watches it.'], ['quick', 'Quickly now, quicker, quickest.'], ['study', 'She studies and studied.']];
@@ -416,16 +428,16 @@ test('318-2. 힌트 만들기: 대표 뜻·품사·빈칸 예문·다른 뜻(최
 
 test('318-2. 힌트: 예문에서 단어를 찾지 못하면 예문 생략, 필드가 없는 오래된 데이터도 있는 항목만, 어떤 필드에서도 정답이 그대로 남지 않는다', () => {
   const none = L.buildHint({ data: { short_meaning: '사과' } }, 'apple', '사과');
-  assert.deepEqual(none.hint, { meaning: '사과', pos: '', example: '', alts: [], note: '' });
+  assert.deepEqual(none.hint, { meaning: '사과', pos: '', alts: [], note: '' });
   assert.deepEqual(none.pop, { pron: '', meaning: '사과', example: '', ranges: [] });
   const missing = L.buildHint({ example_sentence: 'He ran fast.', data: { meanings: [{ pos: 'verb', definition: '달리다' }] } }, 'run', '달리다');
-  assert.equal(missing.hint.example, '', '단어(활용형)가 없는 예문은 생략');
+  assert.ok(!('example' in missing.hint));
   assert.equal(missing.pop.example, 'He ran fast.', '완성 화면에는 강조 없이 그대로'); assert.deepEqual(missing.pop.ranges, []);
   // 다른 예문 후보에서 찾는다: example_sentence 에 없으면 meanings[].example, 그다음 옛 스키마 usages[].example
   const alt = L.buildHint({ example_sentence: 'Nothing here.', data: { meanings: [{ definition: '길', example: 'Take the road.' }], usages: [{ example: 'A road trip.' }] } }, 'road', '길');
-  assert.equal(alt.hint.example, 'Take the ＿＿.');
+  assert.deepEqual(alt.pop.example, 'Take the road.', '완성 화면용 예문은 다른 후보에서도 찾는다'); assert.deepEqual(alt.pop.ranges, [[9, 13]]);
   const legacy = L.buildHint({ data: { short_meaning: '길', usages: [{ example: 'A road trip.' }, null, 'x'] } }, 'road', '길');
-  assert.equal(legacy.hint.example, 'A ＿＿ trip.');
+  assert.equal(legacy.pop.example, 'A road trip.');
   // 이상한 값(문자열 아닌 필드·null·빈 배열)에도 예외 없음
   for (const row of [null, undefined, {}, { data: null }, { data: { meanings: 'x' } }, { data: { meanings: [null, 5, { pos: 5, definition: 7, example: {} }] } }, { data: { meanings: [] , usages: 'x' }, example_sentence: 5 }]) {
     assert.doesNotThrow(() => L.buildHint(row, 'road', '길'));
@@ -435,14 +447,14 @@ test('318-2. 힌트: 예문에서 단어를 찾지 못하면 예문 생략, 필�
   for (const w of words) {
     const text = `${w} ${w}s ${w}es ${w}ed ${w}ing ${w}ly ${w}er ${w}est ${w.toUpperCase()}`;
     const h = L.buildHint({ example_sentence: text, data: { meanings: [{ pos: 'noun', definition: text, usage_note: text, example: text }, { definition: text }, { definition: text + '2' }] } }, w, text).hint;
-    const all = [h.meaning, h.pos, h.example, ...h.alts, h.note].join(' ');
+    const all = [h.meaning, h.pos, ...h.alts, h.note].join(' ');
     for (const f of [w, ...L.wordForms(w)]) assert.ok(!all.toLowerCase().includes(f.toLowerCase()) || f.length < 3, `${w}: '${f}' 가 힌트에 남음`);
   }
 });
 
 test('318-4. 높은 칸 계획: 꺼져 있으면 없음, 첫 칸 제외·최대 2개·전부 높은 칸 없음·확률 반영, 조각 칸과 무관', () => {
-  const on = { ...CONFIG, DJ_ENABLED: true };
-  for (let n = 0; n <= 8; n++) assert.equal(L.planHighSlots(n, Math.random, CONFIG).size, 0, 'dj 꺼짐');
+  const on = CONFIG;   // 작업320: 기본 켜짐
+  for (let n = 0; n <= 8; n++) assert.equal(L.planHighSlots(n, Math.random, { ...CONFIG, DJ_ENABLED: false }).size, 0, 'dj 꺼짐(?dj=0)');
   assert.equal(L.planHighSlots(1, () => 0, on).size, 0, '칸이 하나뿐이면 없음');
   let total = 0, trials = 0; const hist = {};
   for (let n = 2; n <= 7; n++) for (let k = 0; k < 3000; k++) {
@@ -521,7 +533,7 @@ test('318-4. 판정과 가산점: 높은 칸은 HIGH_GRAB_H 이상에서만 공�
     assert.equal(Math.round(slotPoints(len, combo, C, C.HIGH_BONUS) * sm), Math.round(Math.round((base + C.HIGH_BONUS) * comboMult(combo)) * sm));
     assert.ok(slotPoints(len, combo, C, C.HIGH_BONUS) > slotPoints(len, combo, C) + C.HIGH_BONUS - 1, '배율을 거치므로 +100 이상');
   }
-  assert.equal(C.HIGH_BONUS, 100); assert.equal(C.HIGH_SLOT_PROB, 0.2); assert.equal(C.HIGH_MAX, 2); assert.equal(C.DJ_ENABLED, false, '기본 꺼짐');
+  assert.equal(C.HIGH_BONUS, 100); assert.equal(C.HIGH_SLOT_PROB, 0.2); assert.equal(C.HIGH_MAX, 2); assert.equal(C.DJ_ENABLED, true, '기본 켜짐(작업320)');
 });
 
 test('318-5. 주소 옵션: 허용 항목·범위, 범위 밖·숫자 아님은 무시, 기본값과 같으면 적용으로 세지 않는다, pace 는 CONFIG 를 한 번에 바꾼다', () => {
@@ -533,7 +545,8 @@ test('318-5. 주소 옵션: 허용 항목·범위, 범위 밖·숫자 아님은 
     assert.deepEqual(po('?' + bad).values, {}, '무시: ' + bad);
   }
   assert.deepEqual(po('?pace=9&hp=6').values, { hp: 6 }, '유효한 것만 적용');
-  assert.deepEqual(po('?pace=1.3&hp=5&dj=0&highprob=0.2&heartevery=3&startdelay=2.2&popsec=1.6').applied, [], '기본값과 같으면 조정으로 세지 않는다');
+  assert.deepEqual(po('?pace=1.3&hp=5&dj=1&highprob=0.2&heartevery=3&startdelay=2.2&popsec=1.6&maxcombo=5').applied, [], '기본값과 같으면 조정으로 세지 않는다(dj 기본은 작업320부터 1)');
+  assert.deepEqual(po('?dj=0').applied, ['dj'], 'dj=0 은 기본값과 달라 표시 대상');
   assert.deepEqual(po('?highprob=0').values, { highprob: 0 }, '확률 0 도 유효');
   assert.equal(po('?hp=5&hp=7').values.hp, 5, '첫 값');
   // 기본 CONFIG 는 옵션 없이 이전과 같다
@@ -568,7 +581,7 @@ test('319-1. 옵션 병합: 주소 값이 저장값보다 항목 단위로 우�
   assert.deepEqual(r.values, { dj: 1, hp: 7 }); assert.deepEqual(r.save, { dj: 1, hp: 7 }); assert.equal(r.reset, false);
   // 옵션 없이 열면 저장값 적용(다시 저장하지는 않는다)
   r = ro('', JSON.stringify({ dj: 1, hp: 7 }));
-  assert.deepEqual(r.values, { dj: 1, hp: 7 }); assert.equal(r.save, null); assert.deepEqual(r.applied.sort(), ['dj', 'hp']);
+  assert.deepEqual(r.values, { dj: 1, hp: 7 }); assert.equal(r.save, null); assert.deepEqual(r.applied, ['hp'], 'dj=1 은 기본값(켜짐)이라 표시 대상 아님');
   // 주소가 우선하고 그 항목만 덮어쓴다(나머지 저장값은 유지) → 합친 값을 저장
   r = ro('?hp=9&pace=1.1', JSON.stringify({ dj: 1, hp: 7, popsec: 2 }));
   assert.deepEqual(r.values, { dj: 1, hp: 9, popsec: 2, pace: 1.1 }); assert.deepEqual(r.save, r.values);
@@ -585,7 +598,79 @@ test('319-1. 옵션 병합: 주소 값이 저장값보다 항목 단위로 우�
   assert.deepEqual(r, { values: {}, applied: [], save: null, reset: true });
   assert.equal(ro('?reset=0', JSON.stringify({ dj: 1 })).reset, false);
   // 기본값과 같은 값만 있으면 적용 표시(applied)가 비어 있다
-  r = ro('?pace=1.3&hp=5&dj=0', JSON.stringify({ heartevery: 3, startdelay: 2.2 }));
+  r = ro('?pace=1.3&hp=5&dj=1', JSON.stringify({ heartevery: 3, startdelay: 2.2 }));
   assert.deepEqual(r.applied, []); assert.ok(Object.keys(r.values).length === 5);
-  assert.deepEqual(ro('', JSON.stringify({ dj: 0 })).applied, []);
+  assert.deepEqual(ro('', JSON.stringify({ dj: 0 })).applied, ['dj'], '저장된 dj=0 은 꺼짐이라 표시 대상');
+  assert.deepEqual(ro('', JSON.stringify({ dj: 1 })).applied, [], '저장된 dj=1 은 기본값');
+});
+
+// ───────── 작업320: 속도 램프 · maxcombo · dj 기본 켜짐 · 힌트 구성 ─────────
+test('320-4. 속도 램프: 콤보 2부터 25%·50%·75%·100%(콤보 5), 단조 증가·상한, 기본 누적 속도와 max, 실패(콤보 0)면 기본 속도로 내려간다', () => {
+  const C = CONFIG, span = C.SPEED_MAX - C.SPEED_MIN;
+  assert.equal(C.COMBO_RAMP_START, 2); assert.equal(C.COMBO_MAX_SPEED, 5);
+  for (const c of [0, 1]) assert.equal(targetSpeed(C.SPEED_MIN, c), C.SPEED_MIN, '콤보 ' + c + ' 은 램프 영향 없음');
+  [[2, 0.25], [3, 0.5], [4, 0.75], [5, 1], [6, 1], [12, 1]].forEach(([c, f]) => assert.ok(Math.abs(targetSpeed(C.SPEED_MIN, c) - (C.SPEED_MIN + span * f)) < 1e-9, '콤보 ' + c));
+  let prev = -1; for (let c = 0; c <= 12; c++) { const v = targetSpeed(C.SPEED_MIN, c); assert.ok(v >= prev && v <= C.SPEED_MAX); prev = v; }
+  assert.ok(targetSpeed(C.SPEED_MIN, 2) > C.SPEED_MIN && targetSpeed(C.SPEED_MIN, 1) === C.SPEED_MIN, '콤보 2 에서 시작');
+  // 기본 누적 속도가 램프보다 높으면 그 값 유지(max)
+  const high = C.SPEED_MIN + span * 0.9;
+  assert.equal(targetSpeed(high, 2), high); assert.equal(targetSpeed(high, 3), high); assert.equal(targetSpeed(high, 5), C.SPEED_MAX);
+  // 실패: 콤보 0 → 기본 누적 속도(감속된 값)로 하락, 램프 해제
+  let base = C.SPEED_MIN, combo = 0;
+  for (let i = 0; i < 6; i++) { combo++; base = speedAfterHit(base, false); }
+  const peak = targetSpeed(base, combo); assert.equal(peak, C.SPEED_MAX);
+  base = speedAfterFail(base); combo = 0;
+  assert.equal(targetSpeed(base, combo), base); assert.ok(base < peak, '실패 감속');
+  // 점수 배율은 실제 속도 기준이라 변경 없음
+  assert.equal(speedMult(C.SPEED_MAX), 2); assert.equal(speedMult(C.SPEED_MIN), 1);
+  // maxcombo 옵션
+  for (const m of [3, 4, 8, 12]) {
+    const c = L.buildConfig({ maxcombo: m });
+    assert.equal(c.COMBO_MAX_SPEED, m);
+    assert.equal(targetSpeed(c.SPEED_MIN, 1, c), c.SPEED_MIN);
+    assert.equal(targetSpeed(c.SPEED_MIN, m, c), c.SPEED_MAX); assert.ok(targetSpeed(c.SPEED_MIN, m - 1, c) < c.SPEED_MAX);
+    assert.ok(Math.abs(targetSpeed(c.SPEED_MIN, 2, c) - (c.SPEED_MIN + (c.SPEED_MAX - c.SPEED_MIN) / (m - 1))) < 1e-9, '콤보 2 = 1/(m-1)');
+  }
+  const po = q => L.parseOptions(q);
+  assert.deepEqual(po('?maxcombo=8').values, { maxcombo: 8 }); assert.deepEqual(po('?maxcombo=8').applied, ['maxcombo']);
+  assert.deepEqual(po('?maxcombo=5').applied, [], '기본값과 같으면 표시 없음');
+  for (const bad of ['maxcombo=2', 'maxcombo=13', 'maxcombo=4.5', 'maxcombo=x', 'maxcombo=']) assert.deepEqual(po('?' + bad).values, {}, bad);
+  assert.deepEqual(L.resolveOptions('', JSON.stringify({ maxcombo: 7 })).values, { maxcombo: 7 }, '저장 방식 동일');
+  assert.deepEqual(L.resolveOptions('', JSON.stringify({ maxcombo: 99 })).values, {});
+});
+
+test('320-2. 2단 점프 기본 켜짐: dj 없음=켜짐(표시 없음), dj=0=꺼짐(표시), 저장값 dj 처리, 첫 점프 직후의 너무 빠른 입력 기준값', () => {
+  assert.equal(CONFIG.DJ_ENABLED, true); assert.equal(L.buildConfig().DJ_ENABLED, true); assert.equal(L.buildConfig({}).DJ_ENABLED, true);
+  assert.equal(L.buildConfig({ dj: 0 }).DJ_ENABLED, false); assert.equal(L.buildConfig({ dj: 1 }).DJ_ENABLED, true);
+  assert.equal(L.planHighSlots(6, () => 0).size, 2, '옵션 없이도 높은 칸을 계획');
+  assert.equal(L.planHighSlots(6, () => 0, L.buildConfig({ dj: 0 })).size, 0);
+  assert.deepEqual(L.resolveOptions('', null), { values: {}, applied: [], save: null, reset: false });
+  assert.deepEqual(L.resolveOptions('?dj=0', null).applied, ['dj']);
+  assert.deepEqual(L.resolveOptions('?dj=1', JSON.stringify({ dj: 0 })).values, { dj: 1 }, '주소가 저장값(꺼짐)을 덮어쓴다');
+  assert.equal(L.resolveOptions('', JSON.stringify({ dj: 0 })).values.dj, 0);
+  assert.ok(CONFIG.SECOND_JUMP_MIN > 0 && CONFIG.SECOND_JUMP_MIN < 0.2 && CONFIG.SECOND_JUMP_MIN < CONFIG.JUMP_TIME / 2);
+  // 기본 상태에서 여러 단어를 계획하면 높은 칸이 나온다(확률 0.2, 첫 칸 제외): 25단어 중 1개 이상
+  let withHigh = 0; for (let i = 0; i < 25; i++) if (L.planHighSlots(L.planSlots('beautiful', Math.random, CONFIG).slots.length).size > 0) withHigh++;
+  assert.ok(withHigh >= 1, '25단어 중 높은 칸이 있는 단어 ' + withHigh);
+});
+
+test('320-1. 힌트: 예문 없음, 다른 뜻 최대 3개(품사 + 쉼표 키워드), 쓰임 설명은 첫 문장 한 줄, "…" 로 자르지 않고 항목 단위로만 줄이며 정답은 계속 가린다', () => {
+  const row = { example_sentence: 'She runs every morning.', data: { short_meaning: '달리다, 뛰다, 운영하다, 관리하다, 흐르다, 출마하다, 작동하다, 계속되다, 이어지다', meanings: [
+    { pos: 'verb', definition: '달리다', usage_note: 'run 은 빠르게 움직일 때 쓴다. 두 번째 문장은 버린다.' },
+    { pos: 'verb', definition: '운영하다, 관리하다, 경영하다, 감독하다, 책임지다, 이끌다' }, { pos: 'noun', definition: '달리기, 질주' }, { pos: 'noun', definition: '연속, 시리즈' }, { pos: 'noun', definition: '더 있는 뜻' }] } };
+  const main = L.keywords(row.data.short_meaning, 40);
+  assert.ok(Array.from(main).length <= 40 && !main.endsWith(',') && !main.includes('…') && row.data.short_meaning.startsWith(main), '대표 뜻은 항목 단위로만 줄어든다: ' + main);
+  const h = L.buildHint(row, 'run', main).hint;
+  assert.ok(!('example' in h));
+  assert.equal(h.alts.length, 3);
+  assert.ok(h.alts[0].startsWith('동사 운영하다') && h.alts[1] === '명사 달리기, 질주' && h.alts[2] === '명사 연속, 시리즈', JSON.stringify(h.alts));
+  assert.ok(h.alts[0].length <= 4 + 28 && !h.alts[0].endsWith(','));
+  assert.equal(h.note, '＿＿ 은 빠르게 움직일 때 쓴다.', '첫 문장만, 정답은 가림');
+  for (const t of [h.meaning, h.pos, ...h.alts, h.note]) assert.ok(!t.includes('…') && !/\brun(s|ning)?\b/i.test(t), t);
+  // 한 줄에 안 들어갈 만큼 긴 쓰임 설명(첫 문장 60자 초과)은 자르지 않고 쓰지 않는다
+  const longNote = '가'.repeat(70) + '.';
+  assert.equal(L.buildHint({ data: { meanings: [{ usage_note: longNote }] } }, 'run', 'x').hint.note, '');
+  assert.equal(L.keywords('가나다라마바사아자차카타파하', 5), '가나다라마바사아자차카타파하', '쉼표가 없으면 중간을 자르지 않는다');
+  assert.equal(L.keywords('가나다, 라마바, 사아자', 8), '가나다, 라마바');
+  assert.equal(L.firstSentence('끝 부호 없는 설명', 60), '끝 부호 없는 설명');
 });

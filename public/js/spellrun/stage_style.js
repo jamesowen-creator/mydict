@@ -72,10 +72,7 @@
 }
 .sr-box .hint > *{max-width:100%;line-height:1.3}
 .sr-box .hint .h-pos{font-weight:700;font-size:calc(11 * var(--u));color:var(--ink-soft)}
-.sr-box .hint .h-ex{font-weight:500;font-size:calc(var(--hfs,12) * var(--u))}
 .sr-box .hint .h-alt,.sr-box .hint .h-note{font-weight:500;font-size:calc(var(--hfs,12) * var(--u) * .92);color:var(--ink-soft)}
-.sr-box .hint .h-ex.clip{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.sr-box .hint .h-alt.clip,.sr-box .hint .h-note.clip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sr-box .tune{position:absolute;left:0;bottom:0;min-height:44px;padding:0 calc(10 * var(--u));margin:0;background:none;border:0;font-family:var(--f-body);font-size:calc(11 * var(--u));font-weight:700;color:var(--gold);text-decoration:underline;cursor:pointer;z-index:5}
 .sr-box .slot.chunk{
   padding:0 calc(4 * var(--u));margin-top:calc(2 * var(--u));
