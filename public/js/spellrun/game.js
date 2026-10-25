@@ -8,11 +8,15 @@ const L = window.SpellRunLogic;
 // 작업319: 옵션은 기기(localStorage)에 저장해 사전에서 시작해도 이어진다. 주소 값이 저장값보다 우선, ?reset=1 이면 삭제. 저장소를 못 쓰면 이번 방문에만 적용
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const OPT = L.resolveOptions(location.search, lsGet(L.OPTION_KEY));
-try { if (OPT.reset) localStorage.removeItem(L.OPTION_KEY); else if (OPT.save) localStorage.setItem(L.OPTION_KEY, JSON.stringify(OPT.save)); } catch (e) { /* 저장 실패는 무시 */ }
+try { if (OPT.reset) { localStorage.removeItem(L.OPTION_KEY); localStorage.removeItem('spellrun_mode'); } else if (OPT.save) localStorage.setItem(L.OPTION_KEY, JSON.stringify(OPT.save)); } catch (e) { /* 저장 실패는 무시 */ }
 
+// 작업332: 모드(기본 / 생존). 사용자의 선택이라 'spellrun_opts' 의 조정값과 따로 기억하고 "조정값 사용 중" 표시 대상이 아니다. 주소 survival=1|0 이 저장값보다 우선한다.
+const MODE_KEY = 'spellrun_mode';
+let survMode = lsGet(MODE_KEY) === 'survival';
+try { const q = new URLSearchParams(location.search).get('survival'); if (q === '1') survMode = true; else if (q === '0') survMode = false; } catch (e) { /* 주소를 못 읽으면 저장값 */ }
 L.configure(OPT.values);                       // CONFIG 를 한 번에 다시 만든다(pace 는 속도·간격·점프 시간에 같은 비율로 반영)
 const CONFIG = L.CONFIG;
-const { planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
+const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
 
 const W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, RUNNER_X = 72, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;
 const FALL_SEC = 0.55, STUMBLE_SEC = 0.5, FALL_DEPTH = 46;   // 작업326: 연출 시간(초)·구덩이에 빠지는 깊이(논리 px)
@@ -325,7 +329,7 @@ syncSndButtons();
 const G = {
   state: 'idle', words: [], wi: 0, plan: null, si: 0, mist: [],
   hp: 0, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
-  speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, speedPending: false, speedSlot: 0, rescuePending: false, rescueSlot: 0, rescueKind: 'hint', rescueCount: 0, rescue: null, angels: [], boost: 0, roundSeq: 0, boostMax: 0, speedMaxSeen: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
+  speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, survival: false, supply: null, startTime: 0, speedPending: false, speedSlot: 0, rescuePending: false, rescueSlot: 0, rescueKind: 'hint', rescueCount: 0, rescue: null, angels: [], boost: 0, roundSeq: 0, boostMax: 0, speedMaxSeen: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
   tiles: [], parts: [], floats: [],
   packActive: false, packId: 0, spawnT: 0,
   runPhase: 0, prevH: 0, rising: true, cleared: false, spriteDraws: 0, spriteFrame: -1, spriteAngle: 0,
@@ -350,6 +354,7 @@ function renderScore() {
 }
 function renderProgress() {
   const w = G.words[G.wi];
+  if (G.survival) { els.progress.textContent = '단어 ' + (G.wi + 1) + (w && w.boss ? ' · 보스' : ''); box.classList.toggle('boss', !!(w && w.boss)); return; }   // 작업332: 분모 없음
   els.progress.textContent = (w && w.boss) ? '보스 단어'
     : '단어 ' + (G.words.slice(0, G.wi + 1).filter(x => !x.boss).length) + ' / ' + G.regular + (G.review ? ' · 복습' : '');   // 보스 단어는 세지 않는다
   box.classList.toggle('boss', !!(w && w.boss));
@@ -451,11 +456,18 @@ function updateFx(dt) {
 
 // ---------- 라운드 진행 ----------
 // 한 판은 최대 10단어. 5번째·10번째(그 위치에 단어가 있을 때만) 단어가 보스이고 긴 단어부터 배정된다(planRound). 복습 판에는 보스가 없다.
+// 작업332: 생존 모드(체력 0까지 계속). 복습 판은 항상 기본 구조이고, 기본 모드의 코드 경로(난수 호출 순서)는 그대로다.
+const mapWord = w => Object.assign({ word: w.word, meaning: w.meaning, hint: w.hint, pop: w.pop }, w.boss ? { boss: true } : {});
+function survEnsure(i) {   // 단어 i 와 그 다음 단어까지 공급해 둔다(마지막 단어 연출·보스 예고가 "다음 단어가 있는가"를 본다)
+  while (G.survival && G.words.length <= i + 1) { for (const w of G.supply.nextSegment()) { G.words.push(mapWord(w)); G.mist.push(0); } }
+}
 function startRound(reviewOnly) {
-  const plan = planRound(VALID_WORDS, missedSet, CONFIG, Math.random, !!reviewOnly);
-  const pool = plan.list.map((w, i) => Object.assign({ word: w.word, meaning: w.meaning, hint: w.hint, pop: w.pop }, plan.bossIdx.indexOf(i) >= 0 ? { boss: true } : {}));
+  const surv = !reviewOnly && survMode && VALID_WORDS.length >= CONFIG.SURV_MIN_WORDS;
+  const plan = surv ? null : planRound(VALID_WORDS, missedSet, CONFIG, Math.random, !!reviewOnly);
+  const supply = surv ? makeSurvSupply(VALID_WORDS, CONFIG, Math.random) : null;
+  const pool = surv ? supply.nextSegment().map(mapWord) : plan.list.map((w, i) => Object.assign({ word: w.word, meaning: w.meaning, hint: w.hint, pop: w.pop }, plan.bossIdx.indexOf(i) >= 0 ? { boss: true } : {}));
   if (!pool.length) return;
-  const regular = plan.regular;
+  const regular = surv ? 0 : plan.regular;
   primeAudio();
   els.bossBanner.hidden = true;
   Object.assign(G, {
@@ -463,24 +475,27 @@ function startRound(reviewOnly) {
     state: 'run', words: pool, wi: 0, mist: pool.map(() => 0),
     hp: CONFIG.HP, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
     roundSeq: G.roundSeq + 1, boost: 0, speedPending: false, speedMaxSeen: 0, rescuePending: false, rescueCount: 0, rescue: null, angels: [],
-    speed: CONFIG.SPEED_MIN, speedTarget: CONFIG.SPEED_MIN, speedBase: CONFIG.SPEED_MIN, shownMult: 0, heartWords: planHearts(regular), tiles: [], parts: [], floats: [],
+    speed: CONFIG.SPEED_MIN, speedTarget: CONFIG.SPEED_MIN, speedBase: CONFIG.SPEED_MIN, shownMult: 0, heartWords: surv ? new Set() : planHearts(regular), tiles: [], parts: [], floats: [],
     packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
     obstacles: [], obst: null, obstSeq: 0, invuln: 0, stumble: 0, fall: 0, obstHits: 0,
-    review: !!reviewOnly
+    review: !!reviewOnly, survival: surv, supply: supply, startTime: G.time
   });
   els.start.hidden = true; els.result.hidden = true; els.pop.hidden = true; els.hud.hidden = false;
   renderHearts(); renderScore();
   loadWord(0);
 }
 function loadWord(i) {
+  survEnsure(i);
   const boss = !!G.words[i].boss;
   G.wi = i; G.plan = planSlots(G.words[i].word, Math.random, boss ? bossConfig() : CONFIG, G.words[i].syl); G.si = 0;
   G.bossMode = boss;   // 중간에 오는 보스 뒤에는 일반 배경으로 돌아간다
-  G.heartPending = !boss && G.heartWords.has(G.words.slice(0, i).filter(x => !x.boss).length);   // 하트 계획은 보스가 아닌 단어의 순번 기준
-  G.heartSlot = pickHeartSlot(G.plan.slots.length);
-  const highs = planHighSlots(G.plan.slots.length);   // 작업318-4: 2단 점프가 꺼져 있으면 빈 집합
+  const survCfg = G.survival ? survRampCfg(CONFIG, i + 1) : CONFIG;   // 작업332: 생존 모드는 단어 순번에 따라 장애물·높은 칸 확률이 오른다(기본 모드는 CONFIG 그대로)
+  const reg0 = G.words.slice(0, i).filter(x => !x.boss).length;
+  G.heartPending = G.survival ? (!boss && survHeartWord(reg0, G.roundSeq)) : (!boss && G.heartWords.has(reg0));   // 하트 계획은 보스가 아닌 단어의 순번 기준(생존 모드는 난수 없이 해시, 간격이 점점 늘어난다)
+  G.heartSlot = G.survival ? survHeartSlot(G.plan.slots.length, G.roundSeq, reg0) : pickHeartSlot(G.plan.slots.length);
+  const highs = G.survival ? planHighSlots(G.plan.slots.length, Math.random, survCfg) : planHighSlots(G.plan.slots.length);   // 작업318-4: 2단 점프가 꺼져 있으면 빈 집합
   G.plan.slots.forEach((sl, k) => { sl.high = highs.has(k); });
-  const ob = planObstacle(G.plan.slots.length, highs, G.heartPending ? G.heartSlot : null, boss);   // 작업326: 꺼져 있거나 보스면 null(난수를 쓰지 않는다)
+  const ob = G.survival ? planObstacle(G.plan.slots.length, highs, G.heartPending ? G.heartSlot : null, boss, Math.random, survCfg) : planObstacle(G.plan.slots.length, highs, G.heartPending ? G.heartSlot : null, boss);   // 작업326: 꺼져 있거나 보스면 null(난수를 쓰지 않는다)
   G.obst = ob ? { slot: ob.slot, kind: ob.kind, done: false } : null;
   // 작업328: 가속 아이템(난수 없이 판 순번·단어 순번 해시로 결정. 하트 우선, 보스·복습·장애물 단어에는 없음)
   const regIdx = G.words.slice(0, i).filter(x => !x.boss).length;
@@ -686,7 +701,7 @@ function completeWord() {
   G.wordsDone++;
   const perfect = G.mist[G.wi] === 0;
   const isBoss = !!w.boss;
-  const isFinal = G.wi + 1 >= G.words.length;
+  const isFinal = !G.survival && G.wi + 1 >= G.words.length;   // 생존 모드에는 마지막 단어가 없다
   const bonus = boostWordBonus(CONFIG.WORD_BONUS + (perfect ? CONFIG.PERFECT_BONUS : 0) + (isBoss ? CONFIG.BOSS_BONUS : 0), G.boost > 0);   // 작업328: 가속 중이면 완성 점수 배율
   G.score += bonus;
   floatText(RUNNER_X + 40, GROUND - 200, '+' + bonus, '#e07b00', 28);
@@ -739,16 +754,18 @@ function setLetterFly() {
 }
 function afterPop() {
   els.pop.hidden = true;
+  survEnsure(G.wi + 1);
   if (G.wi + 1 >= G.words.length) { finish(true); return; }
   const next = G.words[G.wi + 1];
   if (next.boss) {
     G.state = 'intro'; G.introT = CONFIG.BOSS_INTRO_SEC; G.bossMode = true;
     G.speedBase = Math.min(CONFIG.SPEED_MAX, G.speedBase + CONFIG.BOSS_SPEED_BONUS);
     G.speedTarget = targetSpeed(G.speedBase, G.combo);
-    const healed = G.hp < CONFIG.HP && CONFIG.BOSS_HEAL > 0;
-    G.hp = Math.min(CONFIG.HP, G.hp + CONFIG.BOSS_HEAL);
+    const heal = G.survival ? (G.wi + 2 <= CONFIG.SURV_BOSS_HEAL_UNTIL ? CONFIG.SURV_BOSS_HEAL : 0) : CONFIG.BOSS_HEAL;   // 생존 모드: 초반 보스에서만 회복(시뮬레이션으로 정한 값)
+    const healed = G.hp < CONFIG.HP && heal > 0;
+    G.hp = Math.min(CONFIG.HP, G.hp + heal);
     renderHearts();
-    els.bossSub.textContent = healed ? '긴 단어에 도전! 체력 +' + CONFIG.BOSS_HEAL : '긴 단어에 도전!';
+    els.bossSub.textContent = healed ? '긴 단어에 도전! 체력 +' + heal : '긴 단어에 도전!';
     els.bossBanner.hidden = false;
     els.bossBanner.classList.remove('go'); void els.bossBanner.offsetWidth; els.bossBanner.classList.add('go');
     els.live.textContent = '보스 단어 등장';
@@ -760,25 +777,51 @@ function finish(cleared) {
   box.classList.remove('boss');
   els.pop.hidden = true; els.hud.hidden = true; els.bossBanner.hidden = true;
   els.resChips.textContent = '';
+  const surv = G.survival;
+  const old = box.querySelectorAll('#resTime, #resMissNote'); old.forEach(e => e.remove());   // 생존 모드 전용 요소는 매번 지우고 다시 만든다
+  const shown = [];   // 생존 모드: 틀린 단어 칩(최근 SURV_CHIPS 개)
   G.words.forEach((w, i) => {
+    if (surv && i > G.wordsDone) return;   // 아직 나오지 않은 미리 공급된 단어
     let cls;
     if (i < G.wordsDone) {
       if (G.mist[i] === 0) { cls = 'clean'; missedSet.delete(w.word); }
       else { cls = 'slip'; missedSet.add(w.word); }
     } else if (i === G.wordsDone && !cleared) { cls = 'fail'; missedSet.add(w.word); }
     else cls = '';
+    if (surv && cls !== 'slip' && cls !== 'fail') return;   // 생존 모드는 틀린 단어만 칩으로 보인다
+    if (surv) shown.push({ w: w, cls: cls }); else appendChip(w, cls);
+  });
+  if (surv) {
+    const keep = shown.slice(-CONFIG.SURV_CHIPS);
+    keep.forEach(x => appendChip(x.w, x.cls));
+    const note = document.createElement('p'); note.className = 'note'; note.id = 'resMissNote';
+    note.textContent = shown.length ? '틀린 단어 ' + shown.length + '개' + (shown.length > keep.length ? ' 중 최근 ' + keep.length + '개' : '') : '틀린 단어 없음';
+    els.resChips.parentNode.insertBefore(note, els.resChips.nextSibling);
+  }
+  finishRest(cleared);
+}
+function appendChip(w, cls) {
+  {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'chip ' + cls + (w.boss ? ' boss' : ''); b.dataset.word = w.word;
     if (w.boss) { const em = document.createElement('em'); em.textContent = 'BOSS'; b.appendChild(em); }
     b.appendChild(document.createTextNode(w.word));
     const mean = document.createElement('i'); mean.textContent = w.meaning; b.appendChild(mean);
     els.resChips.appendChild(b);
-  });
+  }
+}
+function finishRest(cleared) {
+  const surv = G.survival;
   const hasBoss = G.words.some(w => w.boss);
   els.resTitle.textContent = cleared ? (hasBoss ? '보스 격파!' : G.words.length + '단어 완주') : '게임 오버';
   els.resScore.textContent = G.score.toLocaleString('en-US');
-  els.resDone.textContent = G.wordsDone + ' / ' + G.words.length;
+  els.resDone.textContent = surv ? String(G.wordsDone) : G.wordsDone + ' / ' + G.words.length;
   els.resCombo.textContent = G.maxCombo;
+  if (surv) {   // 생존 시간(게임 시간: 탭이 가려진 동안은 흐르지 않는다)
+    const sec = Math.max(0, Math.round(G.time - G.startTime)), d = document.createElement('div');
+    d.id = 'resTime'; const b = document.createElement('b'); b.textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); d.appendChild(b); d.appendChild(document.createTextNode('생존 시간'));
+    els.resDone.parentNode.parentNode.appendChild(d);
+  }
   const n = VALID_WORDS.filter(w => missedSet.has(w.word)).length;
   els.revBtn.textContent = n ? '틀린 단어만 다시 도전 (' + n + ')' : '틀린 단어 없음';
   els.revBtn.disabled = n === 0;
@@ -1399,7 +1442,35 @@ function showGame(words, excluded) {
     location.replace(location.pathname + '?reset=1');
   });
   els.startBtn.disabled = false;
+  setupModeUI(words.length);   // 작업332: 생존 모드인데 단어가 모자라면 시작 버튼을 다시 막는다
   requestAnimationFrame(frame);
+}
+// 작업332: 시작 화면 모드 선택. 생존 모드는 단어가 SURV_MIN_WORDS 개 이상일 때만 시작할 수 있다.
+function setupModeUI(nWords) {
+  if ($('modeRow')) return;
+  const baseInfo = els.startInfo.textContent;
+  const row = document.createElement('div'); row.className = 'trow'; row.id = 'modeRow';
+  const mk = (label, val) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'toggle'; b.textContent = label; b.dataset.mode = val; row.appendChild(b); return b; };
+  const bN = mk('기본', 'normal'), bS = mk('생존', 'survival');
+  els.startBtn.parentNode.insertBefore(row, els.startBtn);
+  const apply = () => {
+    bN.setAttribute('aria-pressed', String(!survMode)); bS.setAttribute('aria-pressed', String(survMode));
+    const need = survMode && nWords < CONFIG.SURV_MIN_WORDS;
+    els.startBtn.disabled = need;
+    els.startInfo.textContent = survMode ? '생존 모드 · 체력이 0이 될 때까지 · 5단어마다 보스 · 체력 ' + CONFIG.HP : baseInfo;
+    let note = $('survNote'); if (note) note.remove();
+    if (need) { note = document.createElement('p'); note.className = 'note'; note.id = 'survNote'; note.setAttribute('role', 'status'); note.textContent = '생존 모드는 단어가 ' + CONFIG.SURV_MIN_WORDS + '개 이상 있어야 시작할 수 있어요 (지금 ' + nWords + '개)'; els.startInfo.parentNode.insertBefore(note, els.startInfo.nextSibling); }
+    let li = $('survRule');
+    if (survMode && !li) { li = document.createElement('li'); li.id = 'survRule'; li.textContent = '생존 모드: 체력이 0이 될 때까지 단어가 계속 나오고, 5단어마다 보스예요. 하트는 갈수록 드물어지고 장애물은 점점 많아져요.'; els.djRule.parentNode.insertBefore(li, els.djRule); }
+    else if (!survMode && li) li.remove();
+  };
+  row.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('button'); if (!b) return;
+    survMode = b.dataset.mode === 'survival';
+    try { localStorage.setItem(MODE_KEY, survMode ? 'survival' : 'normal'); } catch (err) { /* 저장 실패는 무시 */ }
+    apply();
+  });
+  apply();
 }
 async function boot() {
   const LOGIN = ['로그인하기', '/auth/google?next=/spelling_run.html'];
@@ -1441,7 +1512,7 @@ function frame(ts) {
 }
 
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
-const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y, obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
+const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
 window.SpellRun = API;
 boot();
 })();

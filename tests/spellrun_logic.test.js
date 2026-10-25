@@ -1195,3 +1195,105 @@ test('329-5. 옵션 itemhp(0~1, 기본 0.4)·rescueevery(1~10 정수, 기본 3)�
   const c = L.buildConfig({ itemhp: 0.7, rescueevery: 5, rescue: 0 }); assert.equal(c.ITEM_HP, 0.7); assert.equal(c.RESCUE_EVERY, 5); assert.equal(c.RESCUE_ENABLED, false);
   const e = L.buildConfig(); for (const k of Object.keys(e)) if (!['ITEM_HP', 'RESCUE_EVERY', 'RESCUE_ENABLED'].includes(k)) assert.deepEqual(L.buildConfig({ rescue: 0 })[k], e[k], k);
 });
+
+// ───────── 작업332: 생존 모드 ─────────
+const SURV_POOLS = n => Array.from({ length: n }, (_, i) => ({ word: ['apple', 'book', 'environment', 'water', 'happy', 'window', 'music', 'friend', 'tomorrow', 'cat', 'beautiful', 'dog'][i % 12] + (i >= 12 ? i : ''), meaning: 'm' + i }));
+
+test('332-2/3. 단어 공급: 구간(5개)마다 일반 4개 + 마지막 보스(구간에서 가장 긴 단어), 5의 배수 순번만 보스, 한 구간 안에 같은 단어 없음, 직전 단어와 연속 같은 단어 없음, 단어가 고르게 돈다', () => {
+  for (const size of [5, 6, 7, 8, 12, 25]) {
+    const pool = SURV_POOLS(size), sup = L.makeSurvSupply(pool, CONFIG, mulberry(332 + size)), seq = [];
+    for (let s = 0; s < 120; s++) {
+      const seg = sup.nextSegment(); assert.equal(seg.length, 5);
+      assert.deepEqual(seg.map(w => !!w.boss), [false, false, false, false, true], '마지막만 보스');
+      assert.equal(new Set(seg.map(w => w.word)).size, 5, `풀 ${size}: 한 구간에 같은 단어 없음`);
+      const longest = Math.max(...seg.map(w => L.letterCount(w.word))); assert.equal(L.letterCount(seg[4].word), longest, '보스는 구간에서 가장 긴 단어');
+      seq.push(...seg);
+    }
+    for (let i = 1; i < seq.length; i++) assert.notEqual(seq[i].word, seq[i - 1].word, `풀 ${size}: ${i} 번째에서 연속 같은 단어`);
+    seq.forEach((w, i) => assert.equal(!!w.boss, (i + 1) % 5 === 0, '순번 ' + (i + 1)));
+    const cnt = {}; seq.forEach(w => { cnt[w.word] = (cnt[w.word] || 0) + 1; });
+    if (size <= 12) { const vals = Object.values(cnt); assert.equal(vals.length, size, '모든 단어가 나온다'); }
+  }
+  // 같은 길이 보스는 난수 없이 해시로: 같은 구간이면 같은 선택
+  const tie = [{ word: 'aaaa' }, { word: 'bbbb' }, { word: 'cccc' }, { word: 'dddd' }, { word: 'eeee' }];
+  assert.equal(L.survPickBoss(tie, 3), L.survPickBoss(tie, 3)); assert.ok(new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => L.survPickBoss(tie, i))).size >= 2, '구간에 따라 달라진다');
+  // 섞기에만 rng 를 쓰고 Math.random 은 쓰지 않는다
+  const orig = Math.random; Math.random = () => { throw new Error('Math.random 금지'); };
+  try { const sup = L.makeSurvSupply(SURV_POOLS(7), CONFIG, mulberry(5)); for (let i = 0; i < 30; i++) sup.nextSegment(); } finally { Math.random = orig; }
+});
+
+test('332-4. 하트: 난수 없이 단어 순번·판 순번 해시로 정하고, 간격이 순번이 늘수록 늘어나며(상한), 그룹마다 정확히 하나, survheart=0 이면 늘지 않는다. 기본 모드의 난수 호출은 그대로', () => {
+  const C = CONFIG;
+  assert.equal(C.SURV_HEART_START_ADJ, 1); assert.equal(C.SURV_HEART_STEP_EVERY, 15); assert.equal(C.SURV_HEART_STEP, 3); assert.equal(C.SURV_HEART_MAX_EVERY, 8);
+  assert.deepEqual([0, 14, 15, 29, 30, 44, 200].map(i => L.survHeartEvery(i, C)), [2, 2, 5, 5, 8, 8, 8], '2 → 5 → 8(상한)');
+  assert.equal(L.survHeartEvery(0, L.buildConfig({ heartevery: 5 })), 4, 'heartevery 가 시작 간격을 따른다(-1)'); assert.equal(L.survHeartEvery(100, L.buildConfig({ survheart: 0 })), 2);
+  const orig = Math.random; Math.random = () => { throw new Error('Math.random 금지'); };
+  try {
+    for (const seq of [1, 2, 3, 7]) {
+      const hearts = []; for (let i = 0; i < 90; i++) if (L.survHeartWord(i, seq, C)) hearts.push(i);
+      // 그룹마다 하나: 그룹 경계 0,2,4,... 로 나눠 확인
+      let start = 0, g = 0; while (start < 80) { const size = L.survHeartEvery(start, C), inGroup = hearts.filter(h => h >= start && h < start + size); assert.equal(inGroup.length, 1, `seq ${seq} 그룹 ${g}(${start}~${start + size - 1})`); start += size; g++; }
+      const gaps = hearts.map((h, i) => [h, i ? h - hearts[i - 1] : h + 1]), mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+      const eg = gaps.filter(g => g[0] < 15).map(g => g[1]), lg = gaps.filter(g => g[0] >= 45).map(g => g[1]); assert.ok(mean(eg) <= 3 && mean(lg) >= 5, `간격이 늘어난다: 처음 ${mean(eg).toFixed(1)}, 45번째 이후 ${mean(lg).toFixed(1)}`);
+      assert.deepEqual(hearts, Array.from({ length: 90 }, (_, i) => i).filter(i => L.survHeartWord(i, seq, C)), '같은 입력 → 같은 결과');
+    }
+  } finally { Math.random = orig; }
+  const early = [...Array(15).keys()].filter(i => L.survHeartWord(i, 1, C)).length, late = [...Array(45).keys()].map(i => i + 45).filter(i => L.survHeartWord(i, 1, C)).length;
+  assert.ok(early >= 6 && late <= 6, `하트 밀도: 처음 15단어 ${early}개, 45~89단어 ${late}개`);
+  assert.equal(L.survHeartSlot(1, 1, 3), 0); for (let n = 2; n < 8; n++) for (let i = 0; i < 20; i++) { const s = L.survHeartSlot(n, 2, i); assert.ok(s >= 1 && s < n); }
+  // 기본 모드의 하트 난수 호출은 그대로
+  let calls = 0; const rec = () => { calls++; return 0.5; }; L.planHearts(9, rec, C); assert.equal(calls, 3); calls = 0; L.pickHeartSlot(5, rec); assert.equal(calls, 1);
+});
+
+test('332-4. 난이도 곡선: 단어 순번에 따라 장애물·높은 칸 확률이 오르고(상한), 원본 설정은 바뀌지 않으며, 안전 간격(여유 창)은 확률이 올라도 그대로이고 난수 호출 순서도 그대로다', () => {
+  const C = CONFIG;
+  assert.equal(C.SURV_RAMP_EVERY, 10); assert.equal(C.SURV_RAMP, 0.05); assert.equal(C.SURV_OBST_MAX, 0.9); assert.equal(C.SURV_HIGH_MAX, 0.5);
+  const o = n => L.survRampCfg(C, n).OBSTACLE_PROB, h = n => L.survRampCfg(C, n).HIGH_SLOT_PROB;
+  assert.equal(o(1), 0.5); assert.equal(o(10), 0.5); assert.ok(Math.abs(o(11) - 0.55) < 1e-9); assert.ok(Math.abs(o(21) - 0.6) < 1e-9); assert.equal(o(1000), 0.9, '상한');
+  assert.equal(h(1), 0.2); assert.ok(Math.abs(h(11) - 0.25) < 1e-9); assert.equal(h(1000), 0.5);
+  for (let n = 2; n < 300; n++) { assert.ok(o(n) >= o(n - 1) && h(n) >= h(n - 1)); }
+  assert.equal(C.OBSTACLE_PROB, 0.5); assert.equal(C.HIGH_SLOT_PROB, 0.2, '원본은 그대로');
+  assert.equal(L.survRampCfg(L.buildConfig({ survramp: 0 }), 500).OBSTACLE_PROB, 0.5, 'survramp=0 이면 오르지 않는다'); assert.equal(L.survRampCfg(L.buildConfig({ obsprob: 0.2 }), 1).OBSTACLE_PROB, 0.2, 'obsprob 가 바탕');
+  for (const n of [1, 11, 51, 301]) { const c = L.survRampCfg(C, n);
+    for (const kind of OBST_KINDS) { const lay = L.obstacleLayout(c, kind); for (let s = c.SPEED_MIN; s <= c.SPEED_MAX; s++) assert.ok(L.obstacleWindow(c, lay, s).width >= c.OBST_MIN_WINDOW, `n=${n} ${kind} v=${s}`); }
+    assert.equal(c.OBST_W, 28); assert.equal(c.OBST_H, 28); assert.equal(c.PIT_W, 36);
+    let calls = 0; L.planObstacle(5, new Set(), null, false, () => { calls++; return 0; }, c); assert.equal(calls, 3, '확률→자리→종류'); }
+});
+
+test('332-1/7. 최소 단어 수·상태 읽기: SURV_MIN_WORDS 5, 옵션 survheart(0~5, 기본 3)·survramp(0~0.2, 기본 0.05)는 조정값, 모드는 조정값이 아니다. runState 는 한 곳에서 현재 상태를 돌려 준다', () => {
+  assert.equal(CONFIG.SURV_MIN_WORDS, 5);
+  const po = q => L.parseOptions(q);
+  assert.deepEqual(po('?survheart=2').applied, ['survheart']); assert.deepEqual(po('?survheart=3').applied, []); assert.deepEqual(po('?survramp=0.1').applied, ['survramp']); assert.deepEqual(po('?survramp=0.05').applied, []);
+  for (const bad of ['survheart=6', 'survheart=-1', 'survheart=1.5', 'survramp=0.3', 'survramp=-0.1', 'survramp=x']) assert.deepEqual(po('?' + bad).values, {}, bad);
+  assert.deepEqual(po('?survival=1').values, {}, 'survival 은 옵션 규칙(조정값)에 없다'); assert.deepEqual(po('?survival=1').applied, []);
+  assert.deepEqual(L.resolveOptions('?survival=1', JSON.stringify({ survival: 1 })).values, {}); assert.equal(L.resolveOptions('?survival=1').save, null, '모드는 spellrun_opts 에 저장되지 않는다');
+  const c = L.buildConfig({ survheart: 1, survramp: 0.1 }); assert.equal(c.SURV_HEART_STEP, 1); assert.equal(c.SURV_RAMP, 0.1);
+  const r = L.runState({ score: 1200, hp: 3, combo: 4, wi: 6, state: 'run', startTime: 10, time: 75.5, survival: true }, CONFIG);
+  assert.deepEqual(r, { score: 1200, hp: 3, maxHp: 5, combo: 4, wordNo: 7, alive: true, elapsed: 65.5, survival: true });
+  assert.equal(L.runState({ score: 0, hp: 0, combo: 0, wi: 0, state: 'ending', startTime: 0, time: 5, survival: false }, CONFIG).alive, false); assert.equal(L.runState({ score: 0, hp: 2, combo: 0, wi: 0, state: 'over', startTime: 0, time: 5, survival: false }, CONFIG).alive, false);
+});
+
+// 332-5: 균형 시뮬레이션. 331 과 같은 방식(칸당 실수율 e, 장애물 한 번에 맞을 확률 2.5 x e, 단어당 12초)이며 실제 logic.js 의 하트·곡선·장애물·높은 칸 계획을 쓴다.
+function survSim(e, N, seed) {
+  const R = mulberry(seed), cfg = L.buildConfig(), f = Math.min(0.5, 2.5 * e); let total = 0, words = 0;
+  for (let run = 1; run <= N; run++) {
+    let hp = cfg.HP, reg = 0, n = 0;
+    while (hp > 0 && n < 2000) {
+      n++; const boss = n % cfg.SURV_BOSS_EVERY === 0, c = L.survRampCfg(cfg, n), slots = boss ? 5 + Math.floor(R() * 3) : 3 + Math.floor(R() * 4), highs = L.planHighSlots(slots, R, c);
+      const heart = !boss && L.survHeartWord(reg, run, cfg), ob = L.planObstacle(slots, highs, heart ? L.survHeartSlot(slots, run, reg) : null, boss, R, c);
+      if (boss && hp < cfg.HP && n <= cfg.SURV_BOSS_HEAL_UNTIL) hp = Math.min(cfg.HP, hp + cfg.SURV_BOSS_HEAL);
+      for (let s = 0; s < slots && hp > 0; s++) { const pe = highs.has(s) ? Math.min(0.6, e * 1.5) : e; while (hp > 0 && R() < pe) hp--; }
+      if (hp > 0 && ob && R() < f) hp--;
+      if (hp > 0 && heart && R() < 0.9 && hp < cfg.HP) hp++;
+      if (!boss) reg++;
+    }
+    total += (n - 0.5) * 12; words += n;
+  }
+  return { sec: total / N, words: words / N };
+}
+test('332-5. 균형 시뮬레이션(가정치): 보통 실력(칸당 실수 10%) 평균 3분 30초~4분, 능숙(6%) 8분 이하, 매우 잘함(4%) 12분 이하', () => {
+  const a = survSim(0.10, 6000, 1), b = survSim(0.06, 6000, 2), c = survSim(0.04, 6000, 3);
+  console.log(`생존 시뮬레이션: 10% ${Math.round(a.sec)}초(${a.words.toFixed(1)}단어), 6% ${Math.round(b.sec)}초(${b.words.toFixed(1)}단어), 4% ${Math.round(c.sec)}초(${c.words.toFixed(1)}단어)`);
+  assert.ok(a.sec >= 210 && a.sec <= 240, '보통 ' + a.sec); assert.ok(b.sec <= 480, '능숙 ' + b.sec); assert.ok(c.sec <= 720, '매우 잘함 ' + c.sec);
+  assert.ok(a.sec < b.sec && b.sec < c.sec, '잘할수록 오래 간다');
+});

@@ -88,7 +88,7 @@ async function openGame({ ids, token = true, width = 390, height = 844, speech =
   const page = await browser.newPage({ width, height, token: token ? jwt() : null });
   await withDodge(page, dodge);
   if (blockObst) { await page.send('Network.enable'); await page.send('Network.setBlockedURLs', { urls: ['*spellrun_obstacles_sheet*'] }); }
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); } catch (e) {}" });   // 작업319: 저장된 주소 옵션이 다른 시험으로 새지 않게 비운다
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); } catch (e) {}" });   // 작업319: 저장된 주소 옵션이 다른 시험으로 새지 않게 비운다
   if (!token) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('mydict_token'); } catch (e) {}" });   // 같은 Chrome 프로필을 쓰는 앞선 시험이 남긴 토큰 제거
   if (speech) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
   if (ids) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` });
@@ -410,7 +410,7 @@ async function openQ({ ids, query = '', width = 390, height = 844, keep = false,
   state.requests.length = 0;
   const page = await browser.newPage({ width, height, token: jwt() });
   await withDodge(page, dodge);
-  if (!keep) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); } catch (e) {}" });   // 작업319: keep=true 가 아니면 저장된 주소 옵션을 비우고 시작
+  if (!keep) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); } catch (e) {}" });   // 작업319: keep=true 가 아니면 저장된 주소 옵션을 비우고 시작
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` });
   await page.goto(base + '/spelling_run.html' + queryOf(query));
   await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
@@ -1145,7 +1145,7 @@ async function openI({ query = '', width = 390, ids = [91, 92, 93], seed = true,
   state.requests.length = 0;
   const page = await browser.newPage({ width, height: 844, token: jwt() });
   await withDodge(page, dodge);
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); } catch (e) {}" });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); } catch (e) {}" });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` + (seed ? SEED : '') });
   await page.goto(base + '/spelling_run.html' + (query ? '?' + query : ''));
   await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
@@ -1378,7 +1378,7 @@ test('321-2) 로딩 실패(시트 요청 차단): 기존 도형 캐릭터로 그
   await withDodge(page);
   await page.send('Network.enable');
   await page.send('Network.setBlockedURLs', { urls: ['*spellrun_penguin_sheet*'] });
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
   await page.goto(base + '/spelling_run.html');
   await gameReady(page);
   assert.equal(await page.eval('SpellRun.penguin().ready'), false, '시트 로딩 실패');
@@ -1472,7 +1472,7 @@ test('325-2) 발음 출처 문구(ttsdebug=1): 서버 HIT/MISS/헤더 없음, 40
     resetState(); state.tts = code;
     const p2 = await browser.newPage({ width: 390, height: 844, token: jwt() });
     await p2.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
-    await p2.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
+    await p2.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
     await p2.goto(base + '/spelling_run.html?ttsdebug=1');
     await gameReady(p2);
     await p2.eval(OKPLAY);
@@ -1485,7 +1485,7 @@ test('325-2) 발음 출처 문구(ttsdebug=1): 서버 HIT/MISS/헤더 없음, 40
   resetState(); state.ttsDelay = 800;
   const p3 = await browser.newPage({ width: 390, height: 844, token: jwt() });
   await p3.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
-  await p3.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
+  await p3.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
   await p3.goto(base + '/spelling_run.html?ttsdebug=1');
   await gameReady(p3);
   await p3.eval(OKPLAY);
@@ -1861,7 +1861,7 @@ test('327-2) 로딩 실패(시트 요청 차단): 기존 코드 상자로 그려
   await withDodge(page);
   await page.send('Network.enable');
   await page.send('Network.setBlockedURLs', { urls: ['*spellrun_obstacles_sheet*'] });
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
   await page.goto(base + '/spelling_run.html?obsprob=1&dj=0');
   await gameReady(page);
   await page.eval(SPY_ART);
@@ -2122,7 +2122,7 @@ test('328-2) 폭 320·360·390: 남은 시간 막대·번개 칸은 힌트·상�
     const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
     await withDodge(page);
     if (reduce) await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
+    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
     await page.goto(base + '/spelling_run.html?obs=0&speedevery=1'); await startManual(page);
     const r = await page.eval(`(() => { const R = SpellRun, G = R.G; let streaks = 0; const st = CanvasRenderingContext2D.prototype.stroke; CanvasRenderingContext2D.prototype.stroke = function () { if (this.strokeStyle === 'rgba(255, 255, 255, 0.85)') streaks++; return st.apply(this, arguments); };
       G.boost = 3; G.boostMax = 5; R.step(1 / 60); R.draw(); const cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360, c = Array.from(cx.getImageData(Math.round(60 * S), Math.round(547 * S), 1, 1).data);
@@ -2231,7 +2231,7 @@ test('329-3) 천사: 먹으면 틀린 타일이 반짝이며(0.5초 이내) 사�
     const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
     await withDodge(page);
     if (reduce) await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
+    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
     await page.goto(base + '/spelling_run.html?obs=0&dj=0&speeditem=0'); await startManual(page);
     const s = await page.eval(STAGE('angel'));
     const a = await page.eval(`(() => { const G = SpellRun.G, C = SpellRun.CONFIG, pk = G.tiles.filter(t => t.id === G.packId && t.kind === undefined); return { rescue: G.rescue && G.rescue.kind, left: pk.map(t => ({ correct: t.correct, state: t.state, angel: !!t.angel })), angels: G.angels.length, floats: G.floats.map(f => f.text), sec: C.ANGEL_SEC }; })()`);
@@ -2279,4 +2279,130 @@ test('329-4) 그림: 힌트(전구)·천사(날개와 후광)가 캔버스에 �
     assert.notEqual(sig('heart'), sig('speed')); assert.notEqual(sig('hint'), sig('heart')); assert.notEqual(sig('angel'), sig('speed')); assert.notEqual(sig('hint'), sig('angel'));
     await page.close();
   }
+});
+
+// ───────── 작업332: 생존 모드 UI ─────────
+// 정답·하트·아이템을 먹고 장애물을 넘는 봇(페이지 안). o.dieAt 이 있으면 그 단어 번호부터 아무것도 하지 않아 체력이 0 이 될 때까지 간다.
+const SBOT = `(async (o) => {
+  const R = window.SpellRun, G = R.G, C = R.CONFIG, T = C.JUMP_TIME, RX = R.RUNNER_X;
+  const out = { steps: 0, labels: [], bossAt: [], maxWi: 0, over: false, finishCalls: 0, words: [] };
+  let lastWi = -1;
+  while (out.steps < 60 * 3000 && G.state !== 'over') {
+    if (G.wi !== lastWi) { lastWi = G.wi; out.labels.push(document.getElementById('progress').textContent); if (G.words[G.wi].boss) out.bossAt.push(G.wi + 1); out.words.push(G.words[G.wi].word); out.maxWi = G.wi; if (o.stopAt && G.wi + 1 >= o.stopAt) break; }
+    const dying = o.dieAt && G.wi + 1 >= o.dieAt;
+    if (G.state === 'run' && G.jumpT < 0 && !dying) {
+      const ob = G.obstacles.find(x => !x.hit && x.x + x.w / 2 > RX), tg = G.tiles.filter(x => x.state === 'live' && !x.checked && (x.correct || ['heart', 'speed', 'hint', 'angel'].includes(x.kind)) && x.x > RX).sort((a, b) => a.x - b.x)[0];
+      if (ob && (ob.x + ob.w / 2 - RX) / G.speed <= T / 2) R.jump(); else if (tg && (tg.x - RX) / G.speed <= T / 2 && !tg.high) R.jump();
+      else if (tg && tg.high && (tg.x - RX) / G.speed <= T) R.jump();
+    } else if (G.state === 'run' && G.jumpT >= 0 && G.j2 < 0 && !dying) { const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.high && x.x > RX).sort((a, b) => a.x - b.x)[0]; if (tg && (tg.x - RX) / G.speed <= T / 2) R.jump(); }
+    R.step(1 / 60); out.steps++;
+    if (out.steps % 300 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+  out.over = G.state === 'over'; out.wordsDone = G.wordsDone; out.hp = G.hp; out.score = G.score; out.survival = G.survival; out.maxSpeed = G.speedMaxSeen;
+  return out;
+})`;
+
+test('332-1) 모드 선택: 기본이 선택돼 있고, 생존을 누르면 안내·규칙 줄이 바뀌며, 선택은 기억되고 "조정값 사용 중"에 들어가지 않는다. 주소 survival=1 이 우선한다. 단어가 5개 미만이면 시작할 수 없다', { skip: SKIP }, async () => {
+  resetState();
+  let page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], dodge: false }); await gameReady(page);
+  assert.equal(await page.eval("document.querySelector('#modeRow [data-mode=normal]').getAttribute('aria-pressed')"), 'true'); assert.equal(await page.eval("document.querySelector('#modeRow [data-mode=survival]').getAttribute('aria-pressed')"), 'false');
+  assert.equal(await page.eval("!!document.getElementById('survRule')"), false); assert.match(await page.text('#startInfo'), /이번 판 \d+단어/);
+  await page.eval("document.querySelector('#modeRow [data-mode=survival]').click()");
+  assert.equal(await page.eval("document.querySelector('#modeRow [data-mode=survival]').getAttribute('aria-pressed')"), 'true'); assert.equal(await page.eval("!!document.getElementById('survRule')"), true);
+  assert.match(await page.text('#startInfo'), /생존 모드/); assert.equal(await page.eval("document.getElementById('tune').hidden"), true, '모드는 조정값이 아니다');
+  assert.equal(await page.eval("localStorage.getItem('spellrun_mode')"), 'survival'); assert.equal(await page.eval("localStorage.getItem('spellrun_opts')"), null, "'spellrun_opts' 에는 저장되지 않는다");
+  await page.eval("document.querySelector('#modeRow [data-mode=normal]').click()");
+  assert.equal(await page.eval("!!document.getElementById('survRule')"), false); assert.equal(await page.eval("localStorage.getItem('spellrun_mode')"), 'normal'); assert.match(await page.text('#startInfo'), /이번 판/);
+  await page.close();
+  // 기억: 저장값 survival → 새로 열어도 생존 선택. 주소 survival=0 이 이긴다. 주소 survival=1 은 기본이 저장돼 있어도 이긴다
+  const raw = async (query, mode) => { const p = await browser.newPage({ width: 390, height: 844, token: jwt() }); await p.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); localStorage.removeItem('spellrun_opts'); ${mode ? `localStorage.setItem('spellrun_mode', '${mode}');` : "localStorage.removeItem('spellrun_mode');"} } catch (e) {}` }); await p.goto(base + '/spelling_run.html' + query); await gameReady(p); return p; };
+  const pressed = p => p.eval("document.querySelector('#modeRow [data-mode=survival]').getAttribute('aria-pressed')");
+  page = await raw('', 'survival'); assert.equal(await pressed(page), 'true', '기억된 선택'); await page.close();
+  page = await raw('?survival=0', 'survival'); assert.equal(await pressed(page), 'false'); await page.close();
+  page = await raw('?survival=1', 'normal'); assert.equal(await pressed(page), 'true'); assert.equal(await page.eval("document.getElementById('tune').hidden"), true, 'survival=1 도 조정값이 아니다'); await page.close();
+  page = await raw('?survival=2', null); assert.equal(await pressed(page), 'false', '범위 밖은 무시'); await page.close();
+  // 단어 5개 미만
+  resetState();
+  page = await openGame({ ids: [1, 2, 3, 4], query: '?survival=1', dodge: false }); await page.waitFor("!document.getElementById('app').hidden && !!document.getElementById('survNote')", 8000);
+  assert.equal(await page.eval("document.getElementById('startBtn').disabled"), true); assert.match(await page.text('#survNote'), /5개 이상.*지금 4개/);
+  await page.eval("document.querySelector('#modeRow [data-mode=normal]').click()");
+  assert.equal(await page.eval("document.getElementById('startBtn').disabled"), false); assert.equal(await page.eval("!!document.getElementById('survNote')"), false);
+  await page.close();
+  page = await openGame({ ids: [1, 2, 3, 4, 11], query: '?survival=1', dodge: false }); await gameReady(page);
+  assert.equal(await page.eval("document.getElementById('startBtn').disabled"), false, '5개면 시작할 수 있다'); await page.close();
+  await clearOpts();
+});
+
+test('332-2/3/6) 생존 모드: 단어가 "단어 n"(분모 없음)으로 계속 나오고 5의 배수마다 보스이며, 체력 0 에서만 끝나고 결과 화면에 단어 수·점수·최고 콤보·생존 시간·틀린 단어(최근 위주)가 나온다. 틀린 단어 복습은 기본 구조로 이어진다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?survival=1&obs=0&speeditem=0&rescue=0', dodge: false });
+  await startManual(page);
+  assert.equal(await page.eval('SpellRun.G.survival'), true);
+  const r = await page.eval(`${SBOT}({ dieAt: 14 })`);
+  assert.equal(r.over, true); assert.equal(r.survival, true);
+  assert.ok(r.maxWi + 1 >= 14, '12단어 넘게 계속 나왔다: ' + (r.maxWi + 1));
+  r.labels.forEach((t, i) => { const boss = (i + 1) % 5 === 0; assert.match(t, boss ? /^단어 \d+ · 보스$/ : /^단어 \d+$/, '표시 ' + t); assert.ok(t.startsWith('단어 ' + (i + 1)), t + ' / 순번 ' + (i + 1)); assert.ok(!/\//.test(t), '분모 없음'); });
+  assert.deepEqual(r.bossAt, Array.from({ length: Math.floor(r.labels.length / 5) }, (_, i) => (i + 1) * 5), '5의 배수마다 보스');
+  assert.ok(r.words.slice(1).every((w, i) => w !== r.words[i]), '직전 단어와 연속으로 같지 않다');
+  assert.equal(r.hp, 0); assert.ok(r.maxSpeed <= 364 + 1e-9);
+  // 결과 화면
+  const res = await page.eval(`(() => { const t = id => { const e = document.getElementById(id); return e ? e.textContent : null; }; return { visible: !document.getElementById('result').hidden, title: t('resTitle'), done: t('resDone'), combo: t('resCombo'), score: t('resScore'), time: t('resTime'), note: t('resMissNote'), chips: [...document.querySelectorAll('#resChips .chip')].map(c => c.dataset.word + ':' + c.className), rev: t('revBtn'), revDis: document.getElementById('revBtn').disabled, G: SpellRun.G.wordsDone }; })()`);
+  assert.equal(res.visible, true); assert.equal(res.title, '게임 오버'); assert.equal(res.done, String(res.G), '풀어낸 단어 수(분모 없음)'); assert.ok(Number(res.done) >= 12);
+  assert.match(res.score, /^[\d,]+$/); assert.match(res.time, /^\d+:\d\d생존 시간$/); assert.match(res.combo, /^\d+$/);
+  assert.match(res.note, /^틀린 단어 \d+개( 중 최근 \d+개)?$/); assert.ok(res.chips.length >= 1 && res.chips.length <= 8, '칩은 최대 8개: ' + res.chips.length); assert.ok(res.chips.every(c => /slip|fail/.test(c)), '틀린 단어만');
+  assert.ok(res.chips.some(c => /fail/.test(c)), '체력이 0 이 된 단어 칩');
+  // 복습: 기본 구조(보스 없음, 단어 n / N)
+  assert.equal(res.revDis, false); await page.click('#revBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000);
+  const rv = await page.eval("({ surv: SpellRun.G.survival, review: SpellRun.G.review, boss: SpellRun.G.words.some(w => w.boss), label: document.getElementById('progress').textContent, n: SpellRun.G.words.length })");
+  assert.equal(rv.surv, false); assert.equal(rv.review, true); assert.equal(rv.boss, false); assert.match(rv.label, /^단어 1 \/ \d+ · 복습$/);
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+  await page.close();
+});
+
+test('332-2/6) 생존 모드를 단어 5개로도 끝없이 이어 가고(재섞기), "새 판 시작"은 생존 모드로 다시 시작하며, 기본 모드는 그대로 10단어 구조(단어 n / N, 보스 5·10)다', { skip: SKIP }, async () => {
+  resetState();
+  let page = await openGame({ ids: [1, 2, 3, 4, 11], query: '?survival=1&obs=0&speeditem=0&rescue=0', dodge: false }); await startManual(page);
+  const r = await page.eval(`${SBOT}({ stopAt: 16 })`);
+  assert.ok(r.maxWi + 1 >= 16, '단어가 5개뿐이어도 16단어째까지: ' + (r.maxWi + 1)); assert.ok(new Set(r.words).size === 5); assert.ok(r.words.slice(1).every((w, i) => w !== r.words[i]));
+  await page.eval("SpellRun.G.hp = 0; SpellRun.G.state = 'run'"); await page.eval('(() => { for (let i = 0; i < 5; i++) SpellRun.step(1 / 60); })()');
+  await page.close();
+  // 기본 모드 회귀: 8단어 판에서 보스 5번째, 표시 '단어 n / N'
+  page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?obs=0&dj=0', dodge: false }); await startManual(page);
+  const d = await page.eval(`(() => { const G = SpellRun.G; return { surv: G.survival, n: G.words.length, boss: G.words.map((w, i) => w.boss ? i + 1 : 0).filter(Boolean), label: document.getElementById('progress').textContent, rule: !!document.getElementById('survRule'), supply: G.supply }; })()`);
+  assert.equal(d.surv, false); assert.equal(d.n, 8); assert.deepEqual(d.boss, [5]); assert.match(d.label, /^단어 1 \/ 7$/); assert.equal(d.rule, false); assert.equal(d.supply, null);
+  await page.close();
+});
+
+test('332-7) 현재 상태 읽기 함수 getRunState: 점수·체력·콤보·단어 순번·생존 여부·경과 시간을 한 곳에서 돌려 준다(아직 쓰는 곳은 없다, 네트워크 코드 없음)', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?survival=1&obs=0', dodge: false }); await startManual(page);
+  const a = await page.eval('SpellRun.getRunState()');
+  assert.deepEqual(Object.keys(a).sort(), ['alive', 'combo', 'elapsed', 'hp', 'maxHp', 'score', 'survival', 'wordNo']); assert.equal(a.alive, true); assert.equal(a.survival, true); assert.equal(a.wordNo, 1); assert.equal(a.hp, 5);
+  await page.eval('(() => { for (let i = 0; i < 120; i++) SpellRun.step(1 / 60); })()');
+  const b = await page.eval('SpellRun.getRunState()'); assert.ok(b.elapsed > a.elapsed + 1.9 && b.elapsed < a.elapsed + 2.1, '경과 시간(게임 시간) ' + b.elapsed);
+  await page.eval("SpellRun.G.hp = 0"); assert.equal((await page.eval('SpellRun.getRunState()')).alive, false);
+  const src = fs.readFileSync(path.join(PUB, 'js', 'spellrun', 'game.js'), 'utf8'); assert.ok(!/WebSocket|EventSource|navigator\.sendBeacon/.test(src), '네트워크 통신 코드 없음');
+  await page.close();
+});
+
+test('332) 폭 320·360·390: 시작 화면의 모드 선택과 생존 결과 화면(생존 시간·틀린 단어 안내)이 카드 안에서 넘치지 않고, 움직임 줄이기에서도 생존 모드가 동작한다', { skip: SKIP }, async () => {
+  resetState();
+  for (const w of [320, 360, 390]) {
+    const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?survival=1&obs=0&speeditem=0&rescue=0', width: w, dodge: false }); await gameReady(page);
+    const a = await page.eval(`(() => { const box = document.getElementById('box').getBoundingClientRect(), r = document.getElementById('modeRow').getBoundingClientRect(), card = document.querySelector('#start .card'); return { l: r.left >= box.left, rr: r.right <= box.right, cardOv: card.scrollWidth > card.clientWidth + 1, h: r.height, doc: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1 }; })()`);
+    assert.ok(a.l && a.rr && !a.cardOv && a.doc, w + ': 모드 선택이 넘치지 않는다 ' + JSON.stringify(a));
+    await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
+    await page.eval(`${SBOT}({ dieAt: 7 })`);
+    const b = await page.eval(`(() => { const res = document.getElementById('result'), card = res.querySelector('.card'), stats = res.querySelector('.stats'), box = document.getElementById('box').getBoundingClientRect(); const kids = [...stats.children].map(c => c.getBoundingClientRect()); return { vis: !res.hidden, cardOv: card.scrollWidth > card.clientWidth + 1, statsIn: kids.every(k => k.left >= box.left - 1 && k.right <= box.right + 1), n: kids.length, doc: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1 }; })()`);
+    assert.ok(b.vis && !b.cardOv && b.statsIn && b.n === 3 && b.doc, w + ': 결과 화면 ' + JSON.stringify(b));
+    await page.close();
+  }
+  const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
+  await withDodge(page);
+  await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
+  await page.goto(base + '/spelling_run.html?survival=1&obs=0'); await startManual(page);
+  const r = await page.eval(`${SBOT}({ dieAt: 8 })`);
+  assert.equal(r.over, true); assert.ok(r.maxWi + 1 >= 8); assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+  await page.close();
 });

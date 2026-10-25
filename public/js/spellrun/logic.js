@@ -113,6 +113,20 @@ function buildConfig(v) {
   ITEM_HP: 0.4,           // 현재 체력 <= HP x 이 값(그리고 1 이상)일 때만 나온다(주소 옵션 itemhp)
   RESCUE_EVERY: 3,        // 체력이 낮은 동안 약 이 개수의 단어마다 1개(주소 옵션 rescueevery). 힌트와 천사가 번갈아 나온다
   ANGEL_SEC: 0.5,         // 천사가 틀린 타일을 지우는 연출 시간(초)
+  // 작업332: 생존 모드(체력 0까지 계속). 기본 모드에는 영향이 없다. 하트·보스·난이도는 난수 없이 단어 순번·판 순번 해시로 정한다
+  SURV_CHIPS: 8,          // 생존 모드 결과 화면에 칩으로 보이는 틀린 단어 수(최근 것 위주, 전체 개수는 숫자로)
+  SURV_MIN_WORDS: 5,      // 생존 모드는 단어장에 이만큼 이상 있어야 시작할 수 있다
+  SURV_BOSS_EVERY: 5,     // 이 순번의 배수마다 보스(한 구간 = 이 개수의 단어, 구간의 가장 긴 단어가 보스)
+  SURV_HEART_START_ADJ: 1, // 하트 시작 간격 = heartevery - 이 값(기본 3 - 1 = 2단어마다). 시뮬레이션으로 정한 값
+  SURV_HEART_STEP_EVERY: 15, // 이 개수의 단어가 지날 때마다 하트 간격이 늘어난다
+  SURV_HEART_STEP: 3,     // 늘어나는 간격(주소 옵션 survheart. 0 이면 늘지 않는다)
+  SURV_HEART_MAX_EVERY: 8, // 하트 간격 상한
+  SURV_RAMP_EVERY: 10,    // 이 개수의 단어가 지날 때마다 장애물·높은 칸 확률이 오른다
+  SURV_RAMP: 0.05,        // 오르는 크기(주소 옵션 survramp. 0 이면 오르지 않는다)
+  SURV_OBST_MAX: 0.9,     // 장애물 확률 상한
+  SURV_HIGH_MAX: 0.5,     // 높은 칸 확률 상한
+  SURV_BOSS_HEAL: 1,      // 생존 모드에서 보스 시작 때 회복하는 체력(기본 모드 BOSS_HEAL 과 따로 둔다)
+  SURV_BOSS_HEAL_UNTIL: 20, // 단어 순번이 이 값 이하인 보스에서만 회복한다(그 뒤에는 회복 없음: 잘하는 사람이 끝없이 가는 것을 막는다)
   WARN_SEC: T(0.78)       // 예고 표시가 보이는 최소 시간(최고 속도 기준, 거리로 계산). 기본 pace 1.3 에서 0.6초이고 pace 에 반비례(다른 시간 값과 같은 방식)
   };
   if (v.hp) cfg.HP = v.hp;
@@ -129,6 +143,8 @@ function buildConfig(v) {
   if (v.hpfullbonus !== undefined) cfg.HP_FULL_BONUS = v.hpfullbonus;
   if (v.speeditem !== undefined) cfg.SPEED_ITEM_ENABLED = !!v.speeditem;
   if (v.speedevery) cfg.SPEED_EVERY = v.speedevery;
+  if (v.survheart !== undefined) cfg.SURV_HEART_STEP = v.survheart;
+  if (v.survramp !== undefined) cfg.SURV_RAMP = v.survramp;
   if (v.rescue !== undefined) cfg.RESCUE_ENABLED = !!v.rescue;
   if (v.itemhp !== undefined) cfg.ITEM_HP = v.itemhp;
   if (v.rescueevery) cfg.RESCUE_EVERY = v.rescueevery;
@@ -148,6 +164,7 @@ const OPTION_RULES = {
   intro: { min: 0, max: 1, int: true, def: 1 }, ttsdebug: { min: 0, max: 1, int: true, def: 0 }, introhold: { min: 0.5, max: 3, def: 1.3 },
   obs: { min: 0, max: 1, int: true, def: 1 }, obsprob: { min: 0, max: 1, def: 0.5 },
   hpfullbonus: { min: 0, max: 1000, int: true, def: 100 }, speeditem: { min: 0, max: 1, int: true, def: 1 }, speedevery: { min: 1, max: 10, int: true, def: 4 }, boostsec: { min: 1, max: 10, def: 5 },
+  survheart: { min: 0, max: 5, int: true, def: 3 }, survramp: { min: 0, max: 0.2, def: 0.05 },
   rescue: { min: 0, max: 1, int: true, def: 1 }, itemhp: { min: 0, max: 1, def: 0.4 }, rescueevery: { min: 1, max: 10, int: true, def: 3 }
 };
 // 반환 { values: 유효한 값(기본값과 같아도 포함), applied: 기본값과 다른 옵션 이름 }
@@ -481,6 +498,64 @@ function planSpeedItem(o, cfg) {
   if (o.regularIdx % e !== hashInt('speed:' + o.roundSeq + ':' + g) % e) return null;
   return 1 + hashInt('speedslot:' + o.roundSeq + ':' + o.regularIdx) % (o.nSlots - 1);
 }
+// ---- 작업332: 생존 모드 ----
+// 하트 간격: 단어 순번(보스를 뺀 일반 단어 순번, 0부터)이 늘수록 SURV_HEART_STEP 씩 늘어난다(상한 SURV_HEART_MAX_EVERY). 시작 간격은 heartevery.
+function survHeartEvery(regularIdx, cfg) {
+  cfg = cfg || CONFIG;
+  return Math.min(cfg.SURV_HEART_MAX_EVERY, Math.max(1, cfg.HEART_EVERY - cfg.SURV_HEART_START_ADJ) + cfg.SURV_HEART_STEP * Math.floor(regularIdx / cfg.SURV_HEART_STEP_EVERY));
+}
+// 이 단어에 하트가 나오는가(난수 없음). 단어를 그룹으로 나누되 그룹 크기가 순번에 따라 커지고, 그룹마다 하나의 자리를 해시로 정한다.
+function survHeartWord(regularIdx, roundSeq, cfg) {
+  cfg = cfg || CONFIG;
+  let start = 0, g = 0;
+  for (;;) {
+    const size = survHeartEvery(start, cfg);
+    if (regularIdx < start + size) return regularIdx === start + hashInt('sh:' + roundSeq + ':' + g) % size;
+    start += size; g++;
+  }
+}
+function survHeartSlot(nSlots, roundSeq, regularIdx) { return nSlots <= 1 ? 0 : 1 + hashInt('shs:' + roundSeq + ':' + regularIdx) % (nSlots - 1); }
+// 난이도 곡선: 단어 순번(1부터, 보스 포함)이 SURV_RAMP_EVERY 개 지날 때마다 장애물·높은 칸 확률이 SURV_RAMP 씩 오른다(상한 있음). 반환은 cfg 복사본이라 planObstacle/planHighSlots 에 그대로 넘긴다.
+function survRampCfg(cfg, wordNo) {
+  cfg = cfg || CONFIG;
+  const lv = Math.floor((wordNo - 1) / cfg.SURV_RAMP_EVERY);
+  return Object.assign({}, cfg, { OBSTACLE_PROB: Math.min(cfg.SURV_OBST_MAX, Math.max(cfg.OBSTACLE_PROB, cfg.OBSTACLE_PROB + cfg.SURV_RAMP * lv)), HIGH_SLOT_PROB: Math.min(cfg.SURV_HIGH_MAX, Math.max(cfg.HIGH_SLOT_PROB, cfg.HIGH_SLOT_PROB + cfg.SURV_RAMP * lv)) });
+}
+// 한 구간(SURV_BOSS_EVERY 개)의 보스: 가장 긴 단어, 같은 길이는 해시가 작은 쪽(난수 없음)
+function survPickBoss(words, segIdx) {
+  let best = -1, bl = -1, bh = 0;
+  words.forEach(function (w, i) { const l = letterCount(w.word), h = hashInt('b' + segIdx + ':' + w.word); if (l > bl || (l === bl && h < bh)) { best = i; bl = l; bh = h; } });
+  return best;
+}
+// 단어 공급: 단어장을 섞어 순서대로 내고 다 쓰면 다시 섞는다. 다시 섞은 첫 단어가 직전 단어와 같지 않고, 한 구간 안에 같은 단어가 겹치지 않는다(단어가 SURV_MIN_WORDS 이상일 때).
+// nextSegment() 는 구간 하나(일반 단어 SURV_BOSS_EVERY-1 개 + 마지막에 보스)를 돌려준다. 섞기에만 rng 를 쓴다(기본 모드와 별개 경로).
+function makeSurvSupply(pool, cfg, rng) {
+  cfg = cfg || CONFIG; rng = rng || Math.random;
+  let queue = [], last = null, segIdx = 0;
+  function pull(exclude) {
+    if (!queue.length) queue = shuffle(pool, rng);
+    let i = queue.findIndex(function (w) { return !exclude.has(w.word); });
+    if (i < 0) { queue = queue.concat(shuffle(pool, rng)); i = queue.findIndex(function (w) { return !exclude.has(w.word); }); }
+    if (i < 0) i = 0;
+    return queue.splice(i, 1)[0];
+  }
+  return {
+    nextSegment: function () {
+      const n = cfg.SURV_BOSS_EVERY, seg = [], used = new Set();
+      for (let k = 0; k < n; k++) { const w = pull(k === 0 && last ? new Set([last]) : used); seg.push(w); used.add(w.word); }
+      const b = survPickBoss(seg, segIdx), boss = seg.splice(b, 1)[0];
+      if (last && seg[0].word === last) { const t = seg[0]; seg[0] = seg[1]; seg[1] = t; }   // 보스를 뺀 뒤 첫 단어가 직전 구간의 보스와 같으면 자리를 바꾼다
+      segIdx++; last = boss.word;
+      return seg.concat([boss]).map(function (w, i, a) { return Object.assign({}, w, i === a.length - 1 ? { boss: true } : {}); });
+    }
+  };
+}
+// 다른 곳(나중의 상대 띠 등)에서 읽는 현재 상태 한 곳: s 는 { score, hp, combo, wi, words, state, startTime, time, survival }
+function runState(s, cfg) {
+  cfg = cfg || CONFIG;
+  return { score: s.score, hp: s.hp, maxHp: cfg.HP, combo: s.combo, wordNo: s.wi + 1, alive: s.hp > 0 && s.state !== 'over', elapsed: Math.max(0, s.time - s.startTime), survival: !!s.survival };
+}
+
 // 작업329: 구조 아이템 계획. 체력이 기준 이하일 때(1 이상)만, 난수 없이.
 // o: { roundSeq, regularIdx, hp, boss, review, hasHeart, hasObst, nSlots, rescueCount: 이번 판에서 이미 계획된 구조 아이템 수 }
 // 반환 { slot: 아이템이 놓일 묶음 번호(첫 묶음 이후), kind: 'hint' | 'angel'(번갈아) } 또는 null. 우선순위: 하트 > 구조 > 가속(호출하는 쪽에서 구조가 정해지면 가속 계획에 hasHeart 를 넘긴다)
@@ -807,7 +882,7 @@ return {
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
-  planRescue: planRescue, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
+  survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };
 });
