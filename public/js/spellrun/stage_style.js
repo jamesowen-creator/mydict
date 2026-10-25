@@ -96,6 +96,7 @@
 .sr-box .cell.fixed{border-bottom-color:transparent;width:calc(var(--cw) * .6 * var(--u))}
 .sr-box .slot.cur .cell{border-bottom-color:var(--coral);animation:sr-blink .9s steps(2,jump-none) infinite}
 .sr-box .cell.hint{color:var(--good);border-bottom-color:var(--good);animation:sr-none}
+.sr-box .cell.ghost{color:rgba(29,43,83,.32)}
 .sr-box .slot.done .cell{border-bottom-color:var(--good);color:var(--ink)}
 .sr-box .slot.done .cell.pop{animation:sr-pop .28s ease-out}
 .sr-box .slot.bad{animation:sr-shake .3s}

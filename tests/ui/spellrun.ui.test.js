@@ -1690,7 +1690,7 @@ test('326-3) obs=0 이면 장애물 없음: 상태·화면 구성(규칙 줄 없
     const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: q, dodge: false });
     await gameReady(page);
     assert.equal(await page.eval("!!document.getElementById('obsRule')"), false, q + ': 장애물이 나올 수 없으면 규칙 줄 없음');
-    assert.equal(await page.eval("document.querySelectorAll('.rules li').length"), 8, q + ': 규칙 줄 8개(이전 7개 + 작업328 가속 아이템 줄. 장애물 줄은 없다)');
+    assert.equal(await page.eval("document.querySelectorAll('.rules li').length"), 9, q + ': 규칙 줄 9개(이전 7개 + 작업328 가속 아이템 줄 + 작업329 구조 아이템 줄. 장애물 줄은 없다)');
     assert.equal(await page.eval("document.getElementById('tune').hidden"), false, q + ': 기본값과 다른 옵션이라 조정값 표시');
     await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
     // 첫 글자가 나오는 순간의 위치 = 이전 식(RUNNER_X + 목표 속도 × 리드 시간)
@@ -2129,6 +2129,154 @@ test('328-2) 폭 320·360·390: 남은 시간 막대·번개 칸은 힌트·상�
       return { streaks: streaks, bar: c }; })()`);
     if (reduce) assert.equal(r.streaks, 0, '움직임 줄이기: 속도선 없음'); else assert.ok(r.streaks >= 4, '속도선 ' + r.streaks);
     assert.ok(r.bar[2] > 200 && r.bar[0] < 120, (reduce ? '움직임 줄이기에서도' : '') + ' 막대 표시는 남는다: ' + r.bar);
+    await page.close();
+  }
+});
+
+// ───────── 작업329: 구조 아이템(힌트·천사) UI ─────────
+// 체력을 직접 낮춰(G.hp) 시작하고, 정답·모든 아이템 칸을 먹고 장애물은 넘는 봇(페이지 안). 단어를 불러올 때마다 구조 아이템 계획을 기록한다.
+const RBOT = `(async (o) => {
+  const R = window.SpellRun, G = R.G, C = R.CONFIG, T = C.JUMP_TIME, RX = R.RUNNER_X;
+  const out = { steps: 0, words: [], picked: [], over: false };
+  let lastWi = -1, lastWords = null;
+  while (out.steps < 60 * 1500 && G.state !== 'over') {
+    if (G.words !== lastWords || G.wi !== lastWi) { lastWords = G.words; lastWi = G.wi; if (o.hpAt && o.hpAt[G.wi] !== undefined && lastWi === G.wi) G.hp = o.hpAt[G.wi];
+      out.words.push({ wi: G.wi, boss: !!G.words[G.wi].boss, review: G.review, hpAtLoad: G.hp, rescue: G.rescuePending, kind: G.rescuePending ? G.rescueKind : null, heart: G.heartPending, speed: G.speedPending, obst: !!G.obst }); }
+    if (G.state === 'run' && G.jumpT < 0) {
+      const ob = G.obstacles.find(x => !x.hit && x.x + x.w / 2 > RX), tg = G.tiles.filter(x => x.state === 'live' && !x.checked && (x.correct || ['heart', 'speed', 'hint', 'angel'].includes(x.kind)) && x.x > RX).sort((a, b) => a.x - b.x)[0];
+      if (ob && (ob.x + ob.w / 2 - RX) / G.speed <= T / 2) R.jump(); else if (tg && (tg.x - RX) / G.speed <= T / 2) R.jump();
+    }
+    const k0 = G.rescue ? G.rescue.kind : null; R.step(1 / 60); out.steps++;
+    if (!k0 && G.rescue) out.picked.push({ kind: G.rescue.kind, wi: G.wi, hp: G.hp });
+    if (out.steps % 300 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+  out.over = G.state === 'over'; out.title = document.getElementById('resTitle').textContent; out.hits = G.obstHits; out.mist = G.mist.reduce((a, b) => a + b, 0);
+  return out;
+})`;
+
+test('329-1) 체력이 낮을 때만 나온다: 낮은 체력에서 힌트·천사가 번갈아 나오고, 체력이 기준을 넘으면 다음 단어부터 나오지 않으며, 보스·복습·장애물·하트·가속 단어에는 없다', { skip: SKIP }, async () => {
+  resetState();
+  // 체력 5(가득)에서는 아예 나오지 않는다
+  let page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?rescueevery=1&dj=0', dodge: false });
+  await startManual(page);
+  let r = await page.eval(`${RBOT}({})`);
+  assert.equal(r.over, true); assert.ok(r.words.every(w => !w.rescue), '체력 가득이면 구조 아이템 없음'); await page.close();
+  // 체력 2 로 시작, 3번째 단어에서 체력이 4 로 회복
+  page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?rescueevery=1&dj=0&speedevery=1&obs=0&heartevery=10', dodge: false });
+  await startManual(page);
+  await page.eval('SpellRun.G.hp = 2');
+  r = await page.eval(`${RBOT}({ hpAt: { 4: 4 } })`);
+  assert.equal(r.over, true);
+  const early = r.words.filter(w => w.wi < 4), late = r.words.filter(w => w.wi >= 4);
+  assert.ok(early.some(w => w.rescue), '체력이 낮은 동안 나온다');
+  for (const w of r.words) { if (w.rescue) { assert.ok(w.hpAtLoad >= 1 && w.hpAtLoad <= 2, '체력 기준 이하: ' + w.hpAtLoad); assert.ok(!w.boss && !w.review && !w.obst && !w.heart && !w.speed, '제외 조건: ' + JSON.stringify(w)); } }
+  assert.ok(late.every(w => !w.rescue || w.hpAtLoad <= 2), '체력이 회복된 뒤(기준 초과)에는 없다');
+  const rescueWords = r.words.filter(w => w.rescue); assert.ok(rescueWords.length >= 2); rescueWords.forEach((w, i) => assert.equal(w.kind, i % 2 === 0 ? 'hint' : 'angel', '번갈아'));
+  await page.close();
+  // 장애물·하트가 있는 기본 구성에서도 제외 규칙이 지켜진다(체력 2 로 시작)
+  page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?rescueevery=1&dj=0&speedevery=1&obsprob=1&heartevery=2', dodge: false });
+  await startManual(page); await page.eval('SpellRun.G.hp = 2');
+  r = await page.eval(`${RBOT}({})`);
+  for (const w of r.words) if (w.rescue) assert.ok(!w.boss && !w.review && !w.obst && !w.heart && !w.speed, '제외 조건: ' + JSON.stringify(w));
+  assert.ok(r.words.some(w => w.obst) && r.words.some(w => w.heart), '장애물·하트 단어도 있었다');
+  await page.close();
+  // rescue=0: 없고 규칙 줄도 없다 / 기본: 규칙 줄 있음, 표시 없음
+  page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?rescue=0&rescueevery=1&dj=0', dodge: false }); await startManual(page);
+  assert.equal(await page.eval("!!document.getElementById('rescueRule')"), false); assert.equal(await page.eval("document.getElementById('tune').hidden"), false);
+  await page.eval('SpellRun.G.hp = 2'); r = await page.eval(`${RBOT}({})`); assert.ok(r.words.every(w => !w.rescue), 'rescue=0'); await page.close();
+  page = await openGame({ ids: [1, 2, 3], query: '', dodge: false }); await gameReady(page);
+  assert.equal(await page.eval("!!document.getElementById('rescueRule')"), true); assert.match(await page.eval("document.getElementById('rescueRule').textContent"), /힌트나 천사/); assert.equal(await page.eval("document.getElementById('tune').hidden"), true);
+  await page.close();
+  // 새 옵션: 범위·표시
+  page = await openGame({ ids: [1, 2, 3], query: '?itemhp=0.6&rescueevery=2&itemhp=9&rescueevery=11', dodge: false }); await gameReady(page);
+  assert.deepEqual(await page.eval('[SpellRun.CONFIG.ITEM_HP, SpellRun.CONFIG.RESCUE_EVERY]'), [0.6, 2]); assert.equal(await page.eval("document.getElementById('tune').hidden"), false); await page.close();
+  page = await openGame({ ids: [1, 2, 3], query: '?itemhp=0.4&rescueevery=3&rescue=1', dodge: false }); await gameReady(page);
+  assert.equal(await page.eval("document.getElementById('tune').hidden"), true, '기본값만 있으면 표시 없음'); await page.close();
+  await clearOpts();
+});
+
+// 한 묶음이 나온 뒤, 그 묶음 앞에 있었을 아이템을 러너 위치에 놓고 공중에서 먹는다(페이지 안). kind: 'hint' | 'angel'
+const STAGE = kind => `(() => { const R = SpellRun, G = R.G, C = R.CONFIG, RX = R.RUNNER_X; let n = 0;
+  G.hp = 2; while (n++ < 1200 && !(G.tiles.some(t => t.correct && t.id === G.packId && t.state === 'live'))) R.step(1 / 60);
+  const pack = G.tiles.filter(t => t.id === G.packId).map(t => ({ text: t.text, correct: t.correct, x: t.x }));
+  G.tiles.push({ id: -G.packId, kind: '${kind}', x: RX + 1, w: 46, text: '', correct: false, state: 'live', t: 0, age: 1, checked: false, ok: false });
+  const mist0 = G.mist[G.wi], hp0 = G.hp; G.jumpT = 0.2; G.j2 = -1; R.step(1 / 60);
+  return { pack: pack, mist0: mist0, hp0: hp0 }; })()`;
+
+test('329-2) 힌트: 먹으면 정답 타일이 빛나고(글로우) 다음 빈칸에 정답 글자가 희미하게 보이며, 정답 판정·타일 데이터는 그대로이고 묶음이 끝나면 사라진다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?obs=0&dj=0&speeditem=0', dodge: false });
+  await startManual(page);
+  await page.eval(`(() => { window.__glow = 0; const st = CanvasRenderingContext2D.prototype.stroke; CanvasRenderingContext2D.prototype.stroke = function () { if (String(this.strokeStyle) === '#34d399' && this.lineWidth === 5) window.__glow++; return st.apply(this, arguments); }; })()`);
+  const s = await page.eval(STAGE('hint'));
+  const after = await page.eval(`(() => { const G = SpellRun.G; window.__glow = 0; SpellRun.draw(); const cells = [...document.querySelectorAll('#word .slot.cur .cell')]; return { rescue: G.rescue, glow: window.__glow, ghost: cells.map(c => c.textContent), ghostCls: cells.map(c => c.classList.contains('ghost')), want: G.plan.slots[G.si].text, pack: G.tiles.filter(t => t.id === G.packId && t.kind === undefined).map(t => ({ text: t.text, correct: t.correct, state: t.state })), floats: G.floats.map(f => f.text), hp: G.hp, mist: G.mist[G.wi] }; })()`);
+  assert.equal(after.rescue.kind, 'hint'); assert.ok(after.floats.includes('힌트!'));
+  assert.ok(after.glow >= 1, '정답 타일에 글로우 테두리가 그려진다: ' + after.glow);
+  assert.deepEqual(after.ghost, after.want.split(''), '다음 빈칸에 정답 글자'); assert.ok(after.ghostCls.every(Boolean), '희미한 표시(ghost)');
+  assert.equal(await page.eval("getComputedStyle(document.querySelector('#word .slot.cur .cell.ghost')).color"), 'rgba(29, 43, 83, 0.32)');
+  assert.deepEqual(after.pack.map(t => [t.text, t.correct]), s.pack.map(t => [t.text, t.correct]), '타일 데이터(글자·정답 여부) 불변'); assert.ok(after.pack.every(t => t.state === 'live'), '타일은 모두 그대로 남아 있다(표시만 추가)');
+  assert.equal(after.hp, s.hp0); assert.equal(after.mist, s.mist0);
+  // 정답을 점프로 먹으면 묶음이 끝나고 효과가 사라진다
+  const end = await page.eval(`(() => { const R = SpellRun, G = R.G, RX = R.RUNNER_X; let n = 0, hit = false; const si0 = G.si;
+    while (n++ < 900 && G.si === si0 && G.state === 'run') { const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.x > RX).sort((a, b) => a.x - b.x)[0]; if (G.jumpT < 0 && tg && (tg.x - RX) / G.speed <= R.CONFIG.JUMP_TIME / 2) R.jump(); R.step(1 / 60); }
+    window.__glow = 0; R.draw(); return { rescue: G.rescue, glow: window.__glow, si: G.si - si0, ghostLeft: document.querySelectorAll('#word .cell.ghost').length, hp: G.hp, done: [...document.querySelectorAll('#word .slot.done .cell')].map(c => c.textContent).join('') }; })()`);
+  assert.equal(end.si, 1, '정답을 먹었다'); assert.equal(end.rescue, null, '효과 종료'); assert.equal(end.glow, 0, '글로우 없음'); assert.equal(end.ghostLeft, 0, '희미한 글자 없음'); assert.equal(end.hp, 2);
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+  await page.close();
+});
+
+test('329-3) 천사: 먹으면 틀린 타일이 반짝이며(0.5초 이내) 사라지고 먹을 수 없으며, 정답 타일은 그대로 남아 점프로 먹어야 하고 판정·점수는 같다. 움직임 줄이기에서는 즉시 사라진다', { skip: SKIP }, async () => {
+  resetState();
+  for (const reduce of [false, true]) {
+    const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
+    await withDodge(page);
+    if (reduce) await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
+    await page.goto(base + '/spelling_run.html?obs=0&dj=0&speeditem=0'); await startManual(page);
+    const s = await page.eval(STAGE('angel'));
+    const a = await page.eval(`(() => { const G = SpellRun.G, C = SpellRun.CONFIG, pk = G.tiles.filter(t => t.id === G.packId && t.kind === undefined); return { rescue: G.rescue && G.rescue.kind, left: pk.map(t => ({ correct: t.correct, state: t.state, angel: !!t.angel })), angels: G.angels.length, floats: G.floats.map(f => f.text), sec: C.ANGEL_SEC }; })()`);
+    assert.equal(a.rescue, 'angel'); assert.ok(a.floats.includes('천사!')); assert.ok(a.sec <= 0.5);
+    const correctN = s.pack.filter(t => t.correct).length, wrongN = s.pack.length - correctN; assert.equal(correctN, 1); assert.ok(wrongN >= 2);
+    assert.equal(a.left.filter(t => t.correct && t.state === 'live').length, 1, '정답 타일은 그대로 남는다');
+    if (reduce) { assert.equal(a.left.filter(t => !t.correct).length, 0, '움직임 줄이기: 틀린 타일이 즉시 사라진다'); assert.equal(a.angels, 0, '반짝임 연출 없음'); }
+    else { assert.equal(a.left.filter(t => !t.correct && t.state === 'fade' && t.angel).length, wrongN, '틀린 타일은 반짝이며 사라지는 중'); assert.ok(a.angels >= wrongN); }
+    // 연출 시간이 지나면 틀린 타일이 모두 없고, 사라지는 도중의 타일은 먹을 수 없다
+    const b = await page.eval(`(() => { const R = SpellRun, G = R.G, RX = R.RUNNER_X; const out = {};
+      if (G.tiles.some(t => t.angel)) { const w = G.tiles.find(t => t.angel); w.x = RX + 1; G.jumpT = 0.2; const h0 = G.hp, m0 = G.mist[G.wi]; R.step(1 / 60); out.eatenWrong = G.hp !== h0 || G.mist[G.wi] !== m0; G.jumpT = -1; }
+      for (let i = 0; i < 40; i++) R.step(1 / 60);   // 0.67초(정답 타일은 아직 멀리 있다)
+      out.wrongLeft = G.tiles.filter(t => t.id === G.packId && t.kind === undefined && !t.correct).length; out.correctLeft = G.tiles.filter(t => t.id === G.packId && t.kind === undefined && t.correct && t.state === 'live').length; out.angels = G.angels.length;
+      return out; })()`);
+    assert.ok(!b.eatenWrong, '사라지는 타일은 먹을 수 없다(체력·실수 변화 없음)'); assert.equal(b.wrongLeft, 0, '연출 뒤 틀린 타일 없음'); assert.equal(b.correctLeft, 1); assert.equal(b.angels, 0, '연출 끝');
+    // 정답은 평소처럼 점프로 먹는다: 점수·콤보는 기존 규칙(+글자 점수), 체력 불변
+    const c = await page.eval(`(() => { const R = SpellRun, G = R.G, RX = R.RUNNER_X; const si0 = G.si, sc0 = G.score, cb0 = G.combo, hp0 = G.hp; let n = 0;
+      while (n++ < 900 && G.si === si0 && G.state === 'run') { const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.x > RX).sort((p, q) => p.x - q.x)[0]; if (G.jumpT < 0 && tg && (tg.x - RX) / G.speed <= R.CONFIG.JUMP_TIME / 2) R.jump(); R.step(1 / 60); }
+      return { ate: G.si - si0, dscore: G.score - sc0, dcombo: G.combo - cb0, hp: G.hp, hp0: hp0, lastPts: G.lastPts, rescue: G.rescue }; })()`);
+    assert.equal(c.ate, 1, '점프로 정답을 먹었다'); assert.equal(c.dcombo, 1); assert.equal(c.dscore, c.lastPts, '점수는 기존 글자 점수 그대로'); assert.equal(c.hp, c.hp0); assert.equal(c.rescue, null);
+    assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+    await page.close();
+  }
+});
+
+test('329-4) 그림: 힌트(전구)·천사(날개와 후광)가 캔버스에 그려지고 하트(빨강)·번개(하늘색)와 색이 다르며, 폭 320·360·390에서 힌트·상단 표시와 겹치지 않는다', { skip: SKIP }, async () => {
+  resetState();
+  for (const w of [320, 360, 390]) {
+    const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?obs=0&dj=0&speeditem=0', width: w, dodge: false });
+    await startManual(page);
+    const r = await page.eval(`(() => { const R = SpellRun, G = R.G, cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360, RX = R.RUNNER_X; const col = (x, y) => Array.from(cx.getImageData(Math.round(x * S), Math.round(y * S), 1, 1).data); const out = {};
+      G.packActive = true; G.tiles = []; G.iActive = false;
+      for (const kind of ['heart', 'speed', 'hint', 'angel']) { G.tiles = [{ id: -5, kind: kind, x: 200, w: 46, text: '', correct: false, state: 'live', t: 0, age: 1, checked: true, ok: false }]; G.time = 0; R.draw();
+        // 아이템 영역(가운데 ±20)의 색을 훑어 대표색(가장 많이 나온 것)과 윤곽을 모은다
+        const seen = {}; for (let dy = -22; dy <= 22; dy += 4) for (let dx = -22; dx <= 22; dx += 4) { const c = col(200 + dx, R.TILE_Y + dy).slice(0, 3).map(v => Math.round(v / 32) * 32).join(','); seen[c] = (seen[c] || 0) + 1; }
+        out[kind] = seen; }
+      const box = document.getElementById('box').getBoundingClientRect(), u = parseFloat(document.getElementById('box').style.getPropertyValue('--u'));
+      const bot = id => (document.getElementById(id).getBoundingClientRect().bottom - box.top) / u;
+      out.hint = Math.max(bot('hintbox'), bot('word')); out.itemTop = R.TILE_Y - 34; return out; })()`);
+    const dom = o => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, 6).map(e => e[0]);
+    const keys = { heart: dom(r.heart), speed: dom(r.speed), hint: dom(r.hint === undefined ? {} : r.hint), angel: dom(r.angel) };
+    assert.ok(typeof r.itemTop === 'number' && r.itemTop > r.hint + 20, `${w}: 아이템 줄(위 ${r.itemTop})이 힌트·글자 칸 줄(${r.hint}) 아래`);
+    // 네 아이템의 색 구성이 서로 다르다
+    const sig = k => JSON.stringify(Object.keys(r[k] || {}).sort());
+    assert.notEqual(sig('heart'), sig('speed')); assert.notEqual(sig('hint'), sig('heart')); assert.notEqual(sig('angel'), sig('speed')); assert.notEqual(sig('hint'), sig('angel'));
     await page.close();
   }
 });

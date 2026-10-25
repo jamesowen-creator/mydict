@@ -1154,3 +1154,44 @@ test('328-1. 하트 단어에서 장애물이 줄어드는 정도(측정): 하�
   // 328 이전: 같은 정적 규칙(체력과 무관)이었으므로 같은 결과 — planObstacle 은 그대로
   assert.deepEqual(L.planObstacle(6, new Set(), 4, false, () => 0.999, L.buildConfig({ obsprob: 1 })), { slot: 2, kind: 'pit' });
 });
+
+// ───────── 작업329: 구조 아이템(힌트·천사) ─────────
+test('329-1. 구조 아이템 조건: 체력 기준 경계(1 이상, HP x itemhp 이하), 난수 없음, 번갈아, 하트·장애물·보스·복습 단어에는 없고 가속 아이템과 겹치지 않는다', () => {
+  const C = CONFIG, base = { roundSeq: 2, hp: 2, boss: false, review: false, hasHeart: false, hasObst: false, nSlots: 5, rescueCount: 0 };
+  assert.equal(C.RESCUE_ENABLED, true); assert.equal(C.ITEM_HP, 0.4); assert.equal(C.RESCUE_EVERY, 3);
+  // 경계: HP 5 x 0.4 = 2 → 체력 2 는 나오고 3 은 아니다, 0 은 아니다
+  assert.equal(L.rescueLow(1, C), true); assert.equal(L.rescueLow(2, C), true); assert.equal(L.rescueLow(3, C), false); assert.equal(L.rescueLow(5, C), false); assert.equal(L.rescueLow(0, C), false, '체력 0 은 아니다');
+  const c10 = L.buildConfig({ hp: 10 }); assert.equal(L.rescueLow(4, c10), true); assert.equal(L.rescueLow(5, c10), false);
+  assert.equal(L.rescueLow(1, L.buildConfig({ itemhp: 0 })), false, 'itemhp=0 이면 나오지 않는다'); assert.equal(L.rescueLow(5, L.buildConfig({ itemhp: 1 })), true); assert.equal(L.rescueLow(1, L.buildConfig({ itemhp: 0.2 })), true); assert.equal(L.rescueLow(2, L.buildConfig({ itemhp: 0.2 })), false);
+  const every1 = L.buildConfig({ rescueevery: 1 });
+  const ok = Object.assign({ regularIdx: 0 }, base);
+  assert.ok(L.planRescue(ok, every1), 'rescueevery=1 이면 매 단어(조건 충족 시)');
+  assert.equal(L.planRescue(Object.assign({}, ok, { hp: 3 }), every1), null, '기준 초과');
+  assert.equal(L.planRescue(Object.assign({}, ok, { hp: 0 }), every1), null);
+  for (const ex of [{ boss: true }, { review: true }, { hasHeart: true }, { hasObst: true }, { nSlots: 1 }]) assert.equal(L.planRescue(Object.assign({}, ok, ex), every1), null, JSON.stringify(ex));
+  assert.equal(L.planRescue(ok, L.buildConfig({ rescueevery: 1, rescue: 0 })), null, 'rescue=0');
+  // 번갈아 + 묶음은 첫 묶음 이후
+  const kinds = [0, 1, 2, 3, 4, 5].map(i => L.planRescue(Object.assign({}, ok, { rescueCount: i }), every1).kind); assert.deepEqual(kinds, ['hint', 'angel', 'hint', 'angel', 'hint', 'angel']);
+  for (let i = 0; i < 60; i++) { const r = L.planRescue(Object.assign({}, ok, { regularIdx: i, roundSeq: i % 7 }), every1); assert.ok(r.slot >= 1 && r.slot <= 4); }
+  // 빈도: 약 3단어에 1번, 같은 입력 같은 결과, 난수 없음
+  let n = 0, hit = 0; const orig = Math.random; Math.random = () => { throw new Error('난수 사용 금지'); };
+  try { for (let round = 1; round <= 60; round++) for (let i = 0; i < 9; i++) { const o = Object.assign({}, base, { roundSeq: round, regularIdx: i }), r = L.planRescue(o, C); assert.deepEqual(L.planRescue(o, C), r); n++; if (r) hit++; } } finally { Math.random = orig; }
+  assert.ok(hit / n > 0.25 && hit / n < 0.42, '약 1/3: ' + (hit / n).toFixed(3));
+  // 우선순위: 구조가 정해진 단어에는 가속 아이템이 없다(호출하는 쪽이 hasHeart 로 넘긴다) — 가속 계획이 hasHeart=true 면 null
+  assert.equal(L.planSpeedItem({ roundSeq: 1, regularIdx: 0, boss: false, review: false, hasHeart: true, hasObst: false, nSlots: 5 }, L.buildConfig({ speedevery: 1 })), null);
+  // 기존 난수 호출 횟수 불변, 장애물 규칙 불변
+  let calls = 0; const rec = () => { calls++; return 0.5; };
+  L.planHearts(9, rec, C); assert.equal(calls, 3); calls = 0; L.pickHeartSlot(5, rec); assert.equal(calls, 1); calls = 0; L.planObstacle(5, new Set(), null, false, rec, L.buildConfig({ obsprob: 1 })); assert.equal(calls, 3);
+  assert.equal(C.OBST_W, 28); assert.equal(C.OBST_H, 28); assert.equal(C.PIT_W, 36);
+  for (const kind of OBST_KINDS) { const lay = L.obstacleLayout(C, kind); for (let s = C.SPEED_MIN; s <= C.SPEED_MAX; s++) assert.ok(L.obstacleWindow(C, lay, s).width >= C.OBST_MIN_WINDOW); }
+});
+
+test('329-5. 옵션 itemhp(0~1, 기본 0.4)·rescueevery(1~10 정수, 기본 3)·rescue(0|1, 기본 1): 범위 밖 무시, 저장 방식 동일, 기본값이면 표시 없음', () => {
+  const po = q => L.parseOptions(q);
+  assert.deepEqual(po('?itemhp=0.6').values, { itemhp: 0.6 }); assert.deepEqual(po('?itemhp=0.6').applied, ['itemhp']); assert.deepEqual(po('?itemhp=0.4').applied, []); assert.deepEqual(po('?itemhp=0').values, { itemhp: 0 }); assert.deepEqual(po('?itemhp=1').values, { itemhp: 1 });
+  assert.deepEqual(po('?rescueevery=2').applied, ['rescueevery']); assert.deepEqual(po('?rescueevery=3').applied, []); assert.deepEqual(po('?rescue=0').applied, ['rescue']); assert.deepEqual(po('?rescue=1').applied, []);
+  for (const bad of ['itemhp=1.1', 'itemhp=-0.1', 'itemhp=x', 'rescueevery=0', 'rescueevery=11', 'rescueevery=2.5', 'rescue=2', 'rescue=0.5', 'rescue=']) assert.deepEqual(po('?' + bad).values, {}, bad);
+  assert.deepEqual(L.resolveOptions('', JSON.stringify({ itemhp: 0.7, rescueevery: 5, rescue: 0 })).values, { itemhp: 0.7, rescueevery: 5, rescue: 0 }); assert.deepEqual(L.resolveOptions('', JSON.stringify({ itemhp: 9, rescueevery: 99 })).values, {});
+  const c = L.buildConfig({ itemhp: 0.7, rescueevery: 5, rescue: 0 }); assert.equal(c.ITEM_HP, 0.7); assert.equal(c.RESCUE_EVERY, 5); assert.equal(c.RESCUE_ENABLED, false);
+  const e = L.buildConfig(); for (const k of Object.keys(e)) if (!['ITEM_HP', 'RESCUE_EVERY', 'RESCUE_ENABLED'].includes(k)) assert.deepEqual(L.buildConfig({ rescue: 0 })[k], e[k], k);
+});

@@ -108,6 +108,11 @@ function buildConfig(v) {
   BOOST_SEC: 5,           // 가속 효과 시간(초, 주소 옵션 boostsec)
   BOOST_FACTOR: 1.3,      // 가속 중 목표 속도 배율(SPEED_MAX 를 넘지 않는다)
   BOOST_SCORE_MULT: 1.5,  // 가속 중 완성한 단어의 완성 점수 배율
+  // 작업329: 구조 아이템(힌트·천사). 체력이 낮을 때만 나온다. 난수 없이 판 순번·단어 순번 해시로 정한다
+  RESCUE_ENABLED: true,   // 주소 옵션 rescue=0 이면 힌트·천사 없음
+  ITEM_HP: 0.4,           // 현재 체력 <= HP x 이 값(그리고 1 이상)일 때만 나온다(주소 옵션 itemhp)
+  RESCUE_EVERY: 3,        // 체력이 낮은 동안 약 이 개수의 단어마다 1개(주소 옵션 rescueevery). 힌트와 천사가 번갈아 나온다
+  ANGEL_SEC: 0.5,         // 천사가 틀린 타일을 지우는 연출 시간(초)
   WARN_SEC: T(0.78)       // 예고 표시가 보이는 최소 시간(최고 속도 기준, 거리로 계산). 기본 pace 1.3 에서 0.6초이고 pace 에 반비례(다른 시간 값과 같은 방식)
   };
   if (v.hp) cfg.HP = v.hp;
@@ -124,6 +129,9 @@ function buildConfig(v) {
   if (v.hpfullbonus !== undefined) cfg.HP_FULL_BONUS = v.hpfullbonus;
   if (v.speeditem !== undefined) cfg.SPEED_ITEM_ENABLED = !!v.speeditem;
   if (v.speedevery) cfg.SPEED_EVERY = v.speedevery;
+  if (v.rescue !== undefined) cfg.RESCUE_ENABLED = !!v.rescue;
+  if (v.itemhp !== undefined) cfg.ITEM_HP = v.itemhp;
+  if (v.rescueevery) cfg.RESCUE_EVERY = v.rescueevery;
   if (v.boostsec) cfg.BOOST_SEC = v.boostsec;
   // 빠른 pace 에서는 같은 px 폭이 더 짧은 시간에 지나가 점프 창도 같은 비율로 짧아지므로, 최저 속도에서도 여유 창이 남도록 폭을 줄인다(기본 pace 1.3 에서는 줄지 않는다)
   const fitW = (base, H) => Math.max(8, Math.min(base, Math.floor(cfg.SPEED_MIN * (airWindow(cfg, H).len - cfg.OBST_MIN_WINDOW - 0.01) - 2 * cfg.OBST_FOOT)));
@@ -139,7 +147,8 @@ const OPTION_RULES = {
   popsec: { min: 0.5, max: 5, def: 1.6 }, highprob: { min: 0, max: 1, def: 0.2 }, heartevery: { min: 1, max: 10, int: true, def: 3 }, dj: { min: 0, max: 1, int: true, def: 1 }, maxcombo: { min: 3, max: 12, int: true, def: 5 },
   intro: { min: 0, max: 1, int: true, def: 1 }, ttsdebug: { min: 0, max: 1, int: true, def: 0 }, introhold: { min: 0.5, max: 3, def: 1.3 },
   obs: { min: 0, max: 1, int: true, def: 1 }, obsprob: { min: 0, max: 1, def: 0.5 },
-  hpfullbonus: { min: 0, max: 1000, int: true, def: 100 }, speeditem: { min: 0, max: 1, int: true, def: 1 }, speedevery: { min: 1, max: 10, int: true, def: 4 }, boostsec: { min: 1, max: 10, def: 5 }
+  hpfullbonus: { min: 0, max: 1000, int: true, def: 100 }, speeditem: { min: 0, max: 1, int: true, def: 1 }, speedevery: { min: 1, max: 10, int: true, def: 4 }, boostsec: { min: 1, max: 10, def: 5 },
+  rescue: { min: 0, max: 1, int: true, def: 1 }, itemhp: { min: 0, max: 1, def: 0.4 }, rescueevery: { min: 1, max: 10, int: true, def: 3 }
 };
 // 반환 { values: 유효한 값(기본값과 같아도 포함), applied: 기본값과 다른 옵션 이름 }
 function parseOptions(search) {
@@ -472,6 +481,16 @@ function planSpeedItem(o, cfg) {
   if (o.regularIdx % e !== hashInt('speed:' + o.roundSeq + ':' + g) % e) return null;
   return 1 + hashInt('speedslot:' + o.roundSeq + ':' + o.regularIdx) % (o.nSlots - 1);
 }
+// 작업329: 구조 아이템 계획. 체력이 기준 이하일 때(1 이상)만, 난수 없이.
+// o: { roundSeq, regularIdx, hp, boss, review, hasHeart, hasObst, nSlots, rescueCount: 이번 판에서 이미 계획된 구조 아이템 수 }
+// 반환 { slot: 아이템이 놓일 묶음 번호(첫 묶음 이후), kind: 'hint' | 'angel'(번갈아) } 또는 null. 우선순위: 하트 > 구조 > 가속(호출하는 쪽에서 구조가 정해지면 가속 계획에 hasHeart 를 넘긴다)
+function rescueLow(hp, cfg) { cfg = cfg || CONFIG; return hp >= 1 && hp <= cfg.HP * cfg.ITEM_HP + 1e-9; }
+function planRescue(o, cfg) {
+  cfg = cfg || CONFIG;
+  if (!cfg.RESCUE_ENABLED || o.boss || o.review || o.hasHeart || o.hasObst || o.nSlots < 2 || !rescueLow(o.hp, cfg)) return null;
+  if (hashInt('rescue:' + o.roundSeq + ':' + o.regularIdx) % cfg.RESCUE_EVERY !== 0) return null;
+  return { slot: 1 + hashInt('rescueslot:' + o.roundSeq + ':' + o.regularIdx) % (o.nSlots - 1), kind: (o.rescueCount || 0) % 2 === 0 ? 'hint' : 'angel' };
+}
 // 가속 중의 목표 속도: 원래 목표 속도 x BOOST_FACTOR, 단 SPEED_MAX 를 넘지 않는다(장애물 안전 간격은 SPEED_MAX 기준이다)
 function boostTarget(target, boosting, cfg) {
   cfg = cfg || CONFIG;
@@ -788,7 +807,7 @@ return {
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
-  heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
+  planRescue: planRescue, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };
 });

@@ -12,7 +12,7 @@ try { if (OPT.reset) localStorage.removeItem(L.OPTION_KEY); else if (OPT.save) l
 
 L.configure(OPT.values);                       // CONFIG 를 한 번에 다시 만든다(pace 는 속도·간격·점프 시간에 같은 비율로 반영)
 const CONFIG = L.CONFIG;
-const { heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
+const { planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
 
 const W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, RUNNER_X = 72, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;
 const FALL_SEC = 0.55, STUMBLE_SEC = 0.5, FALL_DEPTH = 46;   // 작업326: 연출 시간(초)·구덩이에 빠지는 깊이(논리 px)
@@ -325,7 +325,7 @@ syncSndButtons();
 const G = {
   state: 'idle', words: [], wi: 0, plan: null, si: 0, mist: [],
   hp: 0, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
-  speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, speedPending: false, speedSlot: 0, boost: 0, roundSeq: 0, boostMax: 0, speedMaxSeen: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
+  speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, speedPending: false, speedSlot: 0, rescuePending: false, rescueSlot: 0, rescueKind: 'hint', rescueCount: 0, rescue: null, angels: [], boost: 0, roundSeq: 0, boostMax: 0, speedMaxSeen: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
   tiles: [], parts: [], floats: [],
   packActive: false, packId: 0, spawnT: 0,
   runPhase: 0, prevH: 0, rising: true, cleared: false, spriteDraws: 0, spriteFrame: -1, spriteAngle: 0,
@@ -445,6 +445,8 @@ function updateFx(dt) {
   G.parts = G.parts.filter(p => p.life > 0);
   for (const f of G.floats) { f.y -= 42 * dt; f.life -= dt; }
   G.floats = G.floats.filter(f => f.life > 0);
+  for (const g of G.angels) g.t += dt;
+  G.angels = G.angels.filter(g => g.t < CONFIG.ANGEL_SEC);
 }
 
 // ---------- 라운드 진행 ----------
@@ -460,7 +462,7 @@ function startRound(reviewOnly) {
     regular: regular, bossMode: false, introT: 0, repeatT: 0, repeatWord: '',
     state: 'run', words: pool, wi: 0, mist: pool.map(() => 0),
     hp: CONFIG.HP, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
-    roundSeq: G.roundSeq + 1, boost: 0, speedPending: false, speedMaxSeen: 0,
+    roundSeq: G.roundSeq + 1, boost: 0, speedPending: false, speedMaxSeen: 0, rescuePending: false, rescueCount: 0, rescue: null, angels: [],
     speed: CONFIG.SPEED_MIN, speedTarget: CONFIG.SPEED_MIN, speedBase: CONFIG.SPEED_MIN, shownMult: 0, heartWords: planHearts(regular), tiles: [], parts: [], floats: [],
     packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
     obstacles: [], obst: null, obstSeq: 0, invuln: 0, stumble: 0, fall: 0, obstHits: 0,
@@ -481,7 +483,11 @@ function loadWord(i) {
   const ob = planObstacle(G.plan.slots.length, highs, G.heartPending ? G.heartSlot : null, boss);   // 작업326: 꺼져 있거나 보스면 null(난수를 쓰지 않는다)
   G.obst = ob ? { slot: ob.slot, kind: ob.kind, done: false } : null;
   // 작업328: 가속 아이템(난수 없이 판 순번·단어 순번 해시로 결정. 하트 우선, 보스·복습·장애물 단어에는 없음)
-  const sIdx = planSpeedItem({ roundSeq: G.roundSeq, regularIdx: G.words.slice(0, i).filter(x => !x.boss).length, boss: boss, review: G.review, hasHeart: G.heartPending, hasObst: !!G.obst, nSlots: G.plan.slots.length });
+  const regIdx = G.words.slice(0, i).filter(x => !x.boss).length;
+  // 작업329: 구조 아이템(힌트·천사)은 체력이 낮을 때만. 우선순위 하트 > 구조 > 가속이라 구조가 정해지면 가속은 이 단어에 없다. 이 단어의 체력은 단어를 불러올 때 정한다(회복해서 기준을 넘으면 다음 단어부터 없다)
+  const rs = planRescue({ roundSeq: G.roundSeq, regularIdx: regIdx, hp: G.hp, boss: boss, review: G.review, hasHeart: G.heartPending, hasObst: !!G.obst, nSlots: G.plan.slots.length, rescueCount: G.rescueCount });
+  G.rescuePending = !!rs; if (rs) { G.rescueSlot = rs.slot; G.rescueKind = rs.kind; G.rescueCount++; }
+  const sIdx = planSpeedItem({ roundSeq: G.roundSeq, regularIdx: regIdx, boss: boss, review: G.review, hasHeart: G.heartPending || !!rs, hasObst: !!G.obst, nSlots: G.plan.slots.length });
   G.speedPending = sIdx !== null; G.speedSlot = sIdx === null ? 0 : sIdx;
   G.packActive = false; G.spawnT = CONFIG.WORD_START_DELAY + (i === 0 ? CONFIG.FIRST_WORD_EXTRA : 0);
   renderWord(); renderProgress();
@@ -537,6 +543,10 @@ function spawnPack() {
     G.heartPending = false; heartPlaced = true;
     G.tiles.push({ id: -G.packId, kind: 'heart', x: x0, w: 46, text: '', correct: false, chunk: false, state: 'live', t: 0, age: 0, checked: false, ok: false, color: '' });
     x0 += gap;
+  } else if (G.rescuePending && G.si >= G.rescueSlot && !slot.high) {   // 작업329: 힌트·천사도 하트와 같은 방식(묶음 앞 한 칸 간격)
+    G.rescuePending = false;
+    G.tiles.push({ id: -G.packId, kind: G.rescueKind, x: x0, w: 46, text: '', correct: false, chunk: false, state: 'live', t: 0, age: 0, checked: false, ok: false, color: '' });
+    x0 += gap;
   } else if (G.speedPending && G.si >= G.speedSlot && !slot.high) {   // 작업328: 가속 아이템도 하트와 같은 방식(묶음 앞 한 칸 간격)
     G.speedPending = false;
     G.tiles.push({ id: -G.packId, kind: 'speed', x: x0, w: 46, text: '', correct: false, chunk: false, state: 'live', t: 0, age: 0, checked: false, ok: false, color: '' });
@@ -564,6 +574,7 @@ function endPack(hint) {
     else { t.state = 'fade'; t.t = 0; }
   }
   G.packActive = false; G.spawnT = CONFIG.PACK_DELAY;
+  clearRescue();
 }
 function curH() { return airHeight(G.jumpT, G.j2, G.j2h); }
 function resolve(t) {
@@ -571,6 +582,7 @@ function resolve(t) {
   const air = hh > CONFIG.GRAB_H;
   if (t.kind === 'heart') { if (air) onHeart(t); return; }
   if (t.kind === 'speed') { if (air) onSpeedItem(t); return; }
+  if (t.kind === 'hint' || t.kind === 'angel') { if (air) onRescueItem(t); return; }
   // 높은 칸은 HIGH_GRAB_H 이상일 때만 "공중"으로 본다(한 번 점프로는 닿지 않는다). 일반 칸 판정은 그대로
   const r = judge(t.correct, t.high ? hh >= CONFIG.HIGH_GRAB_H : air);
   if (r === 'pass') return;
@@ -586,6 +598,29 @@ function onHeart(t) {
   if (r.full) { if (r.score > 0) floatText(RUNNER_X + 70, GROUND - 235, '+' + r.score, '#e07b00', 22); }
   else floatText(RUNNER_X + 70, GROUND - 235, '체력 +' + CONFIG.HEART_HEAL, GOOD, 22);
   renderHearts(); renderScore();
+}
+// 작업329: 힌트·천사를 먹으면 그 아이템 뒤에 나오는 후보 묶음 한 번에만 효과가 있다(표시와 오답 타일 치우기만. 정답 판정·타일 위치·타이밍·난수는 그대로).
+function onRescueItem(t) {
+  t.state = 'taken'; t.t = 0; t.ok = true;
+  const pack = -t.id, slot = G.plan.slots[G.si];
+  G.rescue = { kind: t.kind, pack: pack };
+  sfx.heart();
+  if (t.kind === 'hint') {
+    burst(RUNNER_X + 8, TILE_Y, '#34d399', 12); floatText(RUNNER_X + 70, GROUND - 235, '힌트!', '#0f8a5f', 22);
+    const el = slotEls[G.si];
+    if (el && slot && !slot.filled) el.querySelectorAll('.cell').forEach((c, k) => { c.textContent = slot.text[k]; c.classList.add('ghost'); });   // 다음 빈칸에 정답 글자를 희미하게
+  } else {
+    burst(RUNNER_X + 8, TILE_Y, '#c4b5fd', 12); floatText(RUNNER_X + 70, GROUND - 235, '천사!', '#6d4fd6', 22);
+    for (const x of G.tiles) {
+      if (x.id !== pack || x.state !== 'live' || x.correct) continue;   // 정답 타일은 그대로 두고 틀린 타일만 치운다
+      if (reduce) x.dead = true; else { G.angels.push({ x: x.x, y: x.high ? HIGH_Y : TILE_Y, t: 0 }); x.state = 'fade'; x.t = 0; x.angel = true; }   // 움직임 줄이기에서는 반짝임 없이 바로 사라진다
+    }
+    if (reduce) G.tiles = G.tiles.filter(x => !x.dead);
+  }
+}
+function clearRescue() {   // 묶음이 끝나면 효과가 사라진다
+  if (G.rescue && G.rescue.kind === 'hint') slotEls.forEach(el => el.querySelectorAll('.cell.ghost').forEach(c => { c.classList.remove('ghost'); if (!c.classList.contains('hint') && !el.classList.contains('done')) c.textContent = ''; }));
+  G.rescue = null;
 }
 // 작업328: 가속 아이템을 먹으면 BOOST_SEC 초 동안 목표 속도가 x BOOST_FACTOR(SPEED_MAX 이하)가 되고 완성 점수에 배율이 붙는다. 기본 속도 누적(speedBase)은 건드리지 않는다.
 function onSpeedItem(t) {
@@ -864,7 +899,7 @@ function step(dt) {
   }
 
   G.obstacles = G.obstacles.filter(o => o.x + o.w > -80);
-  G.tiles = G.tiles.filter(t => t.x > -140 && !((t.state === 'fade' && t.t > 0.35) || (t.state === 'taken' && t.t > 0.4)));
+  G.tiles = G.tiles.filter(t => t.x > -140 && !((t.state === 'fade' && t.t > (t.angel ? CONFIG.ANGEL_SEC + 0.05 : 0.35)) || (t.state === 'taken' && t.t > 0.4)));
   updateFx(dt);
 }
 
@@ -993,6 +1028,45 @@ function drawObstWarn() {
   if (!obstWarnActive() || Math.floor(G.time * 6) % 2) return;
   warnTriangle(W - 24, GROUND - 34, 1.15, GOLD, BAD);
 }
+function drawRescueItem(t) {   // 작업329: 힌트 = 전구, 천사 = 날개와 후광. 선과 도형으로만(이모지 없음). 하트(빨강)·번개(하늘색)와 색·모양이 다르다
+  let a = 1, sc = 1;
+  if (t.state === 'fade') { a = 1 - t.t / 0.3; sc = 1 - 0.2 * Math.min(1, t.t / 0.3); }
+  else if (t.state === 'taken') { a = 1 - t.t / 0.35; sc = 1 + 0.7 * Math.min(1, t.t / 0.35); }
+  if (a <= 0) return;
+  const bob = t.state === 'live' ? Math.sin(G.time * 5 + t.x * 0.02) * 4 : 0;
+  if (t.state === 'live') { ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(t.x, GROUND + 10, 20, 6, 0, 0, Math.PI * 2); ctx.fill(); }
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, a, t.age / 0.2));
+  ctx.translate(t.x, TILE_Y + bob); ctx.scale(sc, sc); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  if (t.kind === 'hint') {
+    ctx.shadowColor = '#34d399'; ctx.shadowBlur = 16;
+    ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.arc(0, -4, 17, 0, Math.PI * 2); ctx.fill();   // 전구
+    ctx.shadowBlur = 0; ctx.lineWidth = 3.5; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.fillStyle = '#9aa3c2'; rr(-8, 11, 16, 10, 3); ctx.fill(); ctx.stroke();   // 소켓
+    ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-5, 3); ctx.lineTo(-3, -6); ctx.lineTo(0, -1); ctx.lineTo(3, -6); ctx.lineTo(5, 3); ctx.stroke();   // 필라멘트
+    ctx.strokeStyle = '#34d399'; ctx.lineWidth = 3;   // 빛줄기
+    for (let k = 0; k < 5; k++) { const ang = -Math.PI / 2 + (k - 2) * 0.62, r1 = 23, r2 = 30; ctx.beginPath(); ctx.moveTo(Math.cos(ang) * r1, -4 + Math.sin(ang) * r1); ctx.lineTo(Math.cos(ang) * r2, -4 + Math.sin(ang) * r2); ctx.stroke(); }
+  } else {
+    ctx.shadowColor = '#c4b5fd'; ctx.shadowBlur = 16;
+    ctx.fillStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeStyle = INK;
+    for (const side of [-1, 1]) {   // 날개
+      ctx.beginPath(); ctx.moveTo(side * 6, 2); ctx.bezierCurveTo(side * 30, -22, side * 36, 6, side * 22, 16); ctx.bezierCurveTo(side * 16, 10, side * 12, 14, side * 6, 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.shadowBlur = 0; ctx.fillStyle = '#ffe3ec'; ctx.beginPath(); ctx.arc(0, 4, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();   // 얼굴
+    ctx.strokeStyle = GOLD; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.ellipse(0, -13, 9, 3.5, 0, 0, Math.PI * 2); ctx.stroke();   // 후광
+  }
+  ctx.restore();
+}
+function drawAngels() {   // 천사 연출: 지워지는 타일 자리에서 후광·반짝임이 ANGEL_SEC 동안 번진다(움직임 줄이기에서는 만들어지지 않는다)
+  for (const g of G.angels) {
+    const p = Math.min(1, g.t / CONFIG.ANGEL_SEC); if (p >= 1) continue;
+    ctx.save(); ctx.globalAlpha = 1 - p; ctx.translate(g.x, g.y - 18 * p);
+    ctx.strokeStyle = GOLD; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(0, -30, 14, 5, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+    for (const side of [-1, 1]) { ctx.beginPath(); ctx.moveTo(side * 4, -20); ctx.quadraticCurveTo(side * 26, -40, side * 24, -16); ctx.quadraticCurveTo(side * 12, -18, side * 4, -14); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    ctx.restore(); drawStar(g.x + Math.sin(g.t * 20) * 14, g.y + Math.cos(g.t * 17) * 12, 6, 1 - p);
+  }
+}
 function drawSpeedItem(t) {   // 작업328: 번개 모양(하트와 구분되는 하늘색). 선과 도형으로만 그린다
   let a = 1, sc = 1;
   if (t.state === 'fade') { a = 1 - t.t / 0.3; sc = 1 - 0.2 * Math.min(1, t.t / 0.3); }
@@ -1058,9 +1132,10 @@ function drawHeartItem(t) {
 function drawTile(t) {
   if (t.kind === 'heart') { drawHeartItem(t); return; }
   if (t.kind === 'speed') { drawSpeedItem(t); return; }
+  if (t.kind === 'hint' || t.kind === 'angel') { drawRescueItem(t); return; }
   const h = TILE_H;
   let a = 1, sc = 1;
-  if (t.state === 'fade') { a = 1 - t.t / 0.3; sc = 1 - 0.2 * Math.min(1, t.t / 0.3); }
+  if (t.state === 'fade') { const fd = t.angel ? CONFIG.ANGEL_SEC : 0.3; a = 1 - t.t / fd; sc = 1 - 0.2 * Math.min(1, t.t / fd); }
   else if (t.state === 'taken') { a = 1 - t.t / 0.35; sc = 1 + 0.5 * Math.min(1, t.t / 0.35); }
   if (a <= 0) return;
   const bob = t.state === 'live' ? Math.sin(G.time * 4 + t.x * 0.02) * 3 : 0;
@@ -1073,7 +1148,9 @@ function drawTile(t) {
   ctx.save();
   ctx.globalAlpha = Math.max(0, Math.min(1, a, t.age / 0.2));
   ctx.translate(t.x, ty + bob); ctx.scale(sc, sc);
+  const hintGlow = G.rescue && G.rescue.kind === 'hint' && t.id === G.rescue.pack && t.correct && t.state === 'live';   // 작업329: 힌트 아이템 효과 중 정답 타일 글로우
   if (t.state === 'hint') { ctx.shadowColor = GOOD; ctx.shadowBlur = 20; }
+  else if (hintGlow) { ctx.shadowColor = '#34d399'; ctx.shadowBlur = 26 + 8 * Math.sin(G.time * 8); }
   if (t.high) {   // 2단 점프 칸 표시: 위쪽 삼각형(도형)
     ctx.fillStyle = GOLD; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.moveTo(0, -h / 2 - 17); ctx.lineTo(-9, -h / 2 - 4); ctx.lineTo(9, -h / 2 - 4); ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -1098,6 +1175,7 @@ function drawTile(t) {
     }
     ctx.closePath(); ctx.fill(); ctx.stroke();
   }
+  if (hintGlow) { ctx.strokeStyle = '#34d399'; ctx.lineWidth = 5; rr(-w / 2 - 3, -h / 2 - 3, w + 6, h + 6, 17); ctx.stroke(); }
   if (t.state === 'hint') {
     ctx.strokeStyle = GOOD; ctx.lineWidth = 5; rr(-w / 2 - 2, -h / 2 - 2, w + 4, h + 4, 16); ctx.stroke();
   }
@@ -1235,6 +1313,7 @@ function draw() {
   drawRunnerFx();
   drawObstWarn();
   drawBoost();
+  drawAngels();
   drawFx();
   ctx.restore();
   if (G.hurt > 0) {
@@ -1301,6 +1380,10 @@ function showGame(words, excluded) {
   els.startExcluded.textContent = excluded + '개 제외(구절·특수문자)';
   els.speechNote.hidden = hasSpeech();
   els.djRule.hidden = !CONFIG.DJ_ENABLED;
+  if (CONFIG.RESCUE_ENABLED && !$('rescueRule')) {   // 작업329: rescue=0 이면 규칙 줄 없음
+    const li = document.createElement('li'); li.id = 'rescueRule'; li.textContent = '체력이 적을 때 힌트나 천사가 도와줘요.';
+    els.djRule.parentNode.insertBefore(li, els.djRule.nextSibling);
+  }
   if (CONFIG.SPEED_ITEM_ENABLED && !$('speedRule')) {   // 작업328: 가속 아이템이 켜져 있을 때만 규칙 줄을 넣는다(speeditem=0 이면 화면 구성이 이전과 같다)
     const li = document.createElement('li'); li.id = 'speedRule'; li.textContent = '번개를 먹으면 잠시 빨라지고 점수가 올라요. 하트는 체력이 가득이면 점수로 바뀌어요.';
     els.djRule.parentNode.insertBefore(li, els.djRule.nextSibling);
