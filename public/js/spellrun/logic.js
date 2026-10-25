@@ -414,6 +414,41 @@ function planHighSlots(nSlots, rng, cfg) {
   return out;
 }
 
+// ---- 작업321: 펭귄 스프라이트 ----
+// 시트(spellrun_penguin_sheet.png 1728x288)는 288x288 칸 6개: 0~3 달리기, 4 점프 상승, 5 점프 하강. 모두 오른쪽을 본다.
+// 칸 안에서 발바닥은 아래에서 8px 위, 얼굴 중심은 폭의 55% 지점이다. size 는 화면(논리 px)에서 그리는 한 칸의 한 변(높이 기준 크기 — 한 곳에서 조정).
+const PENGUIN = { URL: '/img/spellrun/spellrun_penguin_sheet.png', SHEET_W: 1728, SHEET_H: 288, CELL: 288, FRAMES: 6, size: 92, faceX: 0.55, footPad: 8 / 288, faceDx: -10, bodyY: 0.58,
+  RUN_FRAMES: 4, JUMP_UP: 4, JUMP_DOWN: 5, IDLE: 1, JOY: 4, RUN_LEN: 0.11, RUN_LEN_MIN: 0.06, RUN_LEN_MAX: 0.14 };
+// 달리기 한 프레임의 길이(초): 기본 0.11초를 속도에 반비례해 줄이고(빠를수록 빨리 바뀜) 0.06~0.14초로 제한한다. 기준 속도는 최저 속도(SPEED_MIN)
+function runFrameLength(speed, cfg) {
+  cfg = cfg || CONFIG;
+  const len = PENGUIN.RUN_LEN * cfg.SPEED_MIN / Math.max(1, speed);
+  return Math.max(PENGUIN.RUN_LEN_MIN, Math.min(PENGUIN.RUN_LEN_MAX, len));
+}
+// 달리기 위상(0~4 미만). 프레임 번호 = floor(위상). 속도가 바뀌어도 위상이 이어져 번호가 튀지 않는다
+function advanceRunPhase(phase, dt, speed, cfg) {
+  const p = (phase + dt / runFrameLength(speed, cfg)) % PENGUIN.RUN_FRAMES;
+  return p < 0 ? p + PENGUIN.RUN_FRAMES : p;
+}
+// 그릴 프레임 번호(0부터). o: { state, cleared, air, rising, runPhase }
+function penguinFrame(o) {
+  if (o.state === 'idle' || o.state === 'intro' || o.state === 'ending') return PENGUIN.IDLE;   // 대기·보스 배너·게임 오버 연출(기존 회전 유지)은 서 있는 자세
+  if (o.state === 'over') return o.cleared ? PENGUIN.JOY : PENGUIN.IDLE;                       // 결과 화면: 완주는 기쁨(5번), 아니면 서 있는 자세
+  if (o.air) return o.rising ? PENGUIN.JUMP_UP : PENGUIN.JUMP_DOWN;
+  return Math.floor(o.runPhase || 0) % PENGUIN.RUN_FRAMES;
+}
+// 2단 점프 회전(도): 두 번째 점프가 시작되면 체공 시간(land)에 맞춰 0 → 360 으로 단조 증가, 착지(또는 점프 아님)하면 정확히 0
+function spinAngle(j2, land) {
+  if (j2 < 0 || !(land > 0) || j2 >= land) return 0;
+  return 360 * j2 / land;
+}
+// 정점 부근의 반짝임 세기(0~1): 2단 점프 정점(초속도/중력 = JUMP_TIME/2) 앞뒤 0.12초
+function sparkleAlpha(j2, cfg) {
+  cfg = cfg || CONFIG;
+  if (j2 < 0) return 0;
+  return Math.max(0, 1 - Math.abs(j2 - jumpV0(cfg) / jumpG(cfg)) / 0.12);
+}
+
 // ---- 작업323: 새 단어 시작 연출 ----
 // 타임라인: 큰 뜻 유지(hold) → 축소·이동(shrink). 전체(hold+shrink)는 새 단어 대기 시간(delay) 이하로 맞춘다(옵션이 커도 hold 를 줄인다).
 // o: { first: 첫 단어, boss: 보스 단어 }
@@ -578,7 +613,7 @@ return {
   speedLevel: speedLevel, speedMult: speedMult, gapSec: gapSec, leadSec: leadSec, speedAfterHit: speedAfterHit, speedAfterFail: speedAfterFail,
   targetSpeed: targetSpeed, planHearts: planHearts, pickHeartSlot: pickHeartSlot, jumpHeight: jumpHeight, judge: judge, buildRound: buildRound,
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
-  introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
+  PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };

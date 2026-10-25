@@ -715,3 +715,51 @@ test('323-4. 연출 옵션: intro(0|1, 기본 1)·introhold(0.5~3.0, 기본 1.3)
   assert.deepEqual(L.resolveOptions('?intro=1', JSON.stringify({ intro: 0 })).values, { intro: 1 }, '주소가 저장값을 덮어쓴다');
   const d = L.buildConfig(); for (const k of Object.keys(CONFIG)) assert.deepEqual(d[k], CONFIG[k], k);
 });
+
+// ───────── 작업321: 펭귄 스프라이트 프레임 선택 ─────────
+test('321-2. 달리기 프레임 길이: 기본 0.11초를 속도에 반비례해 줄이고 0.06~0.14초로 제한, 위상은 0→1→2→3 순환하며 속도가 바뀌어도 튀지 않는다', () => {
+  const C = CONFIG, P = L.PENGUIN;
+  assert.equal(L.runFrameLength(C.SPEED_MIN), 0.11, '최저 속도 기본 길이');
+  assert.equal(L.runFrameLength(C.SPEED_MAX), P.RUN_LEN_MIN, '최고 속도는 하한 0.06');
+  assert.equal(L.runFrameLength(1), P.RUN_LEN_MAX, '아주 느리면 상한 0.14');
+  assert.equal(P.RUN_LEN_MIN, 0.06); assert.equal(P.RUN_LEN_MAX, 0.14); assert.equal(P.RUN_LEN, 0.11);
+  let prev = Infinity;
+  for (let v = 20; v <= 500; v += 5) { const len = L.runFrameLength(v); assert.ok(len >= 0.06 && len <= 0.14 && len <= prev + 1e-12, '속도가 오를수록 짧아진다 ' + v); prev = len; }
+  assert.ok(Math.abs(L.runFrameLength(C.SPEED_MIN * 1.5) - 0.11 / 1.5) < 1e-9, '반비례(상·하한 안에서)');
+  // 위상: 한 프레임 길이만큼 흐르면 번호가 하나 올라가고 4개를 돌면 처음으로
+  let ph = 0, seen = [];
+  for (let i = 0; i < 12; i++) { ph = L.advanceRunPhase(ph, L.runFrameLength(C.SPEED_MIN) + 1e-9, C.SPEED_MIN); seen.push(Math.floor(ph)); }
+  assert.deepEqual(seen, [1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0], '1→2→3→4→1 순환(0부터 번호)');
+  // 속도가 바뀌어도 한 프레임(1/60초)에 위상이 한 칸 넘게 뛰지 않는다
+  for (const v of [C.SPEED_MIN, 250, C.SPEED_MAX]) { const p2 = L.advanceRunPhase(1.3, 1 / 60, v); assert.ok(p2 - 1.3 > 0 && p2 - 1.3 < 0.5, '연속: ' + v); }
+  assert.ok(L.advanceRunPhase(3.99, 0.05, C.SPEED_MAX) < 4 && L.advanceRunPhase(3.99, 0.05, C.SPEED_MAX) >= 0);
+});
+
+test('321-2. 프레임 선택: 달리기 0~3, 점프 상승 5번째(4)·하강 6번째(5), 대기·보스 배너·게임 오버 연출은 2번째(1), 완주 결과는 5번째(4)', () => {
+  const f = o => L.penguinFrame(Object.assign({ state: 'run', cleared: false, air: false, rising: true, runPhase: 0 }, o));
+  for (const [ph, idx] of [[0, 0], [0.99, 0], [1, 1], [2.5, 2], [3.999, 3], [4, 0], [5.2, 1]]) assert.equal(f({ runPhase: ph }), idx, 'phase ' + ph);
+  assert.equal(f({ air: true, rising: true, runPhase: 2 }), 4, '상승'); assert.equal(f({ air: true, rising: false, runPhase: 2 }), 5, '하강');
+  for (const st of ['idle', 'intro', 'ending']) assert.equal(f({ state: st, air: true }), 1, st + ' = 2번 프레임');
+  assert.equal(f({ state: 'over', cleared: true }), 4, '완주 결과는 5번'); assert.equal(f({ state: 'over', cleared: false }), 1);
+  for (const st of ['run', 'pop']) assert.equal(f({ state: st, runPhase: 2.2 }), 2, st + ' 중에도 달린다');
+  // 점프 중 위상이 멈추면(게임이 공중에서 위상을 올리지 않음) 착지 뒤 같은 번호에서 이어진다
+  assert.equal(f({ runPhase: 2.2 }), f({ air: false, runPhase: 2.2 }));
+  assert.ok(L.PENGUIN.size >= 70 && L.PENGUIN.size <= 110 && L.PENGUIN.SHEET_W === 1728 && L.PENGUIN.SHEET_H === 288 && L.PENGUIN.CELL * L.PENGUIN.FRAMES === 1728);
+});
+
+test('321-2. 2단 점프 회전: 두 번째 점프 동안 0→360° 단조 증가, 착지(또는 점프 아님)하면 정확히 0°, 정점 부근에서 반짝임이 가장 세다', () => {
+  const C = CONFIG;
+  for (const h2 of [0, 60, 118, 118 + 40]) {
+    const land = L.secondJumpLandTime(h2); let prev = -1;
+    assert.equal(L.spinAngle(0, land), 0, '시작은 0°');
+    for (let t = 0; t < land; t += 0.002) { const a = L.spinAngle(t, land); assert.ok(a >= prev && a >= 0 && a < 360, 'monotone ' + t); prev = a; }
+    assert.ok(L.spinAngle(land - 1e-6, land) > 359.9, '착지 직전 ≈ 360°');
+    assert.equal(L.spinAngle(land, land), 0, '착지하면 정확히 0'); assert.equal(L.spinAngle(land + 0.3, land), 0);
+    assert.ok(Math.abs(L.spinAngle(land / 2, land) - 180) < 1e-9, '체공 시간에 비례');
+  }
+  assert.equal(L.spinAngle(-1, 0.5), 0, '2단 점프 아님'); assert.equal(L.spinAngle(0.1, 0), 0);
+  const apex = L.jumpV0() / L.jumpG();
+  assert.ok(Math.abs(apex - C.JUMP_TIME / 2) < 1e-9);
+  assert.equal(L.sparkleAlpha(apex), 1); assert.equal(L.sparkleAlpha(-1), 0); assert.equal(L.sparkleAlpha(apex + 0.2), 0); assert.equal(L.sparkleAlpha(0.001) < 0.1, true);
+  assert.ok(L.sparkleAlpha(apex - 0.06) > 0.4 && L.sparkleAlpha(apex - 0.06) < 0.6);
+});

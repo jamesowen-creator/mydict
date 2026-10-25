@@ -12,7 +12,7 @@ try { if (OPT.reset) localStorage.removeItem(L.OPTION_KEY); else if (OPT.save) l
 
 L.configure(OPT.values);                       // CONFIG 를 한 번에 다시 만든다(pace 는 속도·간격·점프 시간에 같은 비율로 반영)
 const CONFIG = L.CONFIG;
-const { introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
+const { PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
 
 const W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, RUNNER_X = 72, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;
 const INK = '#1d2b53', CORAL = '#ff6b5a', GOLD = '#ffb700', GOOD = '#1fae68', BAD = '#e8454f';
@@ -37,6 +37,14 @@ const els = {
 };
 const sndBtns = [$('snd'), $('sndStart')];
 const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+// ---------- 작업321: 펭귄 스프라이트 시트(미리 불러오기). 로딩 전·실패 시에는 기존 도형 캐릭터로 그린다(게임 시작을 막지 않는다) ----------
+const sheet = new Image();
+let sheetOK = false;
+sheet.onload = () => { sheetOK = sheet.naturalWidth === PENGUIN.SHEET_W && sheet.naturalHeight === PENGUIN.SHEET_H; };
+sheet.onerror = () => { sheetOK = false; };
+try { sheet.src = PENGUIN.URL; } catch (e) { sheetOK = false; }
+const penguinReady = () => sheetOK && sheet.complete;
 
 let VALID_WORDS = [];                  // [{ id, word(소문자), meaning }] 단어장에서 고른 영어 단어
 const missedSet = new Set();           // 틀린 단어(소문자). 서버에 저장하지 않고 이 페이지 메모리에만 둔다
@@ -269,6 +277,7 @@ const G = {
   speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
   tiles: [], parts: [], floats: [],
   packActive: false, packId: 0, spawnT: 0,
+  runPhase: 0, prevH: 0, rising: true, cleared: false, spriteDraws: 0, spriteFrame: -1, spriteAngle: 0,
   iActive: false, iClock: 0, iTl: null, iGeo: null, iKids: 0, iShown: 0,
   jumpT: -1, j2: -1, j2h: 0, j2Land: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
   hintTimer: 0,
@@ -616,7 +625,7 @@ function afterPop() {
   } else { G.state = 'run'; loadWord(G.wi + 1); }
 }
 function finish(cleared) {
-  G.state = 'over'; G.bossMode = false; clearIntro();
+  G.state = 'over'; G.bossMode = false; G.cleared = !!cleared; clearIntro();
   box.classList.remove('boss');
   els.pop.hidden = true; els.hud.hidden = true; els.bossBanner.hidden = true;
   els.resChips.textContent = '';
@@ -710,6 +719,7 @@ function step(dt) {
     }
   }
   if (G.jumpBuf > 0) G.jumpBuf -= dt;
+  { const nh = curH(); if (nh !== G.prevH) G.rising = nh > G.prevH; G.prevH = nh; if (nh <= 1) G.runPhase = advanceRunPhase(G.runPhase, dt, G.speed); }   // 작업321: 게임 시간 기준(일시정지 중 정지)
   G.hurt = Math.max(0, G.hurt - dt);
   G.eat = Math.max(0, G.eat - dt);
   G.shake = Math.max(0, G.shake - dt);
@@ -869,8 +879,7 @@ function drawTile(t) {
   if (t.state === 'taken' && !t.ok) { ctx.fillStyle = 'rgba(232,69,79,.45)'; rr(-w / 2, -h / 2, w, h, 14); ctx.fill(); }
   ctx.restore();
 }
-function drawRunner() {
-  const h = curH();
+function drawRunnerShape(h) {   // 기존 도형 캐릭터(스프라이트를 못 불렀을 때의 대체 그림)
   const air = h > 1;
   const cx = RUNNER_X, cy = GROUND - 27 - h;
   const sx = (G.shake > 0 && !reduce) ? (Math.random() - 0.5) * 6 : 0;
@@ -922,6 +931,38 @@ function drawRunner() {
     else { ctx.beginPath(); ctx.arc(0, 3, 5, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke(); }
   }
   ctx.restore();
+}
+// 펭귄 스프라이트: 발바닥이 땅 선(GROUND)에 닿고 점프 중에는 airHeight 를 따라 오른다. 판정·충돌 위치는 그대로(그림만 교체). 피격 깜빡임·흔들림·게임 오버 기울임은 기존 효과를 그대로 쓴다.
+function drawStar(x, y, r, a) {
+  ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = '#fff6b0'; ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let i = 0; i < 8; i++) { const rr = i % 2 ? r * 0.35 : r, ang = -Math.PI / 2 + i * Math.PI / 4; const px = x + Math.cos(ang) * rr, py = y + Math.sin(ang) * rr; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); }
+  ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+}
+function drawRunner() {
+  const h = curH();
+  if (!penguinReady()) { drawRunnerShape(h); return; }
+  const P = PENGUIN, sz = P.size, sx = (G.shake > 0 && !reduce) ? (Math.random() - 0.5) * 6 : 0;
+  const idx = penguinFrame({ state: G.state, cleared: G.cleared, air: h > 1, rising: G.rising, runPhase: G.runPhase });
+  const angle = spinAngle(G.j2, G.j2Land) + (G.state === 'ending' ? 0.25 * 180 / Math.PI : 0);
+  G.spriteDraws++; G.spriteFrame = idx; G.spriteAngle = angle;
+  ctx.fillStyle = 'rgba(0,0,0,.25)';
+  ctx.beginPath(); ctx.ellipse(RUNNER_X, GROUND + 10, 22 * (1 - h / 260), 6 * (1 - h / 320), 0, 0, Math.PI * 2); ctx.fill();
+  const faceX = RUNNER_X + P.faceDx, footY = GROUND - h;
+  const left = faceX - P.faceX * sz + sx, top = footY + P.footPad * sz - sz;
+  ctx.save();
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  let scx = 1, scy = 1;
+  if (h > 1) { scx = 0.97; scy = 1.04; } else if (G.land > 0) { scx = 1.08; scy = 0.92; }
+  ctx.translate(faceX + sx, footY); ctx.scale(scx, scy); ctx.translate(-(faceX + sx), -footY);   // 늘이기·찌그러짐은 발바닥 기준
+  if (angle) { const bx = left + 0.5 * sz, by = top + P.bodyY * sz; ctx.translate(bx, by); ctx.rotate(angle * Math.PI / 180); ctx.translate(-bx, -by); }   // 2단 점프 회전: 몸 중앙 기준
+  if (G.hurt > 0 && Math.floor(G.time * 20) % 2 === 0) ctx.globalAlpha = 0.55;
+  ctx.drawImage(sheet, idx * P.CELL, 0, P.CELL, P.CELL, left, top, sz, sz);
+  ctx.restore();
+  const sp = sparkleAlpha(G.j2);   // 2단 점프 정점 부근의 작은 반짝임
+  if (sp > 0) {
+    const bx = left + 0.5 * sz, by = top + P.bodyY * sz, t = G.time * 6;
+    for (let i = 0; i < 4; i++) { const a = t + i * Math.PI / 2; drawStar(bx + Math.cos(a) * sz * 0.5, by + Math.sin(a) * sz * 0.42, 4 + 3 * sp, sp); }
+  }
 }
 function drawFx() {
   for (const p of G.parts) {
@@ -1063,7 +1104,7 @@ function frame(ts) {
 }
 
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
-const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, pickWords: pickWords, curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y };
+const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y };
 window.SpellRun = API;
 boot();
 })();

@@ -1299,3 +1299,81 @@ test('323-2) 폭 320·360·390: 큰 뜻 카드(유지 구간)가 가로로 넘�
   const h = await introInfo(hold); assert.ok(h.tl.total <= 2.6 + 1e-9 && Math.abs(h.tl.hold - 2.1) < 1e-9, '큰 값은 대기 시간 안으로 줄인다: ' + JSON.stringify(h.tl));
   await hold.close();
 });
+
+// ───────── 작업321: 펭귄 스프라이트 ─────────
+test('321-1) 시트 파일: public/img/spellrun/spellrun_penguin_sheet.png 가 있고 1728×288 투명 PNG, 페이지가 그 주소를 요청(1회)한다. 개별 프레임·zip 은 repo 에 없다', { skip: SKIP }, async () => {
+  const f = path.join(PUB, 'img', 'spellrun', 'spellrun_penguin_sheet.png');
+  const b = fs.readFileSync(f);
+  assert.equal(b.subarray(1, 4).toString(), 'PNG'); assert.equal(b.readUInt32BE(16), 1728); assert.equal(b.readUInt32BE(20), 288); assert.equal(b[25], 6, 'RGBA(투명)');
+  assert.deepEqual(fs.readdirSync(path.dirname(f)), ['spellrun_penguin_sheet.png'], '시트 한 장만');
+  assert.ok(!fs.readdirSync(PUB, { recursive: true }).some(x => /penguin_frames\.zip|frame_[1-6]\.png/.test(String(x))), 'zip·개별 프레임 없음');
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3] });
+  await gameReady(page);
+  await page.waitFor('SpellRun.penguin().ready', 4000);
+  const reqs = await page.eval("performance.getEntriesByType('resource').filter(e => /penguin/.test(e.name)).map(e => new URL(e.name).pathname)");
+  assert.deepEqual(reqs, ['/img/spellrun/spellrun_penguin_sheet.png'], '시트 요청 1회');
+  await page.close();
+});
+
+test('321-2) 로딩 성공: 스프라이트로 그려지고(달리기 0~3 순환, 점프 상승 4·하강 5, 2단 점프 회전, 착지 후 0도), 한 판이 끝까지 진행되며 오류가 없다', { skip: SKIP }, async () => {
+  resetState(); state.rows = HINT_ROWS;
+  const page = await openQ({ ids: [21, 22, 24, 25, 27] });
+  await page.waitFor('SpellRun.penguin().ready', 4000);
+  await page.click('#startBtn');
+  await page.waitFor("SpellRun.G.state === 'run'", 4000);
+  const r = await page.eval(`(async () => { const R = SpellRun, G = R.G, C = R.CONFIG; R.manual = true; const T = C.JUMP_TIME;
+    const out = { run: new Set(), up: 0, down: 0, spin: 0, spinMax: 0, endAngle: null, bad: [], draws0: R.penguin().draws, frames: [] }; let steps = 0, prevPhase = 0;
+    while (steps < 60 * 900 && G.state !== 'over') {
+      if (G.state === 'run') { const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.kind !== 'heart' && x.x > R.RUNNER_X).sort((a, b) => a.x - b.x)[0];
+        if (tg) { const tta = (tg.x - R.RUNNER_X) / G.speed; if (tg.high) { if (G.jumpT < 0 && tta <= T) R.jump(); else if (G.jumpT >= 0 && G.j2 < 0 && tta <= T / 2) R.jump(); } else if (G.jumpT < 0 && tta <= T / 2) R.jump(); } }
+      R.step(1 / 60); steps++; R.draw();
+      const p = R.penguin(), h = R.curH();
+      if (G.state === 'run' || G.state === 'pop') {
+        if (h <= 1) out.run.add(p.frame); else if (p.frame === 4) out.up++; else if (p.frame === 5) out.down++; else out.bad.push('air frame ' + p.frame);
+        if (h > 1 && p.frame < 4) out.bad.push('공중인데 달리기 프레임');
+        if (h <= 1 && p.frame > 3) out.bad.push('땅인데 점프 프레임');
+      }
+      if (G.j2 >= 0) { out.spin++; out.spinMax = Math.max(out.spinMax, p.angle); } else if (out.spin && out.endAngle === null) out.endAngle = p.angle;
+      if (G.j2 < 0 && p.angle !== 0 && G.state !== 'ending') out.bad.push('회전 잔여 ' + p.angle);
+      if (steps % 400 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+    out.draws = R.penguin().draws - out.draws0; out.run = [...out.run]; out.state = G.state; out.title = document.getElementById('resTitle').textContent; return out; })()`);
+  assert.equal(r.state, 'over'); assert.ok(r.draws > 300, '스프라이트로 그려졌다: ' + r.draws);
+  assert.deepEqual(r.run.sort(), [0, 1, 2, 3], '달리기 4프레임이 모두 쓰였다');
+  assert.ok(r.up > 5 && r.down > 5, `점프 상승(5번째)·하강(6번째) 프레임: ${r.up}/${r.down}`);
+  assert.ok(r.spin > 5 && r.spinMax > 270 && r.spinMax < 360, '2단 점프 중 회전: ' + r.spinMax); assert.equal(r.endAngle, 0, '착지 뒤 정확히 0도');
+  assert.deepEqual(r.bad.slice(0, 5), [], '프레임 선택 오류');
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), [], '오류 없음');
+  // 결과 화면(완주)은 기쁨 프레임(5번째), 대기 화면은 서 있는 프레임(2번째)
+  await page.eval('SpellRun.draw()');
+  const fr = await page.eval('SpellRun.penguin().frame');
+  assert.equal(fr, r.title.includes('완주') || r.title.includes('격파') ? 4 : 1);
+  await page.close();
+  const idle = await openQ({ ids: [21, 22, 24] });
+  await idle.waitFor('SpellRun.penguin().ready', 4000);
+  await idle.waitFor('SpellRun.penguin().draws > 2', 4000);
+  assert.equal(await idle.eval('SpellRun.penguin().frame'), 1, '대기 화면은 2번 프레임');
+  await idle.close();
+});
+
+test('321-2) 로딩 실패(시트 요청 차단): 기존 도형 캐릭터로 그려지고 게임은 끝까지 동작하며 오류가 없다. 로딩 전에도 시작을 막지 않는다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
+  await page.send('Network.enable');
+  await page.send('Network.setBlockedURLs', { urls: ['*spellrun_penguin_sheet*'] });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
+  await page.goto(base + '/spelling_run.html');
+  await gameReady(page);
+  assert.equal(await page.eval('SpellRun.penguin().ready'), false, '시트 로딩 실패');
+  await page.click('#startBtn');
+  await page.waitFor("SpellRun.G.state === 'run'", 4000);
+  await page.eval('SpellRun.manual = true');
+  const r = await page.eval(`${BOT}({ jumpHeart: false })`);
+  assert.equal(r.over, true, '끝까지 진행'); assert.equal(r.fails, 0);
+  await page.eval('SpellRun.draw()');
+  const p = await page.eval('SpellRun.penguin()');
+  assert.deepEqual([p.ready, p.draws], [false, 0], '스프라이트로는 한 번도 그리지 않았다(기존 그림으로 대체)');
+  assert.deepEqual(page.errors.filter(e => !/Failed to load resource|ERR_BLOCKED/.test(e)), [], '오류 없음');
+  await page.close();
+});
