@@ -106,6 +106,24 @@
           </div>
         </section>
 
+        <section class="screen" id="pv" hidden role="dialog" aria-modal="true" aria-labelledby="pvTitle">
+          <div class="card">
+            <h2 class="title small" id="pvTitle">단어 미리 보기</h2>
+            <p class="note" id="pvProg" aria-live="polite"></p>
+            <button class="pvarea" id="pvArea" type="button" aria-label="다음 단어로">
+              <span class="pvw" id="pvWord"></span>
+              <span class="pvm" id="pvMean"></span>
+            </button>
+            <p class="note" id="pvNote" role="status" aria-live="polite"></p>
+            <div class="trow" id="pvCtl">
+              <button class="toggle vsbtn" id="pvPause" type="button" aria-pressed="false">일시정지</button>
+              <button class="toggle vsbtn" id="pvSkip" type="button">건너뛰기</button>
+            </div>
+            <button class="btn" id="pvStart" type="button" hidden>시작</button>
+            <button class="toggle vsbtn" id="pvBack" type="button">돌아가기</button>
+          </div>
+        </section>
+
         <section class="screen" id="cont" hidden role="dialog" aria-modal="true" aria-labelledby="contTitle">
           <div class="card">
             <h2 class="title small" id="contTitle">체력이 0이 됐어요</h2>
@@ -163,8 +181,8 @@
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=71"></script>
-<script src="/js/spellrun/stage_style.js?v=71"></script>
-<script src="/js/spellrun/game.js?v=71"></script>
+<script src="/js/spellrun/logic.js?v=72"></script>
+<script src="/js/spellrun/stage_style.js?v=72"></script>
+<script src="/js/spellrun/game.js?v=72"></script>
 </body>
 </html>

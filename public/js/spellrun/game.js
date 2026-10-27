@@ -14,6 +14,10 @@ try { if (OPT.reset) { localStorage.removeItem(L.OPTION_KEY); localStorage.remov
 const MODE_KEY = 'spellrun_mode';
 let survMode = lsGet(MODE_KEY) === 'survival';
 try { const q = new URLSearchParams(location.search).get('survival'); if (q === '1') survMode = true; else if (q === '0') survMode = false; } catch (e) { /* 주소를 못 읽으면 저장값 */ }
+// 작업345: 시작 전 단어 미리 보기. 기본 켜짐. 사용자의 선택이라 모드처럼 'spellrun_preview' 에 따로 저장하고 "조정값 사용 중" 표시 대상이 아니다. 주소 preview=1|0 이 저장값보다 우선한다(저장하지는 않는다).
+const PREVIEW_KEY = 'spellrun_preview';
+let previewOn = lsGet(PREVIEW_KEY) !== '0';
+try { const q = new URLSearchParams(location.search).get('preview'); if (q === '1') previewOn = true; else if (q === '0') previewOn = false; } catch (e) { /* 주소를 못 읽으면 저장값 */ }
 L.configure(OPT.values);                       // CONFIG 를 한 번에 다시 만든다(pace 는 속도·간격·점프 시간에 같은 비율로 반영)
 const CONFIG = L.CONFIG;
 const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, contHp, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
@@ -461,13 +465,18 @@ const mapWord = w => Object.assign({ word: w.word, meaning: w.meaning, hint: w.h
 function survEnsure(i) {   // 단어 i 와 그 다음 단어까지 공급해 둔다(마지막 단어 연출·보스 예고가 "다음 단어가 있는가"를 본다)
   while (G.survival && G.words.length <= i + 1) { for (const w of G.supply.nextSegment()) { G.words.push(mapWord(w)); G.mist.push(0); } }
 }
-function startRound(reviewOnly) {
+// 작업345: 이번 판 단어 순서를 먼저 정한다(난수 호출 순서는 이전과 같다). 미리 보기는 이 순서 그대로 보여 주고, 시작 때 같은 결과(prepared)를 넘겨 실제 순서와 어긋나지 않게 한다
+function planPool(reviewOnly) {
   const surv = !reviewOnly && survMode && VALID_WORDS.length >= CONFIG.SURV_MIN_WORDS;
   const plan = surv ? null : planRound(VALID_WORDS, missedSet, CONFIG, Math.random, !!reviewOnly);
   const supply = surv ? makeSurvSupply(VALID_WORDS, CONFIG, Math.random) : null;
   const pool = surv ? supply.nextSegment().map(mapWord) : plan.list.map((w, i) => Object.assign({ word: w.word, meaning: w.meaning, hint: w.hint, pop: w.pop }, plan.bossIdx.indexOf(i) >= 0 ? { boss: true } : {}));
+  return { surv: surv, supply: supply, pool: pool, regular: surv ? 0 : plan.regular };
+}
+function startRound(reviewOnly, prepared) {
+  const P = prepared || planPool(reviewOnly);
+  const surv = P.surv, supply = P.supply, pool = P.pool, regular = P.regular;
   if (!pool.length) return;
-  const regular = surv ? 0 : plan.regular;
   primeAudio();
   els.bossBanner.hidden = true;
   Object.assign(G, {
@@ -886,9 +895,9 @@ window.addEventListener('keydown', e => {
     if (G.state === 'run' || G.state === 'pop' || G.state === 'intro') { e.preventDefault(); if (!e.repeat) jump(); }   // 키를 누르고 있어서 생기는 반복 입력은 점프로 세지 않는다
   }
 });
-els.startBtn.addEventListener('click', () => startRound(false));
-els.againBtn.addEventListener('click', () => startRound(false));
-els.revBtn.addEventListener('click', () => startRound(true));
+els.startBtn.addEventListener('click', () => beginRound(false));
+els.againBtn.addEventListener('click', () => beginRound(false));
+els.revBtn.addEventListener('click', () => beginRound(true));
 els.contBtn.addEventListener('click', doContinue);
 els.endBtn.addEventListener('click', doEnd);
 $('ttsTest').addEventListener('click', () => {
@@ -1482,7 +1491,121 @@ function showGame(words, excluded) {
   els.startBtn.disabled = false;
   setupModeUI(words.length);   // 작업332: 생존 모드인데 단어가 모자라면 시작 버튼을 다시 막는다
   setupVersusUI();
+  setupPreviewUI();
   requestAnimationFrame(frame);
+}
+// ---------- 작업345: 시작 전 단어 미리 보기 ----------
+// previewRun(words, onReady): words = [{ word, meaning }] 를 순서대로 하나씩 보여 주며 발음을 읽고, 끝나거나 건너뛰면 "시작" 단추가 있는 준비 상태에서 멈춘 뒤
+// 사용자가 시작을 누르면 onReady() 를 부른다(돌아가기는 onBack). 게임 상태(G)를 건드리지 않아 대결에서도 그대로 쓸 수 있다.
+const PV_MAX = 10;
+const PV_T = { maxMs: 6000, gapMs: 800, silentMs: 2500 };   // 한 단어 최대 시간, 재생 뒤 쉬는 시간, 소리를 껐을 때 한 단어를 보여 주는 시간. 시험이 줄여 쓴다
+const PV = { active: false, mode: '', words: [], idx: 0, token: 0, timers: [], userPaused: false, hiddenPaused: false, onReady: null, onBack: null, lastNote: '', prefetching: 0, maxPrefetch: 0, noPrefetch: false, wordsShown: [] };
+function pvClear() { PV.timers.forEach(clearTimeout); PV.timers = []; }
+function pvLater(fn, ms, tk) { PV.timers.push(setTimeout(() => { if (tk === PV.token && PV.active) fn(); }, ms)); }
+// 같은 종류의 안내는 연달아 다시 띄우지 않는다
+function pvNote(kind, text) { if (PV.lastNote === kind) return; PV.lastNote = kind; $('pvNote').textContent = text; }
+const pvRunning = () => PV.active && PV.mode === 'show' && !PV.userPaused && !PV.hiddenPaused;
+// 한 단어 발음. 게임과 같은 경로(서버 TTS → 기기 음성)를 쓰고, 끝났을 때 done() 을 한 번 부른다. 서버 발음이 안 되면 기기 음성으로 대신한다
+function pvSpeak(word, tk, done) {
+  let fin = false;
+  const end = () => { if (!fin) { fin = true; if (tk === PV.token) done(); } };
+  const builtin = status => {
+    if (status === 429) pvNote('429', '서버 발음 한도에 걸려 기기 음성으로 읽어요.');
+    else if (status === 401 || status === 403) pvNote('auth', '서버 발음을 쓸 수 없어 기기 음성으로 읽어요. 다시 로그인해 보세요.');
+    else if (status) pvNote('tts', '서버 발음을 쓸 수 없어 기기 음성으로 읽어요.');
+    speakBuiltin(word, undefined, false, ok => { if (!ok) end(); });
+    if (lastUtt) { lastUtt.onend = end; const prev = lastUtt.onerror; lastUtt.onerror = e => { if (prev) prev(e); end(); }; }
+  };
+  if (serverTtsOff && !audioCache.has(word)) { builtin(serverTtsStatus); return; }
+  getServerAudio(word).then(url => playUrl(url, 1, false)).then(() => {
+    if (tk !== PV.token) return;
+    const onEnd = () => { player.removeEventListener('ended', onEnd); player.removeEventListener('error', onEnd); end(); };
+    player.addEventListener('ended', onEnd); player.addEventListener('error', onEnd);
+    if (player.ended) onEnd();
+  }, err => {
+    if (err && err.name === 'AbortError') { end(); return; }
+    builtin(err && err.status);
+  });
+}
+// 현재 단어 발음을 받는 요청이 끝난 뒤에야 다음 단어 하나만 미리 받는다(요청이 동시에 둘 이상 나가지 않는다)
+function pvPrefetch(i, tk) {
+  const next = PV.words[i + 1];
+  if (!next || !SND.on || serverTtsOff || PV.noPrefetch || audioCache.has(next.word)) return;
+  const go = () => {
+    if (tk !== PV.token || serverTtsOff || audioCache.has(next.word)) return;
+    PV.prefetching++; PV.maxPrefetch = Math.max(PV.maxPrefetch, PV.prefetching);
+    getServerAudio(next.word).catch(() => { PV.noPrefetch = true; }).then(() => { PV.prefetching--; });   // 한 번 실패하면(429 등) 미리 받기를 그만둔다: 한도에 걸린 서버를 더 두드리지 않는다
+  };
+  const cur = audioCache.get(PV.words[i].word);
+  if (cur) cur.then(go, go); else go();
+}
+function pvRender() {
+  const w = PV.words[PV.idx];
+  $('pvProg').textContent = (PV.idx + 1) + '/' + PV.words.length;
+  $('pvWord').textContent = w.word; $('pvMean').textContent = w.meaning;
+  $('pvArea').disabled = false; $('pvArea').setAttribute('aria-label', '다음 단어로 (' + w.word + ' ' + w.meaning + ')');
+  $('pvPause').textContent = PV.userPaused ? '계속' : '일시정지'; $('pvPause').setAttribute('aria-pressed', String(PV.userPaused));
+  $('pvCtl').hidden = false; $('pvStart').hidden = true;
+}
+function pvShow(i) {
+  pvClear(); stopVoices();
+  const tk = ++PV.token;
+  PV.mode = 'show'; PV.idx = i; PV.wordsShown.push(PV.words[i].word);
+  pvRender();
+  if (!pvRunning()) return;
+  const w = PV.words[i];
+  pvLater(() => pvAdvance(), PV_T.maxMs, tk);   // 재생이 끝나지 않아도 한 단어 최대 시간이 지나면 넘어간다
+  if (!SND.on) { pvLater(() => pvAdvance(), PV_T.silentMs, tk); return; }
+  pvSpeak(w.word, tk, () => pvLater(() => pvAdvance(), PV_T.gapMs, tk));
+  pvPrefetch(i, tk);
+}
+function pvAdvance() {
+  if (!PV.active || PV.mode !== 'show') return;
+  if (PV.idx + 1 < PV.words.length) pvShow(PV.idx + 1); else pvReady();
+}
+function pvReady() {
+  pvClear(); stopVoices(); PV.token++; PV.mode = 'ready'; PV.userPaused = false;
+  $('pvProg').textContent = PV.words.length + '개를 훑어봤어요';
+  $('pvWord').textContent = '준비됐나요?'; $('pvMean').textContent = '시작을 누르면 바로 달려요.';
+  $('pvArea').disabled = true; $('pvArea').setAttribute('aria-label', '준비됐나요?');
+  $('pvCtl').hidden = true; $('pvStart').hidden = false; $('pvStart').focus();
+}
+function pvPauseToggle() {
+  if (!PV.active || PV.mode !== 'show') return;
+  PV.userPaused = !PV.userPaused;
+  if (PV.userPaused) { pvClear(); stopVoices(); PV.token++; pvRender(); } else pvShow(PV.idx);   // 계속하면 지금 단어를 처음부터 다시 읽는다
+}
+function pvStop() { PV.active = false; PV.mode = ''; pvClear(); PV.token++; stopVoices(); $('pv').hidden = true; }
+function previewRun(words, onReady, onBack) {
+  const list = (words || []).slice(0, PV_MAX);
+  if (!list.length) { onReady(); return; }
+  Object.assign(PV, { active: true, words: list, idx: 0, userPaused: false, hiddenPaused: document.hidden, onReady: onReady, onBack: onBack, lastNote: '', prefetching: 0, maxPrefetch: 0, noPrefetch: false, wordsShown: [] });
+  $('pvNote').textContent = '';
+  els.start.hidden = true; els.result.hidden = true; $('pv').hidden = false;
+  pvShow(0);
+}
+function setupPreviewUI() {
+  $('pvArea').addEventListener('click', () => { if (PV.active && PV.mode === 'show') pvAdvance(); });
+  $('pvPause').addEventListener('click', pvPauseToggle);
+  $('pvSkip').addEventListener('click', () => { if (PV.active && PV.mode === 'show') pvReady(); });
+  $('pvStart').addEventListener('click', () => { const f = PV.onReady; pvStop(); if (f) f(); });
+  $('pvBack').addEventListener('click', () => { const f = PV.onBack; pvStop(); if (f) f(); });
+  $('pv').addEventListener('keydown', e => { if (e.key === 'Escape') $('pvBack').click(); });
+  document.addEventListener('visibilitychange', () => {
+    if (!PV.active || PV.mode !== 'show') return;
+    if (document.hidden) { if (!PV.hiddenPaused) { PV.hiddenPaused = true; pvClear(); stopVoices(); PV.token++; } }   // 숨겨지면 멈추고
+    else if (PV.hiddenPaused) { PV.hiddenPaused = false; if (!PV.userPaused) pvShow(PV.idx); }   // 다시 보이면 지금 단어부터 이어 간다
+  });
+  window.addEventListener('pagehide', () => { if (PV.active) pvStop(); });
+}
+// 시작·새 판·틀린 단어 다시 도전: 미리 보기가 켜져 있으면 먼저 이번 판 단어 순서를 정해 보여 주고, 시작을 누르면 같은 순서로 판을 연다
+function beginRound(reviewOnly) {
+  if (!previewOn) { startRound(reviewOnly); return; }
+  const P = planPool(reviewOnly);
+  if (!P.pool.length) return;
+  primeAudio();   // 이 클릭으로 소리 재생 권한을 확보한다(미리 보기의 자동 재생)
+  const back = () => { els.start.hidden = false; };
+  previewRun(P.pool.map(w => ({ word: w.word, meaning: w.meaning })), () => startRound(reviewOnly, P), back);
 }
 // ---------- 작업344: 대결 입구(방 목록·만들기·참가·대기·준비). 서버 API 는 작업343(/api/versus/rooms). 게임 연결은 다음 작업 ----------
 const VS_MIN_WORDS = 10;   // 서버 start 가 10 미만을 400 으로 막는다
@@ -1659,6 +1782,9 @@ function setupModeUI(nWords) {
   const row = document.createElement('div'); row.className = 'trow'; row.id = 'modeRow';
   const mk = (label, val) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'toggle'; b.textContent = label; b.dataset.mode = val; row.appendChild(b); return b; };
   const bN = mk('기본', 'normal'), bS = mk('생존', 'survival');
+  const bP = mk('', 'preview');   // 작업345: 미리 보기 켜기/끄기(모드가 아니라 별도 스위치)
+  const syncPv = () => { bP.textContent = previewOn ? '미리 보기 켬' : '미리 보기 끔'; bP.setAttribute('aria-pressed', String(previewOn)); };
+  syncPv();
   if (canVersus) vsModeBtn = mk('대결', 'versus');   // 작업344: 권한이 있을 때만. 모드가 아니라 방 목록을 여는 버튼이라 aria-pressed 도 저장도 하지 않는다
   els.startBtn.parentNode.insertBefore(row, els.startBtn);
   const apply = () => {
@@ -1675,6 +1801,7 @@ function setupModeUI(nWords) {
   row.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('button'); if (!b) return;
     if (b.dataset.mode === 'versus') { vsOpen(); return; }
+    if (b.dataset.mode === 'preview') { previewOn = !previewOn; try { localStorage.setItem(PREVIEW_KEY, previewOn ? '1' : '0'); } catch (err) { /* 저장 실패는 무시 */ } syncPv(); return; }
     survMode = b.dataset.mode === 'survival';
     try { localStorage.setItem(MODE_KEY, survMode ? 'survival' : 'normal'); } catch (err) { /* 저장 실패는 무시 */ }
     apply();
@@ -1723,6 +1850,7 @@ function frame(ts) {
 
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
 const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival, continued: G.contUsed }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
+API.preview = { T: PV_T, state: PV, run: previewRun, isOn: () => previewOn };   // 작업345: 시험용 훅
 API.vs = { T: VS_T, state: VS, open: vsOpen };   // 작업344: 시험용 훅(조회 간격 단축·상태 확인)
 window.SpellRun = API;
 boot();

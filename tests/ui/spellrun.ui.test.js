@@ -88,7 +88,7 @@ async function openGame({ ids, token = true, width = 390, height = 844, speech =
   const page = await browser.newPage({ width, height, token: token ? jwt() : null });
   await withDodge(page, dodge);
   if (blockObst) { await page.send('Network.enable'); await page.send('Network.setBlockedURLs', { urls: ['*spellrun_obstacles_sheet*'] }); }
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); } catch (e) {}" });   // 작업319: 저장된 주소 옵션이 다른 시험으로 새지 않게 비운다
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); " + (/preview=/.test(query) ? '' : "localStorage.setItem('spellrun_preview', '0'); ") + "} catch (e) {}" });   // 작업319: 저장된 주소 옵션이 다른 시험으로 새지 않게 비운다
   if (!token) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('mydict_token'); } catch (e) {}" });   // 같은 Chrome 프로필을 쓰는 앞선 시험이 남긴 토큰 제거
   if (speech) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
   if (ids) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` });
@@ -132,6 +132,7 @@ const BOT = `(async (opts) => {
 test('1) 사전 단어장에서 영어 3개를 골라 "게임 시작"을 누르면 게임 페이지가 열리고 선택한 단어만 출제된다', { skip: SKIP }, async () => {
   resetState();
   const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.setItem('spellrun_preview', '0'); } catch (e) {}" });   // 작업345: 시작 직후 게임이 진행된다고 보는 시험은 미리 보기를 끈다
   await page.goto(base + '/english_dictionary.html');
   await page.waitFor("!!document.querySelector('nav') && typeof wordbook !== 'undefined' && wordbook.length > 5", 12000);
   await page.eval("showPage('wordbook')");
@@ -411,7 +412,7 @@ async function openQ({ ids, query = '', width = 390, height = 844, keep = false,
   state.requests.length = 0;
   const page = await browser.newPage({ width, height, token: jwt() });
   await withDodge(page, dodge);
-  if (!keep) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); } catch (e) {}" });   // 작업319: keep=true 가 아니면 저장된 주소 옵션을 비우고 시작
+  if (!keep) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.setItem('spellrun_preview', '0'); } catch (e) {}" });   // 작업319: keep=true 가 아니면 저장된 주소 옵션을 비우고 시작
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` });
   await page.goto(base + '/spelling_run.html' + queryOf(query));
   await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
@@ -1146,7 +1147,7 @@ async function openI({ query = '', width = 390, ids = [91, 92, 93], seed = true,
   state.requests.length = 0;
   const page = await browser.newPage({ width, height: 844, token: jwt() });
   await withDodge(page, dodge);
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); } catch (e) {}" });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.setItem('spellrun_preview', '0'); } catch (e) {}" });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` + (seed ? SEED : '') });
   await page.goto(base + '/spelling_run.html' + (query ? '?' + query : ''));
   await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
@@ -1379,7 +1380,7 @@ test('321-2) 로딩 실패(시트 요청 차단): 기존 도형 캐릭터로 그
   await withDodge(page);
   await page.send('Network.enable');
   await page.send('Network.setBlockedURLs', { urls: ['*spellrun_penguin_sheet*'] });
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.setItem('spellrun_preview', '0'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
   await page.goto(base + '/spelling_run.html');
   await gameReady(page);
   assert.equal(await page.eval('SpellRun.penguin().ready'), false, '시트 로딩 실패');
@@ -1473,7 +1474,7 @@ test('325-2) 발음 출처 문구(ttsdebug=1): 서버 HIT/MISS/헤더 없음, 40
     resetState(); state.tts = code;
     const p2 = await browser.newPage({ width: 390, height: 844, token: jwt() });
     await p2.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
-    await p2.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
+    await p2.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.setItem('spellrun_preview', '0'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
     await p2.goto(base + '/spelling_run.html?ttsdebug=1');
     await gameReady(p2);
     await p2.eval(OKPLAY);
@@ -1486,7 +1487,7 @@ test('325-2) 발음 출처 문구(ttsdebug=1): 서버 HIT/MISS/헤더 없음, 40
   resetState(); state.ttsDelay = 800;
   const p3 = await browser.newPage({ width: 390, height: 844, token: jwt() });
   await p3.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
-  await p3.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
+  await p3.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.setItem('spellrun_preview', '0'); sessionStorage.setItem('spellrun_ids', '[1,2,3]'); } catch (e) {}" });
   await p3.goto(base + '/spelling_run.html?ttsdebug=1');
   await gameReady(p3);
   await p3.eval(OKPLAY);
@@ -1862,7 +1863,7 @@ test('327-2) 로딩 실패(시트 요청 차단): 기존 코드 상자로 그려
   await withDodge(page);
   await page.send('Network.enable');
   await page.send('Network.setBlockedURLs', { urls: ['*spellrun_obstacles_sheet*'] });
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.setItem('spellrun_preview', '0'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
   await page.goto(base + '/spelling_run.html?obsprob=1&dj=0');
   await gameReady(page);
   await page.eval(SPY_ART);
@@ -2123,7 +2124,7 @@ test('328-2) 폭 320·360·390: 남은 시간 막대·번개 칸은 힌트·상�
     const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
     await withDodge(page);
     if (reduce) await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
+    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.setItem('spellrun_preview', '0'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
     await page.goto(base + '/spelling_run.html?obs=0&speedevery=1'); await startManual(page);
     const r = await page.eval(`(() => { const R = SpellRun, G = R.G; let streaks = 0; const st = CanvasRenderingContext2D.prototype.stroke; CanvasRenderingContext2D.prototype.stroke = function () { if (this.strokeStyle === 'rgba(255, 255, 255, 0.85)') streaks++; return st.apply(this, arguments); };
       G.boost = 3; G.boostMax = 5; R.step(1 / 60); R.draw(); const cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360, c = Array.from(cx.getImageData(Math.round(60 * S), Math.round(547 * S), 1, 1).data);
@@ -2239,7 +2240,7 @@ test('329-3) 천사: 먹으면 틀린 타일이 반짝이며(0.5초 이내) 사�
     const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
     await withDodge(page);
     if (reduce) await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
+    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.setItem('spellrun_preview', '0'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
     await page.goto(base + '/spelling_run.html?obs=0&dj=0&speeditem=0'); await startManual(page);
     const s = await page.eval(STAGE('angel'));
     const a = await page.eval(`(() => { const G = SpellRun.G, C = SpellRun.CONFIG, pk = G.tiles.filter(t => t.id === G.packId && t.kind === undefined); return { rescue: G.rescue && G.rescue.kind, left: pk.map(t => ({ correct: t.correct, state: t.state, angel: !!t.angel })), angels: G.angels.length, floats: G.floats.map(f => f.text), sec: C.ANGEL_SEC }; })()`);
@@ -2323,7 +2324,7 @@ test('332-1) 모드 선택: 기본이 선택돼 있고, 생존을 누르면 안�
   assert.equal(await page.eval("!!document.getElementById('survRule')"), false); assert.equal(await page.eval("localStorage.getItem('spellrun_mode')"), 'normal'); assert.match(await page.text('#startInfo'), /이번 판/);
   await page.close();
   // 기억: 저장값 survival → 새로 열어도 생존 선택. 주소 survival=0 이 이긴다. 주소 survival=1 은 기본이 저장돼 있어도 이긴다
-  const raw = async (query, mode) => { const p = await browser.newPage({ width: 390, height: 844, token: jwt() }); await p.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); localStorage.removeItem('spellrun_opts'); ${mode ? `localStorage.setItem('spellrun_mode', '${mode}');` : "localStorage.removeItem('spellrun_mode');"} } catch (e) {}` }); await p.goto(base + '/spelling_run.html' + query); await gameReady(p); return p; };
+  const raw = async (query, mode) => { const p = await browser.newPage({ width: 390, height: 844, token: jwt() }); await p.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); localStorage.removeItem('spellrun_opts'); localStorage.setItem('spellrun_preview', '0'); ${mode ? `localStorage.setItem('spellrun_mode', '${mode}');` : "localStorage.removeItem('spellrun_mode'); localStorage.setItem('spellrun_preview', '0');"} } catch (e) {}` }); await p.goto(base + '/spelling_run.html' + query); await gameReady(p); return p; };
   const pressed = p => p.eval("document.querySelector('#modeRow [data-mode=survival]').getAttribute('aria-pressed')");
   page = await raw('', 'survival'); assert.equal(await pressed(page), 'true', '기억된 선택'); await page.close();
   page = await raw('?survival=0', 'survival'); assert.equal(await pressed(page), 'false'); await page.close();
@@ -2408,7 +2409,7 @@ test('332) 폭 320·360·390: 시작 화면의 모드 선택과 생존 결과 �
   const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
   await withDodge(page);
   await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.setItem('spellrun_preview', '0'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
   await page.goto(base + '/spelling_run.html?survival=1&obs=0&continue=0'); await startManual(page);
   const r = await page.eval(`${SBOT}({ dieAt: 8 })`);
   assert.equal(r.over, true); assert.ok(r.maxWi + 1 >= 8); assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);

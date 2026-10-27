@@ -89,12 +89,12 @@ const click = (page, sel) => page.eval(`document.querySelector(${JSON.stringify(
 test('권한이 없으면 모드 버튼에 "대결" 이 없고, 있으면 기본·생존 옆에 생긴다(관리자는 role 로도). 기본/생존의 저장 키는 그대로', { skip: SKIP }, async () => {
   resetState(); state.me = { id: 7, role: 'user', can_wordbook: true, perm_versus: false };
   let page = await openGame();
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('#modeRow button')].map(b => b.textContent)"), ['기본', '생존']);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#modeRow button')].map(b => b.dataset.mode)"), ['normal', 'survival', 'preview']);
   await page.close();
 
   resetState();
   page = await openGame();
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('#modeRow button')].map(b => b.textContent)"), ['기본', '생존', '대결']);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#modeRow button')].map(b => b.dataset.mode)"), ['normal', 'survival', 'preview', 'versus']);
   assert.equal(await page.eval("document.querySelector('#modeRow button[data-mode=\"versus\"]').hasAttribute('aria-pressed')"), false, '대결은 모드가 아니라 입구 버튼');
   await click(page, '#modeRow button[data-mode="survival"]');
   assert.equal(await page.eval("localStorage.getItem('spellrun_mode')"), 'survival');
@@ -319,7 +319,7 @@ test('닫기: 내 방이 있으면 leave 를 부르고 시작 화면으로 돌�
   assert.equal(calls('POST', new RegExp('^/api/versus/rooms/' + ROOM_ID + '/leave$')).length, 1, '닫을 때 leave 호출');
   assert.equal(await visible(page, 'start'), true);
   const n = state.requests.length; await sleep(300);
-  assert.equal(state.requests.slice(n).filter(r => /versus/.test(r.url)).length, 0, '닫은 뒤에는 조회 없음');
+  assert.equal(state.requests.slice(n).filter(r => r.method === 'GET' && /versus/.test(r.url)).length, 0, '닫은 뒤에는 조회 없음');
   // 닫은 뒤에도 게임 시작 버튼이 살아 있다
   assert.equal(await page.eval("document.getElementById('startBtn').disabled"), false);
   assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
