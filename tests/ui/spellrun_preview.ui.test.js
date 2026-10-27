@@ -86,7 +86,7 @@ test('켜짐(기본): 시작 → 미리 보기가 이번 판 순서대로 나오
   resetState();
   const page = await openGame(); await fast(page);
   assert.equal(await page.eval('SpellRun.preview.isOn()'), true);
-  assert.equal(await page.eval("document.querySelector('#modeRow button[data-mode=\"preview\"]').textContent"), '미리 보기 켬');
+  assert.equal(await page.eval("document.querySelector('#optRow button[data-mode=\"preview\"]').textContent"), '미리 보기 켬');
   await click(page, '#startBtn');
   await waitFor(page, "!document.getElementById('pv').hidden");
   assert.notEqual(await page.eval('SpellRun.G.state'), 'run', '미리 보기 동안 판은 시작되지 않음');
@@ -114,10 +114,10 @@ test('켜짐(기본): 시작 → 미리 보기가 이번 판 순서대로 나오
 test('끄기: 스위치로 끄면 저장(spellrun_preview)되고 시작이 바로 판을 연다. 주소 preview=0|1 이 저장값보다 우선하며 조정값 사용 중에는 나오지 않는다', { skip: SKIP }, async () => {
   resetState();
   let page = await openGame();
-  await click(page, '#modeRow button[data-mode="preview"]');
+  await click(page, '#optRow button[data-mode="preview"]');
   assert.equal(await page.eval("localStorage.getItem('spellrun_preview')"), '0');
-  assert.equal(await page.eval("document.querySelector('#modeRow button[data-mode=\"preview\"]').textContent"), '미리 보기 끔');
-  assert.equal(await page.eval("document.querySelector('#modeRow button[data-mode=\"preview\"]').getAttribute('aria-pressed')"), 'false');
+  assert.equal(await page.eval("document.querySelector('#optRow button[data-mode=\"preview\"]').textContent"), '미리 보기 끔');
+  assert.equal(await page.eval("document.querySelector('#optRow button[data-mode=\"preview\"]').getAttribute('aria-pressed')"), 'false');
   await click(page, '#startBtn');
   await waitFor(page, "SpellRun.G.state === 'run' || SpellRun.G.state === 'intro'");
   assert.equal(await page.eval("document.getElementById('pv').hidden"), true, '끄면 미리 보기 화면 없음');

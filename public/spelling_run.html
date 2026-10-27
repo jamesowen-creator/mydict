@@ -85,24 +85,59 @@
         <section class="screen" id="start">
           <div class="card">
             <h1 class="title">스펠링 런</h1>
-            <ul class="rules">
-              <li>뜻에 맞는 철자를 채워 단어를 완성합니다. 탭(스페이스바)으로 점프하고, 정답 글자가 지나갈 때 공중에 있으면 먹습니다.</li>
-              <li>맞힐수록 빨라지고 5콤보부터는 최고 속도입니다. 빠를수록 점수가 높고, 틀리면 속도가 줄어듭니다.</li>
-              <li class="mint">오답을 먹거나 정답을 놓치면 체력이 1 줄고, 같은 칸에 새 글자가 나옵니다.</li>
-              <li class="gold">금색 테두리 조각은 한 음절(2~4글자)을 통째로 먹는 칸이라 점수가 높습니다.</li>
-              <li class="red">3단어마다 하트가 하나 나옵니다. 점프해서 먹으면 체력이 1 회복됩니다.</li>
-              <li id="djRule" hidden>높이 떠 있는 칸(위쪽 삼각형 표시)은 공중에서 한 번 더 탭하는 2단 점프로만 먹을 수 있고, 먹으면 가산점입니다.</li>
-              <li>단어를 모두 끝내면 보스 단어가 나오고, 끝까지 먹으면 발음이 한 번 더 천천히 나옵니다.</li>
+            <p class="lead" id="modeDesc"></p>
+            <ul class="corelist" id="coreList">
+              <li>탭(스페이스바)으로 점프해서 정답 글자를 먹으면 단어가 완성돼요.</li>
+              <li class="mint">맞힐수록 빨라지고, 틀리거나 놓치면 체력이 줄어요.</li>
+              <li class="red" id="coreCont">체력이 0이 되면 한 번 이어서 할 수 있어요.</li>
             </ul>
-            <button class="btn" id="startBtn" type="button" disabled>달리기 시작</button>
-            <p class="note" id="startInfo"></p>
-            <p class="note" id="startExcluded" hidden></p>
-            <div class="trow">
-              <button class="toggle" id="sndStart" type="button">소리 켬</button>
-              <button class="toggle" id="ttsTest" type="button">발음 테스트</button>
+            <div class="trow" id="optRow">
+              <button class="toggle vsbtn" id="helpBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="help">게임 방법</button>
             </div>
-            <p class="note" id="ttsStatus" aria-live="polite"></p>
-            <p class="note" id="speechNote" hidden>이 기기에서는 발음 재생을 지원하지 않습니다.</p>
+            <button class="btn" id="startBtn" type="button" disabled>달리기 시작</button>
+          </div>
+        </section>
+
+        <section class="screen" id="help" hidden role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+          <div class="card">
+            <div class="helphead">
+              <h2 class="title small" id="helpTitle">게임 방법</h2>
+              <button class="toggle vsbtn" id="helpClose" type="button">닫기</button>
+            </div>
+            <div class="helpbody" id="helpBody" tabindex="0">
+              <p class="note" id="startInfo"></p>
+              <p class="note" id="startExcluded" hidden></p>
+              <h3 class="rhead">기본 조작</h3>
+              <ul class="rules rgroup" id="rgBasic">
+                <li>뜻에 맞는 철자를 채워 단어를 완성합니다. 탭(스페이스바)으로 점프하고, 정답 글자가 지나갈 때 공중에 있으면 먹습니다.</li>
+                <li id="djRule" hidden>높이 떠 있는 칸(위쪽 삼각형 표시)은 공중에서 한 번 더 탭하는 2단 점프로만 먹을 수 있고, 먹으면 가산점입니다.</li>
+              </ul>
+              <h3 class="rhead">점수와 속도</h3>
+              <ul class="rules rgroup" id="rgScore">
+                <li>맞힐수록 빨라지고 5콤보부터는 최고 속도입니다. 빠를수록 점수가 높고, 틀리면 속도가 줄어듭니다.</li>
+                <li class="gold">금색 테두리 조각은 한 음절(2~4글자)을 통째로 먹는 칸이라 점수가 높습니다.</li>
+              </ul>
+              <h3 class="rhead">체력과 하트</h3>
+              <ul class="rules rgroup" id="rgHealth">
+                <li class="mint">오답을 먹거나 정답을 놓치면 체력이 1 줄고, 같은 칸에 새 글자가 나옵니다.</li>
+                <li class="red">3단어마다 하트가 하나 나옵니다. 점프해서 먹으면 체력이 1 회복됩니다.</li>
+              </ul>
+              <h3 class="rhead" id="rhObst">장애물</h3>
+              <ul class="rules rgroup" id="rgObst"></ul>
+              <h3 class="rhead" id="rhItems">아이템</h3>
+              <ul class="rules rgroup" id="rgItems"></ul>
+              <h3 class="rhead">보스와 발음</h3>
+              <ul class="rules rgroup" id="rgBoss">
+                <li>단어를 모두 끝내면 보스 단어가 나오고, 끝까지 먹으면 발음이 한 번 더 천천히 나옵니다.</li>
+              </ul>
+              <h3 class="rhead">소리</h3>
+              <div class="trow">
+                <button class="toggle vsbtn" id="sndStart" type="button">소리 켬</button>
+                <button class="toggle vsbtn" id="ttsTest" type="button">발음 테스트</button>
+              </div>
+              <p class="note" id="ttsStatus" aria-live="polite"></p>
+              <p class="note" id="speechNote" hidden>이 기기에서는 발음 재생을 지원하지 않습니다.</p>
+            </div>
           </div>
         </section>
 
@@ -181,8 +216,8 @@
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=72"></script>
-<script src="/js/spellrun/stage_style.js?v=72"></script>
-<script src="/js/spellrun/game.js?v=72"></script>
+<script src="/js/spellrun/logic.js?v=73"></script>
+<script src="/js/spellrun/stage_style.js?v=73"></script>
+<script src="/js/spellrun/game.js?v=73"></script>
 </body>
 </html>

@@ -1466,7 +1466,7 @@ test('325-2) 발음 출처 문구(ttsdebug=1): 서버 HIT/MISS/헤더 없음, 40
   assert.ok(st.fs <= 14 && st.inside && st.pe === 'none', '작은 글자·상자 안·클릭을 가로채지 않음: ' + JSON.stringify(st));
   // 시작 화면의 발음 테스트에도 출처가 같이 보인다
   state.ttsHeader = 'HIT';
-  await page.click('#ttsTest');
+  await page.click('#helpBtn'); await page.click('#ttsTest');   // 작업346: 발음 테스트는 게임 방법 화면 안에 있다
   await page.waitFor("document.getElementById('ttsStatus').textContent.includes('[서버 음성(캐시 있음)]')", 4000);
   await page.close();
   // 401·403·503: 서버 발음을 끄고 내장 음성(출처에 사유)
@@ -1508,7 +1508,7 @@ test('325-2) ttsdebug=0(기본)이면 표시도 요소도 없고 동작이 같�
   assert.equal(await page.eval("document.getElementById('ttsSrc')"), null, '요소 없음');
   assert.equal(await page.eval('document.getElementById("box").querySelectorAll("*").length'), before, 'DOM 변화 없음');
   assert.equal(await page.eval("document.querySelector('.ttssrc')"), null);
-  await page.click('#ttsTest');
+  await page.click('#helpBtn'); await page.click('#ttsTest');   // 작업346: 발음 테스트는 게임 방법 화면 안에 있다
   await page.waitFor("document.getElementById('ttsStatus').textContent.includes('재생이 시작')", 4000);
   assert.ok(!(await page.text('#ttsStatus')).includes('['), '발음 테스트 글에 출처 없음');
   const p2 = await openQ({ ids: [1, 2, 3], query: 'ttsdebug=0' });
@@ -2461,11 +2461,11 @@ test('341-2) 끝내기를 고르면 종료(결과 화면에 이어하기 표시 
   await page.close();
   page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?continue=0&obs=0&dj=0', dodge: false });
   await startManual(page); await warmUp(page);
-  assert.equal(await page.eval("document.getElementById('tune').hidden"), false, '기본값과 다르면 조정값 표시'); assert.doesNotMatch(await page.eval("document.querySelector('#start .rules li.mint').textContent"), /이어서/, 'continue=0 이면 이어하기 안내 없음');
+  assert.equal(await page.eval("document.getElementById('tune').hidden"), false, '기본값과 다르면 조정값 표시'); assert.doesNotMatch(await page.eval("document.querySelector('#help .rules li.mint').textContent"), /이어서/, 'continue=0 이면 이어하기 안내 없음');
   const z = await page.eval(TO_ZERO('obst')); assert.equal(z.state, 'ending'); assert.equal(z.contHidden, true);
   await page.close();
   page = await openGame({ ids: [1, 2, 3], query: '?continue=1', dodge: false }); await gameReady(page);
-  assert.equal(await page.eval("document.getElementById('tune').hidden"), true, '기본값이면 표시 없음'); assert.match(await page.eval("document.querySelector('#start .rules li.mint').textContent"), /한 번 이어서/);
+  assert.equal(await page.eval("document.getElementById('tune').hidden"), true, '기본값이면 표시 없음'); assert.match(await page.eval("document.querySelector('#help .rules li.mint').textContent"), /한 번 이어서/);
   await page.close();
 });
 

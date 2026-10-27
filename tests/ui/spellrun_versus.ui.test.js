@@ -89,12 +89,12 @@ const click = (page, sel) => page.eval(`document.querySelector(${JSON.stringify(
 test('권한이 없으면 모드 버튼에 "대결" 이 없고, 있으면 기본·생존 옆에 생긴다(관리자는 role 로도). 기본/생존의 저장 키는 그대로', { skip: SKIP }, async () => {
   resetState(); state.me = { id: 7, role: 'user', can_wordbook: true, perm_versus: false };
   let page = await openGame();
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('#modeRow button')].map(b => b.dataset.mode)"), ['normal', 'survival', 'preview']);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#modeRow button')].map(b => b.dataset.mode)"), ['normal', 'survival']);
   await page.close();
 
   resetState();
   page = await openGame();
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('#modeRow button')].map(b => b.dataset.mode)"), ['normal', 'survival', 'preview', 'versus']);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#modeRow button')].map(b => b.dataset.mode)"), ['normal', 'survival', 'versus']);
   assert.equal(await page.eval("document.querySelector('#modeRow button[data-mode=\"versus\"]').hasAttribute('aria-pressed')"), false, '대결은 모드가 아니라 입구 버튼');
   await click(page, '#modeRow button[data-mode="survival"]');
   assert.equal(await page.eval("localStorage.getItem('spellrun_mode')"), 'survival');

@@ -1470,18 +1470,20 @@ function showGame(words, excluded) {
   els.djRule.hidden = !CONFIG.DJ_ENABLED;
   if (CONFIG.RESCUE_ENABLED && !$('rescueRule')) {   // 작업329: rescue=0 이면 규칙 줄 없음
     const li = document.createElement('li'); li.id = 'rescueRule'; li.textContent = '힌트나 천사가 가끔 와요. 체력이 적으면 더 자주 와요.';
-    els.djRule.parentNode.insertBefore(li, els.djRule.nextSibling);
+    $('rgItems').appendChild(li);
   }
-  const mintRule = document.querySelector('#start .rules li.mint');   // 작업341: 안내 줄을 늘리지 않고(시작 카드가 이미 스크롤되는 높이라) 체력 규칙 줄에 이어하기 안내를 붙인다. continue=0 이면 원래 문구
+  const mintRule = document.querySelector('#help .rules li.mint');   // 작업341: 안내 줄을 늘리지 않고(시작 카드가 이미 스크롤되는 높이라) 체력 규칙 줄에 이어하기 안내를 붙인다. continue=0 이면 원래 문구
   if (mintRule) mintRule.textContent = CONFIG.CONT_ENABLED ? '오답을 먹거나 놓치면 체력이 1 줄고 새 글자가 나와요. 체력이 0이 되면 한 번 이어서 할 수 있어요.' : mintRule.textContent;
   if (CONFIG.SPEED_ITEM_ENABLED && !$('speedRule')) {   // 작업328: 가속 아이템이 켜져 있을 때만 규칙 줄을 넣는다(speeditem=0 이면 화면 구성이 이전과 같다)
     const li = document.createElement('li'); li.id = 'speedRule'; li.textContent = '번개를 먹으면 잠시 빨라지고 점수가 올라요. 하트는 체력이 가득이면 점수로 바뀌어요.';
-    els.djRule.parentNode.insertBefore(li, els.djRule.nextSibling);
+    $('rgItems').appendChild(li);
   }
   if (CONFIG.OBST_ENABLED && CONFIG.OBSTACLE_PROB > 0 && !$('obsRule')) {   // 작업326: 장애물이 나올 수 있을 때만 규칙 줄을 넣는다(obs=0·obsprob=0 이면 화면 구성이 이전과 같다)
     const li = document.createElement('li'); li.id = 'obsRule'; li.textContent = '길에 놓인 장애물과 구덩이는 점프로 넘으세요. 걸리면 체력이 1 줄고 속도가 느려집니다(콤보와 점수는 그대로).';
-    els.djRule.parentNode.insertBefore(li, els.djRule.nextSibling);
+    $('rgObst').appendChild(li);
   }
+  $('coreCont').textContent = CONFIG.CONT_ENABLED ? '체력이 0이 되면 한 번 이어서 할 수 있어요.' : '체력이 0이 되면 게임이 끝나요.';   // 작업346: continue=0 이면 뜻이 맞는 문구
+  for (const grp of ['rgObst', 'rgItems']) { const ul = $(grp), on = Array.from(ul.children).some(li => !li.hidden); ul.hidden = !on; ul.previousElementSibling.hidden = !on; }   // 조건부 줄이 하나도 없는 묶음은 제목째 숨긴다
   els.tune.hidden = !OPT.applied.length;
   els.tune.title = OPT.applied.length ? OPT.applied.join(', ') + ' (누르면 저장값을 지우고 기본값으로)' : '';
   els.tune.addEventListener('click', () => {   // 저장값을 지우고 옵션 없이 다시 연다
@@ -1492,6 +1494,7 @@ function showGame(words, excluded) {
   setupModeUI(words.length);   // 작업332: 생존 모드인데 단어가 모자라면 시작 버튼을 다시 막는다
   setupVersusUI();
   setupPreviewUI();
+  setupHelpUI();
   requestAnimationFrame(frame);
 }
 // ---------- 작업345: 시작 전 단어 미리 보기 ----------
@@ -1782,18 +1785,19 @@ function setupModeUI(nWords) {
   const row = document.createElement('div'); row.className = 'trow'; row.id = 'modeRow';
   const mk = (label, val) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'toggle'; b.textContent = label; b.dataset.mode = val; row.appendChild(b); return b; };
   const bN = mk('기본', 'normal'), bS = mk('생존', 'survival');
-  const bP = mk('', 'preview');   // 작업345: 미리 보기 켜기/끄기(모드가 아니라 별도 스위치)
+  const bP = document.createElement('button'); bP.type = 'button'; bP.className = 'toggle vsbtn'; bP.dataset.mode = 'preview'; $('optRow').appendChild(bP);   // 작업345: 미리 보기 켜기/끄기(모드가 아니라 별도 스위치). 작업346: 모드 줄이 아니라 "게임 방법" 옆
   const syncPv = () => { bP.textContent = previewOn ? '미리 보기 켬' : '미리 보기 끔'; bP.setAttribute('aria-pressed', String(previewOn)); };
   syncPv();
   if (canVersus) vsModeBtn = mk('대결', 'versus');   // 작업344: 권한이 있을 때만. 모드가 아니라 방 목록을 여는 버튼이라 aria-pressed 도 저장도 하지 않는다
-  els.startBtn.parentNode.insertBefore(row, els.startBtn);
+  $('modeDesc').parentNode.insertBefore(row, $('modeDesc'));
   const apply = () => {
     bN.setAttribute('aria-pressed', String(!survMode)); bS.setAttribute('aria-pressed', String(survMode));
     const need = survMode && nWords < CONFIG.SURV_MIN_WORDS;
     els.startBtn.disabled = need;
+    $('modeDesc').textContent = survMode ? '끝없이 이어져요. 얼마나 오래 버티는지 겨뤄요.' : '이번 판 단어 최대 10개를 달려요.';   // 작업346: 선택한 모드의 한 줄 설명(기본은 한 판 최대 10단어, 생존은 단어 5개 이상)
     els.startInfo.textContent = survMode ? '생존 모드 · 체력이 0이 될 때까지 · 5단어마다 보스 · 체력 ' + CONFIG.HP : baseInfo;
     let note = $('survNote'); if (note) note.remove();
-    if (need) { note = document.createElement('p'); note.className = 'note'; note.id = 'survNote'; note.setAttribute('role', 'status'); note.textContent = '생존 모드는 단어가 ' + CONFIG.SURV_MIN_WORDS + '개 이상 있어야 시작할 수 있어요 (지금 ' + nWords + '개)'; els.startInfo.parentNode.insertBefore(note, els.startInfo.nextSibling); }
+    if (need) { note = document.createElement('p'); note.className = 'note'; note.id = 'survNote'; note.setAttribute('role', 'status'); note.textContent = '생존 모드는 단어가 ' + CONFIG.SURV_MIN_WORDS + '개 이상 있어야 시작할 수 있어요 (지금 ' + nWords + '개)'; $('modeDesc').parentNode.insertBefore(note, $('modeDesc').nextSibling); }
     let li = $('survRule');
     if (survMode && !li) { li = document.createElement('li'); li.id = 'survRule'; li.textContent = '생존 모드: 체력이 0이 될 때까지 단어가 계속 나오고, 5단어마다 보스예요. 하트는 갈수록 드물어지고 장애물은 점점 많아져요.'; els.djRule.parentNode.insertBefore(li, els.djRule); }
     else if (!survMode && li) li.remove();
@@ -1801,12 +1805,20 @@ function setupModeUI(nWords) {
   row.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('button'); if (!b) return;
     if (b.dataset.mode === 'versus') { vsOpen(); return; }
-    if (b.dataset.mode === 'preview') { previewOn = !previewOn; try { localStorage.setItem(PREVIEW_KEY, previewOn ? '1' : '0'); } catch (err) { /* 저장 실패는 무시 */ } syncPv(); return; }
     survMode = b.dataset.mode === 'survival';
     try { localStorage.setItem(MODE_KEY, survMode ? 'survival' : 'normal'); } catch (err) { /* 저장 실패는 무시 */ }
     apply();
   });
+  bP.addEventListener('click', () => { previewOn = !previewOn; try { localStorage.setItem(PREVIEW_KEY, previewOn ? '1' : '0'); } catch (err) { /* 저장 실패는 무시 */ } syncPv(); });
   apply();
+}
+// 작업346: "게임 방법" 화면(상세 규칙). 열고 닫아도 모드·미리 보기 설정은 바뀌지 않는다
+function setupHelpUI() {
+  const open = () => { els.start.hidden = true; $('help').hidden = false; $('helpBtn').setAttribute('aria-expanded', 'true'); $('helpBody').scrollTop = 0; $('helpClose').focus(); };
+  const close = () => { $('help').hidden = true; els.start.hidden = false; $('helpBtn').setAttribute('aria-expanded', 'false'); $('helpBtn').focus(); };
+  $('helpBtn').addEventListener('click', open);
+  $('helpClose').addEventListener('click', close);
+  $('help').addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
 }
 async function boot() {
   const LOGIN = ['로그인하기', '/auth/google?next=/spelling_run.html'];

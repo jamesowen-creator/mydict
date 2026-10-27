@@ -1,4 +1,4 @@
-const CACHE_NAME = 'metis-v72';
+const CACHE_NAME = 'metis-v73';
 const STATIC_ASSETS = [
   '/',
   '/english_dictionary.html',
