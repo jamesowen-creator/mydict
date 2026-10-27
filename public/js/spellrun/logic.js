@@ -111,6 +111,7 @@ function buildConfig(v) {
   // 작업329: 구조 아이템(힌트·천사). 체력이 낮을 때만 나온다. 난수 없이 판 순번·단어 순번 해시로 정한다
   RESCUE_ENABLED: true,   // 주소 옵션 rescue=0 이면 힌트·천사 없음
   ITEM_HP: 0.6,           // 현재 체력 <= HP x 이 값(그리고 1 이상)일 때만 나온다(주소 옵션 itemhp). 작업339: 0.4 → 0.6(기본 체력 5면 3 이하)
+  RESCUE_HIGH: 5,         // 작업340: 체력이 기준보다 높을 때는 약 이 개수의 단어마다 1개(주소 옵션 rescuehigh). 낮을 때는 아래 RESCUE_EVERY
   RESCUE_EVERY: 2,        // 체력이 낮은 동안 약 이 개수의 단어마다 1개(주소 옵션 rescueevery). 작업339: 3 → 2. 힌트·천사는 단어 해시로 정한다(번갈아 나오지 않는다)
   ANGEL_SEC: 0.5,         // 천사가 틀린 타일을 지우는 연출 시간(초)
   // 작업332: 생존 모드(체력 0까지 계속). 기본 모드에는 영향이 없다. 하트·보스·난이도는 난수 없이 단어 순번·판 순번 해시로 정한다
@@ -148,6 +149,7 @@ function buildConfig(v) {
   if (v.rescue !== undefined) cfg.RESCUE_ENABLED = !!v.rescue;
   if (v.itemhp !== undefined) cfg.ITEM_HP = v.itemhp;
   if (v.rescueevery) cfg.RESCUE_EVERY = v.rescueevery;
+  if (v.rescuehigh) cfg.RESCUE_HIGH = v.rescuehigh;
   if (v.boostsec) cfg.BOOST_SEC = v.boostsec;
   // 빠른 pace 에서는 같은 px 폭이 더 짧은 시간에 지나가 점프 창도 같은 비율로 짧아지므로, 최저 속도에서도 여유 창이 남도록 폭을 줄인다(기본 pace 1.3 에서는 줄지 않는다)
   const fitW = (base, H) => Math.max(8, Math.min(base, Math.floor(cfg.SPEED_MIN * (airWindow(cfg, H).len - cfg.OBST_MIN_WINDOW - 0.01) - 2 * cfg.OBST_FOOT)));
@@ -165,7 +167,7 @@ const OPTION_RULES = {
   obs: { min: 0, max: 1, int: true, def: 1 }, obsprob: { min: 0, max: 1, def: 0.5 },
   hpfullbonus: { min: 0, max: 1000, int: true, def: 100 }, speeditem: { min: 0, max: 1, int: true, def: 1 }, speedevery: { min: 1, max: 10, int: true, def: 4 }, boostsec: { min: 1, max: 10, def: 5 },
   survheart: { min: 0, max: 5, int: true, def: 3 }, survramp: { min: 0, max: 0.2, def: 0.05 },
-  rescue: { min: 0, max: 1, int: true, def: 1 }, itemhp: { min: 0, max: 1, def: 0.6 }, rescueevery: { min: 1, max: 10, int: true, def: 2 }
+  rescue: { min: 0, max: 1, int: true, def: 1 }, itemhp: { min: 0, max: 1, def: 0.6 }, rescueevery: { min: 1, max: 10, int: true, def: 2 }, rescuehigh: { min: 1, max: 10, int: true, def: 5 }
 };
 // 반환 { values: 유효한 값(기본값과 같아도 포함), applied: 기본값과 다른 옵션 이름 }
 function parseOptions(search) {
@@ -563,7 +565,7 @@ function runState(s, cfg) {
   return { score: s.score, hp: s.hp, maxHp: cfg.HP, combo: s.combo, wordNo: s.wi + 1, alive: s.hp > 0 && s.state !== 'over', elapsed: Math.max(0, s.time - s.startTime), survival: !!s.survival };
 }
 
-// 작업329: 구조 아이템 계획. 체력이 기준 이하일 때(1 이상)만, 난수 없이.
+// 작업329: 구조 아이템 계획. 난수 없이. 작업340: 체력이 기준 이하(1 이상)이면 약 1/RESCUE_EVERY, 그보다 높으면(가득 포함) 약 1/RESCUE_HIGH 로 가끔.
 // o: { roundSeq, regularIdx, hp, boss, review, hasHeart, hasObst, nSlots }  (작업339: 힌트·천사는 단어 해시로 정한다)
 // 반환 { slot: 아이템이 놓일 묶음 번호(첫 묶음 이후), kind: 'hint' | 'angel'(번갈아) } 또는 null. 우선순위: 하트 > 구조 > 가속(호출하는 쪽에서 구조가 정해지면 가속 계획에 hasHeart 를 넘긴다)
 function rescueLow(hp, cfg) { cfg = cfg || CONFIG; return hp >= 1 && hp <= cfg.HP * cfg.ITEM_HP + 1e-9; }
@@ -571,8 +573,9 @@ function rescueLow(hp, cfg) { cfg = cfg || CONFIG; return hp >= 1 && hp <= cfg.H
 function mix32(h) { h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; return h >>> 0; }
 function planRescue(o, cfg) {
   cfg = cfg || CONFIG;
-  if (!cfg.RESCUE_ENABLED || o.boss || o.review || o.hasHeart || o.hasObst || o.nSlots < 2 || !rescueLow(o.hp, cfg)) return null;
-  if (hashInt('rescue:' + o.roundSeq + ':' + o.regularIdx) % cfg.RESCUE_EVERY !== 0) return null;
+  if (!cfg.RESCUE_ENABLED || o.boss || o.review || o.hasHeart || o.hasObst || o.nSlots < 2 || !(o.hp >= 1)) return null;
+  const every = rescueLow(o.hp, cfg) ? cfg.RESCUE_EVERY : cfg.RESCUE_HIGH;
+  if (hashInt('rescue:' + o.roundSeq + ':' + o.regularIdx) % every !== 0) return null;
   return { slot: 1 + hashInt('rescueslot:' + o.roundSeq + ':' + o.regularIdx) % (o.nSlots - 1), kind: mix32(hashInt('rescuekind:' + o.roundSeq + ':' + o.regularIdx)) % 2 === 0 ? 'hint' : 'angel' };   // 작업339: 판 안의 순번이 아니라 단어 해시로 구분
 }
 // 가속 중의 목표 속도: 원래 목표 속도 x BOOST_FACTOR, 단 SPEED_MAX 를 넘지 않는다(장애물 안전 간격은 SPEED_MAX 기준이다)

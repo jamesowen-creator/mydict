@@ -1205,7 +1205,7 @@ test('328-1. 하트 단어에서 장애물이 줄어드는 정도(측정): 하�
 // ───────── 작업329: 구조 아이템(힌트·천사) ─────────
 test('329-1. 구조 아이템 조건: 체력 기준 경계(1 이상, HP x itemhp 이하), 난수 없음, 번갈아, 하트·장애물·보스·복습 단어에는 없고 가속 아이템과 겹치지 않는다', () => {
   const C = CONFIG, base = { roundSeq: 2, hp: 2, boss: false, review: false, hasHeart: false, hasObst: false, nSlots: 5 };
-  assert.equal(C.RESCUE_ENABLED, true); assert.equal(C.ITEM_HP, 0.6); assert.equal(C.RESCUE_EVERY, 2);   // 작업339: 0.4·3 → 0.6·2
+  assert.equal(C.RESCUE_ENABLED, true); assert.equal(C.ITEM_HP, 0.6); assert.equal(C.RESCUE_EVERY, 2); assert.equal(C.RESCUE_HIGH, 5);   // 작업339: 0.4·3 → 0.6·2
   // 경계: HP 5 x 0.6 = 3 → 체력 3 은 나오고 4 는 아니다, 0 은 아니다
   assert.equal(L.rescueLow(1, C), true); assert.equal(L.rescueLow(2, C), true); assert.equal(L.rescueLow(3, C), true); assert.equal(L.rescueLow(4, C), false); assert.equal(L.rescueLow(5, C), false); assert.equal(L.rescueLow(0, C), false, '체력 0 은 아니다');
   const c10 = L.buildConfig({ hp: 10 }); assert.equal(L.rescueLow(6, c10), true); assert.equal(L.rescueLow(7, c10), false);
@@ -1213,7 +1213,8 @@ test('329-1. 구조 아이템 조건: 체력 기준 경계(1 이상, HP x itemhp
   const every1 = L.buildConfig({ rescueevery: 1 });
   const ok = Object.assign({ regularIdx: 0 }, base);
   assert.ok(L.planRescue(ok, every1), 'rescueevery=1 이면 매 단어(조건 충족 시)');
-  assert.equal(L.planRescue(Object.assign({}, ok, { hp: 4 }), every1), null, '기준 초과'); assert.ok(L.planRescue(Object.assign({}, ok, { hp: 3 }), every1), '체력 3 은 기준 이하(0.6)');
+  // 작업340: 기준 초과(체력 4)에서도 계획될 수 있다 — 약 1/RESCUE_HIGH, 해시로 결정(옛 단언 "기준 초과면 null" 대체)
+  assert.equal(!!L.planRescue(Object.assign({}, ok, { hp: 4 }), every1), L.hashInt('rescue:2:0') % 5 === 0, '기준 초과는 높은 체력 확률(해시 % 5)'); assert.ok(L.planRescue(Object.assign({}, ok, { hp: 3 }), every1), '체력 3 은 기준 이하(0.6)');
   assert.equal(L.planRescue(Object.assign({}, ok, { hp: 0 }), every1), null);
   for (const ex of [{ boss: true }, { review: true }, { hasHeart: true }, { hasObst: true }, { nSlots: 1 }]) assert.equal(L.planRescue(Object.assign({}, ok, ex), every1), null, JSON.stringify(ex));
   assert.equal(L.planRescue(ok, L.buildConfig({ rescueevery: 1, rescue: 0 })), null, 'rescue=0');
@@ -1235,6 +1236,35 @@ test('329-1. 구조 아이템 조건: 체력 기준 경계(1 이상, HP x itemhp
   L.planHearts(9, rec, C); assert.equal(calls, 3); calls = 0; L.pickHeartSlot(5, rec); assert.equal(calls, 1); calls = 0; L.planObstacle(5, new Set(), null, false, rec, L.buildConfig({ obsprob: 1 })); assert.equal(calls, 3);
   assert.equal(C.OBST_W, 28); assert.equal(C.OBST_H, 28); assert.equal(C.PIT_W, 36);
   for (const kind of OBST_KINDS) { const lay = L.obstacleLayout(C, kind); for (let s = C.SPEED_MIN; s <= C.SPEED_MAX; s++) assert.ok(L.obstacleWindow(C, lay, s).width >= C.OBST_MIN_WINDOW); }
+});
+
+test('340-1. 체력이 높을 때(가득 포함)도 구조 아이템이 가끔 계획된다: 약 1/5, 낮을 때는 약 1/2 그대로, 난수 없음, 제외 단어에는 없음, 힌트·천사 균형', () => {
+  const C = CONFIG, base = { roundSeq: 2, boss: false, review: false, hasHeart: false, hasObst: false, nSlots: 5 };
+  const rate = (hp, cfg) => { let n = 0, h = 0, a = 0, hi = 0; for (let seq = 1; seq <= 300; seq++) for (let i = 0; i < 10; i++) { const r = L.planRescue(Object.assign({}, base, { roundSeq: seq, regularIdx: i, hp: hp }), cfg || C); n++; if (r) { h++; if (r.kind === 'angel') a++; else hi++; } } return { rate: h / n, angel: a / (a + hi) }; };
+  const orig = Math.random; Math.random = () => { throw new Error('난수 사용 금지'); };
+  try {
+    const full = rate(5), four = rate(4), low = rate(2), one = rate(1);
+    assert.ok(full.rate > 0.15 && full.rate < 0.25, '체력 최대: 약 1/5 ' + full.rate.toFixed(3)); assert.ok(four.rate > 0.15 && four.rate < 0.25, '기준 초과(4): ' + four.rate.toFixed(3));
+    assert.ok(low.rate > 0.45 && low.rate < 0.55, '낮은 체력은 기존 약 1/2: ' + low.rate.toFixed(3)); assert.ok(one.rate > 0.45 && one.rate < 0.55);
+    assert.ok(full.angel > 0.4 && full.angel < 0.6, '고체력에서도 천사 비율 균형: ' + full.angel.toFixed(3)); assert.ok(low.angel > 0.4 && low.angel < 0.6);
+    const high1 = L.buildConfig({ rescuehigh: 1 }), high10 = L.buildConfig({ rescuehigh: 10 });
+    assert.equal(rate(5, high1).rate, 1); assert.ok(rate(5, high10).rate > 0.05 && rate(5, high10).rate < 0.15); assert.equal(rate(2, high1).rate, rate(2).rate, 'rescuehigh 는 낮은 체력 구간에 영향 없음');
+    for (let seq = 1; seq <= 40; seq++) for (let i = 0; i < 10; i++) { const o = Object.assign({}, base, { roundSeq: seq, regularIdx: i, hp: 5 }); assert.deepEqual(L.planRescue(o, C), L.planRescue(Object.assign({}, o), C), '같은 입력 같은 결과'); }
+    for (const ex of [{ boss: true }, { review: true }, { hasHeart: true }, { hasObst: true }, { nSlots: 1 }, { hp: 0 }]) for (let i = 0; i < 40; i++) assert.equal(L.planRescue(Object.assign({}, base, { hp: 5, regularIdx: i }, ex), high1), null, JSON.stringify(ex));
+    assert.equal(L.planRescue(Object.assign({}, base, { hp: 5, regularIdx: 0 }), L.buildConfig({ rescuehigh: 1, rescue: 0 })), null, 'rescue=0');
+  } finally { Math.random = orig; }
+  // 계획된 단어의 슬롯·종류는 체력과 무관(같은 해시)
+  for (let i = 0; i < 50; i++) { const lo = L.planRescue(Object.assign({}, base, { hp: 2, regularIdx: i }), L.buildConfig({ rescueevery: 1 })), hi = L.planRescue(Object.assign({}, base, { hp: 5, regularIdx: i }), L.buildConfig({ rescuehigh: 1 })); assert.deepEqual(lo, hi, '체력만 다르면 슬롯·종류는 같다'); }
+});
+
+test('340-2. 옵션 rescuehigh(1~10 정수, 기본 5): 범위 밖 무시, 저장 방식 동일, 기본값이면 "조정값 사용 중" 없음, 다른 값이면 표시', () => {
+  const po = s => L.parseOptions(s);
+  assert.deepEqual(po('?rescuehigh=3').values, { rescuehigh: 3 }); assert.deepEqual(po('?rescuehigh=3').applied, ['rescuehigh']); assert.deepEqual(po('?rescuehigh=5').applied, []);
+  assert.deepEqual(po('?rescuehigh=1').values, { rescuehigh: 1 }); assert.deepEqual(po('?rescuehigh=10').values, { rescuehigh: 10 });
+  for (const bad of ['rescuehigh=0', 'rescuehigh=11', 'rescuehigh=2.5', 'rescuehigh=x', 'rescuehigh=-1', 'rescuehigh=']) assert.deepEqual(po('?' + bad).values, {}, bad);
+  assert.deepEqual(L.resolveOptions('', JSON.stringify({ rescuehigh: 7 })).values, { rescuehigh: 7 }); assert.deepEqual(L.resolveOptions('', JSON.stringify({ rescuehigh: 7 })).applied, ['rescuehigh']);
+  assert.deepEqual(L.resolveOptions('', JSON.stringify({ rescuehigh: 99 })).values, {}); assert.deepEqual(L.resolveOptions('?rescuehigh=2', JSON.stringify({ rescuehigh: 7 })).values, { rescuehigh: 2 }, '주소가 저장값보다 우선');
+  assert.equal(L.buildConfig({ rescuehigh: 8 }).RESCUE_HIGH, 8); assert.equal(L.buildConfig().RESCUE_HIGH, 5);
 });
 
 test('329-5. 옵션 itemhp(0~1, 기본 0.6)·rescueevery(1~10 정수, 기본 2)·rescue(0|1, 기본 1): 범위 밖 무시, 저장 방식 동일, 기본값이면 표시 없음', () => {

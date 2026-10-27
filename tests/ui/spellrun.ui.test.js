@@ -2156,21 +2156,24 @@ const RBOT = `(async (o) => {
 
 test('329-1) 체력이 낮을 때만 나온다: 낮은 체력에서 힌트·천사가 나오고, 체력이 기준을 넘으면 다음 단어부터 나오지 않으며, 보스·복습·장애물·하트·가속 단어에는 없다', { skip: SKIP }, async () => {
   resetState();
-  // 체력 5(가득)에서는 아예 나오지 않는다
-  let page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?rescueevery=1&dj=0', dodge: false });
+  // 작업340: 체력 5(가득)에서도 가끔 나온다(rescuehigh=1 이면 조건 충족 단어마다). 낮은 체력과 달리 기본은 약 1/5
+  let page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?rescueevery=1&rescuehigh=1&dj=0&obs=0&heartevery=10', dodge: false });
   await startManual(page);
   let r = await page.eval(`${RBOT}({})`);
-  assert.equal(r.over, true); assert.ok(r.words.every(w => !w.rescue), '체력 가득이면 구조 아이템 없음'); await page.close();
+  assert.equal(r.over, true); assert.ok(r.words.some(w => w.rescue && w.hpAtLoad > 3), '체력이 높아도 구조 아이템이 나온다'); await page.close();
   // 체력 2 로 시작, 3번째 단어에서 체력이 4 로 회복
-  page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?rescueevery=1&dj=0&speedevery=1&obs=0&heartevery=10', dodge: false });
+  page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?rescueevery=1&rescuehigh=10&dj=0&speedevery=1&obs=0&heartevery=10', dodge: false });
   await startManual(page);
   await page.eval('SpellRun.G.hp = 2');
+  const seq = await page.eval('SpellRun.G.roundSeq');
   r = await page.eval(`${RBOT}({ hpAt: { 4: 4 } })`);
   assert.equal(r.over, true);
   const early = r.words.filter(w => w.wi < 4), late = r.words.filter(w => w.wi >= 4);
   assert.ok(early.some(w => w.rescue), '체력이 낮은 동안 나온다');
-  for (const w of r.words) { if (w.rescue) { assert.ok(w.hpAtLoad >= 1 && w.hpAtLoad <= 2, '체력 기준 이하: ' + w.hpAtLoad); assert.ok(!w.boss && !w.review && !w.obst && !w.heart && !w.speed, '제외 조건: ' + JSON.stringify(w)); } }
-  assert.ok(late.every(w => !w.rescue || w.hpAtLoad <= 2), '체력이 회복된 뒤(기준 초과)에는 없다');
+  // 작업340: 체력이 기준을 넘으면 없어지는 대신 드물게(rescuehigh=10 이면 해시 % 10 == 0 인 단어에만) 나온다
+  const hiHash = w => require('../../public/js/spellrun/logic.js').hashInt('rescue:' + seq + ':' + r.words.filter(x => x.wi < w.wi && !x.boss).length) % 10 === 0;
+  for (const w of r.words) { if (w.rescue) { assert.ok((w.hpAtLoad >= 1 && w.hpAtLoad <= 2) || (w.hpAtLoad >= 1 && hiHash(w)), '체력 기준 이하이거나 높은 체력 확률: ' + w.hpAtLoad); assert.ok(!w.boss && !w.review && !w.obst && !w.heart && !w.speed, '제외 조건: ' + JSON.stringify(w)); } }
+  assert.ok(late.every(w => !w.rescue || w.hpAtLoad <= 2 || hiHash(w)), '체력이 회복된 뒤(기준 초과)에는 높은 체력 확률로만');
   const rescueWords = r.words.filter(w => w.rescue); assert.ok(rescueWords.length >= 2); rescueWords.forEach(w => assert.ok(['hint', 'angel'].includes(w.kind), '작업339: 힌트·천사는 단어 해시로 정한다(번갈아 나오지 않는다): ' + w.kind));
   await page.close();
   // 장애물·하트가 있는 기본 구성에서도 제외 규칙이 지켜진다(체력 2 로 시작)
@@ -2190,7 +2193,11 @@ test('329-1) 체력이 낮을 때만 나온다: 낮은 체력에서 힌트·천�
   // 새 옵션: 범위·표시
   page = await openGame({ ids: [1, 2, 3], query: '?itemhp=0.4&rescueevery=3&itemhp=9&rescueevery=11', dodge: false }); await gameReady(page);
   assert.deepEqual(await page.eval('[SpellRun.CONFIG.ITEM_HP, SpellRun.CONFIG.RESCUE_EVERY]'), [0.4, 3]); assert.equal(await page.eval("document.getElementById('tune').hidden"), false); await page.close();
-  page = await openGame({ ids: [1, 2, 3], query: '?itemhp=0.6&rescueevery=2&rescue=1', dodge: false }); await gameReady(page);
+  page = await openGame({ ids: [1, 2, 3], query: '?rescuehigh=3&rescuehigh=11', dodge: false }); await gameReady(page);   // 작업340
+  assert.equal(await page.eval('SpellRun.CONFIG.RESCUE_HIGH'), 3); assert.equal(await page.eval("document.getElementById('tune').hidden"), false); await page.close();
+  page = await openGame({ ids: [1, 2, 3], query: '?rescuehigh=11', dodge: false }); await gameReady(page);
+  assert.equal(await page.eval('SpellRun.CONFIG.RESCUE_HIGH'), 5); assert.equal(await page.eval("document.getElementById('tune').hidden"), true, '범위 밖은 무시'); await page.close();
+  page = await openGame({ ids: [1, 2, 3], query: '?itemhp=0.6&rescueevery=2&rescue=1&rescuehigh=5', dodge: false }); await gameReady(page);
   assert.equal(await page.eval("document.getElementById('tune').hidden"), true, '기본값만 있으면 표시 없음'); await page.close();
   await clearOpts();
 });

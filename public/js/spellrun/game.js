@@ -1426,7 +1426,7 @@ function showGame(words, excluded) {
   els.speechNote.hidden = hasSpeech();
   els.djRule.hidden = !CONFIG.DJ_ENABLED;
   if (CONFIG.RESCUE_ENABLED && !$('rescueRule')) {   // 작업329: rescue=0 이면 규칙 줄 없음
-    const li = document.createElement('li'); li.id = 'rescueRule'; li.textContent = '체력이 적을 때 힌트나 천사가 도와줘요.';
+    const li = document.createElement('li'); li.id = 'rescueRule'; li.textContent = '힌트나 천사가 가끔 와요. 체력이 적으면 더 자주 와요.';
     els.djRule.parentNode.insertBefore(li, els.djRule.nextSibling);
   }
   if (CONFIG.SPEED_ITEM_ENABLED && !$('speedRule')) {   // 작업328: 가속 아이템이 켜져 있을 때만 규칙 줄을 넣는다(speeditem=0 이면 화면 구성이 이전과 같다)
