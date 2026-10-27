@@ -1481,15 +1481,185 @@ function showGame(words, excluded) {
   });
   els.startBtn.disabled = false;
   setupModeUI(words.length);   // 작업332: 생존 모드인데 단어가 모자라면 시작 버튼을 다시 막는다
+  setupVersusUI();
   requestAnimationFrame(frame);
+}
+// ---------- 작업344: 대결 입구(방 목록·만들기·참가·대기·준비). 서버 API 는 작업343(/api/versus/rooms). 게임 연결은 다음 작업 ----------
+const VS_MIN_WORDS = 10;   // 서버 start 가 10 미만을 400 으로 막는다
+const VS_T = { list: 3000, room: 2000, backoff: 5000 };   // 목록·방 조회 간격(ms)과 429/503 뒤 쉬는 시간. 시험이 줄여 쓴다
+const VS_DENIED = '대결 사용 권한이 없어요. 관리자에게 문의해 주세요.';
+const VS = { open: false, view: '', roomId: null, timer: null, token: 0, busy: false, msgKind: '', pausedUntil: 0, polls: 0 };
+let canVersus = false, vsWords = 0, vsModeBtn = null;
+const vsShow = name => { for (const id of ['vsListView', 'vsRoomView', 'vsDeniedView']) $(id).hidden = id !== name; };
+// 같은 종류의 안내를 연달아 다시 띄우지 않는다(같은 문구가 이미 떠 있으면 건너뜀)
+function vsToast(kind, text) {
+  const el = $('vsMsg');
+  if (VS.msgKind === kind && el.textContent === text) return;
+  VS.msgKind = kind; el.textContent = text;
+}
+function vsClearToast(onlyTransient) {
+  if (onlyTransient && !['net', '429', '503'].includes(VS.msgKind)) return;   // 사라진 방 같은 안내는 다음 조회 성공으로 지우지 않는다
+  VS.msgKind = ''; $('vsMsg').textContent = '';
+}
+async function vsApi(method, path, body, keepalive) {
+  try {
+    const r = await fetch('/api/versus/rooms' + path, { method, keepalive: !!keepalive, headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()), body: body === undefined ? undefined : JSON.stringify(body) });
+    let data = null; try { data = await r.json(); } catch (e) { /* 본문 없음 */ }
+    return { status: r.status, ok: r.ok, data };
+  } catch (e) { return { status: 0, ok: false, data: null }; }
+}
+function vsStop() { if (VS.timer) { clearTimeout(VS.timer); VS.timer = null; } VS.token++; }
+function vsSchedule(ms) {
+  if (VS.timer) clearTimeout(VS.timer);
+  VS.timer = setTimeout(() => { VS.timer = null; vsPoll(); }, Math.max(ms, VS.pausedUntil - Date.now()));
+}
+async function vsPoll() {
+  if (!VS.open || VS.busy) return;
+  if (document.hidden) return;   // 탭이 숨겨지면 조회를 멈춘다(다시 보이면 visibilitychange 가 이어 준다)
+  const tk = ++VS.token, view = VS.view, roomId = VS.roomId;
+  VS.polls++;
+  const res = await vsApi('GET', view === 'list' ? '' : '/' + roomId);
+  if (tk !== VS.token || !VS.open) return;   // 그 사이 화면이 바뀌었거나 닫혔으면 옛 응답은 버린다
+  if (!res.ok) { vsFail(res, view === 'list' ? 'list' : 'room'); return; }
+  vsClearToast(true);
+  if (view === 'list') { vsRenderList(res.data && res.data.rooms); vsSchedule(VS_T.list); return; }
+  const d = res.data || {}, st = d.room && d.room.status;
+  if (st === 'closed' || st === 'finished') { VS.roomId = null; vsToast('gone', '방이 닫혔어요.'); vsShowList(); return; }
+  vsRenderRoom(d);
+  vsSchedule(VS_T.room);
+}
+function vsFail(res, ctx) {
+  const s = res.status, msg = res.data && res.data.error;
+  if (s === 401) { vsStop(); vsToast('401', '로그인이 필요해요. 다시 로그인해 주세요.'); return; }
+  if (s === 403 && (ctx !== 'room' || /권한/.test(msg || ''))) {   // 대결 권한이 없다: 메뉴를 숨기고 안내만 남긴다
+    vsStop(); canVersus = false; VS.roomId = null;
+    if (vsModeBtn) { vsModeBtn.remove(); vsModeBtn = null; }
+    vsShow('vsDeniedView'); vsToast('403', VS_DENIED); $('vsDeniedClose').focus(); return;
+  }
+  if (s === 403 || s === 404 || s === 409) {   // 방이 사라졌거나 참가할 수 없다: 목록으로 돌아간다
+    const text = ctx === 'create' ? (msg || '방을 만들 수 없어요.') : ctx === 'join' ? '참가할 수 없는 방이에요. 가득 찼거나 닫혔을 수 있어요.' : '방이 없어졌어요. 목록으로 돌아갈게요.';
+    VS.roomId = null; vsToast(String(s), text); vsShowList(); return;
+  }
+  if (s === 429) { VS.pausedUntil = Date.now() + VS_T.backoff; vsToast('429', '요청이 많아요. 잠시 후 다시 시도할게요.'); }
+  else if (s === 503) { VS.pausedUntil = Date.now() + VS_T.backoff; vsToast('503', '지금은 대결을 쓸 수 없어요. 나중에 다시 해 주세요.'); }
+  else if (s === 0) vsToast('net', '네트워크에 연결하지 못했어요. 잠시 후 다시 시도할게요.');
+  else if (s === 400) vsToast('400', msg || '요청이 올바르지 않아요.');
+  else vsToast('err', '문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
+  vsSchedule(ctx === 'room' ? VS_T.room : VS_T.list);   // 쉬었다가 이어 간다(만들기·참가가 실패했을 때는 목록 조회로 돌아간다)
+}
+function vsFmtElapsed(sec) { const s = Math.max(0, Math.floor(sec || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function vsRenderList(rooms) {
+  const ul = $('vsList'); ul.textContent = '';
+  const arr = Array.isArray(rooms) ? rooms : [];
+  for (const r of arr) {
+    const li = document.createElement('li'), box2 = document.createElement('span'), nm = document.createElement('span'), meta = document.createElement('span'), b = document.createElement('button');
+    nm.className = 'vn'; nm.textContent = String(r.hostName || '플레이어') + (r.mine ? ' (내 방)' : '');
+    meta.className = 'vm'; meta.textContent = ' 경과 ' + vsFmtElapsed(r.elapsedSec) + ' · ' + (r.hostRunning ? '달리는 중' : '대기 중');
+    box2.style.minWidth = '0'; box2.appendChild(nm); box2.appendChild(document.createElement('br')); box2.appendChild(meta);
+    b.type = 'button'; b.className = 'toggle vsbtn'; b.dataset.room = r.id; b.dataset.mine = r.mine ? '1' : '';
+    b.textContent = r.mine ? '들어가기' : '참가';
+    if (r.hostRunning && !r.mine) { b.disabled = true; b.title = '이미 시작한 방은 참가할 수 없어요'; }
+    li.appendChild(box2); li.appendChild(b); ul.appendChild(li);
+  }
+  $('vsEmpty').hidden = arr.length > 0;
+}
+function vsRenderRoom(d) {
+  const me = d.me || {}, opp = d.opponent, full = d.room && d.room.status === 'full' && !!opp;
+  const nextView = full ? 'ready' : 'wait';
+  const first = VS.view !== nextView;
+  VS.view = nextView;
+  vsShow('vsRoomView');
+  const ul = $('vsPlayers'); ul.textContent = '';
+  const add = (label, name) => { const li = document.createElement('li'); const a = document.createElement('span'); a.className = 'vn'; a.textContent = name || '플레이어'; const m = document.createElement('span'); m.className = 'vm'; m.textContent = label; li.appendChild(a); li.appendChild(m); ul.appendChild(li); };
+  if (full) {
+    $('vsRoomText').textContent = opp.left ? '상대가 나갔어요.' : '두 사람이 모였어요. 준비 화면이에요.';
+    add('나', me.name); add('상대', opp.name);
+  } else {
+    $('vsRoomText').textContent = '상대를 기다리는 중이에요.';
+    add('방장', me.name);
+  }
+  $('vsSoon').hidden = !full;
+  $('vsLeave').textContent = full ? '나가기' : '취소';
+  if (first) $('vsLeave').focus();
+}
+function vsShowList() {
+  VS.view = 'list'; vsShow('vsListView'); $('vsList').textContent = ''; $('vsEmpty').hidden = true;
+  vsStop(); vsPoll();
+  const b = $('vsCreate'); if (b && !b.disabled) b.focus();
+}
+function vsOpen() {
+  if (!canVersus || VS.open) return;
+  VS.open = true; VS.pausedUntil = 0; els.start.hidden = true; $('vs').hidden = false; vsClearToast(false);
+  vsShowList();
+}
+// 내 방이 있으면 나간다. 실패해도 화면은 계속 동작한다
+function vsLeaveCall(roomId, keepalive) { if (!roomId) return Promise.resolve(); return vsApi('POST', '/' + roomId + '/leave', {}, keepalive).catch(() => {}); }
+function vsClose() {
+  const rid = VS.roomId;
+  vsStop(); VS.open = false; VS.roomId = null; VS.view = ''; VS.busy = false;
+  $('vs').hidden = true; els.start.hidden = false; vsClearToast(false);
+  vsLeaveCall(rid);
+  if (vsModeBtn) vsModeBtn.focus(); else els.startBtn.focus();
+}
+async function vsLeaveToList() {
+  const rid = VS.roomId;
+  if (VS.busy) return;
+  VS.busy = true; vsStop();
+  if (rid) await vsLeaveCall(rid);
+  VS.busy = false; VS.roomId = null;
+  if (!VS.open) return;
+  vsClearToast(false); vsShowList();
+}
+async function vsCreate() {
+  if (VS.busy) return;
+  if (vsWords < VS_MIN_WORDS) { vsToast('words', '대결은 단어가 ' + VS_MIN_WORDS + '개 이상 있어야 해요 (지금 ' + vsWords + '개)'); return; }
+  VS.busy = true; vsStop();
+  const res = await vsApi('POST', '', {});
+  VS.busy = false;
+  if (!VS.open) { if (res.ok && res.data && res.data.roomId) vsLeaveCall(res.data.roomId); return; }   // 기다리는 사이 닫았다면 방을 바로 닫는다
+  if (!res.ok || !res.data || !res.data.roomId) { vsFail(res, 'create'); return; }
+  vsClearToast(false); VS.roomId = res.data.roomId; VS.view = 'wait';
+  $('vsRoomText').textContent = '상대를 기다리는 중이에요.'; $('vsPlayers').textContent = ''; $('vsSoon').hidden = true; $('vsLeave').textContent = '취소';
+  vsShow('vsRoomView'); $('vsLeave').focus();
+  vsPoll();
+}
+async function vsJoin(roomId, mine) {
+  if (VS.busy) return;
+  if (mine) { vsStop(); VS.roomId = roomId; VS.view = 'wait'; vsClearToast(false); vsPoll(); return; }
+  if (vsWords < VS_MIN_WORDS) { vsToast('words', '대결은 단어가 ' + VS_MIN_WORDS + '개 이상 있어야 해요 (지금 ' + vsWords + '개)'); return; }
+  VS.busy = true; vsStop();
+  const res = await vsApi('POST', '/' + roomId + '/join', {});
+  VS.busy = false;
+  if (!VS.open) { if (res.ok) vsLeaveCall(roomId); return; }
+  if (!res.ok) { vsFail(res, 'join'); return; }
+  vsClearToast(false); VS.roomId = roomId; VS.view = 'ready';
+  vsRenderRoom(res.data || {});
+  vsSchedule(VS_T.room);
+}
+function setupVersusUI() {
+  $('vsCreate').addEventListener('click', vsCreate);
+  $('vsRefresh').addEventListener('click', () => { if (VS.view === 'list' && !VS.busy) { vsStop(); vsPoll(); } });
+  $('vsClose').addEventListener('click', vsClose);
+  $('vsDeniedClose').addEventListener('click', vsClose);
+  $('vsLeave').addEventListener('click', vsLeaveToList);
+  $('vsList').addEventListener('click', e => { const b = e.target.closest && e.target.closest('button[data-room]'); if (b && !b.disabled) vsJoin(b.dataset.room, !!b.dataset.mine); });
+  $('vs').addEventListener('keydown', e => { if (e.key === 'Escape') vsClose(); });
+  document.addEventListener('visibilitychange', () => {
+    if (!VS.open) return;
+    if (document.hidden) { if (VS.timer) { clearTimeout(VS.timer); VS.timer = null; } VS.token++; }   // 숨겨진 동안 조회를 멈춘다
+    else if (!VS.timer && !VS.busy && VS.view) vsPoll();
+  });
+  window.addEventListener('pagehide', () => { if (VS.roomId) vsLeaveCall(VS.roomId, true); });
 }
 // 작업332: 시작 화면 모드 선택. 생존 모드는 단어가 SURV_MIN_WORDS 개 이상일 때만 시작할 수 있다.
 function setupModeUI(nWords) {
   if ($('modeRow')) return;
+  vsWords = nWords;
   const baseInfo = els.startInfo.textContent;
   const row = document.createElement('div'); row.className = 'trow'; row.id = 'modeRow';
   const mk = (label, val) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'toggle'; b.textContent = label; b.dataset.mode = val; row.appendChild(b); return b; };
   const bN = mk('기본', 'normal'), bS = mk('생존', 'survival');
+  if (canVersus) vsModeBtn = mk('대결', 'versus');   // 작업344: 권한이 있을 때만. 모드가 아니라 방 목록을 여는 버튼이라 aria-pressed 도 저장도 하지 않는다
   els.startBtn.parentNode.insertBefore(row, els.startBtn);
   const apply = () => {
     bN.setAttribute('aria-pressed', String(!survMode)); bS.setAttribute('aria-pressed', String(survMode));
@@ -1504,6 +1674,7 @@ function setupModeUI(nWords) {
   };
   row.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('button'); if (!b) return;
+    if (b.dataset.mode === 'versus') { vsOpen(); return; }
     survMode = b.dataset.mode === 'survival';
     try { localStorage.setItem(MODE_KEY, survMode ? 'survival' : 'normal'); } catch (err) { /* 저장 실패는 무시 */ }
     apply();
@@ -1522,6 +1693,7 @@ async function boot() {
   } catch (e) { showGate('권한을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.'); return; }
   // 권한은 fail-closed: 단어장 권한이 명시적으로 true일 때만 연다(서버도 /api/wordbook에서 다시 검사한다)
   if (!me || me.is_blocked || me.can_wordbook !== true) { showGate('단어장 사용 권한이 없어 게임을 시작할 수 없습니다. 관리자에게 문의해 주세요.'); return; }
+  canVersus = me.role === 'admin' || me.perm_versus === true;   // 작업344: 서버가 관리자에게도 perm_versus 를 true 로 준다. 서버 대결 경로가 다시 검사한다
   const ids = readIds();
   if (!ids) { showGate('단어장에서 단어를 골라 게임을 시작해 주세요.', '단어장으로', '/english_dictionary.html#wordbook'); return; }
   let rows;
@@ -1551,6 +1723,7 @@ function frame(ts) {
 
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
 const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival, continued: G.contUsed }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
+API.vs = { T: VS_T, state: VS, open: vsOpen };   // 작업344: 시험용 훅(조회 간격 단축·상태 확인)
 window.SpellRun = API;
 boot();
 })();

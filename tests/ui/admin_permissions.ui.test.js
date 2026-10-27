@@ -69,7 +69,7 @@ for (const width of [1280, 390]) {
 test('표 머리글 순서: 사용자·역할·승인·차단·과목 5열(작업CL-1: 개념학습 열 삭제)+개념 지도(작업270-1)·일본어 문법(작업JG-2)·사용 횟수 3열·저장', { skip: SKIP }, async () => {
   const page = await openAdmin([userRow(7, '관리자', { role: 'admin' }), userRow(8, '학생')]);
   const heads = await page.eval("[...document.querySelectorAll('thead th')].map(t => t.innerText.trim())");
-  assert.deepEqual(heads, ['사용자', '역할', '승인', '차단', '언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '개념 지도', '문장 학습', '검색 횟수', 'TTS 횟수', '단어장', '저장']);
+  assert.deepEqual(heads, ['사용자', '역할', '승인', '차단', '언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '개념 지도', '문장 학습', '대결', '검색 횟수', 'TTS 횟수', '단어장', '저장']);
   assert.equal(await page.eval("document.querySelectorAll('#row-8 > td').length"), heads.length, '열 수가 머리글과 같음');
   await page.close();
 });
@@ -123,6 +123,22 @@ test('문학·한입·과학·음성 토글은 각각 컬럼 하나만 보낸다
     assert.equal(srv.state.adminUsers[1][field], false);
     await page.waitFor("document.getElementById('save-8').textContent === '저장'", 4000);
   }
+  assert.ok(DICT.every(f => srv.state.adminUsers[1][f] === true), '언어 사전 5개 권한은 바뀌지 않음');
+  await page.close();
+});
+
+test('작업344: 대결 토글은 별도 열이고 기본은 꺼짐. 켜고 저장하면 PATCH 가 perm_versus: true 하나만 보내며 언어 사전 5개 권한은 바뀌지 않는다', { skip: SKIP }, async () => {
+  const page = await openAdmin([userRow(7, '관리자', { role: 'admin' }), userRow(8, '학생'), userRow(9, '허용', { perm_versus: true })]);
+  const sel = id => `#row-${id} > td:nth-child(12) input`;   // 사용자·역할·승인·차단·언어 사전·문학·한입·과학·음성·개념 지도·문장 학습 다음
+  const prop = (id, p) => page.eval(`document.querySelector(${JSON.stringify(sel(id))}).${p}`);
+  assert.equal(await prop(8, "getAttribute('aria-label')"), '대결');
+  assert.equal(await prop(8, 'checked'), false, '값이 없으면 꺼짐');
+  assert.equal(await prop(9, 'checked'), true, 'true 면 켜짐');
+  await click(page, sel(8));
+  await page.click('#save-8');
+  const deadline = Date.now() + 5000;
+  while (patches(8).length < 1 && Date.now() < deadline) await new Promise(r => setTimeout(r, 50));
+  assert.deepEqual(patches(8).pop().body, { perm_versus: true });
   assert.ok(DICT.every(f => srv.state.adminUsers[1][f] === true), '언어 사전 5개 권한은 바뀌지 않음');
   await page.close();
 });

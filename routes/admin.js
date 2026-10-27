@@ -10,7 +10,7 @@ router.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
-        u.id, u.email, u.name, u.role, u.is_blocked, u.is_approved,
+        u.id, u.email, u.name, u.role, u.is_blocked, u.is_approved, u.perm_versus,
         u.can_search, u.can_wordbook, u.can_quiz, u.can_tts, u.can_podcast,
         u.perm_literature_compass, u.perm_digest_reading, u.perm_science_reading, u.perm_voice_study, u.perm_concept_map, u.perm_jgrammar,
         u.created_at,
@@ -53,7 +53,7 @@ router.patch('/api/admin/users/:id', requireAdmin, async (req, res) => {
     const setClauses = updates.map(([k], i) => `${k} = $${i + 2}`).join(', ');
     const values = [targetId, ...updates.map(([, v]) => v)];
     const { rows } = await pool.query(
-      `UPDATE users SET ${setClauses} WHERE id = $1 RETURNING id, email, name, role, is_blocked, is_approved, can_search, can_wordbook, can_quiz, can_tts, can_podcast, perm_literature_compass, perm_digest_reading, perm_science_reading, perm_voice_study, perm_concept_map, perm_jgrammar`,
+      `UPDATE users SET ${setClauses} WHERE id = $1 RETURNING id, email, name, role, is_blocked, is_approved, perm_versus, can_search, can_wordbook, can_quiz, can_tts, can_podcast, perm_literature_compass, perm_digest_reading, perm_science_reading, perm_voice_study, perm_concept_map, perm_jgrammar`,
       values
     );
     if (!rows.length) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });

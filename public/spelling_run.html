@@ -115,6 +115,31 @@
           </div>
         </section>
 
+        <section class="screen" id="vs" hidden role="dialog" aria-modal="true" aria-labelledby="vsTitle">
+          <div class="card">
+            <h2 class="title small" id="vsTitle">대결</h2>
+            <p class="note" id="vsMsg" role="status" aria-live="polite"></p>
+            <div class="vsview" id="vsListView">
+              <button class="btn" id="vsCreate" type="button">방 만들기</button>
+              <ul class="vlist" id="vsList" aria-label="참가할 수 있는 방"></ul>
+              <p class="note" id="vsEmpty" hidden>참가할 수 있는 방이 없어요. 방을 만들어 보세요.</p>
+              <div class="trow">
+                <button class="toggle vsbtn" id="vsRefresh" type="button">새로 고침</button>
+                <button class="toggle vsbtn" id="vsClose" type="button">닫기</button>
+              </div>
+            </div>
+            <div class="vsview" id="vsRoomView" hidden>
+              <p class="lead" id="vsRoomText"></p>
+              <ul class="vlist" id="vsPlayers"></ul>
+              <p class="note" id="vsSoon" hidden>시작 기능은 곧 추가돼요.</p>
+              <button class="btn alt" id="vsLeave" type="button">나가기</button>
+            </div>
+            <div class="vsview" id="vsDeniedView" hidden>
+              <button class="btn alt" id="vsDeniedClose" type="button">닫기</button>
+            </div>
+          </div>
+        </section>
+
         <section class="screen" id="result" hidden>
           <div class="card">
             <h2 class="title small" id="resTitle"></h2>
@@ -138,8 +163,8 @@
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=70"></script>
-<script src="/js/spellrun/stage_style.js?v=70"></script>
-<script src="/js/spellrun/game.js?v=70"></script>
+<script src="/js/spellrun/logic.js?v=71"></script>
+<script src="/js/spellrun/stage_style.js?v=71"></script>
+<script src="/js/spellrun/game.js?v=71"></script>
 </body>
 </html>

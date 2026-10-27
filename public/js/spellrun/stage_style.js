@@ -157,6 +157,13 @@
   background:transparent;border:calc(2 * var(--u)) solid var(--ink);border-radius:999px;padding:calc(5 * var(--u)) calc(14 * var(--u));
 }
 .sr-box .toggle[aria-pressed="true"]{background:var(--ink);color:#fff}
+.sr-box .vsview{display:flex;flex-direction:column;gap:calc(10 * var(--u))}
+.sr-box .vsview[hidden]{display:none}
+.sr-box .vlist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:calc(6 * var(--u));max-height:calc(150 * var(--u));overflow:auto}
+.sr-box .vlist li{display:flex;align-items:center;justify-content:space-between;gap:calc(8 * var(--u));border:calc(2 * var(--u)) solid var(--ink);border-radius:calc(12 * var(--u));padding:calc(6 * var(--u)) calc(10 * var(--u));font-size:calc(13 * var(--u));font-weight:700}
+.sr-box .vlist li .vm{font-size:calc(11 * var(--u));font-weight:500;color:var(--ink-soft)}
+.sr-box .vlist li .vn{min-width:0;overflow-wrap:anywhere}
+.sr-box .vsbtn,.sr-box #vs .btn{min-height:var(--ctl-min-h,44px);min-width:calc(88 * var(--u))}
 .sr-box .toggle:focus-visible{outline:calc(3 * var(--u)) solid var(--ink);outline-offset:calc(3 * var(--u))}
 .sr-box .big{font-family:var(--f-letter);font-weight:700;white-space:nowrap;font-size:calc(var(--bfs,56) * var(--u));line-height:1;text-align:center;font-variant-numeric:tabular-nums}
 .sr-box .stats{display:flex;justify-content:center;gap:calc(22 * var(--u));font-size:calc(13 * var(--u));font-weight:700;text-align:center}
