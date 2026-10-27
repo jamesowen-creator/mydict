@@ -35,8 +35,11 @@ router.patch('/api/admin/users/:id', requireAdmin, async (req, res) => {
   if (isNaN(targetId)) return res.status(400).json({ error: '잘못된 ID입니다.' });
 
   const allowed = ['role', 'is_blocked', 'is_approved', 'can_search', 'can_wordbook', 'can_quiz', 'can_tts', 'can_podcast', 'perm_literature_compass', 'perm_digest_reading', 'perm_science_reading', 'perm_voice_study', 'perm_concept_map', 'perm_jgrammar'];
-  const updates = Object.entries(req.body).filter(([k]) => allowed.includes(k));
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};   // 작업338: 본문이 배열·문자열이어도 예외 없이 400
+  const updates = Object.entries(body).filter(([k]) => allowed.includes(k));
   if (!updates.length) return res.status(400).json({ error: '변경할 항목이 없습니다.' });
+  // 작업338: 값의 타입 검사(role 은 'admin'|'user', 나머지는 true|false). 잘못된 값은 DB 오류(500) 대신 400
+  if (updates.some(([k, v]) => (k === 'role' ? v !== 'admin' && v !== 'user' : typeof v !== 'boolean'))) return res.status(400).json({ error: '변경 값이 올바르지 않습니다.' });
 
   // Prevent self-demotion, self-block, or self-unapproval
   if (targetId === req.user.id) {

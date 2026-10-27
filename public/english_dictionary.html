@@ -1864,7 +1864,7 @@ async function callAI(prompt) {
   try {
     const response = await fetch('/api/ai', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },   // 작업338: /api/ai 는 로그인 필수. 401/403/429/503 은 서버가 준 한국어 안내 문구가 그대로 화면에 나온다
       body: JSON.stringify({ prompt }),
       signal: ctrl.signal
     });
@@ -3735,8 +3735,9 @@ async function checkMcWithAI() {
   const meaning = getMcMeaning(word);
   const prompt  = `단어 "${word.word}"의 뜻은 "${meaning}"입니다. 학습자가 "${mcState.subjAnswer}"라고 답했습니다. 이 답이 뜻을 올바르게 표현하고 있나요? "정답" 또는 "오답"으로만 답하세요.`;
   try {
-    const res  = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) });
+    const res  = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ prompt }) });
     const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'AI 확인 실패');   // 작업338: 401/403/429/503 이면 아래 "AI 확인 실패" 와 직접 판단으로 넘어간다
     const aiVerdict = (data.result || '').trim();
     document.getElementById('mc-ai-result').innerHTML = `
       <div style="margin-top:8px;font-size:13px">AI 판단: <strong>${aiVerdict}</strong></div>
@@ -3815,9 +3816,9 @@ function renderMcSummary() {
 async function generateMcExample(word) {
   try {
     const prompt = `Generate one natural example sentence using the word '${word.word}'. Return only the sentence, nothing else.`;
-    const res  = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) });
+    const res  = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ prompt }) });
     const data = await res.json();
-    const sentence = (data.result || '').trim();
+    const sentence = res.ok ? (data.result || '').trim() : '';   // 작업338: 실패하면 예문을 만들지 않고 조용히 넘어간다
     if (sentence) {
       await fetch(`/api/wordbook/${word.id}/example`, {
         method: 'PATCH',

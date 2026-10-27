@@ -4,6 +4,11 @@ const { requireAuth, checkPermission } = require('../middleware/auth');
 
 const router = express.Router();
 
+// 작업338: 예상 밖 타입(숫자·객체·배열 등)을 DB 오류(500)가 아니라 400 으로 돌려준다. 정상 화면이 보내는 값(문자열 단어, 객체 data, 숫자 id)은 그대로 통과한다.
+const bodyOf = req => (req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {});
+const isStr = (v, max) => typeof v === 'string' && v.trim().length > 0 && v.length <= max;
+const isId = v => (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 2147483647) || (typeof v === 'string' && /^\d{1,10}$/.test(v) && Number(v) >= 1 && Number(v) <= 2147483647);
+
 // ─── Wordbook endpoints ───────────────────────────────────────────────────────
 
 router.get('/api/wordbook', requireAuth, async (req, res) => {
@@ -24,8 +29,10 @@ router.get('/api/wordbook', requireAuth, async (req, res) => {
 router.post('/api/wordbook', requireAuth, async (req, res) => {
   const allowed = await checkPermission(req.user.id, 'can_wordbook');
   if (!allowed) return res.status(403).json({ error: '단어장 권한이 없습니다.' });
-  const { word, lang = 'en', data, source = 'manual' } = req.body;
-  if (!word) return res.status(400).json({ error: '단어를 입력해주세요.' });
+  const { word, lang = 'en', data, source = 'manual' } = bodyOf(req);
+  if (!word || !isStr(word, 500)) return res.status(400).json({ error: '단어를 입력해주세요.' });
+  if (!isStr(lang, 20) || !isStr(source, 40)) return res.status(400).json({ error: '언어 또는 출처가 올바르지 않습니다.' });
+  if (data !== undefined && data !== null && typeof data !== 'object') return res.status(400).json({ error: '단어 데이터가 올바르지 않습니다.' });
   try {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -58,8 +65,8 @@ router.delete('/api/wordbook/:id', requireAuth, async (req, res) => {
 });
 
 router.patch('/api/wordbook/:id/example', requireAuth, async (req, res) => {
-  const { example_sentence } = req.body;
-  if (!example_sentence) return res.status(400).json({ error: 'example_sentence가 필요합니다.' });
+  const { example_sentence } = bodyOf(req);
+  if (!isStr(example_sentence, 2000)) return res.status(400).json({ error: 'example_sentence가 필요합니다.' });
   try {
     const { rowCount } = await pool.query(
       'UPDATE wordbook SET example_sentence = $1 WHERE id = $2 AND user_id = $3',
@@ -101,8 +108,8 @@ function applySM2({ score, repetitions, ease_factor, interval_days }) {
 }
 
 router.post('/api/review-result', requireAuth, async (req, res) => {
-  const { word_id, score } = req.body;
-  if (word_id == null || ![0, 1, 3].includes(score)) {
+  const { word_id, score } = bodyOf(req);
+  if (!isId(word_id) || ![0, 1, 3].includes(score)) {
     return res.status(400).json({ error: 'word_id와 score(0·1·3)가 필요합니다.' });
   }
   try {
@@ -136,8 +143,8 @@ router.post('/api/review-result', requireAuth, async (req, res) => {
 });
 
 router.post('/api/quiz-correct', requireAuth, async (req, res) => {
-  const { word_id } = req.body;
-  if (!word_id) return res.status(400).json({ error: 'word_id가 필요합니다.' });
+  const { word_id } = bodyOf(req);
+  if (!isId(word_id)) return res.status(400).json({ error: 'word_id가 필요합니다.' });
   try {
     await pool.query(
       'UPDATE wordbook SET correct_count = COALESCE(correct_count, 0) + 1 WHERE id = $1 AND user_id = $2',
