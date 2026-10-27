@@ -94,6 +94,7 @@ async function openGame({ ids, token = true, width = 390, height = 844, speech =
   if (ids) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` });
   await page.goto(base + '/spelling_run.html' + query);
   await page.waitFor("!!document.querySelector('.metis-app-header-logo') && document.getElementById('gateMsg').textContent !== '불러오는 중...' || !document.getElementById('app').hidden", 8000);
+  if (!/continue=/.test(query)) await page.eval('window.SpellRun && (SpellRun.CONFIG.CONT_ENABLED = false)');   // 작업341: 체력 0 에서 곧바로 끝나는 기존 시험은 이어하기를 끄고 본다(주소 옵션이 아니라 설정값만 바꿔 "조정값 사용 중" 표시에는 영향 없음)
   return page;
 }
 const gameReady = page => page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
@@ -2384,7 +2385,7 @@ test('332-7) 현재 상태 읽기 함수 getRunState: 점수·체력·콤보·�
   resetState();
   const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?survival=1&obs=0', dodge: false }); await startManual(page);
   const a = await page.eval('SpellRun.getRunState()');
-  assert.deepEqual(Object.keys(a).sort(), ['alive', 'combo', 'elapsed', 'hp', 'maxHp', 'score', 'survival', 'wordNo']); assert.equal(a.alive, true); assert.equal(a.survival, true); assert.equal(a.wordNo, 1); assert.equal(a.hp, 5);
+  assert.deepEqual(Object.keys(a).sort(), ['alive', 'combo', 'continued', 'elapsed', 'hp', 'maxHp', 'score', 'survival', 'wordNo']); assert.equal(a.alive, true); assert.equal(a.survival, true); assert.equal(a.wordNo, 1); assert.equal(a.hp, 5);
   await page.eval('(() => { for (let i = 0; i < 120; i++) SpellRun.step(1 / 60); })()');
   const b = await page.eval('SpellRun.getRunState()'); assert.ok(b.elapsed > a.elapsed + 1.9 && b.elapsed < a.elapsed + 2.1, '경과 시간(게임 시간) ' + b.elapsed);
   await page.eval("SpellRun.G.hp = 0"); assert.equal((await page.eval('SpellRun.getRunState()')).alive, false);
@@ -2408,8 +2409,79 @@ test('332) 폭 320·360·390: 시작 화면의 모드 선택과 생존 결과 �
   await withDodge(page);
   await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
-  await page.goto(base + '/spelling_run.html?survival=1&obs=0'); await startManual(page);
+  await page.goto(base + '/spelling_run.html?survival=1&obs=0&continue=0'); await startManual(page);
   const r = await page.eval(`${SBOT}({ dieAt: 8 })`);
   assert.equal(r.over, true); assert.ok(r.maxWi + 1 >= 8); assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
   await page.close();
 });
+
+
+// ---- 작업341: 이어하기 ----
+// 체력 0 을 만드는 두 경로. 'fail': 체력 1 로 두고 정답 글자를 점프 없이 지나치게 한다 / 'obst': 체력 1 로 두고 러너 위치에 상자 장애물을 놓는다
+const TO_ZERO = (path) => `(() => { const R = SpellRun, G = R.G; G.hp = 1; let n = 0;
+  ${path === 'obst' ? "G.invuln = 0; G.jumpT = -1; G.j2 = -1; G.obstacles.push({ kind: 'box', x: R.RUNNER_X - 6, w: 28, hit: false, age: 0, art: 0 }); R.step(1 / 60);" : "while (n++ < 60 * 60 && G.state === 'run') R.step(1 / 60);"}
+  return { state: G.state, hp: G.hp, score: G.score, combo: G.combo, wi: G.wi, si: G.si, mist: G.mist[G.wi], contHidden: document.getElementById('cont').hidden }; })()`;
+const warmUp = page => page.eval(`(() => { const R = SpellRun, G = R.G; let n = 0; while (n++ < 60 * 30 && !(G.si >= 1 && G.state === 'run')) { const t = G.tiles.find(x => x.correct && x.state === 'live' && x.x > R.RUNNER_X); if (t && (t.x - R.RUNNER_X) / G.speed <= R.CONFIG.JUMP_TIME / 2 && G.jumpT < 0) R.jump(); R.step(1 / 60); } G.score = Math.max(G.score, 777); G.combo = 4; return G.si; })()`);
+
+for (const path of ['fail', 'obst']) {
+  test('341-1) 이어하기(' + path + '): 체력 0 이면 멈추고 선택 화면, 이어하면 체력 절반·점수·콤보 유지·이 단어 처음부터·1.5초 피격 무시, 두 번째 체력 0 은 종료', { skip: SKIP }, async () => {
+    resetState();
+    const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?continue=1&obs=0&dj=0', dodge: false });
+    await startManual(page); await warmUp(page);
+    const a = await page.eval(TO_ZERO(path));
+    assert.equal(a.state, 'choice'); assert.equal(a.hp, 0); assert.equal(a.contHidden, false, '선택 화면이 보인다');
+    assert.deepEqual(await page.eval("[...document.querySelectorAll('#cont button')].map(b => b.textContent)"), ['이어하기', '끝내기']);
+    assert.equal(await page.eval('document.activeElement && document.activeElement.id'), 'contBtn', '키보드 포커스는 이어하기에');
+    const t0 = await page.eval('SpellRun.G.time'); await page.eval('(() => { for (let i = 0; i < 300; i++) SpellRun.step(1 / 60); })()');
+    assert.equal(await page.eval('SpellRun.G.time'), t0, '선택 화면에서는 게임 시간이 멈춘다');
+    assert.equal(await page.eval('document.getElementById("resTitle").offsetParent === null'), true, '결과 화면은 아직 아니다');
+    await page.click('#contBtn');
+    const b = await page.eval(`(() => { const G = SpellRun.G; return { state: G.state, hp: G.hp, score: G.score, combo: G.combo, si: G.si, mist: G.mist[G.wi], contUsed: G.contUsed, invuln: G.invuln, obst: G.obstacles.length, tiles: G.tiles.length, boost: G.boost, hidden: document.getElementById('cont').hidden, rs: SpellRun.getRunState(), hits: G.obstHits }; })()`);
+    assert.equal(b.state, 'run'); assert.equal(b.hp, 3, '체력 절반(올림)'); assert.equal(b.score, a.score, '점수 유지'); assert.equal(b.combo, a.combo, '콤보 유지');
+    assert.equal(b.si, 0, '이 단어를 처음부터'); assert.equal(b.mist, a.mist, '실수 횟수 유지'); assert.equal(b.contUsed, true); assert.equal(b.rs.continued, true);
+    assert.ok(Math.abs(b.invuln - 1.5) < 1e-9); assert.equal(b.obst, 0); assert.equal(b.boost, 0); assert.equal(b.hidden, true);
+    // 이어한 직후 1.5초는 장애물에 맞지 않는다
+    const c = await page.eval(`(() => { const R = SpellRun, G = R.G; G.obstacles.push({ kind: 'box', x: R.RUNNER_X - 6, w: 28, hit: false, age: 0, art: 0 }); for (let i = 0; i < 60; i++) R.step(1 / 60); return { hp: G.hp, hits: G.obstHits, state: G.state }; })()`);
+    assert.equal(c.hits, b.hits, '1.5초 안에는 피격 없음'); assert.equal(c.hp, 3);
+    // 두 번째 체력 0 은 선택 화면 없이 종료
+    const d = await page.eval(`(() => { const R = SpellRun, G = R.G; G.invuln = 0; G.jumpT = -1; G.j2 = -1; G.hp = 1; G.obstacles = []; G.obstacles.push({ kind: 'box', x: R.RUNNER_X - 6, w: 28, hit: false, age: 0, art: 0 }); R.step(1 / 60); const s1 = G.state; for (let i = 0; i < 120; i++) R.step(1 / 60); return { s1: s1, state: G.state, hidden: document.getElementById('cont').hidden, note: (document.getElementById('resCont') || {}).textContent }; })()`);
+    assert.equal(d.s1, 'ending', '두 번째는 선택 화면 없이 쓰러짐'); assert.equal(d.state, 'over'); assert.equal(d.hidden, true); assert.equal(d.note, '이어하기 사용', '결과 화면 한 줄 표시');
+    await page.close();
+  });
+}
+
+test('341-2) 끝내기를 고르면 종료(결과 화면에 이어하기 표시 없음), continue=0 이면 기존대로(선택 화면 없음, 조정값 표시), 시작 화면 안내 줄', { skip: SKIP }, async () => {
+  resetState();
+  let page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?continue=1&obs=0&dj=0', dodge: false });
+  await startManual(page); await warmUp(page); await page.eval(TO_ZERO('obst'));
+  await page.click('#endBtn');
+  assert.equal(await page.eval('SpellRun.G.state'), 'over'); assert.equal(await page.eval('document.getElementById("cont").hidden'), true);
+  assert.equal(await page.text('#resTitle'), '게임 오버'); assert.equal(await page.eval('!!document.getElementById("resCont")'), false);
+  await page.close();
+  page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?continue=0&obs=0&dj=0', dodge: false });
+  await startManual(page); await warmUp(page);
+  assert.equal(await page.eval("document.getElementById('tune').hidden"), false, '기본값과 다르면 조정값 표시'); assert.doesNotMatch(await page.eval("document.querySelector('#start .rules li.mint').textContent"), /이어서/, 'continue=0 이면 이어하기 안내 없음');
+  const z = await page.eval(TO_ZERO('obst')); assert.equal(z.state, 'ending'); assert.equal(z.contHidden, true);
+  await page.close();
+  page = await openGame({ ids: [1, 2, 3], query: '?continue=1', dodge: false }); await gameReady(page);
+  assert.equal(await page.eval("document.getElementById('tune').hidden"), true, '기본값이면 표시 없음'); assert.match(await page.eval("document.querySelector('#start .rules li.mint').textContent"), /한 번 이어서/);
+  await page.close();
+});
+
+test('341-3) 생존 모드: 선택 화면에 머문 시간은 생존 시간에서 제외되고, 결과에 이어하기 사용이 구분되어 보인다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?continue=1&obs=0&dj=0&survival=1', dodge: false });
+  await startManual(page); await warmUp(page);
+  assert.equal(await page.eval('SpellRun.G.survival'), true);
+  await page.eval(TO_ZERO('obst'));
+  const t0 = await page.eval('SpellRun.getRunState().elapsed'); await page.eval('(() => { for (let i = 0; i < 600; i++) SpellRun.step(1 / 60); })()');   // 10초 머문다
+  assert.equal(await page.eval('SpellRun.getRunState().elapsed'), t0, '선택 화면 시간 제외');
+  await page.click('#contBtn');
+  await page.eval(`(() => { const R = SpellRun, G = R.G; G.invuln = 0; G.jumpT = -1; G.j2 = -1; G.hp = 1; G.obstacles.push({ kind: 'box', x: R.RUNNER_X - 6, w: 28, hit: false, age: 0, art: 0 }); for (let i = 0; i < 120; i++) R.step(1 / 60); })()`);
+  assert.equal(await page.eval('SpellRun.G.state'), 'over');
+  assert.match(await page.text('#resCont'), /이어하기 사용/); assert.match(await page.text('#resCont'), /생존/);
+  const sec = await page.eval('(() => { const m = document.querySelector("#resTime b").textContent.split(":"); return (+m[0]) * 60 + (+m[1]); })()'); assert.ok(sec <= Math.ceil(t0) + 4, '10초 대기가 생존 시간에 들어가지 않았다: ' + sec + ' (선택 직전 ' + t0 + ')');
+  await page.close();
+});
+
+

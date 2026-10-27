@@ -1238,6 +1238,17 @@ test('329-1. 구조 아이템 조건: 체력 기준 경계(1 이상, HP x itemhp
   for (const kind of OBST_KINDS) { const lay = L.obstacleLayout(C, kind); for (let s = C.SPEED_MIN; s <= C.SPEED_MAX; s++) assert.ok(L.obstacleWindow(C, lay, s).width >= C.OBST_MIN_WINDOW); }
 });
 
+test('341-1. 이어하기: 이어한 뒤 체력 = 최대 체력 절반(올림), 옵션 continue(0|1, 기본 1), runState.continued', () => {
+  assert.equal(L.contHp(5), 3); assert.equal(L.contHp(2), 1); assert.equal(L.contHp(1), 1); assert.equal(L.contHp(10), 5); assert.equal(L.contHp(7), 4);
+  assert.equal(CONFIG.CONT_ENABLED, true); assert.equal(CONFIG.CONT_INVULN_SEC, 1.5);
+  assert.equal(L.buildConfig({ continue: 0 }).CONT_ENABLED, false); assert.equal(L.buildConfig({ continue: 1 }).CONT_ENABLED, true);
+  const po = s => L.parseOptions(s);
+  assert.deepEqual(po('?continue=0').values, { continue: 0 }); assert.deepEqual(po('?continue=0').applied, ['continue']); assert.deepEqual(po('?continue=1').applied, []);
+  for (const bad of ['continue=2', 'continue=-1', 'continue=0.5', 'continue=x', 'continue=']) assert.deepEqual(po('?' + bad).values, {}, bad);
+  assert.deepEqual(L.resolveOptions('', JSON.stringify({ continue: 0 })).applied, ['continue']); assert.deepEqual(L.resolveOptions('?continue=1', JSON.stringify({ continue: 0 })).values, { continue: 1 }, '주소가 저장값보다 우선');
+  assert.equal(L.runState({ score: 0, hp: 3, combo: 0, wi: 0, state: 'run', startTime: 0, time: 1, survival: false, continued: true }, CONFIG).continued, true);
+});
+
 test('340-1. 체력이 높을 때(가득 포함)도 구조 아이템이 가끔 계획된다: 약 1/5, 낮을 때는 약 1/2 그대로, 난수 없음, 제외 단어에는 없음, 힌트·천사 균형', () => {
   const C = CONFIG, base = { roundSeq: 2, boss: false, review: false, hasHeart: false, hasObst: false, nSlots: 5 };
   const rate = (hp, cfg) => { let n = 0, h = 0, a = 0, hi = 0; for (let seq = 1; seq <= 300; seq++) for (let i = 0; i < 10; i++) { const r = L.planRescue(Object.assign({}, base, { roundSeq: seq, regularIdx: i, hp: hp }), cfg || C); n++; if (r) { h++; if (r.kind === 'angel') a++; else hi++; } } return { rate: h / n, angel: a / (a + hi) }; };
@@ -1350,7 +1361,7 @@ test('332-1/7. 최소 단어 수·상태 읽기: SURV_MIN_WORDS 5, 옵션 survhe
   assert.deepEqual(L.resolveOptions('?survival=1', JSON.stringify({ survival: 1 })).values, {}); assert.equal(L.resolveOptions('?survival=1').save, null, '모드는 spellrun_opts 에 저장되지 않는다');
   const c = L.buildConfig({ survheart: 1, survramp: 0.1 }); assert.equal(c.SURV_HEART_STEP, 1); assert.equal(c.SURV_RAMP, 0.1);
   const r = L.runState({ score: 1200, hp: 3, combo: 4, wi: 6, state: 'run', startTime: 10, time: 75.5, survival: true }, CONFIG);
-  assert.deepEqual(r, { score: 1200, hp: 3, maxHp: 5, combo: 4, wordNo: 7, alive: true, elapsed: 65.5, survival: true });
+  assert.deepEqual(r, { score: 1200, hp: 3, maxHp: 5, combo: 4, wordNo: 7, alive: true, elapsed: 65.5, survival: true, continued: false });   // 작업341: continued 필드 추가(이어하기 사용 여부)
   assert.equal(L.runState({ score: 0, hp: 0, combo: 0, wi: 0, state: 'ending', startTime: 0, time: 5, survival: false }, CONFIG).alive, false); assert.equal(L.runState({ score: 0, hp: 2, combo: 0, wi: 0, state: 'over', startTime: 0, time: 5, survival: false }, CONFIG).alive, false);
 });
 

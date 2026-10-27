@@ -16,7 +16,7 @@ let survMode = lsGet(MODE_KEY) === 'survival';
 try { const q = new URLSearchParams(location.search).get('survival'); if (q === '1') survMode = true; else if (q === '0') survMode = false; } catch (e) { /* 주소를 못 읽으면 저장값 */ }
 L.configure(OPT.values);                       // CONFIG 를 한 번에 다시 만든다(pace 는 속도·간격·점프 시간에 같은 비율로 반영)
 const CONFIG = L.CONFIG;
-const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
+const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, contHp, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
 
 const W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, RUNNER_X = 72, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;
 const FALL_SEC = 0.55, STUMBLE_SEC = 0.5, FALL_DEPTH = 46;   // 작업326: 연출 시간(초)·구덩이에 빠지는 깊이(논리 px)
@@ -39,7 +39,7 @@ const els = {
   start: $('start'), startBtn: $('startBtn'), startInfo: $('startInfo'), startExcluded: $('startExcluded'), speechNote: $('speechNote'),
   result: $('result'), resTitle: $('resTitle'), resScore: $('resScore'), resDone: $('resDone'), resCombo: $('resCombo'),
   resChips: $('resChips'), revBtn: $('revBtn'), againBtn: $('againBtn'), live: $('live'),
-  bossBanner: $('bossBanner'), bossSub: $('bossSub')
+  bossBanner: $('bossBanner'), bossSub: $('bossSub'), cont: $('cont'), contBtn: $('contBtn'), endBtn: $('endBtn')
 };
 const sndBtns = [$('snd'), $('sndStart')];
 const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -329,7 +329,7 @@ syncSndButtons();
 const G = {
   state: 'idle', words: [], wi: 0, plan: null, si: 0, mist: [],
   hp: 0, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
-  speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, survival: false, supply: null, startTime: 0, speedPending: false, speedSlot: 0, rescuePending: false, rescueSlot: 0, rescueKind: 'hint', speedGroupTaken: -1, rescue: null, angels: [], boost: 0, roundSeq: 0, boostMax: 0, speedMaxSeen: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
+  speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, survival: false, supply: null, startTime: 0, speedPending: false, speedSlot: 0, rescuePending: false, rescueSlot: 0, rescueKind: 'hint', speedGroupTaken: -1, groupTakenAtLoad: -1, contUsed: false, rescue: null, angels: [], boost: 0, roundSeq: 0, boostMax: 0, speedMaxSeen: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
   tiles: [], parts: [], floats: [],
   packActive: false, packId: 0, spawnT: 0,
   runPhase: 0, prevH: 0, rising: true, cleared: false, spriteDraws: 0, spriteFrame: -1, spriteAngle: 0,
@@ -474,7 +474,7 @@ function startRound(reviewOnly) {
     regular: regular, bossMode: false, introT: 0, repeatT: 0, repeatWord: '',
     state: 'run', words: pool, wi: 0, mist: pool.map(() => 0),
     hp: CONFIG.HP, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
-    roundSeq: G.roundSeq + 1, boost: 0, speedPending: false, speedMaxSeen: 0, rescuePending: false, speedGroupTaken: -1, rescue: null, angels: [],
+    roundSeq: G.roundSeq + 1, boost: 0, speedPending: false, speedMaxSeen: 0, rescuePending: false, speedGroupTaken: -1, groupTakenAtLoad: -1, contUsed: false, rescue: null, angels: [],
     speed: CONFIG.SPEED_MIN, speedTarget: CONFIG.SPEED_MIN, speedBase: CONFIG.SPEED_MIN, shownMult: 0, heartWords: surv ? new Set() : planHearts(regular), tiles: [], parts: [], floats: [],
     packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
     obstacles: [], obst: null, obstSeq: 0, invuln: 0, stumble: 0, fall: 0, obstHits: 0,
@@ -502,8 +502,10 @@ function loadWord(i) {
   // 작업329: 구조 아이템(힌트·천사)은 체력이 낮을 때만. 우선순위 하트 > 구조 > 가속이라 구조가 정해지면 가속은 이 단어에 없다. 이 단어의 체력은 단어를 불러올 때 정한다(회복해서 기준을 넘으면 다음 단어부터 없다)
   const rs = planRescue({ roundSeq: G.roundSeq, regularIdx: regIdx, hp: G.hp, boss: boss, review: G.review, hasHeart: G.heartPending, hasObst: !!G.obst, nSlots: G.plan.slots.length, });
   G.rescuePending = !!rs; if (rs) { G.rescueSlot = rs.slot; G.rescueKind = rs.kind; }
+  const groupBefore = G.speedGroupTaken;   // 작업341: 이어하기로 이 단어를 다시 시작할 때 번개 계획을 같은 모양으로 되돌린다
   const sIdx = planSpeedItem({ roundSeq: G.roundSeq, regularIdx: regIdx, boss: boss, review: G.review, hasHeart: G.heartPending || !!rs, hasObst: !!G.obst, nSlots: G.plan.slots.length,
     groupTaken: G.speedGroupTaken, isHeartAt: G.survival ? (j => survHeartWord(j, G.roundSeq)) : (j => G.heartWords.has(j)), regularCount: G.survival ? undefined : G.regular });   // 작업339: 제외 대상이면 같은 그룹의 다음 후보로
+  G.groupTakenAtLoad = groupBefore;
   if (sIdx !== null) G.speedGroupTaken = Math.floor(regIdx / CONFIG.SPEED_EVERY);
   G.speedPending = sIdx !== null; G.speedSlot = sIdx === null ? 0 : sIdx;
   G.packActive = false; G.spawnT = CONFIG.WORD_START_DELAY + (i === 0 ? CONFIG.FIRST_WORD_EXTRA : 0);
@@ -670,6 +672,30 @@ function onHit(t) {
   if (G.si >= G.plan.slots.length) completeWord();
   else { setCur(); G.spawnT = CONFIG.PACK_DELAY; }
 }
+// 작업341: 체력이 0이 된 순간. 이어하기를 아직 안 썼고 켜져 있으면 게임을 멈추고 선택 화면을 띄운다(생존 시간은 step 이 멈춰 있어서 흐르지 않는다). 아니면 예전처럼 쓰러지고 끝난다.
+function onZeroHp() {
+  sfx.over();
+  if (CONFIG.CONT_ENABLED && !G.contUsed) {
+    G.state = 'choice'; els.cont.hidden = false;
+    els.live.textContent = '체력이 0이 됐어요. 이어하기 또는 끝내기';
+    try { els.contBtn.focus({ preventScroll: true }); } catch (e) { /* 무시 */ }
+  } else { G.state = 'ending'; G.endT = 0.9; }
+}
+function doContinue() {
+  if (G.state !== 'choice') return;
+  G.contUsed = true; els.cont.hidden = true;
+  G.hp = contHp(CONFIG.HP);
+  clearRescue();
+  Object.assign(G, { tiles: [], obstacles: [], boost: 0, rescuePending: false, packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, hurt: 0, shake: 0, stumble: 0, fall: 0, eat: 0,
+    invuln: CONFIG.CONT_INVULN_SEC, speedGroupTaken: G.groupTakenAtLoad, state: 'run' });   // 점수·콤보·실수 횟수(mist)는 그대로
+  renderHearts();
+  els.live.textContent = '이어서 합니다';
+  loadWord(G.wi);   // 이 단어를 처음부터(칸 초기화)
+}
+function doEnd() {
+  if (G.state !== 'choice') return;
+  els.cont.hidden = true; finish(false);
+}
 function onFail(t, kind) {
   if (kind === 'wrong') { t.state = 'taken'; t.t = 0; t.ok = false; }
   else { t.state = 'fade'; t.t = 0; }
@@ -682,7 +708,7 @@ function onFail(t, kind) {
   floatText(RUNNER_X + 30, GROUND - 150, kind === 'wrong' ? '오답!' : '놓쳤어요', BAD, 22);
   flashHint(G.si);
   renderHearts(); renderScore();
-  if (G.hp <= 0) { G.state = 'ending'; G.endT = 0.9; sfx.over(); }
+  if (G.hp <= 0) onZeroHp();
 }
 // 작업326: 장애물에 맞았다(상자에 걸림·구덩이에 빠짐). 체력 -1, 속도 즉시 감소(이후 가속도로 목표 속도까지 회복). 콤보·점수·실수 기록(mist)은 건드리지 않는다.
 function onObstacleHit(ob) {
@@ -696,7 +722,7 @@ function onObstacleHit(ob) {
   burst(RUNNER_X, GROUND - 6, ob.kind === 'pit' ? '#8a93c4' : '#c8791f', 10);
   floatText(RUNNER_X + 30, GROUND - 150, ob.kind === 'pit' ? '구덩이!' : '걸렸어요', BAD, 22);
   renderHearts();
-  if (G.hp <= 0) { G.state = 'ending'; G.endT = 0.9; sfx.over(); }
+  if (G.hp <= 0) onZeroHp();
 }
 function completeWord() {
   const w = G.words[G.wi];
@@ -775,12 +801,12 @@ function afterPop() {
   } else { G.state = 'run'; loadWord(G.wi + 1); }
 }
 function finish(cleared) {
-  G.state = 'over'; G.bossMode = false; G.cleared = !!cleared; clearIntro();
+  G.state = 'over'; G.bossMode = false; G.cleared = !!cleared; clearIntro(); els.cont.hidden = true;
   box.classList.remove('boss');
   els.pop.hidden = true; els.hud.hidden = true; els.bossBanner.hidden = true;
   els.resChips.textContent = '';
   const surv = G.survival;
-  const old = box.querySelectorAll('#resTime, #resMissNote'); old.forEach(e => e.remove());   // 생존 모드 전용 요소는 매번 지우고 다시 만든다
+  const old = box.querySelectorAll('#resTime, #resMissNote, #resCont'); old.forEach(e => e.remove());   // 생존 모드 전용 요소는 매번 지우고 다시 만든다
   const shown = [];   // 생존 모드: 틀린 단어 칩(최근 SURV_CHIPS 개)
   G.words.forEach((w, i) => {
     if (surv && i > G.wordsDone) return;   // 아직 나오지 않은 미리 공급된 단어
@@ -824,6 +850,11 @@ function finishRest(cleared) {
     d.id = 'resTime'; const b = document.createElement('b'); b.textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); d.appendChild(b); d.appendChild(document.createTextNode('생존 시간'));
     els.resDone.parentNode.parentNode.appendChild(d);
   }
+  if (G.contUsed) {   // 작업341: 이어하기를 썼으면 결과에 한 줄(생존 모드는 기록에 이어한 구간이 들어 있다는 설명을 붙인다)
+    const n = document.createElement('p'); n.className = 'note'; n.id = 'resCont';
+    n.textContent = surv ? '이어하기 사용 (생존 시간과 단어 수에 이어한 구간 포함)' : '이어하기 사용';
+    els.resChips.parentNode.insertBefore(n, els.resChips);
+  }
   const n = VALID_WORDS.filter(w => missedSet.has(w.word)).length;
   els.revBtn.textContent = n ? '틀린 단어만 다시 도전 (' + n + ')' : '틀린 단어 없음';
   els.revBtn.disabled = n === 0;
@@ -858,6 +889,8 @@ window.addEventListener('keydown', e => {
 els.startBtn.addEventListener('click', () => startRound(false));
 els.againBtn.addEventListener('click', () => startRound(false));
 els.revBtn.addEventListener('click', () => startRound(true));
+els.contBtn.addEventListener('click', doContinue);
+els.endBtn.addEventListener('click', doEnd);
 $('ttsTest').addEventListener('click', () => {
   const st = $('ttsStatus');
   st.textContent = '재생 중...';
@@ -874,6 +907,7 @@ els.resChips.addEventListener('click', e => {
 
 // ---------- 업데이트 ----------
 function step(dt) {
+  if (G.state === 'choice') return;   // 작업341: 선택 화면에 머문 시간은 게임 시간(생존 시간)에 들어가지 않는다
   G.time += dt;
   if (G.repeatT > 0) {
     G.repeatT -= dt;
@@ -1237,7 +1271,7 @@ function drawRunnerShape(h) {   // 기존 도형 캐릭터(스프라이트를 �
   ctx.translate(cx + sx, cy);
   let scx = 1, scy = 1;
   if (air) { scx = 0.94; scy = 1.08; } else if (G.land > 0) { scx = 1.1; scy = 0.9; }
-  if (G.state === 'ending') ctx.rotate(0.25);
+  if ((G.state === 'ending' || G.state === 'choice')) ctx.rotate(0.25);
   ctx.scale(scx, scy);
   if (G.hurt > 0 && Math.floor(G.time * 20) % 2 === 0) ctx.globalAlpha = 0.55;
   // legs
@@ -1263,7 +1297,7 @@ function drawRunnerShape(h) {   // 기존 도형 캐릭터(스프라이트를 �
   ctx.beginPath(); ctx.ellipse(0, 8, 13, 13, 0, 0, Math.PI * 2); ctx.fill();
   // face
   ctx.strokeStyle = INK; ctx.fillStyle = INK; ctx.lineWidth = 3;
-  if (G.hurt > 0 || G.state === 'ending') {
+  if (G.hurt > 0 || (G.state === 'ending' || G.state === 'choice')) {
     for (const side of [-1, 1]) {
       const ex = side * 8;
       ctx.beginPath(); ctx.moveTo(ex - 3.5, -9); ctx.lineTo(ex + 3.5, -3); ctx.moveTo(ex + 3.5, -9); ctx.lineTo(ex - 3.5, -3); ctx.stroke();
@@ -1291,7 +1325,7 @@ function drawRunner() {
   if (!penguinReady()) { drawRunnerShape(h); return; }
   const P = PENGUIN, sz = P.size, sx = (G.shake > 0 && !reduce) ? (Math.random() - 0.5) * 6 : 0;
   const idx = penguinFrame({ state: G.state, cleared: G.cleared, air: h > 1, rising: G.rising, runPhase: G.runPhase });
-  const angle = spinAngle(G.j2, G.j2Land) + (G.state === 'ending' ? 0.25 * 180 / Math.PI : 0);
+  const angle = spinAngle(G.j2, G.j2Land) + ((G.state === 'ending' || G.state === 'choice') ? 0.25 * 180 / Math.PI : 0);
   G.spriteDraws++; G.spriteFrame = idx; G.spriteAngle = angle;
   ctx.fillStyle = 'rgba(0,0,0,.25)';
   ctx.beginPath(); ctx.ellipse(RUNNER_X, GROUND + 10, 22 * (1 - h / 260), 6 * (1 - h / 320), 0, 0, Math.PI * 2); ctx.fill();
@@ -1429,6 +1463,8 @@ function showGame(words, excluded) {
     const li = document.createElement('li'); li.id = 'rescueRule'; li.textContent = '힌트나 천사가 가끔 와요. 체력이 적으면 더 자주 와요.';
     els.djRule.parentNode.insertBefore(li, els.djRule.nextSibling);
   }
+  const mintRule = document.querySelector('#start .rules li.mint');   // 작업341: 안내 줄을 늘리지 않고(시작 카드가 이미 스크롤되는 높이라) 체력 규칙 줄에 이어하기 안내를 붙인다. continue=0 이면 원래 문구
+  if (mintRule) mintRule.textContent = CONFIG.CONT_ENABLED ? '오답을 먹거나 놓치면 체력이 1 줄고 새 글자가 나와요. 체력이 0이 되면 한 번 이어서 할 수 있어요.' : mintRule.textContent;
   if (CONFIG.SPEED_ITEM_ENABLED && !$('speedRule')) {   // 작업328: 가속 아이템이 켜져 있을 때만 규칙 줄을 넣는다(speeditem=0 이면 화면 구성이 이전과 같다)
     const li = document.createElement('li'); li.id = 'speedRule'; li.textContent = '번개를 먹으면 잠시 빨라지고 점수가 올라요. 하트는 체력이 가득이면 점수로 바뀌어요.';
     els.djRule.parentNode.insertBefore(li, els.djRule.nextSibling);
@@ -1514,7 +1550,7 @@ function frame(ts) {
 }
 
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
-const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
+const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival, continued: G.contUsed }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
 window.SpellRun = API;
 boot();
 })();
