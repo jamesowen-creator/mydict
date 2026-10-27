@@ -77,6 +77,12 @@
           <div class="pn" id="popNote"></div>
         </div>
 
+        <div class="vsbar" id="vsBar" hidden>
+          <div class="vsbn" id="vsBarName"></div>
+          <div class="vsbs" id="vsBarStats"></div>
+        </div>
+        <div class="vstoast" id="vsToast" role="status" hidden></div>
+
         <div class="banner" id="bossBanner" hidden>
           <div class="b1">BOSS</div>
           <div class="b2" id="bossSub"></div>
@@ -184,8 +190,18 @@
             <div class="vsview" id="vsRoomView" hidden>
               <p class="lead" id="vsRoomText"></p>
               <ul class="vlist" id="vsPlayers"></ul>
-              <p class="note" id="vsSoon" hidden>시작 기능은 곧 추가돼요.</p>
+              <button class="btn" id="vsGo" type="button">시작</button>
               <button class="btn alt" id="vsLeave" type="button">나가기</button>
+            </div>
+            <div class="vsview" id="vsFinView" hidden>
+              <p class="lead" id="vsFinTitle" role="status" aria-live="polite"></p>
+              <p class="note" id="vsFinWhy"></p>
+              <ul class="vlist vfin" id="vsFinList"></ul>
+              <p class="note" id="vsFinNote" role="status"></p>
+              <div class="trow">
+                <button class="toggle vsbtn" id="vsFinRooms" type="button">방 목록으로</button>
+                <button class="toggle vsbtn" id="vsFinClose" type="button">대결 화면 닫기</button>
+              </div>
             </div>
             <div class="vsview" id="vsDeniedView" hidden>
               <button class="btn alt" id="vsDeniedClose" type="button">닫기</button>
@@ -216,8 +232,8 @@
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=73"></script>
-<script src="/js/spellrun/stage_style.js?v=73"></script>
-<script src="/js/spellrun/game.js?v=73"></script>
+<script src="/js/spellrun/logic.js?v=74"></script>
+<script src="/js/spellrun/stage_style.js?v=74"></script>
+<script src="/js/spellrun/game.js?v=74"></script>
 </body>
 </html>

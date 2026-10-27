@@ -123,7 +123,7 @@ test('방 목록: 빈 목록 안내, 방 행(방장 이름·경과 시간·달�
   await waitFor(page, "document.querySelectorAll('#vsList li').length === 3");
   const rows = await page.eval("[...document.querySelectorAll('#vsList li')].map(li => ({ t: li.innerText.replace(/\\s+/g, ' '), dis: li.querySelector('button').disabled, label: li.querySelector('button').textContent }))");
   assert.match(rows[0].t, /민수/); assert.match(rows[0].t, /1:15/); assert.match(rows[0].t, /대기 중/); assert.equal(rows[0].label, '참가'); assert.equal(rows[0].dis, false);
-  assert.match(rows[1].t, /지은/); assert.match(rows[1].t, /달리는 중/); assert.equal(rows[1].dis, true, '이미 달리는 방은 참가 단추가 막힘');
+  assert.match(rows[1].t, /지은/); assert.match(rows[1].t, /달리는 중/); assert.equal(rows[1].dis, false, '작업347: 방장이 달리는 중이어도 참가할 수 있다(합의)');
   assert.equal(await visible(page, 'vsEmpty'), false);
   assert.ok(calls('GET', /^\/api\/versus\/rooms$/).every(r => /^Bearer /.test(r.auth || '')), '목록 요청에 토큰');
   // 360×640: 상단 버튼과 닫기가 상자 안에 보이고 카드는 스크롤되지 않는다
@@ -156,15 +156,15 @@ test('방 만들기 → 상대를 기다리는 화면(방장 이름) → 상대�
   await waitFor(page, "document.getElementById('vsPlayers').textContent.includes('테스터')");
   assert.match(await text(page, '#vsRoomText'), /상대를 기다리는 중/);
   assert.equal(await text(page, '#vsLeave'), '취소');
-  assert.equal(await visible(page, 'vsSoon'), false);
+  assert.equal(await text(page, '#vsGo'), '먼저 달리기', '작업347: 혼자일 때는 먼저 달리기');
   assert.equal(calls('POST', /^\/api\/versus\/rooms$/).length, 1);
   assert.ok(calls('GET', new RegExp('^/api/versus/rooms/' + ROOM_ID + '$')).length >= 1, '방 상태를 조회함');
   state.room = { status: 200, body: roomView('full', '민수') };
   await waitFor(page, "document.getElementById('vsPlayers').textContent.includes('민수')");
-  const ready = await page.eval("({ items: [...document.querySelectorAll('#vsPlayers li')].map(l => l.innerText.replace(/\\s+/g, ' ')), soon: !document.getElementById('vsSoon').hidden, soonText: document.getElementById('vsSoon').textContent, leave: document.getElementById('vsLeave').textContent, btns: [...document.querySelectorAll('#vsRoomView button')].map(b => b.textContent) })");
+  const ready = await page.eval("({ items: [...document.querySelectorAll('#vsPlayers li')].map(l => l.innerText.replace(/\\s+/g, ' ')), go: document.getElementById('vsGo').textContent, leave: document.getElementById('vsLeave').textContent, btns: [...document.querySelectorAll('#vsRoomView button')].map(b => b.textContent) })");
   assert.match(ready.items[0], /테스터/); assert.match(ready.items[1], /민수/);
-  assert.equal(ready.soon, true); assert.match(ready.soonText, /시작 기능은 곧 추가돼요/);
-  assert.deepEqual(ready.btns, ['나가기'], '준비 화면에는 나가기만');
+  assert.equal(ready.go, '시작'); assert.equal(await page.eval("!document.getElementById('vsSoon')"), true, '작업347: 시작 기능은 곧 추가돼요 안내는 제거');
+  assert.deepEqual(ready.btns, ['시작', '나가기'], '준비 화면: 시작과 나가기');
   await click(page, '#vsLeave');
   await waitFor(page, "!document.getElementById('vsListView').hidden");
   assert.equal(calls('POST', new RegExp('^/api/versus/rooms/' + ROOM_ID + '/leave$')).length, 1);
