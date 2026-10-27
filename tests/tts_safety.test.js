@@ -1,4 +1,5 @@
-// 작업334: /api/tts 서버 안전 강화 시험 — 잘못된 입력·예외로 서버가 멈추지 않고, 캐시 삭제는 관리자 전용이다. 정상 요청의 동작(응답·헤더·500자 자르기·비로그인 허용·can_tts 검사)은 그대로다.
+// 작업334: /api/tts 서버 안전 강화 시험 — 잘못된 입력·예외로 서버가 멈추지 않고, 캐시 삭제는 관리자 전용이다. 정상 요청의 동작(응답·헤더·500자 자르기·can_tts 검사)은 그대로다.
+// 작업337: /api/tts 는 로그인 필수(비로그인 401), 관리자는 can_tts 제외, 캐시 미스만 하루 사용량(30000자·150회) 제한(429), 확인 DB 오류는 503. 아래 337 시험.
 // 모의 DB(tts_cache·users)와 모의 OpenAI(전역 fetch 가로채기)만 쓴다. 운영 서버·운영 DB·실제 OpenAI 와 무관.
 // 실행: node --test tests/tts_safety.test.js
 const test = require('node:test');
@@ -12,7 +13,7 @@ const { startApp } = require('./helpers/app');
 
 // 모의 DB: tts_cache·users 만 흉내 낸다
 function createDb() {
-  const db = { cache: new Map(), users: new Map(), usage: [], queries: [], failCache: false, failUsage: false };
+  const db = { cache: new Map(), users: new Map(), usage: [], queries: [], failCache: false, failUsage: false, failUsageCheck: false };
   db.users.set(7, { is_blocked: false, can_tts: true, role: 'user' });
   db.users.set(8, { is_blocked: false, can_tts: false, role: 'user' });
   db.users.set(5, { is_blocked: true, can_tts: true, role: 'user' });
@@ -25,6 +26,7 @@ function createDb() {
       if (/^DELETE FROM tts_cache/.test(sql)) { if (db.failCache) throw new Error('boom: secret table detail'); const n = db.cache.size; db.cache.clear(); return { rowCount: n, rows: [] }; }
       if (/^SELECT is_blocked, can_tts FROM users/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ is_blocked: u.is_blocked, can_tts: u.can_tts }] : [] }; }
       if (/^SELECT role FROM users/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ role: u.role }] : [] }; }
+      if (/FROM api_usage/.test(sql)) { if (db.failUsageCheck) throw new Error('usage check boom'); const mine = db.usage.filter(u => u.userId === params[0] && u.eventType === 'tts'); return { rows: [{ n: mine.length, chars: mine.reduce((a, u) => a + (u.chars || 0), 0) }] }; }
       throw new Error('모의 DB 가 모르는 SQL: ' + sql.slice(0, 60));
     },
   };
@@ -56,11 +58,12 @@ async function setup() {
   openai.calls.length = 0; openai.fail = false; process.env.OPENAI_API_KEY = 'test-openai-key';
   const t = await startApp(['routes/tts.js'], { db });
   const raw = (method, url, body, user = null) => t.call(method, url, body, { user });
-  return { db, t, post: (body, user = null) => raw('POST', '/api/tts', body, user), del: (user = null) => raw('DELETE', '/api/tts/cache', undefined, user) };
+  return { db, t, post: (body, user = 7) => raw('POST', '/api/tts', body, user), del: (user = null) => raw('DELETE', '/api/tts/cache', undefined, user) };
 }
 // 응답 헤더·바이트까지 보려고 직접 요청
-async function postRaw(a, body) {
-  const r = await realFetch(a.t.base + '/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+async function postRaw(a, body, user = 7) {
+  const headers = { 'Content-Type': 'application/json' }; if (user !== null) headers.Authorization = 'Bearer ' + require('jsonwebtoken').sign({ id: user, email: 'u' + user + '@example.com' }, process.env.JWT_SECRET || 'mydict-jwt-secret');   // 작업337: 로그인 필수
+  const r = await realFetch(a.t.base + '/api/tts', { method: 'POST', headers, body: JSON.stringify(body) });
   return { status: r.status, type: r.headers.get('content-type'), cache: r.headers.get('x-tts-cache'), bytes: Buffer.from(await r.arrayBuffer()) };
 }
 
@@ -101,7 +104,7 @@ test('정상 요청은 그대로: MISS 응답(audio/mpeg·X-TTS-Cache)·OpenAI �
   assert.equal(c.url, 'https://api.openai.com/v1/audio/speech'); assert.equal(c.headers.Authorization, 'Bearer test-openai-key');
   assert.deepEqual(c.body, { model: 'tts-1-hd', input: 'hello world', voice: 'onyx', response_format: 'mp3' });
   await new Promise(r => setImmediate(r));
-  assert.deepEqual(a.db.usage, [{ userId: undefined, eventType: 'tts', model: 'tts-1-hd', chars: 11 }], '캐시 미스만 사용량(글자 수) 기록');
+  assert.deepEqual(a.db.usage, [{ userId: 7, eventType: 'tts', model: 'tts-1-hd', chars: 11 }], '캐시 미스만 사용량(글자 수) 기록');
   assert.ok(a.db.cache.has('en|hello world'), '캐시에 저장(앞뒤 공백 제거)');
   const h = await postRaw(a, { text: 'hello world', lang: 'en' });
   assert.equal(h.status, 200); assert.equal(h.cache, 'HIT'); assert.equal(h.type, 'audio/mpeg'); assert.deepEqual(h.bytes, AUDIO); assert.equal(openai.calls.length, 1, '적중은 OpenAI 를 부르지 않는다'); assert.equal(a.db.usage.length, 1);
@@ -120,15 +123,15 @@ test('500자 초과 입력은 거부하지 않고 앞 500자로 자른다(OpenAI
   const again = await postRaw(a, { text: long }); assert.equal(again.cache, 'HIT', '같은 긴 입력은 적중');
 });
 
-test('can_tts·차단 검사와 비로그인 허용은 그대로: 비로그인 200, can_tts 없음 403, 차단 403, 권한 있음 200, 관리자 200', async t => {
+test('can_tts·차단 검사는 그대로: can_tts 없음 403, 차단 403, 권한 있음 200, 관리자 200 (작업337: 비로그인은 이제 401)', async t => {
   const a = await setup(); t.after(() => a.t.close());
-  assert.equal((await a.post({ text: 'anon' }, null)).status, 200, '비로그인 호출 허용');
+  assert.equal((await a.post({ text: 'anon' }, null)).status, 401, '작업337: 비로그인 호출은 401(옛 단언: 200)');
   assert.equal((await a.post({ text: 'ok' }, 7)).status, 200);
   const no = await a.post({ text: 'x' }, 8); assert.equal(no.status, 403); assert.deepEqual(no.body, { error: 'TTS 권한이 없습니다.' });
   assert.equal((await a.post({ text: 'x2' }, 5)).status, 403, '차단된 사용자');
   assert.equal((await a.post({ text: 'adm' }, 9)).status, 200);
   assert.equal((await a.post({ text: 'x', lang: 'fr' }, 8)).status, 400, '입력 검증이 권한 검사보다 먼저(기존 순서)');
-  assert.equal(openai.calls.length, 3);
+  assert.equal(openai.calls.length, 2);   // 작업337: 비로그인 호출이 빠져 3 → 2
 });
 
 test('예외 방지: OpenAI 오류·키 없음·사용량 기록 예외가 모두 일반 문구로 응답하고 서버는 살아 있다. 오류 본문에 내부 오류 문구가 없다', async t => {
@@ -178,4 +181,71 @@ test('server.js 에는 처리되지 않은 거부를 로그만 남기고 종료�
   const tts = fs.readFileSync(path.join(__dirname, '..', 'routes', 'tts.js'), 'utf8').replace(/\r\n/g, '\n');
   assert.match(tts, /router\.delete\('\/api\/tts\/cache', requireAdmin,/); assert.match(tts, /TTS_LANGS = \['en', 'ko', 'ja', 'zh'\]/);
   assert.ok(!/res\.status\(500\)\.json\(\{ error: e\.message \}\)/.test(tts), 'e.message 를 응답에 싣지 않는다');
+});
+
+// ---- 작업337: 로그인 필수 + 권한 + 하루 사용량 제한 ----
+test('337-1. 로그인 필수: 토큰 없음·잘못된 토큰 401(OpenAI·DB 를 부르지 않는다), 캐시에 있어도 토큰 없으면 401, 입력 검증보다 먼저', async t => {
+  const a = await setup(); t.after(() => a.t.close());
+  await a.post({ text: 'cached' }); const n = openai.calls.length;
+  const none = await a.post({ text: 'cached' }, null); assert.equal(none.status, 401); assert.deepEqual(none.body, { error: '로그인이 필요합니다.' });
+  const bad = await realFetch(a.t.base + '/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer not-a-token' }, body: JSON.stringify({ text: 'cached' }) });
+  assert.equal(bad.status, 401); assert.deepEqual(await bad.json(), { error: '유효하지 않은 토큰입니다.' });
+  const raw = await realFetch(a.t.base + '/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 5 }) });
+  assert.equal(raw.status, 401, '토큰이 없으면 잘못된 입력도 401(인증이 맨 앞)');
+  assert.equal(openai.calls.length, n); assert.equal((await postRaw(a, { text: 'cached' })).cache, 'HIT', '로그인하면 캐시 적중');
+});
+
+test('337-2. can_tts: false 는 403, 관리자(이메일·DB role)는 can_tts 검사에서 제외, 차단 사용자는 403', async t => {
+  const a = await setup(); t.after(() => a.t.close());
+  assert.equal((await a.post({ text: 'x' }, 8)).status, 403);
+  a.db.users.set(10, { is_blocked: false, can_tts: false, role: 'admin' });   // DB role 관리자인데 can_tts 가 false
+  assert.equal((await a.post({ text: 'admin-db' }, 10)).status, 200, 'DB role admin 은 can_tts 검사 제외');
+  a.db.users.set(9, { is_blocked: false, can_tts: false, role: 'user' });     // u9@example.com 은 ADMIN_EMAILS(이메일) 관리자
+  assert.equal((await a.post({ text: 'admin-mail' }, 9)).status, 200, 'ADMIN_EMAILS 관리자는 can_tts 검사 제외');
+  assert.equal((await a.post({ text: 'x' }, 5)).status, 403);
+});
+
+test('337-3. 하루 호출 횟수 제한(기본 150): 캐시 미스만 센다 — 150번째까지 통과하고 151번째 미스는 429(한국어 안내), 캐시 적중은 제한 뒤에도 통과, 사용자별', async t => {
+  const a = await setup(); t.after(() => a.t.close());
+  delete process.env.TTS_DAILY_CALLS_CAP; delete process.env.TTS_DAILY_CHARS_CAP;
+  for (let i = 0; i < 150; i++) { const r = await a.post({ text: 'w' + i }); assert.equal(r.status, 200, 'call ' + i); }
+  assert.equal(openai.calls.length, 150);
+  const over = await a.post({ text: 'w-new' }); assert.equal(over.status, 429); assert.match(over.body.error, /오늘 서버 발음 사용량/); assert.equal(openai.calls.length, 150, '초과하면 OpenAI 를 부르지 않는다');
+  const hit = await postRaw(a, { text: 'w0' }); assert.equal(hit.status, 200); assert.equal(hit.cache, 'HIT', '캐시 적중은 제한에 안 걸린다');
+  assert.equal(a.db.usage.length, 150, '적중은 사용량에 안 들어간다');
+  a.db.users.set(12, { is_blocked: false, can_tts: true, role: 'user' });
+  assert.equal((await a.post({ text: 'w-other-user' }, 12)).status, 200, '사용량은 사용자별');
+});
+
+test('337-4. 하루 글자 수 제한(기본 30000): 합이 넘으면 429(넘기는 요청 포함), 정확히 채우는 요청은 통과, 관리자에게도 적용', async t => {
+  const a = await setup(); t.after(() => a.t.close());
+  delete process.env.TTS_DAILY_CALLS_CAP; delete process.env.TTS_DAILY_CHARS_CAP;
+  a.db.usage.push({ userId: 7, eventType: 'tts', model: 'tts-1-hd', chars: 29990 });
+  assert.equal((await a.post({ text: 'x'.repeat(11) })).status, 429, '29990 + 11 > 30000');
+  assert.equal((await a.post({ text: 'y'.repeat(10) })).status, 200, '29990 + 10 = 30000 은 통과');
+  assert.equal((await a.post({ text: 'z' })).status, 429, '이제 가득');
+  a.db.usage.push({ userId: 9, eventType: 'tts', model: 'tts-1-hd', chars: 30000 });
+  assert.equal((await a.post({ text: 'admin-limited' }, 9)).status, 429, '관리자에게도 제한(비용 보호)');
+});
+
+test('337-5. 환경변수로 덮어쓰기(TTS_DAILY_CALLS_CAP·TTS_DAILY_CHARS_CAP), 잘못된 값은 기본값, 없어도 기본값으로 동작', async t => {
+  const a = await setup(); t.after(() => { a.t.close(); delete process.env.TTS_DAILY_CALLS_CAP; delete process.env.TTS_DAILY_CHARS_CAP; });
+  process.env.TTS_DAILY_CALLS_CAP = '2';
+  assert.equal((await a.post({ text: 'e1' })).status, 200); assert.equal((await a.post({ text: 'e2' })).status, 200); assert.equal((await a.post({ text: 'e3' })).status, 429, '횟수 2 로 덮어씀');
+  process.env.TTS_DAILY_CALLS_CAP = 'abc'; assert.equal((await a.post({ text: 'e3' })).status, 200, '잘못된 값은 기본값 150');
+  process.env.TTS_DAILY_CALLS_CAP = '0'; assert.equal((await a.post({ text: 'e4' })).status, 200, '0 은 범위 밖 → 기본값');
+  delete process.env.TTS_DAILY_CALLS_CAP; process.env.TTS_DAILY_CHARS_CAP = '20';
+  assert.equal((await a.post({ text: 'f'.repeat(30) })).status, 429, '글자 수 20 으로 덮어씀');
+});
+
+test('337-6. 제한 확인 중 DB 오류면 503(서버 음성을 쓰지 않는다, OpenAI 호출 없음). 캐시 적중은 영향 없음. 기존 DELETE 관리자 잠금 유지', async t => {
+  const a = await setup(); t.after(() => a.t.close());
+  await a.post({ text: 'warm' }); const n = openai.calls.length;
+  a.db.failUsageCheck = true;
+  const origErr = console.error; console.error = () => {};
+  let r; try { r = await a.post({ text: 'cold' }); } finally { console.error = origErr; }
+  assert.equal(r.status, 503); assert.ok(!JSON.stringify(r.body).includes('boom')); assert.equal(openai.calls.length, n);
+  assert.equal((await postRaw(a, { text: 'warm' })).cache, 'HIT', '적중은 제한 확인을 하지 않는다');
+  a.db.failUsageCheck = false;
+  assert.equal((await a.del(null)).status, 401); assert.equal((await a.del(7)).status, 403); assert.equal((await a.del(9)).status, 200);
 });
