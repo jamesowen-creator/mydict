@@ -34,7 +34,7 @@ router.patch('/api/admin/users/:id', requireAdmin, async (req, res) => {
   const targetId = parseInt(req.params.id);
   if (isNaN(targetId)) return res.status(400).json({ error: '잘못된 ID입니다.' });
 
-  const allowed = ['role', 'is_blocked', 'is_approved', 'can_search', 'can_wordbook', 'can_quiz', 'can_tts', 'can_podcast', 'perm_literature_compass', 'perm_digest_reading', 'perm_science_reading', 'perm_voice_study', 'perm_concept_map', 'perm_jgrammar'];
+  const allowed = ['role', 'is_blocked', 'is_approved', 'can_search', 'can_wordbook', 'can_quiz', 'can_tts', 'can_podcast', 'perm_literature_compass', 'perm_digest_reading', 'perm_science_reading', 'perm_voice_study', 'perm_concept_map', 'perm_jgrammar', 'perm_versus'];
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};   // 작업338: 본문이 배열·문자열이어도 예외 없이 400
   const updates = Object.entries(body).filter(([k]) => allowed.includes(k));
   if (!updates.length) return res.status(400).json({ error: '변경할 항목이 없습니다.' });

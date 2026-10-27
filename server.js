@@ -69,6 +69,7 @@ app.use(require('./routes/admin'));
 app.use(require('./routes/voice_study'));
 app.use(require('./routes/concept_map'));   // 작업270-1: 새 메뉴 개념 지도
 app.use(require('./routes/jgrammar'));      // 작업JG-1: 일본어 문법 해설
+app.use(require('./routes/versus'));        // 작업343: 2인 대결(방은 서버 메모리, 인스턴스 1개 전제)
 
 app.listen(PORT, () => {
   console.log(`사전 서버 실행 중: http://localhost:${PORT}`);
