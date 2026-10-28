@@ -241,7 +241,7 @@ test('오류 코드별 처리: 401 안내·조회 멈춤, 403 메뉴 숨김과 �
   await waitFor(page, "!document.getElementById('vsRoomView').hidden");
   state.room = { status: 404, body: { error: '방을 찾을 수 없습니다.' } };
   await waitFor(page, "!document.getElementById('vsListView').hidden");
-  assert.match(await text(page, '#vsMsg'), /방이 없어졌어요/);
+  assert.match(await text(page, '#vsMsg'), /방이 사라져 결과를 겨루지 못했어요/);   // 작업348: 방 화면의 404 도 방 소실 문구
   assert.equal(await page.eval('SpellRun.vs.state.roomId'), null);
   await page.close();
 
@@ -253,7 +253,7 @@ test('오류 코드별 처리: 401 안내·조회 멈춤, 403 메뉴 숨김과 �
   await openVs(page);
   await waitFor(page, "document.querySelectorAll('#vsList li').length === 1");
   await click(page, '#vsList button');
-  await waitFor(page, "document.getElementById('vsMsg').textContent.includes('참가할 수 없는 방')");
+  await waitFor(page, "document.getElementById('vsMsg').textContent.includes('이미 끝났거나 가득 찬 방이에요.')");
   assert.equal(await visible(page, 'vsListView'), true);
   await page.close();
 
@@ -318,6 +318,7 @@ test('닫기: 내 방이 있으면 leave 를 부르고 시작 화면으로 돌�
   for (let i = 0; i < 60 && !calls("POST", /leave$/).length; i++) await sleep(50);   // leave 요청이 서버에 닿을 때까지 기다린다(부하가 큰 실행에서도 안정)
   assert.equal(calls('POST', new RegExp('^/api/versus/rooms/' + ROOM_ID + '/leave$')).length, 1, '닫을 때 leave 호출');
   assert.equal(await visible(page, 'start'), true);
+  await sleep(200);   // 닫는 순간 이미 나간 조회 요청이 서버에 닿을 시간(기존에도 가끔 이 요청이 집계에 섞여 불안정했다)
   const n = state.requests.length; await sleep(300);
   assert.equal(state.requests.slice(n).filter(r => r.method === 'GET' && /versus/.test(r.url)).length, 0, '닫은 뒤에는 조회 없음');
   // 닫은 뒤에도 게임 시작 버튼이 살아 있다

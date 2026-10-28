@@ -175,7 +175,10 @@
 .sr-box .vsbar{position:absolute;left:calc(14 * var(--u));right:calc(14 * var(--u));bottom:calc(10 * var(--u));z-index:2;pointer-events:none;box-sizing:border-box;background:var(--paper);border:calc(2 * var(--u)) solid var(--ink);border-radius:calc(12 * var(--u));padding:calc(4 * var(--u)) calc(10 * var(--u));display:flex;flex-direction:column;gap:calc(1 * var(--u));font-family:var(--f-body);color:var(--ink)}
 .sr-box .vsbn{font-size:calc(12 * var(--u));font-weight:700;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sr-box .vsbs{font-size:calc(11.5 * var(--u));font-weight:500;line-height:1.3;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sr-box .vstoast{position:absolute;left:calc(14 * var(--u));right:calc(14 * var(--u));bottom:calc(64 * var(--u));z-index:2;pointer-events:none;text-align:center;background:var(--ink);color:#fff;border-radius:999px;padding:calc(5 * var(--u)) calc(12 * var(--u));font-size:calc(12 * var(--u));font-weight:700}
+.sr-box .vstoast{position:absolute;left:calc(14 * var(--u));right:calc(14 * var(--u) + max(44px, 64 * var(--u)) + 8px);bottom:calc(66 * var(--u));z-index:2;pointer-events:none;text-align:center;background:var(--ink);color:#fff;border-radius:calc(14 * var(--u));padding:calc(5 * var(--u)) calc(12 * var(--u));font-size:calc(12 * var(--u));font-weight:700;line-height:1.3}
+/* 작업348: 대결 나가기. 막대 위쪽 줄의 오른쪽 끝, 터치 44px 이상, 막대·가장자리와 간격을 둔다. z-index 를 주지 않아 선택·확인 화면이 열리면 그 아래로 가려진다 */
+.sr-box .vsquit{position:absolute;right:calc(14 * var(--u));bottom:calc(66 * var(--u));box-sizing:border-box;width:max(44px, 64 * var(--u));min-height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--f-body);font-weight:700;font-size:calc(12 * var(--u));color:var(--ink);background:var(--paper);border:calc(2 * var(--u)) solid var(--ink);border-radius:calc(14 * var(--u));padding:0}
+.sr-box .vsquit:focus-visible{outline:calc(3 * var(--u)) solid var(--ink);outline-offset:calc(3 * var(--u))}
 .sr-box .vfin li{flex-direction:column;align-items:flex-start;gap:calc(2 * var(--u))}
 .sr-box .vsview{display:flex;flex-direction:column;gap:calc(10 * var(--u))}
 .sr-box .vsview[hidden]{display:none}
@@ -183,7 +186,7 @@
 .sr-box .vlist li{display:flex;align-items:center;justify-content:space-between;gap:calc(8 * var(--u));border:calc(2 * var(--u)) solid var(--ink);border-radius:calc(12 * var(--u));padding:calc(6 * var(--u)) calc(10 * var(--u));font-size:calc(13 * var(--u));font-weight:700}
 .sr-box .vlist li .vm{font-size:calc(11 * var(--u));font-weight:500;color:var(--ink-soft)}
 .sr-box .vlist li .vn{min-width:0;overflow-wrap:anywhere}
-.sr-box .vsbtn,.sr-box #vs .btn,.sr-box #pv .btn,.sr-box #start .btn{min-height:var(--ctl-min-h,44px);min-width:calc(88 * var(--u))}
+.sr-box .vsbtn,.sr-box #vs .btn,.sr-box #vsQuit .btn,.sr-box #pv .btn,.sr-box #start .btn{min-height:var(--ctl-min-h,44px);min-width:calc(88 * var(--u))}
 .sr-box .toggle:focus-visible{outline:calc(3 * var(--u)) solid var(--ink);outline-offset:calc(3 * var(--u))}
 .sr-box .big{font-family:var(--f-letter);font-weight:700;white-space:nowrap;font-size:calc(var(--bfs,56) * var(--u));line-height:1;text-align:center;font-variant-numeric:tabular-nums}
 .sr-box .stats{display:flex;justify-content:center;gap:calc(22 * var(--u));font-size:calc(13 * var(--u));font-weight:700;text-align:center}

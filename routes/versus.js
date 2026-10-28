@@ -40,7 +40,8 @@ function throttle(req, res, next) {
 }
 const guard = [requireAuth, throttle, requireVersusPerm];
 const bodyOf = req => (req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : null);
-const send = (res, r, okFn) => (r.error ? res.status(r.error.status).json({ error: r.error.error }) : res.json(okFn(r)));
+const errBody = e => (e.code ? { error: e.error, code: e.code } : { error: e.error });   // code 는 있을 때만 덧붙인다(작업348)
+const send = (res, r, okFn) => (r.error ? res.status(r.error.status).json(errBody(r.error)) : res.json(okFn(r)));
 function validId(req, res, next) {
   if (!ID_RE.test(req.params.id)) return res.status(400).json({ error: '방 번호가 올바르지 않습니다.' });
   next();
@@ -50,7 +51,7 @@ const safe = fn => (req, res) => { try { fn(req, res); } catch (err) { console.e
 
 router.post('/api/versus/rooms', guard, safe((req, res) => {
   const r = store.create({ id: req.user.id, name: req.versusName });
-  if (r.error) return res.status(r.error.status).json({ error: r.error.error });
+  if (r.error) return res.status(r.error.status).json(errBody(r.error));
   res.json({ ok: true, roomId: r.room.id });
 }));
 
@@ -65,7 +66,7 @@ router.post('/api/versus/rooms/:id/join', guard, validId, safe((req, res) => {
 
 router.post('/api/versus/rooms/:id/start', guard, validId, safe((req, res) => {
   const b = bodyOf(req); if (!b) return res.status(400).json({ error: '본문이 올바르지 않습니다.' });
-  const r = store.start(req.params.id, req.user.id, b.wordCount);
+  const r = store.start(req.params.id, req.user.id, b.wordCount, b.round);
   send(res, r, x => store.view(x.room, req.user.id));
 }));
 
@@ -81,6 +82,11 @@ router.post('/api/versus/rooms/:id/finish', guard, validId, safe((req, res) => {
 
 router.get('/api/versus/rooms/:id', guard, validId, safe((req, res) => {
   const r = store.get(req.params.id, req.user.id);
+  send(res, r, x => store.view(x.room, req.user.id));
+}));
+
+router.post('/api/versus/rooms/:id/rematch', guard, validId, safe((req, res) => {
+  const r = store.rematch(req.params.id, req.user.id);
   send(res, r, x => store.view(x.room, req.user.id));
 }));
 

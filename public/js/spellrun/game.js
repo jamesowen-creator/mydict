@@ -882,6 +882,7 @@ function startSecondJump() {
   sfx.jump2(); burst(RUNNER_X, GROUND - 27 - G.j2h + 24, '#ffffff', 8);
 }
 function jump() {
+  if (VSG.quitOpen) return;
   if (G.state !== 'run' && G.state !== 'pop' && G.state !== 'intro') return;
   if (G.jumpT < 0) startJump();
   else if (CONFIG.DJ_ENABLED && G.j2 < 0) { if (G.jumpT >= CONFIG.SECOND_JUMP_MIN) startSecondJump(); }   // 첫 점프 직후의 너무 빠른 입력(중복 이벤트)은 무시
@@ -918,7 +919,7 @@ els.resChips.addEventListener('click', e => {
 
 // ---------- 업데이트 ----------
 function step(dt) {
-  if (G.state === 'choice') return;   // 작업341: 선택 화면에 머문 시간은 게임 시간(생존 시간)에 들어가지 않는다
+  if (G.state === 'choice' || VSG.quitOpen) return;   // 작업341: 선택 화면에 머문 시간은 게임 시간(생존 시간)에 들어가지 않는다. 작업348: 대결 나가기 확인 대화상자가 열려 있는 동안도 같다
   G.time += dt;
   if (G.repeatT > 0) {
     G.repeatT -= dt;
@@ -1617,7 +1618,12 @@ function beginRound(reviewOnly) {
 const VS_MIN_WORDS = 10;   // 서버 start 가 10 미만을 400 으로 막는다
 const VS_T = { list: 3000, room: 2000, backoff: 5000, signal: 1000, fin: 1000 };   // 목록·방 조회 간격(ms)과 429/503 뒤 쉬는 시간. 시험이 줄여 쓴다
 const VS_DENIED = '대결 사용 권한이 없어요. 관리자에게 문의해 주세요.';
-const VS = { open: false, view: '', roomId: null, timer: null, token: 0, busy: false, msgKind: '', pausedUntil: 0, polls: 0 };
+const VS = { open: false, view: '', roomId: null, timer: null, token: 0, busy: false, msgKind: '', pausedUntil: 0, polls: 0, round: 0 };   // round: 서버가 알려 준 현재 판 번호(작업348)
+const VS_TXT = {   // 작업348: 예외 안내 문구
+  hasRoom: '이미 만든 방이 있어요. 목록에서 내 방으로 들어가거나 취소해 주세요.',
+  unavailable: '이미 끝났거나 가득 찬 방이에요.',
+  gone: '방이 사라져 결과를 겨루지 못했어요.',
+};
 let canVersus = false, vsWords = 0, vsModeBtn = null;
 const vsShow = name => { for (const id of ['vsListView', 'vsRoomView', 'vsDeniedView', 'vsFinView']) $(id).hidden = id !== name; };
 // 같은 종류의 안내를 연달아 다시 띄우지 않는다(같은 문구가 이미 떠 있으면 건너뜀)
@@ -1665,8 +1671,11 @@ function vsFail(res, ctx) {
     if (vsModeBtn) { vsModeBtn.remove(); vsModeBtn = null; }
     vsShow('vsDeniedView'); vsToast('403', VS_DENIED); $('vsDeniedClose').focus(); return;
   }
-  if (s === 403 || s === 404 || s === 409) {   // 방이 사라졌거나 참가할 수 없다: 목록으로 돌아간다
-    const text = ctx === 'create' ? (msg || '방을 만들 수 없어요.') : ctx === 'join' ? '참가할 수 없는 방이에요. 가득 찼거나 닫혔을 수 있어요.' : '방이 없어졌어요. 목록으로 돌아갈게요.';
+  if (s === 403 || s === 404 || s === 409) {   // 방이 사라졌거나 참가할 수 없다: 목록으로 돌아간다(목록은 새로 조회한다)
+    const code = res.data && res.data.code;
+    const text = ctx === 'create' ? (s === 409 ? VS_TXT.hasRoom : (msg || '방을 만들 수 없어요.'))
+      : ctx === 'join' ? (s === 409 ? (code === 'has_room' ? VS_TXT.hasRoom : VS_TXT.unavailable) : '참가할 수 없는 방이에요. 가득 찼거나 닫혔을 수 있어요.')
+      : (s === 404 && (ctx === 'room' || ctx === 'start')) ? VS_TXT.gone : '방이 없어졌어요. 목록으로 돌아갈게요.';
     VS.roomId = null; vsToast(String(s), text); vsShowList(); return;
   }
   if (s === 429) { VS.pausedUntil = Date.now() + VS_T.backoff; vsToast('429', '요청이 많아요. 잠시 후 다시 시도할게요.'); }
@@ -1692,6 +1701,7 @@ function vsRenderList(rooms) {
   $('vsEmpty').hidden = arr.length > 0;
 }
 function vsRenderRoom(d) {
+  if (d.round) VS.round = d.round;
   const me = d.me || {}, opp = d.opponent, full = d.room && d.room.status === 'full' && !!opp;
   const nextView = full ? 'ready' : 'wait';
   const first = VS.view !== nextView;
@@ -1711,7 +1721,7 @@ function vsRenderRoom(d) {
   if (first) $('vsGo').focus();
 }
 function vsShowList() {
-  VS.view = 'list'; vsShow('vsListView'); $('vsList').textContent = ''; $('vsEmpty').hidden = true;
+  VS.view = 'list'; VS.round = 0; vsShow('vsListView'); $('vsList').textContent = ''; $('vsEmpty').hidden = true;
   vsStop(); vsPoll();
   const b = $('vsCreate'); if (b && !b.disabled) b.focus();
 }
@@ -1748,7 +1758,7 @@ async function vsCreate() {
   VS.busy = false;
   if (!VS.open) { if (res.ok && res.data && res.data.roomId) vsLeaveCall(res.data.roomId); return; }   // 기다리는 사이 닫았다면 방을 바로 닫는다
   if (!res.ok || !res.data || !res.data.roomId) { vsFail(res, 'create'); return; }
-  vsClearToast(false); VS.roomId = res.data.roomId; VS.view = 'wait';
+  vsClearToast(false); VS.roomId = res.data.roomId; VS.view = 'wait'; VS.round = 1;   // 새 방의 첫 판은 1
   $('vsRoomText').textContent = '상대를 기다리는 중이에요.'; $('vsPlayers').textContent = ''; $('vsGo').textContent = '먼저 달리기'; $('vsLeave').textContent = '취소';
   vsShow('vsRoomView'); $('vsGo').focus();
   vsPoll();
@@ -1766,22 +1776,28 @@ async function vsJoin(roomId, mine) {
   vsRenderRoom(res.data || {});
   vsSchedule(VS_T.room);
 }
-// ---------- 작업347: 대결 게임 연결(시작·상태 신호·상대 진행 막대·종료·결과). 서버는 작업343 그대로 ----------
+// ---------- 작업347: 대결 게임 연결(시작·상태 신호·상대 진행 막대·종료·결과). 작업348: 다시 하기·판 번호·예외 처리 ----------
 // POST state 의 응답에 상대의 공개 상태가 들어 있으므로, 달리는 동안은 상태 신호가 곧 상대 조회다(요청 수를 늘리지 않는다).
+// 판 번호(round)는 서버 view 에서 받아 start·state·finish 에 함께 보낸다. 서버가 불일치(409 round_mismatch)를 알리면 방 상태를 다시 조회해 최신 판으로 맞춘다.
 const VSG = { on: false, running: false, ended: false, finActive: false, roomId: null, timer: null, finTimer: null, nudgeTimer: null, toastTimer: null, token: 0,
-  inflight: false, pending: false, lost: false, lastSendAt: 0, lastHp: -1, sends: 0, maxInflight: 0, pausedUntil: 0, opp: null, oppKnown: false, contSaved: null, mine: null, finishCalls: 0 };
-const vsgBody = () => ({ score: Math.max(0, Math.round(G.score)), combo: Math.max(0, Math.round(G.combo)), hp: Math.max(0, Math.min(CONFIG.HP, Math.round(G.hp))), maxHp: CONFIG.HP, wordNo: G.wi + 1, continued: !!G.contUsed });
+  inflight: false, pending: false, lost: false, lastSendAt: 0, lastHp: -1, sends: 0, maxInflight: 0, pausedUntil: 0, opp: null, oppKnown: false, contSaved: null, mine: null, finishCalls: 0,
+  round: 0, quitOpen: false, roomGone: false, finBody: null, finBusy: false, rematchBusy: false, resultShown: false, resKey: '', rematchGone: false };
+const vsgBody = () => { const b = { score: Math.max(0, Math.round(G.score)), combo: Math.max(0, Math.round(G.combo)), hp: Math.max(0, Math.min(CONFIG.HP, Math.round(G.hp))), maxHp: CONFIG.HP, wordNo: G.wi + 1, continued: !!G.contUsed }; if (VSG.round) b.round = VSG.round; return b; };
+const setText = (el, t) => { if (el.textContent !== t) el.textContent = t; };   // 같은 문구로 다시 쓰지 않는다(스크린리더가 같은 안내를 되풀이하지 않게)
 function vsgToast(text) {
-  const el = $('vsToast'); el.textContent = text; el.hidden = false;
+  const el = $('vsToast');
+  if (!el.hidden && el.textContent === text) return;   // 같은 안내를 연달아 띄우지 않는다
+  el.textContent = text; el.hidden = false;
   if (VSG.toastTimer) clearTimeout(VSG.toastTimer);
   VSG.toastTimer = setTimeout(() => { el.hidden = true; }, 3500);
 }
 function vsgRenderBar() {
-  const o = VSG.opp;
-  $('vsBar').hidden = !VSG.running || VSG.ended;
-  if (!o) { $('vsBarName').textContent = '상대'; $('vsBarStats').textContent = '상대를 기다리는 중'; return; }
-  $('vsBarName').textContent = o.name + (o.disconnected ? ' · 연결 끊김' : o.finished ? ' · 상대 종료' : o.left ? ' · 나감' : '');
-  $('vsBarStats').textContent = (o.running || o.finished) ? '체력 ' + o.hp + '/' + o.maxHp + ' · 점수 ' + o.score.toLocaleString('en-US') + ' · 콤보 ' + o.combo + ' · 단어 ' + o.wordNo : '아직 시작 전';
+  const o = VSG.opp, off = VSG.running && !VSG.ended;
+  $('vsBar').hidden = !off; $('vsQuitBtn').hidden = !off;
+  if (VSG.roomGone) { setText($('vsBarName'), '방 연결 끊김'); setText($('vsBarStats'), '기록은 남지 않아요'); return; }
+  if (!o) { setText($('vsBarName'), '상대'); setText($('vsBarStats'), '상대를 기다리는 중'); return; }
+  setText($('vsBarName'), o.name + (o.disconnected ? ' · 연결 끊김' : o.left ? ' · 나감' : o.finished ? ' · 상대 종료' : ''));
+  setText($('vsBarStats'), (o.running || o.finished) ? '체력 ' + o.hp + '/' + o.maxHp + ' · 점수 ' + o.score.toLocaleString('en-US') + ' · 콤보 ' + o.combo + ' · 단어 ' + o.wordNo : '아직 시작 전');
 }
 function vsgApplyView(v) {
   if (!v) return;
@@ -1805,14 +1821,26 @@ async function vsgSend(nudge) {
   if (res.ok) vsgApplyView(res.data); else await vsgSendFailed(res);
   if (VSG.pending && VSG.running && !VSG.ended) vsgSend(true);
 }
+// 서버가 다시 시작돼 방이 사라졌다(404): 게임은 멈추지 않고 끝까지 달린다. 신호만 멈추고 한 번만 알린다. 끝나면 겨루지 못했다는 안내와 내 기록을 보인다
+function vsgRoomGone() {
+  if (VSG.roomGone) return;
+  VSG.roomGone = true; VSG.lost = true;
+  if (VSG.timer) { clearInterval(VSG.timer); VSG.timer = null; }
+  if (VSG.nudgeTimer) { clearTimeout(VSG.nudgeTimer); VSG.nudgeTimer = null; }
+  if (VSG.running && !VSG.ended) { vsgToast('방 연결이 끊겨 기록은 남지 않아요'); vsgRenderBar(); }
+}
 async function vsgSendFailed(res) {
   const s = res.status;
   if (s === 429) { VSG.pausedUntil = Date.now() + VS_T.backoff; return; }
   if (s === 401) { VSG.lost = true; return; }
-  if (s === 403 || s === 404 || s === 409) {   // 내 판이 서버에서 끝났거나(30초 무신호 등) 방이 없다: 조회로 확인한다
+  if (s === 404) { vsgRoomGone(); return; }
+  if (s === 403 || s === 409) {   // 내 판이 서버에서 끝났거나(30초 무신호 등) 판 번호가 다르다: 조회로 확인한다
     const g = await vsApi('GET', '/' + VSG.roomId);
     if (!VSG.running || VSG.ended) return;
-    if (g.ok) { vsgApplyView(g.data); if (!VSG.ended) VSG.lost = true; } else VSG.lost = true;   // 끝난 게 아니면 신호만 멈춘다(예외 처리는 다음 작업)
+    if (g.ok) {
+      if (g.data && g.data.round > VSG.round) { vsgGoReady(g.data); return; }
+      vsgApplyView(g.data); if (!VSG.ended) VSG.lost = true;   // 끝난 게 아니면 신호만 멈춘다
+    } else if (g.status === 404) vsgRoomGone(); else VSG.lost = true;
   }
   // 400·서버 오류·네트워크 오류: 게임을 멈추지 않고 다음 주기에 최신 값을 다시 보낸다
 }
@@ -1823,17 +1851,27 @@ function vsgStopTimers() {
   if (VSG.finTimer) { clearTimeout(VSG.finTimer); VSG.finTimer = null; }
   VSG.token++;
 }
+function vsgHideInGame() {   // 달리는 중에만 보이는 것(막대·나가기·확인 대화상자)을 감춘다
+  $('vsBar').hidden = true; $('vsQuitBtn').hidden = true;
+  if (VSG.quitOpen) { VSG.quitOpen = false; $('vsQuit').hidden = true; }
+}
 function vsgReset() {
   vsgStopTimers();
   if (VSG.contSaved !== null) { CONFIG.CONT_ENABLED = VSG.contSaved; VSG.contSaved = null; }
-  Object.assign(VSG, { on: false, running: false, ended: false, finActive: false, roomId: null, inflight: false, pending: false, lost: false, opp: null, oppKnown: false, mine: null });
-  $('vsBar').hidden = true; $('vsToast').hidden = true;
+  Object.assign(VSG, { on: false, running: false, ended: false, finActive: false, roomId: null, inflight: false, pending: false, lost: false, opp: null, oppKnown: false, mine: null,
+    round: 0, roomGone: false, finBody: null, finBusy: false, rematchBusy: false, resultShown: false, resKey: '', rematchGone: false });
+  vsgHideInGame(); $('vsToast').hidden = true;
+}
+// 게임을 멈춘다(서버가 내 판을 끝냈을 때·나갈 때·새 판으로 갈 때)
+function vsgHaltGame() {
+  if (G.state !== 'over') { G.state = 'over'; G.bossMode = false; clearIntro(); els.cont.hidden = true; box.classList.remove('boss'); els.pop.hidden = true; els.hud.hidden = true; els.bossBanner.hidden = true; stopVoices(); }
 }
 function vsgBegin(P, roomId, view) {
   VSG.running = true; VSG.ended = false; VSG.roomId = roomId; VSG.lost = false; VSG.inflight = false; VSG.pending = false; VSG.lastHp = -1; VSG.sends = 0; VSG.pausedUntil = 0; VSG.finishCalls = 0;
+  VSG.round = (view && view.round) || VS.round || 0; VSG.roomGone = false; VSG.finBody = null; VSG.finBusy = false; VSG.rematchBusy = false; VSG.resultShown = false; VSG.resKey = ''; VSG.rematchGone = false; VSG.quitOpen = false;
   VSG.opp = view && view.opponent || null; VSG.oppKnown = !!VSG.opp;   // 시작할 때 이미 상대가 있으면 입장 안내는 없다
   VSG.contSaved = CONFIG.CONT_ENABLED; CONFIG.CONT_ENABLED = true;   // 대결은 이어하기가 켜진 규칙으로 겨룬다(주소 옵션 continue=0 도 이번 판에는 적용하지 않는다)
-  $('vs').hidden = true; els.start.hidden = true;
+  $('vs').hidden = true; els.start.hidden = true; $('vsQuit').hidden = true;
   startRound(false, P);
   vsgRenderBar();
   VSG.timer = setInterval(() => vsgSend(false), VS_T.signal);
@@ -1847,10 +1885,15 @@ function vsgLi(label, parts) {
 function vsgSideText(side) {
   return '생존 ' + vsFmtSec(side.survivalSec) + ' · 점수 ' + side.score.toLocaleString('en-US') + ' · 푼 단어 ' + side.wordCount + '개 · 이어하기 ' + (side.continued ? '사용' : '안 씀') + (side.disconnected ? ' · 연결 끊김' : '');
 }
+// 결과 화면의 보조 단추(다시 하기·다시 보내기)와 문구를 처음 상태로 돌린다
+function vsgFinChrome() {
+  $('vsFinRematch').hidden = true; setText($('vsFinRematchNote'), ''); $('vsFinRetry').hidden = true; setText($('vsFinRooms'), '방 목록으로');
+}
 function vsgShowFin(v, note) {
-  vsStop(); VS.view = 'fin'; VSG.finActive = true;
+  vsStop(); VS.view = 'fin'; VSG.finActive = true; VSG.resultShown = false; VSG.resKey = '';
   $('vs').hidden = false; els.start.hidden = true; vsShow('vsFinView');
-  $('vsFinTitle').textContent = '결과를 기다리는 중이에요'; $('vsFinWhy').textContent = ''; $('vsFinNote').textContent = note || '';
+  vsgFinChrome();
+  setText($('vsFinTitle'), '결과를 기다리는 중이에요'); setText($('vsFinWhy'), ''); setText($('vsFinNote'), note || '');
   const ul = $('vsFinList'); ul.textContent = '';
   const m = VSG.mine;
   if (m) ul.appendChild(vsgLi('나', vsgSideText(m)));
@@ -1858,55 +1901,115 @@ function vsgShowFin(v, note) {
   ul.appendChild(vsgLi(o ? o.name : '상대', !o ? '상대를 기다리는 중' : o.disconnected ? '연결 끊김' : o.finished ? '상대 종료' : (o.running ? '체력 ' + o.hp + '/' + o.maxHp + ' · 점수 ' + o.score.toLocaleString('en-US') + ' · 콤보 ' + o.combo + ' · 단어 ' + o.wordNo : '아직 시작 전')));
   if (!$('vsFinView').contains(document.activeElement)) $('vsFinRooms').focus();
 }
-function vsgShowResult(v) {
-  VSG.finActive = false;
-  const r = v.result, w = r.winner;
-  $('vsFinTitle').textContent = w === 'me' ? '승리' : w === 'opponent' ? '패배' : '무승부';
-  $('vsFinWhy').textContent = r.reason === 'survival' ? '생존 시간이 ' + r.diffSec.toFixed(1) + '초 더 길어서 판정됐어요.' : r.reason === 'score' ? '생존 시간이 1.5초 이내로 비슷해서 점수로 판정됐어요.' : '생존 시간과 점수가 모두 같아요.';
-  $('vsFinNote').textContent = r.me.disconnected ? '연결이 끊겨 종료됐어요.' : '';
-  const ul = $('vsFinList'); ul.textContent = '';
-  ul.appendChild(vsgLi((r.me.name || '나') + ' (나)', vsgSideText(r.me)));
-  ul.appendChild(vsgLi(r.opponent.name || '상대', vsgSideText(r.opponent)));
+// 다시 하기 영역: 서버 view 의 rematch 로 그린다(버튼은 누를 수 있을 때만 보인다)
+function vsgRenderRematch(v) {
+  const btn = $('vsFinRematch'), rm = v.rematch || {}, opp = v.opponent;
+  let can = false, txt = '';
+  if (VSG.rematchGone) txt = '방이 사라져 다시 하기를 할 수 없어요.';
+  else if (!opp || opp.left) txt = '상대가 방을 나가서 다시 할 수 없어요.';
+  else if (rm.available === false) txt = '상대의 연결이 끊겨 있어서 지금은 다시 할 수 없어요.';
+  else if (rm.me) txt = '상대의 다시 하기를 기다리는 중이에요.';
+  else { can = true; txt = rm.opponent ? '상대가 다시 하기를 원해요.' : ''; }
+  const had = document.activeElement === btn;
+  btn.hidden = !can; setText($('vsFinRematchNote'), txt);
+  if (had && !can) $('vsFinRooms').focus();
 }
-// 내 판이 끝났다: 결과를 서버에 보내고(실패하면 한 번 더) 상대를 기다린다
+function vsgShowResult(v) {
+  const r = v.result, w = r.winner;
+  VSG.resultShown = true;
+  const notes = [];
+  if (r.me.disconnected) notes.push('연결이 끊겨 종료됐어요.');
+  if (r.leftMid && r.leftMid.opponent) notes.push('상대가 중간에 나갔어요.');
+  const key = JSON.stringify([r, notes]);
+  if (key !== VSG.resKey) {   // 내용이 바뀐 때만 다시 그린다(1초마다 조회해도 깜빡이지 않게)
+    VSG.resKey = key;
+    vsgFinChrome();
+    setText($('vsFinTitle'), w === 'me' ? '승리' : w === 'opponent' ? '패배' : '무승부');
+    setText($('vsFinWhy'), r.reason === 'survival' ? '생존 시간이 ' + r.diffSec.toFixed(1) + '초 더 길어서 판정됐어요.' : r.reason === 'score' ? '생존 시간이 1.5초 이내로 비슷해서 점수로 판정됐어요.' : '생존 시간과 점수가 모두 같아요.');
+    setText($('vsFinNote'), notes.join(' '));
+    const ul = $('vsFinList'); ul.textContent = '';
+    ul.appendChild(vsgLi((r.me.name || '나') + ' (나)', vsgSideText(r.me)));
+    ul.appendChild(vsgLi(r.opponent.name || '상대', vsgSideText(r.opponent)));
+  }
+  vsgRenderRematch(v);
+}
+// 방이 사라졌다(서버 재시작): 겨루지 못했다는 안내와 내 기록, 방 목록으로
+function vsgShowGone() {
+  vsgStopTimers(); VSG.finActive = false; VSG.resultShown = false; VSG.resKey = '';
+  vsStop(); VS.view = 'fin';
+  $('vs').hidden = false; els.start.hidden = true; vsShow('vsFinView'); vsgFinChrome();
+  setText($('vsFinTitle'), '방이 사라져 결과를 겨루지 못했어요.'); setText($('vsFinWhy'), ''); setText($('vsFinNote'), '서버가 다시 시작됐을 수 있어요. 내 기록은 남지 않아요.');
+  const ul = $('vsFinList'); ul.textContent = '';
+  if (VSG.mine) ul.appendChild(vsgLi('나', vsgSideText(VSG.mine)));
+  if (!$('vsFinView').contains(document.activeElement)) $('vsFinRooms').focus();
+}
+// 내 판이 끝났다: 결과를 서버에 보내고(실패하면 한 번 더) 상대를 기다린다. 끝내 실패하면 다시 보내기·그냥 나가기
 async function vsgOver() {
-  VSG.ended = true; vsgStopTimers(); $('vsBar').hidden = true;
+  VSG.ended = true; vsgStopTimers(); vsgHideInGame();
   const sec = Math.round(Math.max(0, G.time - G.startTime) * 1000) / 1000;   // 게임이 쓰는 생존 시간(탭이 가려진 동안·선택 화면은 흐르지 않는다)
   const body = { survivalSec: sec, score: Math.max(0, Math.round(G.score)), wordCount: G.wordsDone, continued: !!G.contUsed };
+  if (VSG.round) body.round = VSG.round;
+  VSG.finBody = body;
   VSG.mine = { survivalSec: sec, score: body.score, wordCount: body.wordCount, continued: body.continued, disconnected: false };
-  const tk = VSG.token;
+  if (VSG.roomGone) { vsgShowGone(); return; }   // 방이 이미 사라졌다: 보낼 곳이 없다
   vsgShowFin(null, '결과를 보내는 중이에요.');
+  await vsgSendFinish(true);
+}
+async function vsgSendFinish(withRetry) {
+  const tk = VSG.token;
   let res = null;
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < (withRetry ? 2 : 1); i++) {
     VSG.finishCalls++;
-    res = await vsApi('POST', '/' + VSG.roomId + '/finish', body);
+    res = await vsApi('POST', '/' + VSG.roomId + '/finish', VSG.finBody);
     if (tk !== VSG.token || !VSG.on) return;
     if (res.ok || [400, 401, 403, 404, 409].includes(res.status)) break;
-    await new Promise(r => setTimeout(r, 800));
-    if (tk !== VSG.token || !VSG.on) return;
+    if (i + 1 < (withRetry ? 2 : 1)) { await new Promise(r => setTimeout(r, 800)); if (tk !== VSG.token || !VSG.on) return; }
   }
-  if (!res.ok && res.status !== 409) { $('vsFinNote').textContent = '결과를 서버에 보내지 못했어요. 방 목록으로 돌아가 다시 시도해 주세요.'; VSG.finActive = false; return; }
-  $('vsFinNote').textContent = '';
+  if (res.status === 404) { vsgShowGone(); return; }
+  if (!res.ok && res.status !== 409) {   // 끝내 실패: 같은 값을 다시 보내거나(멱등) 그냥 나갈 수 있다
+    VSG.finActive = false; vsgFinChrome();
+    setText($('vsFinNote'), '결과를 서버에 보내지 못했어요. 다시 보내거나 그냥 나갈 수 있어요.');
+    $('vsFinRetry').hidden = false; $('vsFinRetry').disabled = false; setText($('vsFinRooms'), '그냥 나가기');
+    $('vsFinRetry').focus();
+    return;
+  }
+  VSG.finActive = true; vsgFinChrome(); setText($('vsFinNote'), '');
   if (res.ok) vsgFinApply(res.data);
-  vsgFinPollSoon(0);
+  if (VSG.on && VSG.finActive) vsgFinPollSoon(0);
+}
+async function vsgRetryFinish() {
+  if (VSG.finBusy || !VSG.finBody || !VSG.on) return;
+  VSG.finBusy = true; $('vsFinRetry').disabled = true; setText($('vsFinNote'), '결과를 다시 보내는 중이에요.');
+  await vsgSendFinish(false);
+  VSG.finBusy = false;
 }
 // 서버가 내 판이 끝났다고 알렸다(30초 무신호 등): 게임을 멈추고 같은 흐름으로
 function vsgServerEnded(v) {
-  VSG.ended = true; vsgStopTimers(); $('vsBar').hidden = true;
-  if (G.state !== 'over') { G.state = 'over'; G.bossMode = false; clearIntro(); els.cont.hidden = true; box.classList.remove('boss'); els.pop.hidden = true; els.hud.hidden = true; els.bossBanner.hidden = true; stopVoices(); }
+  VSG.ended = true; vsgStopTimers(); vsgHideInGame(); vsgHaltGame();
   const me = v.me || {};
   VSG.mine = { survivalSec: me.survivalSec || 0, score: me.score || 0, wordCount: me.wordCount || 0, continued: !!me.continued, disconnected: !!me.disconnected };
-  vsgShowFin(v, me.disconnected ? '연결이 끊겨 종료됐어요.' : '서버에서 판이 끝난 것으로 처리됐어요.');
+  vsgShowFin(v, me.disconnected ? '연결이 끊겨 종료됐어요. 상대가 끝나면 결과가 나오고, 그때 다시 하기를 할 수 있어요.' : '서버에서 판이 끝난 것으로 처리됐어요.');
   if (v.result) vsgShowResult(v);
   vsgFinPollSoon(0);
 }
+// 새 판이 열렸다(서버 round 증가, 결과 없음): 게임 화면을 정리하고 준비 화면으로. 미리 보기·시작 흐름은 일반 대결과 같다
+function vsgGoReady(v) {
+  vsgHaltGame();
+  vsgReset();
+  VS.round = v.round; VS.view = ''; vsClearToast(false);
+  $('vs').hidden = false; els.start.hidden = true;
+  vsRenderRoom(v);
+  vsSchedule(VS_T.room);
+}
 function vsgFinApply(v) {
   if (!v) return;
+  if (v.round > VSG.round && !v.result) { vsgGoReady(v); return; }
   VSG.opp = v.opponent || null;
   if (v.me && v.me.finished) VSG.mine = { survivalSec: v.me.survivalSec || 0, score: v.me.score || 0, wordCount: v.me.wordCount || 0, continued: !!v.me.continued, disconnected: !!v.me.disconnected };
   if (v.result) { vsgShowResult(v); return; }
   if (VSG.finActive) { const n = $('vsFinNote').textContent; vsgShowFin(v, n); }
 }
+// 결과를 기다리는 동안과 결과가 나온 뒤(다시 하기 대기)에도 같은 주기(VS_T.fin)로 방을 조회한다
 function vsgFinPollSoon(ms) {
   if (VSG.finTimer) clearTimeout(VSG.finTimer);
   const tk = VSG.token;
@@ -1918,13 +2021,54 @@ function vsgFinPollSoon(ms) {
     if (tk !== VSG.token || !VSG.on || !VSG.finActive) return;
     if (res.ok) {
       const v = res.data, st = v.room && v.room.status;
-      if (v.result) { vsgFinApply(v); return; }
-      if (st === 'closed' && !v.opponent) { VSG.finActive = false; $('vsFinTitle').textContent = '상대 없이 끝났어요'; $('vsFinNote').textContent = '상대가 들어오지 않아 결과를 겨루지 못했어요.'; return; }
+      if (!v.result && st === 'closed' && !v.opponent) { VSG.finActive = false; setText($('vsFinTitle'), '상대 없이 끝났어요'); setText($('vsFinNote'), '상대가 들어오지 않아 결과를 겨루지 못했어요.'); return; }
       vsgFinApply(v);
-      vsgFinPollSoon(VS_T.fin);
-    } else if (res.status === 404 || res.status === 403) { VSG.finActive = false; $('vsFinNote').textContent = '방을 찾을 수 없어요. 서버가 다시 시작됐을 수 있어요.'; }
-    else { if (res.status === 429) VSG.pausedUntil = Date.now() + VS_T.backoff; vsgFinPollSoon(res.status === 429 ? VS_T.backoff : VS_T.fin); }
+    } else if (res.status === 404) {
+      if (VSG.resultShown) { VSG.rematchGone = true; $('vsFinRematch').hidden = true; setText($('vsFinRematchNote'), '방이 사라져 다시 하기를 할 수 없어요.'); VSG.finActive = false; return; }
+      vsgShowGone(); return;
+    } else if (res.status === 403) { VSG.finActive = false; setText($('vsFinNote'), '방에 접근할 수 없어요. 방 목록으로 돌아가 주세요.'); return; }
+    else if (res.status === 429) VSG.pausedUntil = Date.now() + VS_T.backoff;
+    if (VSG.on && VSG.finActive) vsgFinPollSoon(res.status === 429 ? VS_T.backoff : VS_T.fin);
   }, ms);
+}
+// 결과 화면의 "다시 하기": 내 의사를 서버에 알린다. 양쪽이 모두 눌렀으면 응답이 곧 새 판(round 증가)이다
+async function vsgRematch() {
+  if (VSG.rematchBusy || !VSG.on || !VSG.roomId) return;
+  VSG.rematchBusy = true;
+  const tk = VSG.token;
+  const res = await vsApi('POST', '/' + VSG.roomId + '/rematch', {});
+  VSG.rematchBusy = false;
+  if (tk !== VSG.token || !VSG.on) return;
+  if (res.ok) { vsgFinApply(res.data); return; }
+  if (res.status === 404) { VSG.rematchGone = true; VSG.finActive = false; $('vsFinRematch').hidden = true; setText($('vsFinRematchNote'), '방이 사라져 다시 하기를 할 수 없어요.'); $('vsFinRooms').focus(); return; }
+  if (res.status === 409) {   // 막혔거나(상대 나감·끊김) 그 사이 새 판이 열렸다: 조회로 맞춘 뒤 사유를 보인다
+    const g = await vsApi('GET', '/' + VSG.roomId);
+    if (tk !== VSG.token || !VSG.on) return;
+    if (g.ok) { vsgFinApply(g.data); if (!VSG.on || !(g.data.result)) return; }
+    const msg = res.data && res.data.error; if (msg) setText($('vsFinRematchNote'), msg);
+    return;
+  }
+  if (res.status === 429) { VSG.pausedUntil = Date.now() + VS_T.backoff; setText($('vsFinRematchNote'), '요청이 많아요. 잠시 후 다시 눌러 주세요.'); return; }
+  setText($('vsFinRematchNote'), res.status === 0 ? '네트워크에 연결하지 못했어요. 다시 눌러 주세요.' : '문제가 생겼어요. 잠시 후 다시 눌러 주세요.');
+}
+// 게임 중 나가기: 확인 대화상자가 열려 있는 동안 게임 시간은 멈춘다(step 이 쉰다. 이어하기 선택 화면과 같은 방식). 상태 신호는 계속 가서 연결은 유지된다
+function vsgQuitOpen() {
+  if (!VSG.running || VSG.ended || VSG.quitOpen) return;
+  VSG.quitOpen = true; $('vsQuit').hidden = false;
+  els.live.textContent = '나가기 확인';
+  $('vsQuitStay').focus();
+}
+function vsgQuitClose(refocus) {
+  if (!VSG.quitOpen) return;
+  VSG.quitOpen = false; $('vsQuit').hidden = true;
+  if (refocus && !$('vsQuitBtn').hidden) $('vsQuitBtn').focus();
+}
+async function vsgQuitConfirm() {
+  if (!VSG.quitOpen) return;
+  vsgQuitClose(false);
+  VSG.ended = true; vsgStopTimers(); vsgHideInGame(); vsgHaltGame();   // 서버는 leave 로 지금 기록(경과 시간·마지막 점수)을 종료 기록으로 삼는다
+  $('vs').hidden = false; els.start.hidden = true;
+  await vsLeaveToList();
 }
 // 방 화면의 "시작" / "먼저 달리기": (미리 보기) → POST start → 게임. 서버 시작 알림은 미리 보기가 끝나고 실제로 시작하는 시점에 보낸다
 async function vsGo() {
@@ -1932,16 +2076,21 @@ async function vsGo() {
   if (vsWords < VS_MIN_WORDS) { vsToast('words', '대결은 단어가 ' + VS_MIN_WORDS + '개 이상 있어야 해요 (지금 ' + vsWords + '개)'); return; }
   const roomId = VS.roomId;
   vsStop(); vsClearToast(false);
-  VSG.on = true;   // 이번 판 단어 순서를 생존 모드 규칙으로 정한다
+  VSG.on = true;   // 이번 판 단어 순서를 생존 모드 규칙으로 정한다(새 판도 매번 새로 정한다)
   const P = planPool(false);
   if (!P.pool.length) { VSG.on = false; vsPoll(); return; }
   const backToRoom = () => { VSG.on = false; $('vs').hidden = false; els.start.hidden = true; if (VS.open) vsPoll(); };
   const begin = async () => {
     VS.busy = true;
-    const res = await vsApi('POST', '/' + roomId + '/start', { wordCount: vsWords });
+    const sb = { wordCount: vsWords }; if (VS.round) sb.round = VS.round;
+    const res = await vsApi('POST', '/' + roomId + '/start', sb);
     VS.busy = false;
     if (!VS.open) { VSG.on = false; return; }
-    if (!res.ok) { VSG.on = false; $('vs').hidden = false; els.start.hidden = true; vsFail(res, 'start'); return; }
+    if (!res.ok) {
+      VSG.on = false; $('vs').hidden = false; els.start.hidden = true;
+      if (res.status === 409 && res.data && res.data.code === 'round_mismatch') { vsToast('round', '방 상태가 바뀌어 새로 맞췄어요. 다시 시작해 주세요.'); vsPoll(); return; }   // 판 번호가 달랐다: 방을 다시 조회해 최신 판으로 맞춘다
+      vsFail(res, 'start'); return;
+    }
     vsgBegin(P, roomId, res.data);
   };
   $('vs').hidden = true; primeAudio();
@@ -1954,6 +2103,20 @@ function setupVersusGameUI() {
     if (VSG.running && !VSG.ended) vsgSend(true);   // 앱이 다시 보이면 즉시 한 번
     else if (VSG.on && VSG.ended && VSG.finActive && !VSG.finTimer) vsgFinPollSoon(0);
   });
+  $('vsQuitBtn').addEventListener('click', vsgQuitOpen);
+  $('vsQuitStay').addEventListener('click', () => vsgQuitClose(true));
+  $('vsQuitGo').addEventListener('click', vsgQuitConfirm);
+  document.addEventListener('keydown', e => {   // 확인 대화상자: Esc 는 "계속 달리기", Tab 은 두 단추 사이만 돈다
+    if (!VSG.quitOpen) return;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); vsgQuitClose(true); }
+    else if (e.key === 'Tab') {
+      e.preventDefault();
+      const f = [$('vsQuitStay'), $('vsQuitGo')], i = f.indexOf(document.activeElement);
+      f[i < 0 ? 0 : (i + (e.shiftKey ? f.length - 1 : 1)) % f.length].focus();
+    }
+  }, true);
+  $('vsFinRematch').addEventListener('click', vsgRematch);
+  $('vsFinRetry').addEventListener('click', vsgRetryFinish);
 }
 function setupVersusUI() {
   $('vsCreate').addEventListener('click', vsCreate);

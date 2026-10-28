@@ -114,7 +114,7 @@ test('시작 흐름(미리 보기 끔): 먼저 달리기 → POST start(wordCoun
   await click(page, '#vsGo');
   await running(page);
   const st = calls('POST', /\/start$/);
-  assert.equal(st.length, 1); assert.deepEqual(st[0].body, { wordCount: 12 });
+  assert.equal(st.length, 1); assert.deepEqual(st[0].body, { wordCount: 12, round: 1 });   // 작업348: 현재 판 번호를 함께 보낸다
   assert.equal(await page.eval('SpellRun.G.survival'), true, '대결은 생존 모드 규칙');
   assert.equal(await page.eval('SpellRun.CONFIG.CONT_ENABLED'), true, '이어하기 켜짐');
   assert.equal(await page.eval("localStorage.getItem('spellrun_mode')"), null, '저장된 모드 선택은 건드리지 않는다');
@@ -194,7 +194,7 @@ test('상태 신호: 주기마다 한 번씩 보내고 겹치지 않으며, 체�
   assert.ok(n1 >= 2 && n1 <= 6, '응답 지연 350ms 에서 겹치지 않고 이어서 보냄: ' + n1);
   assert.equal(state.maxInflight, 1, '서버에 동시 state 요청 최대 ' + state.maxInflight);
   const body = stateCalls()[0].body;
-  assert.deepEqual(Object.keys(body).sort(), ['combo', 'continued', 'hp', 'maxHp', 'score', 'wordNo']);
+  assert.deepEqual(Object.keys(body).sort(), ['combo', 'continued', 'hp', 'maxHp', 'round', 'score', 'wordNo']);
   assert.equal(body.maxHp, 5); assert.equal(body.continued, false); assert.equal(body.wordNo, 1);
   delete state.delay['POST state'];
   // 체력 변화 → 즉시(주기 150ms 를 5000 으로 늘려서 확인)
@@ -306,7 +306,7 @@ test('종료: 내 판이 끝나면 finish(생존 시간·점수·단어 수·이
   assert.match(await text(page, '#vsFinWhy'), /생존 시간이 .*초 더 길어서/);
   const t = await page.eval("document.getElementById('vsFinList').innerText");
   assert.match(t, /테스터[\s\S]*이어하기 사용/); assert.match(t, /민수[\s\S]*점수 500[\s\S]*푼 단어 5개[\s\S]*이어하기 안 씀/);
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('#vsFinView button')].map(b => b.textContent)"), ['방 목록으로', '대결 화면 닫기']);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#vsFinView button:not([hidden])')].map(b => b.textContent)"), ['다시 하기', '방 목록으로', '대결 화면 닫기']);   // 작업348: 결과가 나오면 다시 하기 단추가 맨 앞
   await page.close();
 
   // 승리(생존 시간 차이) · 점수로 판정 · 무승부
