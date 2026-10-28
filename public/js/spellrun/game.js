@@ -2097,11 +2097,27 @@ async function vsGo() {
   if (previewOn) previewRun(P.pool.map(w => ({ word: w.word, meaning: w.meaning })), begin, backToRoom);
   else begin();
 }
+// 작업350: 앱이 다시 보일 때(visibilitychange)와 페이지 보관에서 돌아올 때(pageshow persisted)의 재개는 같은 동작이다.
+// 브라우저에 따라 둘이 함께 오거나 하나만 올 수 있어서, 같은 재개가 0.5초 안에 두 번 일어나지 않게 시각을 적어 둔다.
+let vsResumedAt = 0;
+function vsResumeGame() {
+  if (VSG.running && !VSG.ended) vsgSend(true);   // 달리는 중이면 즉시 한 번
+  else if (VSG.on && VSG.ended && VSG.finActive && !VSG.finTimer) vsgFinPollSoon(0);   // 결과 대기 중이면 결과 조회
+}
+function vsResumeRoom() {
+  if (VS.open && !VS.timer && !VS.busy && VS.view && !VSG.on) vsPoll();   // 방 화면·목록이면 조회 재개
+}
 function setupVersusGameUI() {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
-    if (VSG.running && !VSG.ended) vsgSend(true);   // 앱이 다시 보이면 즉시 한 번
-    else if (VSG.on && VSG.ended && VSG.finActive && !VSG.finTimer) vsgFinPollSoon(0);
+    vsResumedAt = Date.now();
+    vsResumeGame();
+  });
+  window.addEventListener('pageshow', e => {
+    if (!e.persisted || document.hidden) return;   // 보관에서 돌아온 경우만(처음 열림은 해당 없음)
+    if (Date.now() - vsResumedAt < 500) return;   // 방금 visibilitychange 가 같은 재개를 했다
+    vsResumedAt = Date.now();
+    vsResumeGame(); vsResumeRoom();
   });
   $('vsQuitBtn').addEventListener('click', vsgQuitOpen);
   $('vsQuitStay').addEventListener('click', () => vsgQuitClose(true));
@@ -2132,9 +2148,10 @@ function setupVersusUI() {
   document.addEventListener('visibilitychange', () => {
     if (!VS.open) return;
     if (document.hidden) { if (VS.timer) { clearTimeout(VS.timer); VS.timer = null; } VS.token++; }   // 숨겨진 동안 조회를 멈춘다
-    else if (!VS.timer && !VS.busy && VS.view && !VSG.on) vsPoll();
+    else vsResumeRoom();
   });
-  window.addEventListener('pagehide', () => { if (VS.roomId) vsLeaveCall(VS.roomId, true); });
+  // 작업350: persisted 가 true 이면 되돌아올 수 있는 보관(bfcache)이라 방을 나가지 않는다. 끝내 안 돌아오면 서버의 30초 무신호 규칙이 처리한다
+  window.addEventListener('pagehide', e => { if (e.persisted) return; if (VS.roomId) vsLeaveCall(VS.roomId, true); });
 }
 // 작업332: 시작 화면 모드 선택. 생존 모드는 단어가 SURV_MIN_WORDS 개 이상일 때만 시작할 수 있다.
 function setupModeUI(nWords) {

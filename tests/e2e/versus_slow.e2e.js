@@ -8,7 +8,7 @@ const H = require('./helpers/harness');
 const { SKIP, click, text, shown, roomIdOf, roundOf, createRoom, joinFromList, holdAlive, endRun, hideTab, showTab, resultShown, finTitle, closePlayer, startGame, sleep, api } = H;
 const { LIMITS } = require('../../lib/versus');
 
-const KNOWN = { 'pagehide-true': '350에서 수정: B1 (pagehide persisted=true 에서도 leave 를 보내 돌아온 사용자가 방에서 빠져 있음)' };
+const KNOWN = {};
 const opts = (name, extra) => Object.assign({ skip: SKIP || KNOWN[name] || false, timeout: 240000 }, extra);
 
 let env;
@@ -145,8 +145,13 @@ for (const persisted of [false, true]) {
     const v = (await api(env.srv, 'A', 'GET', '/rooms/' + id)).data;
     console.log(`[흉내 결과] pagehide persisted=${persisted}: leave 요청 ${leaves}건, 서버에서 A 의 left=${v.me.left}`);
     if (persisted) {
+      const t = Date.now();
       await A.eval("window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))");
-      await sleep(1500);
+      for (let i = 0; i < 30 && !A.reqs.some(r => r.path.endsWith('/state') && r.t >= t); i++) await sleep(50);
+      const first = A.reqs.find(r => r.path.endsWith('/state') && r.t >= t);
+      assert.ok(first && first.t - t < 1000, '돌아온 뒤 1초 안에 상태 신호: ' + (first && first.t - t));
+      assert.equal(await A.eval("SpellRun.G.state !== 'over'"), true, '게임 계속');
+      await sleep(1000);
       const v2 = (await api(env.srv, 'A', 'GET', '/rooms/' + id)).data;
       assert.equal(v2.me.left, false, '돌아온 뒤에도 방에 남아 있어야 한다');
       assert.equal(leaves, 0);

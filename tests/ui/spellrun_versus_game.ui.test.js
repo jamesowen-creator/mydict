@@ -457,3 +457,98 @@ for (const [w, h] of [[320, 568], [360, 568], [390, 568], [320, 640], [360, 640]
     await page.close();
   });
 }
+
+// 작업350: 페이지 보관(bfcache). pagehide persisted=true 는 방을 나가지 않고, 돌아오면(pageshow persisted=true) 앱이 다시 보일 때와 같은 재개를 한 번만 한다.
+const pagehide = (page, persisted) => page.eval(`window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: ${persisted} }))`);
+const pageshow = (page, persisted) => page.eval(`window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: ${persisted} }))`);
+const roomGets = () => calls('GET', /rooms\/[0-9a-f]{24}$/).length;
+
+test('보관(pagehide persisted=true) → 복귀(pageshow): 방 화면에서 leave 없이 조회가 이어지고 타이머는 하나뿐', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame();
+  const id = await makeRoom(page);
+  await page.eval('SpellRun.vs.T.room = 300');
+  await sleep(700);
+  await pagehide(page, true);
+  await sleep(300);
+  assert.equal(calls('POST', /\/leave$/).length, 0, '보관에서는 leave 없음');
+  assert.equal(store._rooms.get(id).host.left, false);
+  await page.eval("Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange'));");   // 보관에 들어가며 숨김
+  await sleep(500);
+  const n0 = roomGets(); await sleep(700);
+  assert.equal(roomGets(), n0, '숨겨진 동안 조회 없음');
+  await page.eval("Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange'));");   // 돌아옴: 둘 다 온다
+  await pageshow(page, true);
+  await sleep(2000);
+  const per = (roomGets() - n0) / 2;
+  assert.ok(per <= 5, '조회 주기가 하나뿐(주기 300ms 면 초당 약 3.3회): 초당 ' + per);
+  assert.ok(per >= 2, '조회가 이어진다: 초당 ' + per);
+  assert.equal(calls('POST', /\/leave$/).length, 0);
+  await page.close();
+});
+
+test('보관 → 복귀: 달리는 중에 leave 없이 상태 신호가 즉시 정확히 한 번(visibilitychange 와 pageshow 가 함께 와도)', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame();
+  const id = await makeRoom(page);
+  await click(page, '#vsGo'); await running(page);
+  await page.eval("SpellRun.manual = true; SpellRun.vs.T.signal = 5000; clearInterval(SpellRun.vs.game.timer); SpellRun.vs.game.timer = setInterval(() => {}, 5000)");
+  await sleep(600);
+  await pagehide(page, true);
+  await page.eval("Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange'));");
+  await sleep(500);
+  const n = stateCalls().length;
+  await page.eval("Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange'));");
+  await pageshow(page, true);
+  await sleep(900);
+  assert.equal(stateCalls().length, n + 1, '복귀 즉시 신호 한 번');
+  assert.equal(calls('POST', /\/leave$/).length, 0); assert.equal(store._rooms.get(id).host.left, false);
+  // pageshow 만 오는 브라우저
+  await sleep(600);
+  const m = stateCalls().length;
+  await pagehide(page, true); await pageshow(page, true);
+  await sleep(700);
+  assert.equal(stateCalls().length, m + 1, 'pageshow 만 와도 한 번');
+  assert.ok(['run', 'intro'].includes(await page.eval('SpellRun.G.state')));
+  await page.close();
+});
+
+test('보관 → 복귀: 결과 대기 중에는 leave 없이 결과 조회가 이어지고(타이머 하나), persisted=false 는 leave 1건', { skip: SKIP }, async () => {
+  resetState();
+  let page = await openGame();
+  let id = await makeRoom(page);
+  joinOpp(id); store.start(id, OPP.id, 12);
+  await page.waitFor("document.getElementById('vsGo').textContent === '시작'");
+  await click(page, '#vsGo'); await running(page);
+  await die(page);
+  await page.waitFor("!document.getElementById('vsFinView').hidden", 4000);
+  await sleep(500);
+  await pagehide(page, true);
+  await page.eval("Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange'));");
+  await sleep(500);
+  const n0 = roomGets(); await sleep(500);
+  assert.equal(roomGets(), n0, '숨겨진 동안 조회 없음');
+  await page.eval("Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange'));");
+  await pageshow(page, true);
+  await sleep(2000);
+  const per = (roomGets() - n0) / 2;
+  assert.ok(per >= 5 && per <= 12, '결과 조회 주기(100ms 설정)가 하나뿐: 초당 ' + per);
+  assert.equal(calls('POST', /\/leave$/).length, 0);
+  store.finish(id, OPP.id, { survivalSec: 0.2, score: 0, wordCount: 1, continued: false });
+  await page.waitFor("['승리', '패배', '무승부'].includes(document.getElementById('vsFinTitle').textContent)", 4000);
+  await page.close();
+
+  resetState();
+  page = await openGame();
+  id = await makeRoom(page);
+  joinOpp(id); store.start(id, OPP.id, 12);
+  await page.waitFor("document.getElementById('vsGo').textContent === '시작'");
+  await click(page, '#vsGo'); await running(page);
+  await die(page);
+  await page.waitFor("!document.getElementById('vsFinView').hidden", 4000);
+  await pagehide(page, false);
+  await sleep(500);
+  assert.equal(calls('POST', /\/leave$/).length, 1, '닫히는 pagehide 는 leave 한 번');
+  assert.equal(store._rooms.get(id).host.left, true);
+  await page.close();
+});
