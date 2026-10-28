@@ -92,9 +92,6 @@ router.get('/auth/google/callback', (req, res, next) => {
   }
 );
 
-router.get('/auth/logout', (req, res) => {
-  req.logout(() => res.redirect('/'));
-});
 
 // ─── /api/me ─────────────────────────────────────────────────────────────────
 

@@ -3055,7 +3055,7 @@ function podcastStartSelected() {
   const locale = { en: 'en', ko: 'ko', ja: 'ja', zh: 'zh' }[tab] || 'en';
   podcastPlaylist = words.slice().sort((a, b) => a.word.localeCompare(b.word, locale));
   podcastIndex = 0; podcastAudio = null; podcastSegments = []; podcastSegIdx = 0;
-  podcastPlaying = true;
+  podcastPlaying = true; podcastLimitShown = false;
   _updatePodcastBtn(); _showPodcastPlayer(); _podcastPlayFromCurrentWord();
 }
 
@@ -4082,6 +4082,8 @@ async function prefetchTTS(text, lang) {
 
 // ─── PODCAST MODE ────────────────────────────────────────────────────────────
 let podcastPlaylist = [];
+let podcastLimitShown = false;   // 작업352: 발음 한도 초과 안내는 한 번의 재생에서 한 번만
+function podcastLimitNotice() { if (podcastLimitShown) return; podcastLimitShown = true; showToast('오늘 발음 듣기 한도를 다 썼어요'); }
 let podcastIndex = 0;
 let podcastPlaying = false;
 let podcastSpeed = 1.0;
@@ -4205,6 +4207,7 @@ async function _podcastPlayNextSeg() {
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, lang })
       });
+      if (res.status === 429) podcastLimitNotice();
       if (!res.ok) throw new Error('TTS 실패');
       const blob = await res.blob();
       url = URL.createObjectURL(blob);

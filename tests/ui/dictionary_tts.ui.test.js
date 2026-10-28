@@ -189,3 +189,25 @@ test('기기 음성으로 읽는 중 같은 버튼을 다시 누르면 멈추고
   assert.match(pod, /fetch\('\/api\/tts', \{\s+method: 'POST',\s+headers: \{ \.\.\.authHeaders\(\), 'Content-Type': 'application\/json' \}/, '팟캐스트는 이미 헤더를 보내고 그대로다');
   assert.match(pod, /if \(!res\.ok\) throw new Error\('TTS 실패'\)/); assert.ok(!/speechSynthesis|serverTtsOff/.test(pod), '팟캐스트 구간에는 이번 변경이 없다');
 });
+
+// 작업352: 팟캐스트 재생 중 발음 한도 초과(429)는 안내를 한 번만 보이고, 그 밖의 동작(다음 구간으로 넘어감)은 그대로다
+test('팟캐스트 429: "오늘 발음 듣기 한도를 다 썼어요" 안내 한 번(구간이 여러 개여도 반복 없음), 500 은 안내 없음, 새로 재생하면 다시 한 번', { skip: SKIP }, async () => {
+  const run = async (page, plan) => {
+    state.plan.length = 0; for (const p of plan) state.plan.push(p);
+    await page.eval("window.__toasts.length = 0; podcastPlaylist = [{ word: 'apple', lang: 'en', short_meaning: '사과' }, { word: 'pear', lang: 'en', short_meaning: '배' }]; podcastIndex = 0; podcastAudio = null; podcastSegments = []; podcastSegIdx = 0; podcastMode = 'word+meaning'; podcastRepeat = 1; podcastGap = 0.05; podcastPlaying = true; podcastLimitShown = false; _podcastPlayFromCurrentWord();");
+    await sleep(2500);
+    await page.eval('podcastPlaying = false');
+  };
+  const page = await open();
+  await run(page, Array(8).fill({ status: 429 }));
+  let t = await page.eval('window.__toasts.filter(m => m.includes("발음 듣기 한도"))');
+  assert.deepEqual(t, ['오늘 발음 듣기 한도를 다 썼어요'], '구간이 여러 개 실패해도 안내는 한 번');
+  assert.ok(state.reqs.length >= 3, '다음 구간으로 계속 넘어간다(동작은 그대로): ' + state.reqs.length);
+  assert.doesNotMatch(t[0], /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
+  state.reqs.length = 0;
+  await run(page, Array(8).fill({ status: 500 }));
+  assert.deepEqual(await page.eval('window.__toasts.filter(m => m.includes("발음 듣기 한도"))'), [], '429 가 아니면 안내 없음');
+  await run(page, Array(8).fill({ status: 429 }));
+  assert.deepEqual(await page.eval('window.__toasts.filter(m => m.includes("발음 듣기 한도"))'), ['오늘 발음 듣기 한도를 다 썼어요'], '새 재생에서는 다시 한 번');
+  await page.close();
+});

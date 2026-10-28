@@ -1,4 +1,10 @@
 require('dotenv').config();
+// 작업352: 운영 환경(DATABASE_URL 있음)에서 비밀값이 비어 있으면 시작하지 않는다(변수 이름만 로그, 값은 출력하지 않음)
+const { missingSecrets, errorHandler, corsOptions } = require('./lib/http_safety');
+{
+  const missing = missingSecrets(process.env);
+  if (missing.length) { console.error('필수 환경변수가 비어 있어 서버를 시작하지 않습니다: ' + missing.join(', ')); process.exit(1); }
+}
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -28,7 +34,7 @@ if (process.env.DATABASE_URL) {
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
-app.use(cors());
+app.use(cors(corsOptions));   // 작업352: 같은 사이트 요청만 허용
 app.use(express.json({ limit: '1mb' }));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'mydict-session-secret',
@@ -70,6 +76,8 @@ app.use(require('./routes/voice_study'));
 app.use(require('./routes/concept_map'));   // 작업270-1: 새 메뉴 개념 지도
 app.use(require('./routes/jgrammar'));      // 작업JG-1: 일본어 문법 해설
 app.use(require('./routes/versus'));        // 작업343: 2인 대결(방은 서버 메모리, 인스턴스 1개 전제)
+
+app.use(errorHandler);   // 작업352: 라우터 등록 뒤. 잘못된 JSON 400, 그 밖의 처리되지 않은 오류 500(내부 내용 없음)
 
 app.listen(PORT, () => {
   console.log(`사전 서버 실행 중: http://localhost:${PORT}`);
