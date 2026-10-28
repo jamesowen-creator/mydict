@@ -1598,12 +1598,16 @@ function setupPreviewUI() {
   $('pvStart').addEventListener('click', () => { const f = PV.onReady; pvStop(); if (f) f(); });
   $('pvBack').addEventListener('click', () => { const f = PV.onBack; pvStop(); if (f) f(); });
   $('pv').addEventListener('keydown', e => { if (e.key === 'Escape') $('pvBack').click(); });
+  // 작업351: 숨겨질 때와 되돌아올 수 있는 보관(pagehide persisted=true)은 같은 "숨겨짐" 멈춤이고, 다시 보일 때와 보관에서 돌아올 때(pageshow persisted=true)는 같은 재개다.
+  // 사용자가 직접 멈춘 상태(userPaused)는 돌아와도 멈춘 채로 둔다. 둘이 함께 와도 재개는 한 번만(hiddenPaused 와 직전 0.5초 기록).
+  let pvResumedAt = 0;
+  const pvHide = () => { if (PV.active && PV.mode === 'show' && !PV.hiddenPaused) { PV.hiddenPaused = true; pvClear(); stopVoices(); PV.token++; } };
+  const pvResume = () => { if (PV.active && PV.mode === 'show' && PV.hiddenPaused) { PV.hiddenPaused = false; if (!PV.userPaused) pvShow(PV.idx); } };   // 지금 단어부터 이어 간다
   document.addEventListener('visibilitychange', () => {
-    if (!PV.active || PV.mode !== 'show') return;
-    if (document.hidden) { if (!PV.hiddenPaused) { PV.hiddenPaused = true; pvClear(); stopVoices(); PV.token++; } }   // 숨겨지면 멈추고
-    else if (PV.hiddenPaused) { PV.hiddenPaused = false; if (!PV.userPaused) pvShow(PV.idx); }   // 다시 보이면 지금 단어부터 이어 간다
+    if (document.hidden) pvHide(); else { pvResumedAt = Date.now(); pvResume(); }
   });
-  window.addEventListener('pagehide', () => { if (PV.active) pvStop(); });
+  window.addEventListener('pagehide', e => { if (!PV.active) return; if (e.persisted) pvHide(); else pvStop(); });   // 실제로 닫힐 때만 끝낸다
+  window.addEventListener('pageshow', e => { if (!e.persisted || document.hidden || Date.now() - pvResumedAt < 500) return; pvResumedAt = Date.now(); pvResume(); });
 }
 // 시작·새 판·틀린 단어 다시 도전: 미리 보기가 켜져 있으면 먼저 이번 판 단어 순서를 정해 보여 주고, 시작을 누르면 같은 순서로 판을 연다
 function beginRound(reviewOnly) {

@@ -294,3 +294,79 @@ test('360×640: 모드 줄에 미리 보기 스위치가 들어가도 시작 카
   noErrors(page);
   await page.close();
 });
+
+// 작업351: 페이지 보관(bfcache). pagehide persisted=true 는 미리 보기를 끝내지 않고 숨겨짐처럼 멈추며, 돌아오면(pageshow persisted=true) 지금 단어부터 한 번만 이어 간다.
+const pagehide = (page, persisted) => page.eval(`window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: ${persisted} }))`);
+const pageshow = (page, persisted) => page.eval(`window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: ${persisted} }))`);
+const setHidden = (page, h) => page.eval(`Object.defineProperty(document, 'hidden', { configurable: true, get: () => ${h} }); document.dispatchEvent(new Event('visibilitychange'));`);
+
+test('보관(pagehide persisted=true) → 복귀(pageshow): 미리 보기가 끝나지 않고 멈췄다가 같은 단어부터 한 번만 이어지고, 끝나면 시작이 그대로 동작한다', { skip: SKIP }, async () => {
+  for (const withVisibility of [true, false]) {   // 보관에 들어갈 때 visibilitychange 가 함께 오는 브라우저 / 오지 않는 브라우저
+    resetState();
+    const page = await openGame(); await fast(page, { maxMs: 3000, gapMs: 2500 });
+    await click(page, '#startBtn');
+    await waitFor(page, "document.getElementById('pvProg').textContent === '1/10'");   // 단어가 저절로 넘어가지 않을 만큼 느리게(재개 횟수를 세기 위해)
+    await page.eval("document.getElementById('pvArea').click()");   // 탭하면 다음 단어
+    await waitFor(page, "document.getElementById('pvProg').textContent === '2/10'");
+    if (withVisibility) await setHidden(page, true);
+    await pagehide(page, true);
+    await sleep(200);
+    assert.equal(await page.eval('SpellRun.preview.state.active'), true, '끝나지 않는다');
+    assert.equal(await page.eval("document.getElementById('pv').hidden"), false);
+    const idx = await page.eval('SpellRun.preview.state.idx'), shownN = (await pvShown(page)).length, n = state.requests.length;
+    await sleep(700);
+    assert.equal(await page.eval('SpellRun.preview.state.idx'), idx, '멈춘 동안 단어가 넘어가지 않음');
+    assert.equal(state.requests.length, n, '멈춘 동안 요청 없음');
+    if (withVisibility) await setHidden(page, false);
+    await pageshow(page, true);
+    await waitFor(page, `SpellRun.preview.state.wordsShown.length === ${shownN + 1}`, 3000);
+    const shown = await pvShown(page);
+    assert.equal(shown[shownN], shown[shownN - 1], '같은 단어부터 이어 간다');
+    await sleep(300);
+    assert.equal((await pvShown(page)).length, shownN + 1, '재개는 한 번만(visibilitychange 와 pageshow 가 함께 와도)');
+    await page.eval("document.getElementById('pvSkip').click()");
+    await ready(page);
+    await click(page, '#pvStart');
+    await waitFor(page, "SpellRun.G.state === 'run' || SpellRun.G.state === 'intro'");   // onReady 가 그대로 동작
+    noErrors(page);
+    await page.close();
+  }
+  // 돌아가기(onBack)도 그대로
+  resetState();
+  const p2 = await openGame(); await fast(p2, { maxMs: 3000, gapMs: 100 });
+  await click(p2, '#startBtn');
+  await waitFor(p2, "document.getElementById('pvProg').textContent === '1/10'");
+  await pagehide(p2, true); await pageshow(p2, true);
+  await click(p2, '#pvBack');
+  assert.equal(await p2.eval("document.getElementById('start').hidden"), false);
+  assert.equal(await p2.eval('SpellRun.preview.state.active'), false);
+  await p2.close();
+});
+
+test('보관 복귀: 사용자가 직접 멈춘 미리 보기는 돌아와도 멈춘 채. 실제로 닫히는 pagehide(persisted=false)는 지금처럼 끝낸다', { skip: SKIP }, async () => {
+  resetState();
+  let page = await openGame(); await fast(page, { maxMs: 3000, gapMs: 100 });
+  await click(page, '#startBtn');
+  await waitFor(page, "document.getElementById('pvProg').textContent === '2/10'");
+  await click(page, '#pvPause');
+  await sleep(200);
+  const idx = await page.eval('SpellRun.preview.state.idx'), n = state.requests.length, shownN = (await pvShown(page)).length;
+  await pagehide(page, true); await pageshow(page, true);
+  await sleep(800);
+  assert.equal(await page.eval('SpellRun.preview.state.idx'), idx);
+  assert.equal(state.requests.length, n, '직접 멈춘 채로 둔다');
+  assert.equal((await pvShown(page)).length, shownN);
+  assert.equal(await page.eval("document.getElementById('pvPause').getAttribute('aria-pressed')"), 'true');
+  await click(page, '#pvPause');   // 직접 계속하면 이어 간다
+  await waitFor(page, `SpellRun.preview.state.wordsShown.length === ${shownN + 1}`, 3000);
+  await page.close();
+
+  resetState();
+  page = await openGame(); await fast(page, { maxMs: 3000, gapMs: 100 });
+  await click(page, '#startBtn');
+  await waitFor(page, "document.getElementById('pvProg').textContent === '1/10'");
+  await pagehide(page, false);
+  assert.equal(await page.eval('SpellRun.preview.state.active'), false, '닫히는 것이면 끝낸다');
+  assert.equal(await page.eval("document.getElementById('pv').hidden"), true);
+  await page.close();
+});
