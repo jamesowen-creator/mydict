@@ -131,6 +131,7 @@ function buildConfig(v) {
   SURV_HIGH_MAX: 0.5,     // 높은 칸 확률 상한
   SURV_BOSS_HEAL: 1,      // 생존 모드에서 보스 시작 때 회복하는 체력(기본 모드 BOSS_HEAL 과 따로 둔다)
   SURV_BOSS_HEAL_UNTIL: 20, // 단어 순번이 이 값 이하인 보스에서만 회복한다(그 뒤에는 회복 없음: 잘하는 사람이 끝없이 가는 것을 막는다)
+  STREAM_EDGE: false,     // 작업354: 타일 진입 방식. false = 'classic'(지금 세로 동작), true = 'edge'(오른쪽 화면 밖에서 흘러 들어온다). 주소 옵션 stream=edge
   WARN_SEC: T(0.78)       // 예고 표시가 보이는 최소 시간(최고 속도 기준, 거리로 계산). 기본 pace 1.3 에서 0.6초이고 pace 에 반비례(다른 시간 값과 같은 방식)
   };
   if (v.hp) cfg.HP = v.hp;
@@ -155,6 +156,7 @@ function buildConfig(v) {
   if (v.rescuehigh) cfg.RESCUE_HIGH = v.rescuehigh;
   if (v.continue !== undefined) cfg.CONT_ENABLED = !!v.continue;
   if (v.boostsec) cfg.BOOST_SEC = v.boostsec;
+  if (v.stream !== undefined) cfg.STREAM_EDGE = !!v.stream;
   // 빠른 pace 에서는 같은 px 폭이 더 짧은 시간에 지나가 점프 창도 같은 비율로 짧아지므로, 최저 속도에서도 여유 창이 남도록 폭을 줄인다(기본 pace 1.3 에서는 줄지 않는다)
   const fitW = (base, H) => Math.max(8, Math.min(base, Math.floor(cfg.SPEED_MIN * (airWindow(cfg, H).len - cfg.OBST_MIN_WINDOW - 0.01) - 2 * cfg.OBST_FOOT)));
   cfg.OBST_W = fitW(cfg.OBST_W, cfg.OBST_H);
@@ -172,7 +174,8 @@ const OPTION_RULES = {
   hpfullbonus: { min: 0, max: 1000, int: true, def: 100 }, speeditem: { min: 0, max: 1, int: true, def: 1 }, speedevery: { min: 1, max: 10, int: true, def: 4 }, boostsec: { min: 1, max: 10, def: 5 },
   survheart: { min: 0, max: 5, int: true, def: 3 }, survramp: { min: 0, max: 0.2, def: 0.05 },
   rescue: { min: 0, max: 1, int: true, def: 1 }, itemhp: { min: 0, max: 1, def: 0.6 }, rescueevery: { min: 1, max: 10, int: true, def: 2 }, rescuehigh: { min: 1, max: 10, int: true, def: 5 },
-  continue: { min: 0, max: 1, int: true, def: 1 }
+  continue: { min: 0, max: 1, int: true, def: 1 },
+  stream: { min: 0, max: 1, int: true, def: 0 }   // 작업354: stream=edge(=1) / classic(=0)
 };
 // 반환 { values: 유효한 값(기본값과 같아도 포함), applied: 기본값과 다른 옵션 이름 }
 function parseOptions(search) {
@@ -180,7 +183,9 @@ function parseOptions(search) {
   let sp;
   try { sp = new URLSearchParams(String(search || '')); } catch (e) { return { values: values, applied: applied }; }
   Object.keys(OPTION_RULES).forEach(function (k) {
-    const raw = sp.get(k), rule = OPTION_RULES[k];
+    let raw = sp.get(k);
+    const rule = OPTION_RULES[k];
+    if (k === 'stream' && raw !== null) raw = raw.trim() === 'edge' ? '1' : raw.trim() === 'classic' ? '0' : raw;   // 작업354: 낱말로도 받는다
     if (raw === null || !/^\s*-?\d+(\.\d+)?\s*$/.test(raw)) return;
     const n = Number(raw);
     if (!Number.isFinite(n) || n < rule.min || n > rule.max || (rule.int && !Number.isInteger(n))) return;
@@ -724,6 +729,86 @@ function sparkleAlpha(j2, cfg) {
   return Math.max(0, 1 - Math.abs(j2 - jumpV0(cfg) / jumpG(cfg)) / 0.12);
 }
 
+// ---- 작업354: 타일 흐름(스트림) 'edge' 진입 방식 ----
+// classic(세로, 지금 동작)은 이 함수들을 쓰지 않는다. edge 는 글자 묶음·아이템·장애물을 오른쪽 화면 밖에서 시작해 흘려보내고,
+// 도착 시점은 classic 과 같게(앞 묶음 정답을 먹은 시점 기준) 계산한 뒤 화면 안에서 생기지 않도록·남은 타일과 겹치지 않도록 오른쪽으로 민다.
+// 좌표는 모두 화면 논리 px 이고, R0 는 "그 묶음이 classic 이라면 생겼을 순간의 러너 위치"(가상 위치)다.
+const STREAM = {
+  MIN_GAP: 90,        // 남은 타일과 다음 묶음 첫 객체의 중심 사이 최소 거리(px). 타일 폭 + 여유
+  PAD: 32,            // 두 타일 폭의 절반 합에 더하는 여유(px). 폭이 큰 조각 타일에서 MIN_GAP 이 모자라지 않게
+  HALF_TILE: 29,      // 진입 거리에 쓰는 기본 타일 반폭(px). 실제로는 객체마다 반폭을 쓴다
+  HALF_ITEM: 23,      // 하트·번개·구조 아이템 반폭
+  LOOKAHEAD: 240,     // 첫 객체가 진입 지점보다 이만큼 가까워지면 미리 줄에 넣는다(px)
+  DIM_ALPHA: 0.55,    // 지금 풀 묶음이 아닌 타일의 투명도
+  DIM_SCALE: 0.88     // 지금 풀 묶음이 아닌 타일의 크기 배율
+};
+// 진입 지점: 객체의 중심이 이 값 이상이면 화면 밖(오른쪽)에서 시작한다. viewW = 화면 논리 폭
+function streamEntryX(viewW, half) { return viewW + (half === undefined ? STREAM.HALF_TILE : half); }
+// minPx: 추가로 요구하는 거리. 다음 묶음의 첫 타일이 높은 칸이면 2단 점프를 위해 첫 점프가 일찍(약 0.46초 전) 시작되므로, 남은 타일이 그 점프 중에 지나가지 않도록 묶음 안 간격(gap)을 요구한다
+function streamMinGap(wA, wB, minPx) { return Math.max(STREAM.MIN_GAP, ((wA || 0) + (wB || 0)) / 2 + STREAM.PAD, minPx || 0); }
+// 묶음 하나의 배치(classic 의 spawnPack 산식과 같다). o: { R0, v, widths: 타일 폭 목록, item: 앞에 아이템이 붙는가, obstacle: 'box'|'pit'|null, firstHigh: 첫 타일이 높은 칸인가 }
+function layoutGroup(cfg, o) {
+  cfg = cfg || CONFIG;
+  const v = o.v, gap = v * gapSec(v, cfg);
+  let x0 = o.R0 + v * leadSec(v, cfg), itemX = null, ob = null, lay = null;
+  if (o.item) { itemX = x0; x0 += gap; }
+  if (o.obstacle) {
+    lay = obstacleLayout(cfg, o.obstacle);
+    x0 = Math.max(x0, o.R0 + lay.D1);
+    ob = { kind: lay.kind, x: x0 - lay.post - lay.w, w: lay.w };
+  }
+  return { firstHigh: !!o.firstHigh, itemX: itemX, obstacle: ob, lay: lay, tiles: o.widths.map(function (w, i) { return { x: x0 + i * gap, w: w }; }), x0: x0, gap: gap, R0: o.R0, v: v };
+}
+// 묶음의 가장 왼쪽 가장자리(아이템·장애물·첫 타일 중 가장 왼쪽)와 가장 왼쪽 객체의 중심·폭
+function groupLeft(g) {
+  let left = Infinity, cx = Infinity, w = 0;
+  const take = function (l, c, ww) { if (l < left) left = l; if (c < cx) { cx = c; w = ww; } };
+  if (g.itemX !== null) take(g.itemX - STREAM.HALF_ITEM, g.itemX, STREAM.HALF_ITEM * 2);
+  if (g.obstacle) take(g.obstacle.x, g.obstacle.x + g.obstacle.w / 2, g.obstacle.w);
+  if (g.tiles.length) take(g.tiles[0].x - g.tiles[0].w / 2, g.tiles[0].x, g.tiles[0].w);
+  return { left: left, cx: cx, w: w };
+}
+function shiftGroup(g, dx) {
+  return Object.assign({}, g, { itemX: g.itemX === null ? null : g.itemX + dx, obstacle: g.obstacle ? Object.assign({}, g.obstacle, { x: g.obstacle.x + dx }) : null, x0: g.x0 + dx,
+    tiles: g.tiles.map(function (t) { return { x: t.x + dx, w: t.w }; }) });
+}
+// 오른쪽으로 밀어야 하는 거리(px, 0 이상): ① 모든 객체가 화면 밖(왼쪽 가장자리 >= viewW) ② 남은 타일(leftover: {x, w})과 최소 거리 ③ 장애물이 있으면 남은 타일이 장애물 점프 시작 전에 러너를 지나가도록
+function streamShift(cfg, g, o) {
+  cfg = cfg || CONFIG;
+  const gl = groupLeft(g);
+  let dx = Math.max(0, o.viewW - gl.left);
+  if (o.leftover) {
+    dx = Math.max(dx, o.leftover.x + streamMinGap(o.leftover.w, gl.w, g.firstHigh ? g.gap : 0) - gl.cx);
+    if (g.obstacle && g.lay) {   // 장애물 점프 시작 구간의 가장 이른 시각(lo, 묶음이 생긴 순간 기준)보다 남은 타일이 먼저 러너를 지나가야 한다
+      const win = obstacleWindow(cfg, g.lay, g.v);
+      dx = Math.max(dx, o.leftover.x + g.lay.D1 - g.v * win.lo - g.x0);
+    }
+  }
+  return Math.max(0, dx);
+}
+// 묶음이 생긴 순간의 가상 러너 위치. kind: 'pack'(앞 묶음 정답을 먹은 뒤) | 'word'(앞 단어 마지막 정답 뒤 새 단어) | 'start'(판 시작·이어하기) | 'recover'(틀린 뒤 같은 칸 다시)
+// o: { xc: 앞 묶음 정답 타일 위치, runnerX, v, bossNext, first }
+function streamBaseR0(cfg, kind, o) {
+  cfg = cfg || CONFIG;
+  if (kind === 'pack') return o.xc + o.v * cfg.PACK_DELAY;
+  if (kind === 'word') return o.xc + o.v * (cfg.POP_SEC + (o.bossNext ? cfg.BOSS_INTRO_SEC : 0) + cfg.WORD_START_DELAY);
+  if (kind === 'start') return o.runnerX + o.v * (cfg.WORD_START_DELAY + (o.first ? cfg.FIRST_WORD_EXTRA : 0));
+  return o.runnerX + o.v * cfg.PACK_DELAY;   // recover: classic 이 틀린 뒤 같은 칸을 다시 내는 시간과 같다
+}
+// 한 번에 배치: 배치 결과(g)와 classic 대비 늦춤(dx, px)을 돌려준다
+function streamPlace(cfg, kind, o) {
+  cfg = cfg || CONFIG;
+  const g0 = layoutGroup(cfg, { R0: streamBaseR0(cfg, kind, o), v: o.v, widths: o.widths, item: o.item, obstacle: o.obstacle, firstHigh: o.firstHigh });
+  const dx = streamShift(cfg, g0, { viewW: o.viewW, leftover: o.leftover });
+  return { group: dx ? shiftGroup(g0, dx) : g0, dx: dx, group0: g0 };
+}
+// 글자 타일이 "지금 풀 칸"의 정답인가. cur: { wi, si }
+function streamIsCorrect(t, cur) { return !!(t.correct && t.wi === cur.wi && t.si === cur.si); }
+// 지금 풀 칸의 묶음이 아닌 글자 타일은 흐리게 보인다(아이템은 그대로)
+function streamDim(t, cur) { return !t.kind && !!(t.dimmed || t.wi !== cur.wi || t.si !== cur.si); }
+// 화면 밖(왼쪽 가장자리가 viewW 이상)에 있고 아직 러너에 닿지 않은 살아 있는 타일
+function streamOffscreen(t, viewW) { return t.state === 'live' && !t.checked && t.x - t.w / 2 >= viewW; }
+
 // ---- 작업325: 발음 출처 문구(점검 옵션 ttsdebug) ----
 // o: { engine: 'server'|'builtin'|'none', cache: 'HIT'|'MISS'|'', status: 서버 응답 코드, reason: 'timeout'|'play'|'' }
 function ttsSourceLabel(o) {
@@ -902,6 +987,7 @@ return {
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
   survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
+  STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamDim: streamDim, streamOffscreen: streamOffscreen,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };
 });

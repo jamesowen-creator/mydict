@@ -335,7 +335,7 @@ const G = {
   hp: 0, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
   speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, survival: false, supply: null, startTime: 0, speedPending: false, speedSlot: 0, rescuePending: false, rescueSlot: 0, rescueKind: 'hint', speedGroupTaken: -1, groupTakenAtLoad: -1, contUsed: false, rescue: null, angels: [], boost: 0, roundSeq: 0, boostMax: 0, speedMaxSeen: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
   tiles: [], parts: [], floats: [],
-  packActive: false, packId: 0, spawnT: 0,
+  packActive: false, packId: 0, spawnT: 0, ec: null,   // 작업354: ec = edge 흐름 기록(묶음 목록·미리 정한 단어 계획). classic 에서는 쓰지 않는다
   runPhase: 0, prevH: 0, rising: true, cleared: false, spriteDraws: 0, spriteFrame: -1, spriteAngle: 0,
   iActive: false, iClock: 0, iTl: null, iGeo: null, iKids: 0, iShown: 0,
   jumpT: -1, j2: -1, j2h: 0, j2Land: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
@@ -486,7 +486,7 @@ function startRound(reviewOnly, prepared) {
     hp: CONFIG.HP, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
     roundSeq: G.roundSeq + 1, boost: 0, speedPending: false, speedMaxSeen: 0, rescuePending: false, speedGroupTaken: -1, groupTakenAtLoad: -1, contUsed: false, rescue: null, angels: [],
     speed: CONFIG.SPEED_MIN, speedTarget: CONFIG.SPEED_MIN, speedBase: CONFIG.SPEED_MIN, shownMult: 0, heartWords: surv ? new Set() : planHearts(regular), tiles: [], parts: [], floats: [],
-    packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
+    ec: { packs: [], wps: {} }, packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
     obstacles: [], obst: null, obstSeq: 0, invuln: 0, stumble: 0, fall: 0, obstHits: 0,
     review: !!reviewOnly, survival: surv, supply: supply, startTime: G.time
   });
@@ -494,33 +494,49 @@ function startRound(reviewOnly, prepared) {
   renderHearts(); renderScore();
   loadWord(0);
 }
-function loadWord(i) {
+// 작업354: loadWord 를 "계획(planWord, 상태를 바꾸지 않음)"과 "적용(applyWord)"으로 나눴다. classic 은 둘을 바로 이어 불러 이전과 같은 결과(난수 호출 순서 포함)다.
+// edge 는 다음 단어를 앞 단어 마지막 묶음이 줄에 들어갈 때 미리 계획해 둔다. groupIn: 이 단어를 계획하기 직전의 번개 그룹 기록(speedGroupTaken)
+function planWord(i, groupIn) {
   survEnsure(i);
   const boss = !!G.words[i].boss;
-  G.wi = i; G.plan = planSlots(G.words[i].word, Math.random, boss ? bossConfig() : CONFIG, G.words[i].syl); G.si = 0;
-  G.bossMode = boss;   // 중간에 오는 보스 뒤에는 일반 배경으로 돌아간다
+  const wp = { i: i, boss: boss };
+  wp.plan = planSlots(G.words[i].word, Math.random, boss ? bossConfig() : CONFIG, G.words[i].syl);
   const survCfg = G.survival ? survRampCfg(CONFIG, i + 1) : CONFIG;   // 작업332: 생존 모드는 단어 순번에 따라 장애물·높은 칸 확률이 오른다(기본 모드는 CONFIG 그대로)
   const reg0 = G.words.slice(0, i).filter(x => !x.boss).length;
-  G.heartPending = G.survival ? (!boss && survHeartWord(reg0, G.roundSeq)) : (!boss && G.heartWords.has(reg0));   // 하트 계획은 보스가 아닌 단어의 순번 기준(생존 모드는 난수 없이 해시, 간격이 점점 늘어난다)
-  G.heartSlot = G.survival ? survHeartSlot(G.plan.slots.length, G.roundSeq, reg0) : pickHeartSlot(G.plan.slots.length);
-  const highs = G.survival ? planHighSlots(G.plan.slots.length, Math.random, survCfg) : planHighSlots(G.plan.slots.length);   // 작업318-4: 2단 점프가 꺼져 있으면 빈 집합
-  G.plan.slots.forEach((sl, k) => { sl.high = highs.has(k); });
-  const ob = G.survival ? planObstacle(G.plan.slots.length, highs, G.heartPending ? G.heartSlot : null, boss, Math.random, survCfg) : planObstacle(G.plan.slots.length, highs, G.heartPending ? G.heartSlot : null, boss);   // 작업326: 꺼져 있거나 보스면 null(난수를 쓰지 않는다)
-  G.obst = ob ? { slot: ob.slot, kind: ob.kind, done: false } : null;
+  wp.heartPending = G.survival ? (!boss && survHeartWord(reg0, G.roundSeq)) : (!boss && G.heartWords.has(reg0));   // 하트 계획은 보스가 아닌 단어의 순번 기준(생존 모드는 난수 없이 해시, 간격이 점점 늘어난다)
+  wp.heartSlot = G.survival ? survHeartSlot(wp.plan.slots.length, G.roundSeq, reg0) : pickHeartSlot(wp.plan.slots.length);
+  const highs = G.survival ? planHighSlots(wp.plan.slots.length, Math.random, survCfg) : planHighSlots(wp.plan.slots.length);   // 작업318-4: 2단 점프가 꺼져 있으면 빈 집합
+  wp.plan.slots.forEach((sl, k) => { sl.high = highs.has(k); });
+  const ob = G.survival ? planObstacle(wp.plan.slots.length, highs, wp.heartPending ? wp.heartSlot : null, boss, Math.random, survCfg) : planObstacle(wp.plan.slots.length, highs, wp.heartPending ? wp.heartSlot : null, boss);   // 작업326: 꺼져 있거나 보스면 null(난수를 쓰지 않는다)
+  wp.obst = ob ? { slot: ob.slot, kind: ob.kind, done: false } : null;
   // 작업328: 가속 아이템(난수 없이 판 순번·단어 순번 해시로 결정. 하트 우선, 보스·복습·장애물 단어에는 없음)
-  const regIdx = G.words.slice(0, i).filter(x => !x.boss).length;
-  // 작업329: 구조 아이템(힌트·천사)은 체력이 낮을 때만. 우선순위 하트 > 구조 > 가속이라 구조가 정해지면 가속은 이 단어에 없다. 이 단어의 체력은 단어를 불러올 때 정한다(회복해서 기준을 넘으면 다음 단어부터 없다)
-  const rs = planRescue({ roundSeq: G.roundSeq, regularIdx: regIdx, hp: G.hp, boss: boss, review: G.review, hasHeart: G.heartPending, hasObst: !!G.obst, nSlots: G.plan.slots.length, });
-  G.rescuePending = !!rs; if (rs) { G.rescueSlot = rs.slot; G.rescueKind = rs.kind; }
-  const groupBefore = G.speedGroupTaken;   // 작업341: 이어하기로 이 단어를 다시 시작할 때 번개 계획을 같은 모양으로 되돌린다
-  const sIdx = planSpeedItem({ roundSeq: G.roundSeq, regularIdx: regIdx, boss: boss, review: G.review, hasHeart: G.heartPending || !!rs, hasObst: !!G.obst, nSlots: G.plan.slots.length,
-    groupTaken: G.speedGroupTaken, isHeartAt: G.survival ? (j => survHeartWord(j, G.roundSeq)) : (j => G.heartWords.has(j)), regularCount: G.survival ? undefined : G.regular });   // 작업339: 제외 대상이면 같은 그룹의 다음 후보로
-  G.groupTakenAtLoad = groupBefore;
-  if (sIdx !== null) G.speedGroupTaken = Math.floor(regIdx / CONFIG.SPEED_EVERY);
-  G.speedPending = sIdx !== null; G.speedSlot = sIdx === null ? 0 : sIdx;
+  const regIdx = reg0;
+  // 작업329: 구조 아이템(힌트·천사)은 체력이 낮을 때만. 우선순위 하트 > 구조 > 가속이라 구조가 정해지면 가속은 이 단어에 없다. 이 단어의 체력은 단어를 계획할 때 정한다(회복해서 기준을 넘으면 다음 단어부터 없다)
+  const rs = planRescue({ roundSeq: G.roundSeq, regularIdx: regIdx, hp: G.hp, boss: boss, review: G.review, hasHeart: wp.heartPending, hasObst: !!wp.obst, nSlots: wp.plan.slots.length, });
+  wp.rescuePending = !!rs; wp.rs = rs;
+  wp.groupBefore = groupIn;   // 작업341: 이어하기로 이 단어를 다시 시작할 때 번개 계획을 같은 모양으로 되돌린다
+  const sIdx = planSpeedItem({ roundSeq: G.roundSeq, regularIdx: regIdx, boss: boss, review: G.review, hasHeart: wp.heartPending || !!rs, hasObst: !!wp.obst, nSlots: wp.plan.slots.length,
+    groupTaken: groupIn, isHeartAt: G.survival ? (j => survHeartWord(j, G.roundSeq)) : (j => G.heartWords.has(j)), regularCount: G.survival ? undefined : G.regular });   // 작업339: 제외 대상이면 같은 그룹의 다음 후보로
+  wp.groupAfter = sIdx !== null ? Math.floor(regIdx / CONFIG.SPEED_EVERY) : groupIn;
+  wp.speedPending = sIdx !== null; wp.speedSlot = sIdx === null ? 0 : sIdx;
+  return wp;
+}
+function applyWord(wp) {
+  const i = wp.i;
+  G.wi = i; G.plan = wp.plan; G.si = 0;
+  G.bossMode = wp.boss;   // 중간에 오는 보스 뒤에는 일반 배경으로 돌아간다
+  G.heartPending = wp.heartPending; G.heartSlot = wp.heartSlot;
+  G.obst = wp.obst;
+  G.rescuePending = wp.rescuePending; if (wp.rs) { G.rescueSlot = wp.rs.slot; G.rescueKind = wp.rs.kind; }
+  G.groupTakenAtLoad = wp.groupBefore; G.speedGroupTaken = wp.groupAfter;
+  G.speedPending = wp.speedPending; G.speedSlot = wp.speedSlot;
   G.packActive = false; G.spawnT = CONFIG.WORD_START_DELAY + (i === 0 ? CONFIG.FIRST_WORD_EXTRA : 0);
   renderWord(); renderProgress();
-  startIntro(i, boss);
+  startIntro(i, wp.boss);
+}
+function loadWord(i) {
+  if (edgeOn()) { edgeLoadWord(i); return; }
+  applyWord(planWord(i, G.speedGroupTaken));
 }
 // ---------- 작업323: 새 단어 시작 연출 ----------
 // 큰 뜻(= 상단 힌트 묶음 #hintbox 를 확대해 화면 가운데에 둔 모양)을 보여 주다가, 하나의 요소를 transform(이동+크기)으로 상단 힌트 위치(작업322 최종 모양)로 옮기며
@@ -596,6 +612,106 @@ function spawnPack() {
     });
   });
 }
+// ---------- 작업354: 타일 흐름(스트림) 'edge' ----------
+// 주소 옵션 stream=edge 일 때만 켜진다(기본 꺼짐 = classic, 위 spawnPack/endPack 동작 그대로). 355 에서 가로 모드가 이 방식을 쓴다.
+// 묶음·아이템·장애물을 오른쪽 화면 밖(streamViewW 보다 오른쪽)에서 시작해 흘려보낸다. 다음 묶음은 앞 묶음 정답을 먹은 시점 기준으로 classic 과 같은 도착 시점으로 계산하고(logic.js streamPlace),
+// 화면 안에서 생기지 않도록·남은 타일과 겹치지 않도록 그만큼 늦춘다. 한 묶음의 정답 위치는 월드 좌표(x + G.dist)로 기록해 속도가 바뀌어도 어긋나지 않는다.
+const edgeOn = () => !!CONFIG.STREAM_EDGE;
+let streamViewW = W;   // 화면 논리 폭(진입 거리 = 이 값 + 타일 반폭). 355 에서 가로 모드가 키운다
+const dimCur = () => ({ wi: G.wi, si: G.si });
+function edgeWPFor(i) {
+  const ec = G.ec;
+  if (ec.wps[i]) return ec.wps[i];
+  survEnsure(i);
+  const prev = ec.wps[i - 1];
+  return (ec.wps[i] = planWord(i, prev ? prev.groupAfter : G.speedGroupTaken));
+}
+function edgeNextKey(key) {
+  const wp = edgeWPFor(key.wi);
+  if (key.si + 1 < wp.plan.slots.length) return { wi: key.wi, si: key.si + 1 };
+  survEnsure(key.wi + 1);
+  return key.wi + 1 >= G.words.length ? null : { wi: key.wi + 1, si: 0 };
+}
+function edgeRightmost() {
+  let best = null;
+  for (const t of G.tiles) if (t.x > RUNNER_X && (!best || t.x > best.x)) best = { x: t.x, w: t.w };
+  return best;
+}
+// key 묶음(아이템·장애물 포함)을 줄에 넣는다. nearOnly 이면 첫 객체가 아직 진입 지점에서 멀면(LOOKAHEAD 보다) 넣지 않고 false.
+function edgeCommit(key, kind, nearOnly) {
+  const ec = G.ec, wp = edgeWPFor(key.wi), slot = wp.plan.slots[key.si], word = G.words[key.wi], v = G.speedTarget;
+  const tail = ec.packs[ec.packs.length - 1];
+  const heartOk = wp.heartPending && key.si >= wp.heartSlot && !slot.high;
+  const resOk = !heartOk && wp.rescuePending && key.si >= wp.rescueSlot && !slot.high;
+  const spdOk = !heartOk && !resOk && wp.speedPending && key.si >= wp.speedSlot && !slot.high;
+  const item = heartOk ? 'heart' : resOk ? wp.rescueKind : spdOk ? 'speed' : null;
+  const obKind = (wp.obst && !wp.obst.done && wp.obst.slot === key.si && !heartOk) ? wp.obst.kind : null;   // 하트가 놓이는 묶음에는 장애물을 두지 않는다(classic 과 같다)
+  const ccfg = wp.boss ? bossConfig() : CONFIG, tw = slot.chunk ? 20 + slot.text.length * 26 : 58;
+  const r = L.streamPlace(CONFIG, kind, { xc: tail ? tail.xcW - G.dist : RUNNER_X, runnerX: RUNNER_X, v: v, bossNext: !!wp.boss, first: key.wi === 0, viewW: streamViewW,
+    widths: Array.from({ length: ccfg.CANDIDATES }, () => tw), item: !!item, obstacle: obKind, firstHigh: !!slot.high, leftover: edgeRightmost() });
+  if (nearOnly && L.groupLeft(r.group).left > streamViewW + L.STREAM.LOOKAHEAD) return false;
+  const g = r.group, pid = ++G.packId, rec = { key: key, kind: kind, dx: r.dx, correct: null, xcW: 0 };
+  if (heartOk) wp.heartPending = false; else if (resOk) wp.rescuePending = false; else if (spdOk) wp.speedPending = false;
+  if (item) G.tiles.push({ id: -pid, kind: item, x: g.itemX, w: 46, text: '', correct: false, chunk: false, state: 'live', t: 0, age: 0, checked: false, ok: false, color: '', wi: key.wi, si: key.si, wp: wp, itemKind: item });
+  if (obKind) {
+    G.obstacles.push({ kind: g.obstacle.kind, x: g.obstacle.x, w: g.obstacle.w, hit: false, age: 0, art: obstacleArtIndex(word.word, wp.obst.slot, G.obstSeq++), wp: wp });
+    wp.obst.done = true;
+  }
+  const cands = makeCandidates(slot.text, word.word, Math.random, ccfg);
+  cands.forEach((c, i) => {
+    const t = { id: pid, x: g.tiles[i].x, w: g.tiles[i].w, text: c.text, correct: c.correct, chunk: slot.chunk, high: !!slot.high, state: 'live', t: 0, age: 0,
+      checked: false, ok: false, color: TILE_COLORS[(i + key.si) % TILE_COLORS.length], wi: key.wi, si: key.si };
+    G.tiles.push(t);
+    if (c.correct) { rec.correct = t; rec.xcW = t.x + G.dist; }
+  });
+  ec.packs.push(rec);
+  return true;
+}
+// 미리 줄에 넣는다: 마지막 묶음 다음 묶음(같은 단어의 다음 칸, 없으면 다음 단어)을 첫 객체가 진입 지점 가까이 올 때 넣는다. 다음 단어는 이때 계획된다(구조 아이템은 그 시점의 체력으로 판단)
+function edgeFill() {
+  const ec = G.ec;
+  if (!ec || (G.state !== 'run' && G.state !== 'pop' && G.state !== 'intro')) return;
+  for (let n = 0; n < 8; n++) {
+    const tail = ec.packs[ec.packs.length - 1];
+    if (!tail) { if (G.state === 'run' && G.si < G.plan.slots.length) edgeCommit({ wi: G.wi, si: G.si }, 'recover', false); return; }
+    const nk = edgeNextKey(tail.key);
+    if (!nk || !edgeCommit(nk, nk.wi === tail.key.wi ? 'pack' : 'word', true)) return;
+  }
+}
+function edgeLoadWord(i) {
+  const ec = G.ec;
+  let wp = ec.wps[i];
+  if (!wp) { const prev = ec.wps[i - 1]; wp = ec.wps[i] = planWord(i, prev ? prev.groupAfter : G.speedGroupTaken); }
+  applyWord(wp);
+  const tail = ec.packs[ec.packs.length - 1];
+  if (!ec.packs.some(p => p.key.wi === i) && !(tail && tail.key.wi === i - 1)) edgeCommit({ wi: i, si: 0 }, 'start', false);   // 판 시작·이어하기만 첫 묶음을 지금 놓는다(이전 단어에서 이어지면 이미 미리 놓였거나 곧 놓인다)
+}
+// 틀렸을 때: 화면에 보이는 타일은 그대로 두고, 화면 밖 타일·장애물·아이템만 거둔 뒤 "지금 풀 칸"에 맞게 다시 줄을 세운다(맞는 글자가 화면에 없으면 앞쪽 화면 밖에 넣는다)
+function edgeReplan() {
+  const ec = G.ec;
+  if (!ec) return;
+  const cur = dimCur(), dead = new Set();
+  G.tiles = G.tiles.filter(t => {
+    if (!L.streamOffscreen(t, streamViewW)) return true;
+    if (t.itemKind) { if (t.itemKind === 'heart') t.wp.heartPending = true; else if (t.itemKind === 'speed') t.wp.speedPending = true; else t.wp.rescuePending = true; }
+    dead.add(t);
+    return false;
+  });
+  G.obstacles = G.obstacles.filter(o => {
+    if (o.hit || !o.wp || o.x < streamViewW) return true;
+    o.wp.obst.done = false; G.obstSeq--;
+    return false;
+  });
+  const kn = k => k.wi * 100000 + k.si;
+  ec.packs = ec.packs.filter(p => kn(p.key) <= kn(cur) && !(p.correct && dead.has(p.correct)));
+  const has = G.tiles.some(t => !t.kind && t.state === 'live' && !t.checked && L.streamIsCorrect(t, cur));
+  if (!has && G.si < G.plan.slots.length) edgeCommit(cur, 'recover', false);
+}
+// 매 걸음: 달리는 중이 아닐 때 러너를 지나간 타일은 판정 없이 지나간 것으로 본다(나중에 달리는 중이 되어 한꺼번에 판정되지 않게). 그다음 줄을 채운다
+function edgeStep() {
+  if (G.state !== 'run') for (const t of G.tiles) if (!t.checked && t.x <= RUNNER_X) t.checked = true;
+  edgeFill();
+}
 function endPack(hint) {
   for (const t of G.tiles) {
     if (t.id !== G.packId || t.state !== 'live') continue;
@@ -613,7 +729,7 @@ function resolve(t) {
   if (t.kind === 'speed') { if (air) onSpeedItem(t); return; }
   if (t.kind === 'hint' || t.kind === 'angel') { if (air) onRescueItem(t); return; }
   // 높은 칸은 HIGH_GRAB_H 이상일 때만 "공중"으로 본다(한 번 점프로는 닿지 않는다). 일반 칸 판정은 그대로
-  const r = judge(t.correct, t.high ? hh >= CONFIG.HIGH_GRAB_H : air);
+  const r = judge(t.wi !== undefined ? L.streamIsCorrect(t, dimCur()) : t.correct, t.high ? hh >= CONFIG.HIGH_GRAB_H : air);   // 작업354: edge 는 "지금 풀 칸"의 정답만 정답이다(다른 칸·다음 단어용 타일은 오답)
   if (r === 'pass') return;
   if (r === 'hit') onHit(t);
   else onFail(t, r);
@@ -642,9 +758,10 @@ function onRescueItem(t) {
     burst(RUNNER_X + 8, TILE_Y, '#c4b5fd', 12); floatText(RUNNER_X + 70, GROUND - 235, '천사!', '#6d4fd6', 22);
     for (const x of G.tiles) {
       if (x.id !== pack || x.state !== 'live' || x.correct) continue;   // 정답 타일은 그대로 두고 틀린 타일만 치운다
+      if (edgeOn()) { if (L.streamOffscreen(x, streamViewW)) x.dead = true; else x.dimmed = true; continue; }   // 작업354: edge 는 화면 밖 타일만 치우고 보이는 타일은 흐리게만 바꾼다
       if (reduce) x.dead = true; else { G.angels.push({ x: x.x, y: x.high ? HIGH_Y : TILE_Y, t: 0 }); x.state = 'fade'; x.t = 0; x.angel = true; }   // 움직임 줄이기에서는 반짝임 없이 바로 사라진다
     }
-    if (reduce) G.tiles = G.tiles.filter(x => !x.dead);
+    if (reduce || edgeOn()) G.tiles = G.tiles.filter(x => !x.dead);
   }
 }
 function clearRescue() {   // 묶음이 끝나면 효과가 사라진다
@@ -661,7 +778,7 @@ function onSpeedItem(t) {
 }
 function onHit(t) {
   t.state = 'taken'; t.t = 0; t.ok = true;
-  endPack(false);
+  if (edgeOn()) clearRescue(); else endPack(false);   // 작업354: edge 는 같은 묶음의 남은 타일을 지우지 않는다
   const slot = G.plan.slots[G.si];
   G.combo++; G.maxCombo = Math.max(G.maxCombo, G.combo);
   const sm = speedMult(G.speed);
@@ -696,7 +813,7 @@ function doContinue() {
   G.contUsed = true; els.cont.hidden = true;
   G.hp = contHp(CONFIG.HP);
   clearRescue();
-  Object.assign(G, { tiles: [], obstacles: [], boost: 0, rescuePending: false, packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, hurt: 0, shake: 0, stumble: 0, fall: 0, eat: 0,
+  Object.assign(G, { ec: { packs: [], wps: {} }, tiles: [], obstacles: [], boost: 0, rescuePending: false, packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, hurt: 0, shake: 0, stumble: 0, fall: 0, eat: 0,
     invuln: CONFIG.CONT_INVULN_SEC, speedGroupTaken: G.groupTakenAtLoad, state: 'run' });   // 점수·콤보·실수 횟수(mist)는 그대로
   renderHearts();
   els.live.textContent = '이어서 합니다';
@@ -709,7 +826,7 @@ function doEnd() {
 function onFail(t, kind) {
   if (kind === 'wrong') { t.state = 'taken'; t.t = 0; t.ok = false; }
   else { t.state = 'fade'; t.t = 0; }
-  endPack(true);
+  if (edgeOn()) clearRescue(); else endPack(true);   // 작업354: edge 는 보이는 타일을 그대로 두고 아래에서 화면 밖 줄만 다시 정한다
   G.hp--; G.combo = 0; G.mist[G.wi]++;
   G.speedBase = speedAfterFail(G.speedBase);
   G.speedTarget = targetSpeed(G.speedBase, G.combo);
@@ -717,6 +834,7 @@ function onFail(t, kind) {
   sfx.bad();
   floatText(RUNNER_X + 30, GROUND - 150, kind === 'wrong' ? '오답!' : '놓쳤어요', BAD, 22);
   flashHint(G.si);
+  if (edgeOn()) edgeReplan();
   renderHearts(); renderScore();
   if (G.hp <= 0) onZeroHp();
 }
@@ -974,7 +1092,7 @@ function step(dt) {
         if (G.state !== 'run') break;
       }
     }
-    if (G.state === 'run' && !G.packActive) {
+    if (!edgeOn() && G.state === 'run' && !G.packActive) {
       G.spawnT -= dt;
       if (G.spawnT <= 0) { if (G.iActive) clearIntro(); spawnPack(); }   // 안전장치: 연출은 항상 첫 타일 등장 전에 끝난다
     }
@@ -989,6 +1107,7 @@ function step(dt) {
     if (G.endT <= 0) finish(false);
   }
 
+  if (edgeOn()) edgeStep();   // 작업354
   G.obstacles = G.obstacles.filter(o => o.x + o.w > -80);
   G.tiles = G.tiles.filter(t => t.x > -140 && !((t.state === 'fade' && t.t > (t.angel ? CONFIG.ANGEL_SEC + 0.05 : 0.35)) || (t.state === 'taken' && t.t > 0.4)));
   updateFx(dt);
@@ -1112,6 +1231,7 @@ function drawObstacleArt(o) {
 // 작업327: 예고 표시. 장애물이 정해진 순간(앞 묶음 정답을 먹은 뒤 새 묶음이 나오기 전)부터 장애물 앞쪽 끝이 러너에 닿을 때까지 화면 오른쪽 가장자리에서 깜빡인다. 그림만 바꾸고 판정·타이밍에는 영향이 없다
 function obstWarnActive() {
   if (G.state !== 'run') return false;
+  if (edgeOn()) return G.obstacles.some(o => !o.hit && o.x >= streamViewW);   // 작업354: edge 는 아직 화면 밖에서 다가오는 장애물이 있을 때만 예고 표시(보이면 표시가 필요 없다)
   if (G.obst && !G.obst.done && G.obst.slot === G.si && !G.packActive) return true;
   return G.obstacles.some(o => !o.hit && o.x > RUNNER_X + CONFIG.OBST_FOOT);
 }
@@ -1237,8 +1357,9 @@ function drawTile(t) {
   }
   const w = t.w;
   ctx.save();
-  ctx.globalAlpha = Math.max(0, Math.min(1, a, t.age / 0.2));
-  ctx.translate(t.x, ty + bob); ctx.scale(sc, sc);
+  const dim = edgeOn() && L.streamDim(t, dimCur());   // 작업354: 지금 풀 묶음이 아닌 타일(남은 타일·다음 묶음·다음 단어)은 흐리게
+  ctx.globalAlpha = Math.max(0, Math.min(1, a, t.age / 0.2)) * (dim ? L.STREAM.DIM_ALPHA : 1);
+  ctx.translate(t.x, ty + bob); ctx.scale(dim ? sc * L.STREAM.DIM_SCALE : sc, dim ? sc * L.STREAM.DIM_SCALE : sc);
   const hintGlow = G.rescue && G.rescue.kind === 'hint' && t.id === G.rescue.pack && t.correct && t.state === 'live';   // 작업329: 힌트 아이템 효과 중 정답 타일 글로우
   if (t.state === 'hint') { ctx.shadowColor = GOOD; ctx.shadowBlur = 20; }
   else if (hintGlow) { ctx.shadowColor = '#34d399'; ctx.shadowBlur = 26 + 8 * Math.sin(G.time * 8); }
@@ -2242,6 +2363,7 @@ function frame(ts) {
 
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
 const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival, continued: G.contUsed }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
+API.edge = { on: edgeOn, setViewW: w => { streamViewW = w; }, viewW: () => streamViewW, fill: edgeFill };   // 작업354: 시험용 훅
 API.preview = { T: PV_T, state: PV, run: previewRun, isOn: () => previewOn };   // 작업345: 시험용 훅
 API.vs = { T: VS_T, state: VS, open: vsOpen, game: VSG, renderHearts: renderHearts };   // 작업344: 시험용 훅(조회 간격 단축·상태 확인)
 window.SpellRun = API;
