@@ -222,6 +222,42 @@
 .sr-box .legend .f::before{background:#ffcfd3}
 .sr-box .legend .k::before{background:#eef0f6}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* 작업355: 꽉 찬 화면. 게임 화면에서는 앱 헤더·화면 바를 숨기고 판이 화면 전체(안전 여백 안)를 채운다. 배경은 화면 끝까지 */
+body.sr-full{max-width:none;margin:0;overflow:hidden;position:fixed;inset:0;width:100%;height:100%;overscroll-behavior:none}
+body.sr-full .metis-app-header,body.sr-full .screen-bar{display:none !important}
+body.sr-full .content{max-width:none;margin:0;padding:0}
+body.sr-full .sr-stage{position:fixed;inset:0;align-items:center;justify-content:center;border-radius:0;
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+body.sr-full .sr-box{border-radius:0;box-shadow:none}
+body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
+/* 위쪽 작은 단추: 시각 크기는 작게, 터치 영역은 44px 이상(::before). 달리는 중에는 HUD 둘째 줄 아래, 아닐 때는 맨 위 */
+.sr-box .ctl{position:absolute;left:calc(8 * var(--u));top:calc(6 * var(--u));display:flex;gap:calc(8 * var(--u));z-index:6}
+.sr-box .hud:not([hidden]) ~ .ctl{left:calc(14 * var(--u));top:calc(64 * var(--u))}
+.sr-box .ctlb{position:relative;cursor:pointer;font-family:var(--f-body);font-weight:700;font-size:calc(12 * var(--u));line-height:1;color:var(--ink);background:rgba(255,255,255,.78);border:calc(2 * var(--u)) solid var(--ink);border-radius:999px;padding:calc(5 * var(--u)) calc(12 * var(--u));height:calc(26 * var(--u))}
+.sr-box .ctlb::before{content:"";position:absolute;left:-4px;right:-4px;top:50%;height:max(44px,100%);transform:translateY(-50%)}
+.sr-box .ctlb:focus-visible{outline:calc(3 * var(--u)) solid var(--ink);outline-offset:calc(2 * var(--u))}
+.sr-box .srtoast{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(76 * var(--u));z-index:6;max-width:86%;text-align:center;pointer-events:none;background:var(--ink);color:#fff;border-radius:calc(14 * var(--u));padding:calc(6 * var(--u)) calc(14 * var(--u));font-size:calc(12 * var(--u));font-weight:700;line-height:1.3}
+.sr-box .vlabel{align-self:center;font-weight:700;font-size:calc(12 * var(--u));color:var(--ink-soft)}
+/* 가로를 골랐는데 폰이 세로일 때의 안내 띠: 판 바깥(화면 맨 위)에 둔다 */
+.sr-stage .rotband{position:absolute;left:0;right:0;top:0;z-index:20;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;box-sizing:border-box;
+  padding:calc(6px + env(safe-area-inset-top,0px)) calc(10px + env(safe-area-inset-right,0px)) 6px calc(10px + env(safe-area-inset-left,0px));background:var(--ink);color:#fff;font-size:13px;font-weight:700;line-height:1.4;text-align:center}
+.sr-stage .rotbtn{cursor:pointer;min-height:44px;padding:0 14px;font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);background:var(--gold);border:2px solid #fff;border-radius:999px}
+.sr-stage .rotbtn:focus-visible{outline:3px solid #fff;outline-offset:2px}
+/* 가로 800x400 배치: 체력·점수·콤보는 위 모서리, 뜻·보조 줄·글자 칸은 가운데 위쪽 하늘(높이 100 이하), 대결 막대·나가기는 아래 */
+.sr-box.land .hud{padding:calc(4 * var(--u)) calc(14 * var(--u)) 0}
+.sr-box.land .hud .row:nth-child(1){position:absolute;left:calc(14 * var(--u));right:calc(14 * var(--u));top:calc(8 * var(--u));width:auto}
+.sr-box.land .hud .row:nth-child(2){position:absolute;left:calc(14 * var(--u));right:calc(14 * var(--u));top:calc(38 * var(--u));width:auto;justify-content:flex-start}
+.sr-box.land .hud .row:nth-child(2) .snd{margin-left:auto}
+.sr-box.land .hintbox{width:calc(420 * var(--u));gap:calc(2 * var(--u))}
+.sr-box.land .sub{margin-top:0}
+.sr-box.land .word{margin-top:calc(16 * var(--u))}
+.sr-box.land .cell{height:calc(34 * var(--u));line-height:calc(30 * var(--u));border-bottom-width:calc(3 * var(--u))}
+.sr-box.land .popword{left:calc(160 * var(--u));right:calc(160 * var(--u));top:calc(60 * var(--u))}
+.sr-box.land .card{max-width:calc(520 * var(--u));align-self:center}
+.sr-box.land .vsbar{bottom:calc(6 * var(--u));right:calc(14 * var(--u) + max(44px, 64 * var(--u)) + 8px)}
+.sr-box.land .vsquit{bottom:calc(6 * var(--u))}
+.sr-box.land .vstoast{bottom:calc(50 * var(--u))}
+.sr-box.land .srtoast{bottom:calc(50 * var(--u))}
 @media (prefers-reduced-motion:reduce){
 .sr-box .word > .iv,.sr-box .popword.go .pl,.sr-box .slot.cur .cell,.sr-box .slot.done .cell.pop,.sr-box .slot.bad,.sr-box .popword.go,.sr-box .banner.go,.sr-box .meaning.enter{animation:sr-none}
 }

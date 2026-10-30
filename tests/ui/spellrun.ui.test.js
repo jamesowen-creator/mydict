@@ -357,7 +357,8 @@ test('8) 뒤로가기 링크는 /english_dictionary.html#wordbook 이고, 사전
   resetState();
   const page = await openGame({ ids: [1, 2, 3] });
   assert.equal(await page.eval("document.querySelector('.screen-bar-back').getAttribute('href')"), '/english_dictionary.html#wordbook');
-  await page.click('.screen-bar-back');
+  assert.equal(await page.eval("getComputedStyle(document.querySelector('.screen-bar')).display"), 'none', '작업355: 꽉 찬 화면이라 화면 바(뒤로가기)는 숨겨진다');
+  await page.click('#srClose');   // 같은 곳으로 돌아가는 [닫기]
   await page.waitFor("location.pathname === '/english_dictionary.html'", 8000);
   await page.waitFor("document.getElementById('page-wordbook') && document.getElementById('page-wordbook').classList.contains('active')", 8000);
   assert.equal(await page.eval("document.getElementById('page-search').classList.contains('active')"), false);
@@ -381,11 +382,13 @@ for (const w of [320, 390, 768, 1024]) {
     const page = await openGame({ ids: [1, 2, 3], width: w, height: 900 });
     await gameReady(page);
     const m = await page.eval(`(() => { const r = e => { const b = document.getElementById(e).getBoundingClientRect(); return { x0: b.left, x1: b.right, h: b.height }; };
-      return { sw: document.documentElement.scrollWidth, vw: document.documentElement.clientWidth, box: r('box'), stage: r('stage'), main: (() => { const b = document.querySelector('main').getBoundingClientRect(); return { x0: b.left, x1: b.right }; })() }; })()`);
+      return { sw: document.documentElement.scrollWidth, vw: document.documentElement.clientWidth, vh: window.innerHeight, box: r('box'), stage: r('stage'), main: (() => { const b = document.querySelector('main').getBoundingClientRect(); return { x0: b.left, x1: b.right }; })() }; })()`);
     assert.ok(m.sw <= m.vw, `가로 스크롤: ${m.sw} > ${m.vw}`);
-    assert.ok(m.box.x0 >= m.main.x0 - 0.5 && m.box.x1 <= m.main.x1 + 0.5, `무대가 본문 열 안: ${m.box.x0}~${m.box.x1} (열 ${m.main.x0}~${m.main.x1})`);
-    assert.ok(Math.abs((m.box.x0 - m.stage.x0) - (m.stage.x1 - m.box.x1)) <= 1, '무대 좌우 가운데');
-    assert.ok(Math.abs(m.box.h / (m.box.x1 - m.box.x0) - 640 / 360) < 0.02, '9:16 비율 유지');
+    assert.ok(m.box.x0 >= -0.5 && m.box.x1 <= m.vw + 0.5, `판이 화면 안: ${m.box.x0}~${m.box.x1} (화면 ${m.vw})`);   // 작업355: 꽉 찬 화면(본문 열 제한 없음)
+    assert.ok(Math.abs((m.box.x0 - m.stage.x0) - (m.stage.x1 - m.box.x1)) <= 1, '판 좌우 가운데');
+    assert.ok(m.box.h / (m.box.x1 - m.box.x0) >= 640 / 360 - 0.02, '세로 비율은 9:16 이상으로 길다(높이를 늘려 화면을 채운다)');
+    assert.ok(m.box.h <= m.vh + 0.5 && m.box.h >= m.vh - 3 || m.box.x1 - m.box.x0 >= m.vw - 3, '화면의 높이 또는 폭을 채운다');
+    assert.equal(await page.eval("getComputedStyle(document.querySelector('.metis-app-header')).display"), 'none', '앱 헤더 숨김');
     await page.close();
   });
 }
@@ -1769,7 +1772,7 @@ test('326-2) 그림(시트를 못 불러온 대체 그림): 상자·구덩이·�
       R.step(1 / 60);
       const o = G.obstacles.find(x => !x.hit && x.x > 200 && x.x < 300);
       if (o && !seenKinds[o.kind]) { R.draw(); const mid = o.x + o.w / 2;
-        seenKinds[o.kind] = o.kind === 'pit' ? { hole: colorAt(mid, 560), road: colorAt(mid - o.w, 560), sign: colorAt(mid + 6, R.obstTop(o) + 20) } : { face: colorAt(o.x + 4, 520 - 6), outline: colorAt(mid, 520 - R.CONFIG.OBST_H - 1), sign: colorAt(mid + 6, R.obstTop(o) + 20) }; }
+        seenKinds[o.kind] = o.kind === 'pit' ? { hole: colorAt(mid, R.view.layout().GROUND + 40), road: colorAt(mid - o.w, R.view.layout().GROUND + 40), sign: colorAt(mid + 6, R.obstTop(o) + 20) } : { face: colorAt(o.x + 4, R.view.layout().GROUND - 6), outline: colorAt(mid, R.view.layout().GROUND - R.CONFIG.OBST_H - 1), sign: colorAt(mid + 6, R.obstTop(o) + 20) }; }
     }
     return seenKinds; })()`);
   assert.ok(px.pit && px.box, '두 종류를 그렸다: ' + JSON.stringify(Object.keys(px)));
@@ -1842,7 +1845,7 @@ test('327-2) 시트가 로딩되면 4종(돌무더기·통나무·콘·가시덤
         if (n % 300 === 0) await new Promise(r => setTimeout(r, 0));
       }
     }
-    return { arts: [...arts], checks: checks, objs: R.obstArt().objs, W: C.OBST_W, H: C.OBST_H, PW: C.PIT_W, seqLen: seq.length }; })()`);
+    return { arts: [...arts], checks: checks, ground: R.view.layout().GROUND, objs: R.obstArt().objs, W: C.OBST_W, H: C.OBST_H, PW: C.PIT_W, seqLen: seq.length }; })()`);
   assert.deepEqual(out.arts.sort(), [0, 1, 2, 3], '4종 모두 그려졌다: ' + out.arts);
   assert.ok(!out.checks.includes('종류가 바뀜'), '그림은 지나가는 동안 바뀌지 않는다');
   const draws = out.checks.filter(c => typeof c === 'object');
@@ -1851,7 +1854,7 @@ test('327-2) 시트가 로딩되면 4종(돌무더기·통나무·콘·가시덤
     const [sx, sy, sw, sh, dx, dy, dw, dh] = c.a, o = out.objs[c.art], k = out.W * 1.4 / Math.max(o.w, o.h);
     assert.equal(sx, c.art * 256); assert.equal(sy, 0); assert.equal(sw, 256); assert.equal(sh, 256);
     assert.ok(Math.abs(dw - 256 * k) < 0.01 && Math.abs(dh - 256 * k) < 0.01, `크기 ${dw} ≈ ${256 * k} (긴 변 ${Math.max(o.w, o.h) * k} = ${out.W * 1.4})`);
-    assert.ok(Math.abs(dy + o.foot * k - 520) < 0.01, '물체 바닥이 땅 선(520)'); assert.ok(Math.abs(dx + 128 * k - c.cx) < 0.01, '가로 중앙');
+    assert.ok(Math.abs(dy + o.foot * k - out.ground) < 0.01, '물체 바닥이 땅 선(' + out.ground + ')'); assert.ok(Math.abs(dx + 128 * k - c.cx) < 0.01, '가로 중앙');
   }
   assert.deepEqual([out.W, out.H, out.PW], [28, 28, 36], '판정 크기 그대로');
   await page.close();
@@ -1893,7 +1896,8 @@ test('327-3) 구덩이: 판정 폭 36 은 그대로이고 그림은 1.25배 넓�
       if (!found) return null;
       const o = G.obstacles.find(o => o.kind === 'pit' && o.x > 200 && o.x < 300); R.draw();
       const mid = o.x + o.w / 2, dw = o.w * R.CONFIG.PIT_ART_K;
-      return { w: o.w, dw: dw, top: col(mid, 530), deep: col(mid, 620), stripe: Array.from({ length: 11 }, (_, i) => col(mid - dw / 2 - 21 + i * 2, 515)), border: Array.from({ length: 9 }, (_, i) => col(mid - dw / 2 - 10, 508 + i * 0.5)), outL: col(mid - dw / 2 - 26, 560), inL: col(mid - dw / 2 + 4, 560) }; })()`);
+      const lo = R.view.layout(), g0 = lo.GROUND;   // 작업355: 높이가 가변이라 땅 선·판 아래 끝 기준 상대 값(640 에서는 이전 값과 같다)
+      return { w: o.w, dw: dw, top: col(mid, g0 + 10), deep: col(mid, lo.H - 20), stripe: Array.from({ length: 11 }, (_, i) => col(mid - dw / 2 - 21 + i * 2, g0 - 5)), border: Array.from({ length: 9 }, (_, i) => col(mid - dw / 2 - 10, g0 - 12 + i * 0.5)), outL: col(mid - dw / 2 - 26, g0 + 40), inL: col(mid - dw / 2 + 4, g0 + 40) }; })()`);
     if (!px) { await page.eval("SpellRun.startRound(false); SpellRun.manual = true"); }
   }
   assert.ok(px, '구덩이가 나왔다'); assert.equal(px.w, 36); assert.ok(Math.abs(px.dw - 45) < 1e-9, '그림 폭 36×1.25');
@@ -1922,7 +1926,7 @@ test('327-4) 예고 표시: 장애물이 정해진 뒤 새 묶음이 나오기 �
       const on = R.obstWarnActive(), frontAhead = G.obstacles.some(o => !o.hit && o.x > RX + C.OBST_FOOT), pending = !!(G.obst && !G.obst.done && G.obst.slot === G.si && !G.packActive && G.state === 'run');
       if (on !== (pending || frontAhead)) bad.push('활성 조건 불일치');
       if (on) { if (!cur) cur = { t: 0, speed: G.speed }; cur.t += 1 / 60;
-        if (!pix) { G.time = 0; R.draw(); pix = Array.from(cx.getImageData(Math.round((360 - 24 + 6) * S), Math.round((520 - 34 + 5) * S), 1, 1).data); } }
+        if (!pix) { G.time = 0; R.draw(); pix = Array.from(cx.getImageData(Math.round((360 - 24 + 6) * S), Math.round((R.view.layout().GROUND - 34 + 5) * S), 1, 1).data); } }
       else if (cur) { periods.push(cur); cur = null; }
       if (n % 300 === 0) await new Promise(r => setTimeout(r, 0));
     }
@@ -1956,12 +1960,12 @@ test('327-4) 폭 320·360·390: 예고 표시·장애물 그림은 글자 타일
         R.step(1 / 60);
         if (R.obstWarnActive()) { warnOn++;
           // 표시 사각형(논리 px): x 360-24±17, y 520-34-15 ~ 520-34+12 → 아래 끝/위 끝이 타일·하트 줄과 겹치는지
-          const wx0 = 360 - 24 - 17, wy0 = 520 - 34 - 17;
+          const wx0 = 360 - 24 - 17, wy0 = R.view.layout().GROUND - 34 - 17;
           for (const t of G.tiles) { const ty = t.kind === 'heart' ? R.TILE_Y : (t.high ? R.HIGH_Y : R.TILE_Y), half = t.kind === 'heart' ? 24 : 29 + 5, tw = t.w / 2;
             if (t.x + tw > wx0 && t.x - tw < 360 && ty + half > wy0) { if (t.kind === 'heart') overlapHeart++; else overlapTile++; } } }
         for (const o of G.obstacles) if (o.x > 0 && o.x < 360) artTops.push(R.obstTop(o));
       }
-      return { warnOn: warnOn, overlapTile: overlapTile, overlapHeart: overlapHeart, minArtTop: Math.min(...artTops), hint: Math.max(bot('hintbox'), bot('word'), bot('sub'), bot('meaning')), hud: Math.max(...[...document.querySelectorAll('#hud .row')].map(e => (e.getBoundingClientRect().bottom - box.top) / u)), warnTop: 520 - 34 - 17, tileBottom: R.TILE_Y + 34 }; })()`);
+      return { warnOn: warnOn, overlapTile: overlapTile, overlapHeart: overlapHeart, minArtTop: Math.min(...artTops), hint: Math.max(bot('hintbox'), bot('word'), bot('sub'), bot('meaning')), hud: Math.max(...[...document.querySelectorAll('#hud .row')].map(e => (e.getBoundingClientRect().bottom - box.top) / u)), warnTop: R.view.layout().GROUND - 34 - 17, tileBottom: R.TILE_Y + 34 }; })()`);
     assert.ok(r.warnOn > 60, w + ': 예고가 보인 프레임 ' + r.warnOn);
     assert.equal(r.overlapTile, 0, w + ': 예고 표시와 글자 타일이 겹치지 않는다'); assert.equal(r.overlapHeart, 0, w + ': 하트와도');
     assert.ok(r.warnTop > r.tileBottom && r.warnTop > r.hint + 20 && r.warnTop > r.hud + 20, `${w}: 예고 위끝 ${r.warnTop} 가 타일 줄(${r.tileBottom})·힌트(${r.hint})·HUD(${r.hud}) 아래`);
@@ -2113,11 +2117,11 @@ test('328-2) 폭 320·360·390: 남은 시간 막대·번개 칸은 힌트·상�
       const box = document.getElementById('box').getBoundingClientRect(), u = parseFloat(document.getElementById('box').style.getPropertyValue('--u'));
       const rel = e => { const r = e.getBoundingClientRect(); return { top: (r.top - box.top) / u, bottom: (r.bottom - box.top) / u, left: (r.left - box.left) / u, right: (r.right - box.left) / u }; };
       const tune = rel(document.getElementById('tune')), hint = Math.max(...['hintbox', 'word'].map(id => rel(document.getElementById(id)).bottom));
-      const cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360, col = (x, y) => Array.from(cx.getImageData(Math.round(x * S), Math.round(y * S), 1, 1).data);
-      return { tune: tune, hint: hint, bar: col(60, 520 + 24 + 3), barEnd: col(38 + 112 - 3, 520 + 24 + 3), barBottom: 520 + 24 + 7 }; })()`);
+      const cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360, col = (x, y) => Array.from(cx.getImageData(Math.round(x * S), Math.round(y * S), 1, 1).data), g = window.SpellRun.view.layout().GROUND;
+      return { tune: tune, hint: hint, ground: g, bar: col(60, g + 24 + 3), barEnd: col(38 + 112 - 3, g + 24 + 3), barBottom: g + 24 + 7 }; })()`);
     assert.ok(r.bar[2] > 200 && r.bar[0] < 120, w + ': 막대(하늘색) ' + r.bar); assert.ok(r.barEnd[2] < 200 || r.barEnd[0] > 120 || true);
     assert.ok(r.barBottom < r.tune.top || r.tune.left > 38 + 112 + 8 || r.tune.right < 38, `${w}: 막대 아래 끝 ${r.barBottom} 가 조정값 버튼(위 ${r.tune.top.toFixed(0)}, 좌우 ${r.tune.left.toFixed(0)}~${r.tune.right.toFixed(0)})과 겹치지 않는다`);
-    assert.ok(520 + 24 - 8 > r.hint + 100, w + ': 힌트·글자 칸 줄 아래'); await page.close();
+    assert.ok(r.ground + 24 - 8 > r.hint + 100, w + ': 힌트·글자 칸 줄 아래'); await page.close();
   }
   // 움직임 줄이기
   for (const reduce of [false, true]) {
@@ -2127,7 +2131,7 @@ test('328-2) 폭 320·360·390: 남은 시간 막대·번개 칸은 힌트·상�
     await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.setItem('spellrun_preview', '0'); sessionStorage.setItem('spellrun_ids', '[1,2,3,4,11,12,13,14]'); } catch (e) {}" });
     await page.goto(base + '/spelling_run.html?obs=0&speedevery=1'); await startManual(page);
     const r = await page.eval(`(() => { const R = SpellRun, G = R.G; let streaks = 0; const st = CanvasRenderingContext2D.prototype.stroke; CanvasRenderingContext2D.prototype.stroke = function () { if (this.strokeStyle === 'rgba(255, 255, 255, 0.85)') streaks++; return st.apply(this, arguments); };
-      G.boost = 3; G.boostMax = 5; R.step(1 / 60); R.draw(); const cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360, c = Array.from(cx.getImageData(Math.round(60 * S), Math.round(547 * S), 1, 1).data);
+      G.boost = 3; G.boostMax = 5; R.step(1 / 60); R.draw(); const cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360, c = Array.from(cx.getImageData(Math.round(60 * S), Math.round((R.view.layout().GROUND + 27) * S), 1, 1).data);
       return { streaks: streaks, bar: c }; })()`);
     if (reduce) assert.equal(r.streaks, 0, '움직임 줄이기: 속도선 없음'); else assert.ok(r.streaks >= 4, '속도선 ' + r.streaks);
     assert.ok(r.bar[2] > 200 && r.bar[0] < 120, (reduce ? '움직임 줄이기에서도' : '') + ' 막대 표시는 남는다: ' + r.bar);

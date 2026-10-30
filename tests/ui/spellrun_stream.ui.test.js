@@ -46,8 +46,8 @@ test.before(async () => {
 });
 test.after(async () => { if (browser) await browser.close(); if (srv) await new Promise(r => srv.close(r)); });
 
-async function openGame(query = '') {
-  const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
+async function openGame(query = '', width = 390, height = 844) {
+  const page = await browser.newPage({ width, height, token: jwt() });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.setItem('spellrun_preview', '0'); } catch (e) {}" });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(IDS))}); } catch (e) {}` });
   await page.goto(base + '/spelling_run.html' + query);
@@ -142,6 +142,20 @@ for (const sc of SCENARIOS) {
     assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
     await page.close();
   });
+}
+
+// 작업355: 꽉 찬 화면에서 세로 판 높이가 화면에 따라 늘어나도(640·780·915) 타일 x·시점·글자·장애물·아이템 기록은 같다(좌표는 가로 x 와 시점뿐이라 땅 기준 상대 위치와 같다)
+for (const [w, h] of [[360, 640], [360, 780], [412, 915]]) {
+  for (const sc of [SCENARIOS[0], SCENARIOS[2], SCENARIOS[4]]) {
+    test(`355-3) 세로 동일성(화면 ${w}x${h}): ${sc.name}`, { skip: SKIP }, async () => {
+      const page = await openGame('', w, h);
+      const r = await page.eval(`${TRACE}(${JSON.stringify(sc)})`);
+      const base0 = JSON.parse(fs.readFileSync(FIX, 'utf8'))[sc.name];
+      assert.equal(r.ev.length, base0.n);
+      assert.equal(hash(r.ev), base0.sha, '기준과 같다');
+      await page.close();
+    });
+  }
 }
 
 // ───────── ② edge ─────────

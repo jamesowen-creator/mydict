@@ -137,3 +137,30 @@ test('logic.js 판단 함수는 classic 설정 값을 바꾸지 않는다(CONFIG
   const keys = Object.keys(L.buildConfig({})), base = keys.filter(k => k !== 'STREAM_EDGE');
   assert.equal(keys.length, base.length + 1);
 });
+
+// ───────── 작업355: 꽉 찬 화면 판 크기 ─────────
+test('layoutFor 세로: 높이 640 이면 LAYOUT 과 완전히 같고, 높이를 늘리면 하늘 2/3·아래 띠 1/3, 땅 기준 상대 위치 불변, 배율 상한 1.5', () => {
+  const base = L.layoutFor('port', 360, 640);
+  for (const k of Object.keys(L.LAYOUT)) assert.equal(base[k], L.LAYOUT[k], k);
+  assert.equal(base.scale, 1); assert.equal(base.extra, 0);
+  for (const [aw, ah] of [[360, 700], [360, 780], [390, 750], [412, 900], [412, 915], [768, 1024], [360, 560]]) {
+    const l = L.layoutFor('port', aw, ah);
+    assert.equal(l.W, 360); assert.ok(l.H >= 640);
+    assert.equal(l.GROUND - l.TILE_Y, L.LAYOUT.GROUND - L.LAYOUT.TILE_Y); assert.equal(l.GROUND - l.HIGH_TILE_Y, L.LAYOUT.GROUND - L.LAYOUT.HIGH_TILE_Y);
+    const e = l.H - 640, es = Math.round(e * 2 / 3);
+    assert.equal(l.GROUND, 520 + es); assert.equal(l.H - l.GROUND, 120 + (e - es));
+    assert.equal(l.CONTENT_BOTTOM_Y, L.LAYOUT.CONTENT_BOTTOM_Y, '위쪽 글자 영역은 그대로'); assert.equal(l.HUD_SHIFT, 24);
+    assert.ok(l.scale <= 1.5 + 1e-9 && l.scale > 0.3);
+    assert.ok(l.W * l.scale <= aw + 1e-6 && l.H * l.scale <= ah + 1e-6, `${aw}x${ah}: 판이 화면 안`);
+    if (e > 0) assert.ok(l.H * l.scale >= ah - 1.5 || l.scale >= 1.5 - 1e-9, '늘어난 경우 화면 높이를 채운다');
+  }
+});
+test('layoutFor 가로: 800x400 고정, 글자 영역 100 이하가 높은 칸 타일 윗변(112)보다 위, 땅 아래 띠 44', () => {
+  const l = L.layoutFor('land', 915, 412);
+  assert.equal(l.W, 800); assert.equal(l.H, 400); assert.equal(l.GROUND, 356);
+  assert.equal(l.GROUND - l.TILE_Y, 108); assert.equal(l.GROUND - l.HIGH_TILE_Y, 215);
+  assert.ok(l.CONTENT_BOTTOM_Y <= 100 && l.CONTENT_BOTTOM_Y < l.HIGH_TILE_Y - l.TILE_H / 2, '글자 영역 아래 끝이 높은 칸 타일 윗변보다 위');
+  assert.equal(l.H - l.GROUND, 44);
+  assert.ok(Math.abs(l.scale - Math.min(915 / 800, 412 / 400)) < 1e-9);
+  assert.equal(L.layoutFor('land', 2000, 1200).scale, 1.5, '상한 1.5');
+});

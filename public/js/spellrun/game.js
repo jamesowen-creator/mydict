@@ -20,9 +20,18 @@ let previewOn = lsGet(PREVIEW_KEY) !== '0';
 try { const q = new URLSearchParams(location.search).get('preview'); if (q === '1') previewOn = true; else if (q === '0') previewOn = false; } catch (e) { /* 주소를 못 읽으면 저장값 */ }
 L.configure(OPT.values);                       // CONFIG 를 한 번에 다시 만든다(pace 는 속도·간격·점프 시간에 같은 비율로 반영)
 const CONFIG = L.CONFIG;
-const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, contHp, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, LAYOUT } = L;
+// 작업355: 화면 모드(세로 'port' | 가로 'land'). 마지막 선택은 localStorage, 주소 옵션 mode(0|1)가 이긴다(조정값에 넣지 않고 저장하지도 않는다). 진입 방식 stream 은 직접 준 값이 있으면 그것이 우선, 없으면 가로=edge·세로=classic
+const VIEW_KEY = 'spellrun_view';
+let viewMode = lsGet(VIEW_KEY) === 'land' ? 'land' : 'port';
+try { const q = new URLSearchParams(location.search).get('mode'); if (q === '1') viewMode = 'land'; else if (q === '0') viewMode = 'port'; } catch (e) { /* 주소를 못 읽으면 저장값 */ }
+const streamPinned = OPT.values.stream !== undefined;
+const syncStream = () => { if (!streamPinned) CONFIG.STREAM_EDGE = viewMode === 'land'; };
+syncStream();
+const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, contHp, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount } = L;
+const LAYOUT = Object.assign({}, L.LAYOUT);   // 작업355: 화면 모드·크기에 따라 값이 바뀌는 사본(logic.js 의 LAYOUT 은 세로 640 기준값 그대로)
 
-const W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, RUNNER_X = 72, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;
+let W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;   // 작업355: applyLayout 이 화면 모드·크기에 맞게 바꾼다
+const RUNNER_X = 72;
 const FALL_SEC = 0.55, STUMBLE_SEC = 0.5, FALL_DEPTH = 46;   // 작업326: 연출 시간(초)·구덩이에 빠지는 깊이(논리 px)
 const INK = '#1d2b53', CORAL = '#ff6b5a', GOLD = '#ffb700', GOOD = '#1fae68', BAD = '#e8454f';
 const TILE_COLORS = ['#ffd25e', '#ff9fb2', '#7ed9c3', '#a8c0ff'];
@@ -82,13 +91,30 @@ let VALID_WORDS = [];                  // [{ id, word(소문자), meaning }] 단
 const missedSet = new Set();           // 틀린 단어(소문자). 서버에 저장하지 않고 이 페이지 메모리에만 둔다
 
 // ---------- 크기 맞춤 ----------
-let S = 1;
+// 작업355: 게임 판은 화면 전체(안전 여백 안)를 채운다. 세로는 폭 360 고정·높이 가변(최소 640), 가로는 800x400. 배율 = 판 전체 확대·축소(상한 1.5). 크기 계산은 logic.js layoutFor
+let S = 1, curScale = 1;
+const safeProbe = document.createElement('div');
+safeProbe.setAttribute('aria-hidden', 'true');
+safeProbe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';
+document.body.appendChild(safeProbe);
+function safeInsets() { const cs = getComputedStyle(safeProbe), f = k => parseFloat(cs[k]) || 0; return { t: f('paddingTop'), r: f('paddingRight'), b: f('paddingBottom'), l: f('paddingLeft') }; }
+function viewSize() { const vv = window.visualViewport; return { w: Math.round((vv && vv.width) || window.innerWidth), h: Math.round((vv && vv.height) || window.innerHeight) }; }
+const deviceLandscape = () => window.innerWidth > window.innerHeight;
+function applyLayout(lo) {
+  Object.assign(LAYOUT, lo);
+  W = LAYOUT.W; H = LAYOUT.H; GROUND = LAYOUT.GROUND; TILE_Y = LAYOUT.TILE_Y; TILE_H = LAYOUT.TILE_H; HIGH_Y = LAYOUT.HIGH_TILE_Y;
+  box.style.setProperty('--hs', LAYOUT.HUD_SHIFT);
+  box.classList.toggle('land', lo.mode === 'land');
+  streamViewW = W;   // edge 진입 지점 = 판 폭 + 타일 반폭
+}
 function resize() {
-  const availW = stage.clientWidth - 16;
-  if (availW <= 0) return;   // 아직 보이지 않는 상태
-  const top = stage.getBoundingClientRect().top + window.scrollY;
-  const availH = Math.max(window.innerHeight - top - 32, 480);
-  const scale = Math.max(0.5, Math.min(availW / W, availH / H, 1.5));
+  if ($('app').hidden) return;   // 아직 보이지 않는 상태
+  const v = viewSize(), ins = safeInsets();
+  const aw = v.w - ins.l - ins.r, ah = v.h - ins.t - ins.b;
+  if (aw <= 0 || ah <= 0) return;
+  const lo = L.layoutFor(viewMode, aw, ah), scale = lo.scale;
+  applyLayout(lo);
+  curScale = scale;
   box.style.width = Math.round(W * scale) + 'px';
   box.style.height = Math.round(H * scale) + 'px';
   box.style.setProperty('--u', scale + 'px');
@@ -96,9 +122,12 @@ function resize() {
   cv.width = Math.round(W * scale * dpr);
   cv.height = Math.round(H * scale * dpr);
   S = cv.width / W;
+  if (typeof syncRot === 'function') syncRot();
   fitAll();   // 폭이 바뀌면(리사이즈·회전) 글자 맞춤을 다시 계산한다
 }
 window.addEventListener('resize', resize);
+try { if (window.visualViewport) window.visualViewport.addEventListener('resize', resize); } catch (e) { /* 지원 안 함 */ }   // 작업355: Safari 주소창이 나타나고 사라질 때
+try { window.addEventListener('orientationchange', () => setTimeout(resize, 120)); } catch (e) { /* 무시 */ }
 try { if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { if (typeof fitAll === 'function') fitAll(); }); } catch (e) { /* 글꼴 이벤트가 없으면 무시 */ }   // 웹 글꼴이 늦게 로드돼 폭이 바뀌면 글자 맞춤을 다시 계산한다
 
 // ---------- 작업318-1: 폭을 재서 맞추는 글자 크기 ----------
@@ -126,14 +155,14 @@ function fitSub(items) {
   const bottom = () => (els.word.getBoundingClientRect().bottom - box.getBoundingClientRect().top) / unitPx();
   for (let n = items.length; n > 0; n--) {
     els.sub.textContent = items.slice(0, n).join(' · ');
-    fitFont(els.sub, 12, 10, px => (px > 10.5 ? 1 : 2));
+    fitFont(els.sub, LAYOUT.SUB_MAX || 12, 10, px => (px > 10.5 ? 1 : 2));
     if (fitsIn(els.sub, 2) && bottom() <= limit) return;
   }
   els.sub.hidden = true; els.sub.textContent = '';
 }
 function fitHud() {
   if (els.hud.hidden || !G.plan) return;
-  fitFont(els.meaning, 28, 14, px => (px > 22 ? 1 : 2));   // 한 줄을 먼저 시도하고, 22 이하부터 두 줄까지 허용
+  fitFont(els.meaning, LAYOUT.MEAN_MAX || 28, 14, px => (px > 22 ? 1 : 2));   // 한 줄을 먼저 시도하고, 22 이하부터 두 줄까지 허용
   const h = (G.words[G.wi] && G.words[G.wi].hint) || {};
   fitSub(h.subs || []);
 }
@@ -375,7 +404,7 @@ function wordItems() {
   return items;
 }
 function layoutWord() {
-  const fit = fitWord(wordItems(), LAYOUT.WORD_AVAIL_W);
+  const fit = fitWord(wordItems(), LAYOUT.WORD_AVAIL_W, { cwMax: LAYOUT.CW_MAX || 34 });
   els.word.style.setProperty('--cw', fit.cw);
   els.word.style.setProperty('--fs', fit.fs);
   els.word.style.setProperty('--cg', fit.cellGap);
@@ -1016,9 +1045,9 @@ window.addEventListener('keydown', e => {
     if (G.state === 'run' || G.state === 'pop' || G.state === 'intro') { e.preventDefault(); if (!e.repeat) jump(); }   // 키를 누르고 있어서 생기는 반복 입력은 점프로 세지 않는다
   }
 });
-els.startBtn.addEventListener('click', () => beginRound(false));
-els.againBtn.addEventListener('click', () => beginRound(false));
-els.revBtn.addEventListener('click', () => beginRound(true));
+els.startBtn.addEventListener('click', () => { tryFs(); beginRound(false); });
+els.againBtn.addEventListener('click', () => { tryFs(); beginRound(false); });
+els.revBtn.addEventListener('click', () => { tryFs(); beginRound(true); });
 els.contBtn.addEventListener('click', doContinue);
 els.endBtn.addEventListener('click', doEnd);
 $('ttsTest').addEventListener('click', () => {
@@ -1141,7 +1170,7 @@ function drawScene() {
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = G.bossMode ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.85)';
   for (const c of CLOUDS) {
-    const x = ((c[0] - G.dist * 0.12) % (W + 140) + (W + 140)) % (W + 140) - 70, y = c[1], s = c[2];
+    const x = ((c[0] - G.dist * 0.12) % (W + 140) + (W + 140)) % (W + 140) - 70, y = c[1] * GROUND / 520, s = c[2];
     ctx.beginPath();
     ctx.ellipse(x, y, 34 * s, 13 * s, 0, 0, Math.PI * 2);
     ctx.ellipse(x - 20 * s, y + 4 * s, 22 * s, 10 * s, 0, 0, Math.PI * 2);
@@ -1585,6 +1614,8 @@ function showGame(words, excluded) {
   VALID_WORDS = words;
   $('gate').hidden = true;
   $('app').hidden = false;
+  document.body.classList.add('sr-full');   // 작업355: 헤더·화면 바를 숨기고 판이 화면 전체를 채운다
+  setupViewUI();
   resize();
   const shape = L.roundShape(words.length);
   els.startInfo.textContent = '이번 판 ' + shape.regular + '단어' + (shape.bosses ? ' + 보스 ' + shape.bosses + '단어' : '') + ' · 체력 ' + CONFIG.HP;
@@ -1716,7 +1747,7 @@ function setupPreviewUI() {
   $('pvArea').addEventListener('click', () => { if (PV.active && PV.mode === 'show') pvAdvance(); });
   $('pvPause').addEventListener('click', pvPauseToggle);
   $('pvSkip').addEventListener('click', () => { if (PV.active && PV.mode === 'show') pvReady(); });
-  $('pvStart').addEventListener('click', () => { const f = PV.onReady; pvStop(); if (f) f(); });
+  $('pvStart').addEventListener('click', () => { tryFs(); const f = PV.onReady; pvStop(); if (f) f(); });
   $('pvBack').addEventListener('click', () => { const f = PV.onBack; pvStop(); if (f) f(); });
   $('pv').addEventListener('keydown', e => { if (e.key === 'Escape') $('pvBack').click(); });
   // 작업351: 숨겨질 때와 되돌아올 수 있는 보관(pagehide persisted=true)은 같은 "숨겨짐" 멈춤이고, 다시 보일 때와 보관에서 돌아올 때(pageshow persisted=true)는 같은 재개다.
@@ -2197,6 +2228,7 @@ async function vsgQuitConfirm() {
 }
 // 방 화면의 "시작" / "먼저 달리기": (미리 보기) → POST start → 게임. 서버 시작 알림은 미리 보기가 끝나고 실제로 시작하는 시점에 보낸다
 async function vsGo() {
+  tryFs();   // 작업355: 사용자 탭 안에서 전체 화면 시도(거부·미지원은 조용히)
   if (VS.busy || VSG.on || !VS.roomId) return;
   if (vsWords < VS_MIN_WORDS) { vsToast('words', '대결은 단어가 ' + VS_MIN_WORDS + '개 이상 있어야 해요 (지금 ' + vsWords + '개)'); return; }
   const roomId = VS.roomId;
@@ -2352,17 +2384,70 @@ async function boot() {
   showGame(picked.words, picked.excluded);
 }
 
+// ---------- 작업355: 꽉 찬 화면 · 화면 모드(세로/가로) · 닫기 · 전체 화면 ----------
+// 전체 화면은 사용자 탭 안에서만 시도하고(시작·화면 모드 버튼), 거부·미지원(iPhone 포함)은 조용히 넘어간다. 해제돼도 다시 요청하지 않는다.
+function tryFs() {
+  try {
+    const de = document.documentElement;
+    if (!document.fullscreenElement && de && de.requestFullscreen) { const p = de.requestFullscreen({ navigationUI: 'hide' }); if (p && p.catch) p.catch(() => {}); }
+  } catch (e) { /* 지원 안 함·거부는 조용히 넘어간다 */ }
+}
+function exitFs() {
+  try { if (document.fullscreenElement && document.exitFullscreen) { const p = document.exitFullscreen(); if (p && p.catch) p.catch(() => {}); } } catch (e) { /* 무시 */ }
+}
+let pendingView = null, srToastTimer = 0;
+const viewBusy = () => (G.state !== 'idle' && G.state !== 'over') || VSG.running;
+function srToast(text) {
+  const el = $('srToast'); el.textContent = text; el.hidden = false;
+  clearTimeout(srToastTimer); srToastTimer = setTimeout(() => { el.hidden = true; }, 3500);
+}
+function syncRot() {
+  const el = $('rotBand'); if (!el) return;
+  el.hidden = !(viewMode === 'land' && !deviceLandscape());   // 가로를 골랐는데 폰이 세로일 때만(게임은 멈추지 않는다)
+}
+function syncViewUI() {
+  const want = pendingView || viewMode;
+  const b = $('srView'); if (b) { b.textContent = want === 'land' ? '세로로' : '가로로'; b.setAttribute('aria-label', want === 'land' ? '세로 화면으로 바꾸기' : '가로 화면으로 바꾸기'); }
+  document.querySelectorAll('#viewRow [data-view]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.view === want)));
+  syncRot();
+}
+function applyViewMode(m) { pendingView = null; viewMode = m; syncStream(); resize(); syncViewUI(); }
+function setViewMode(m) {
+  if (m !== 'port' && m !== 'land') return;
+  try { localStorage.setItem(VIEW_KEY, m); } catch (e) { /* 저장 실패는 무시 */ }   // 선택은 곧바로 기억하고, 적용만 판이 끝난 뒤로 미룰 수 있다
+  if (m === viewMode) { pendingView = null; syncViewUI(); return; }
+  if (viewBusy()) { pendingView = m; srToast(m === 'land' ? '판이 끝나면 가로로 바뀌어요' : '판이 끝나면 세로로 바뀌어요'); syncViewUI(); return; }
+  applyViewMode(m);
+}
+function srClose() {
+  if (VSG.on && VSG.running && !VSG.ended) { vsgQuitOpen(); return; }   // 대결 중이면 기존 나가기 확인을 거친다
+  exitFs();
+  location.href = '/english_dictionary.html#wordbook';   // 지금의 뒤로가기와 같은 곳
+}
+let viewUIReady = false;
+function setupViewUI() {
+  if (viewUIReady) return;
+  viewUIReady = true;
+  $('srClose').addEventListener('click', srClose);
+  $('srView').addEventListener('click', () => { tryFs(); setViewMode((pendingView || viewMode) === 'land' ? 'port' : 'land'); });
+  $('rotBtn').addEventListener('click', () => { tryFs(); setViewMode('port'); });
+  $('viewRow').addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (b && b.dataset.view) { tryFs(); setViewMode(b.dataset.view); } });
+  syncViewUI();
+}
+
 let last = 0;
 function frame(ts) {
   const dt = Math.min(0.05, (ts - last) / 1000 || 0);
   last = ts;
+  if (pendingView && !viewBusy()) applyViewMode(pendingView);   // 작업355: 달리는 중에 고른 화면 모드는 판이 끝난 뒤 적용한다
   if (!API.manual) step(dt);   // 테스트는 manual=true로 두고 step()을 직접 부른다
   draw();
   requestAnimationFrame(frame);
 }
 
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
-const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, HIGH_Y: HIGH_Y, TILE_Y: TILE_Y, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival, continued: G.contUsed }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
+const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, get HIGH_Y() { return HIGH_Y; }, get TILE_Y() { return TILE_Y; }, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival, continued: G.contUsed }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
+API.view = { mode: () => viewMode, pending: () => pendingView, set: setViewMode, scale: () => curScale, layout: () => ({ W: W, H: H, GROUND: GROUND, TILE_Y: TILE_Y, HIGH_Y: HIGH_Y }) };   // 작업355: 시험용 훅
 API.edge = { on: edgeOn, setViewW: w => { streamViewW = w; }, viewW: () => streamViewW, fill: edgeFill };   // 작업354: 시험용 훅
 API.preview = { T: PV_T, state: PV, run: previewRun, isOn: () => previewOn };   // 작업345: 시험용 훅
 API.vs = { T: VS_T, state: VS, open: vsOpen, game: VSG, renderHearts: renderHearts };   // 작업344: 시험용 훅(조회 간격 단축·상태 확인)

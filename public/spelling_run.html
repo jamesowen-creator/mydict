@@ -2,7 +2,12 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="METIS">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
 <title>스펠링 런</title>
 <link rel="icon" type="image/png" href="/icons/favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -77,6 +82,12 @@
           <div class="pn" id="popNote"></div>
         </div>
 
+        <div class="ctl" id="srCtl">
+          <button class="ctlb" id="srClose" type="button" aria-label="게임 닫기">닫기</button>
+          <button class="ctlb" id="srView" type="button">가로로</button>
+        </div>
+        <div class="srtoast" id="srToast" role="status" hidden></div>
+
         <div class="vsbar" id="vsBar" hidden>
           <div class="vsbn" id="vsBarName"></div>
           <div class="vsbs" id="vsBarStats"></div>
@@ -98,6 +109,11 @@
               <li class="mint">맞힐수록 빨라지고, 틀리거나 놓치면 체력이 줄어요.</li>
               <li class="red" id="coreCont">체력이 0이 되면 한 번 이어서 할 수 있어요.</li>
             </ul>
+            <div class="trow" id="viewRow" role="group" aria-label="화면">
+              <span class="vlabel">화면</span>
+              <button class="toggle vsbtn" type="button" data-view="port" aria-pressed="true">세로</button>
+              <button class="toggle vsbtn" type="button" data-view="land" aria-pressed="false">가로</button>
+            </div>
             <div class="trow" id="optRow">
               <button class="toggle vsbtn" id="helpBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="help">게임 방법</button>
             </div>
@@ -238,14 +254,18 @@
         </section>
         <button class="tune" id="tune" type="button" hidden>조정값 사용 중</button>
       </div>
+      <div class="rotband" id="rotBand" role="status" hidden>
+        <span>폰을 가로로 돌려 주세요(폰의 자동 회전이 켜져 있어야 해요)</span>
+        <button class="rotbtn" id="rotBtn" type="button">세로로 하기</button>
+      </div>
       <div class="sr-only" id="live" aria-live="polite"></div>
     </div>
   </div>
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=79"></script>
-<script src="/js/spellrun/stage_style.js?v=79"></script>
-<script src="/js/spellrun/game.js?v=79"></script>
+<script src="/js/spellrun/logic.js?v=80"></script>
+<script src="/js/spellrun/stage_style.js?v=80"></script>
+<script src="/js/spellrun/game.js?v=80"></script>
 </body>
 </html>

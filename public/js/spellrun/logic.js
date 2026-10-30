@@ -228,6 +228,26 @@ const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TIL
   CONTENT_BOTTOM_Y: 266 // 글자 칸 줄 아래 끝의 한계: 높은 칸 타일 윗변(HIGH_TILE_Y - TILE_H/2 = 276)보다 위(여유 포함)
 };
 
+// ---- 작업355: 꽉 찬 화면의 판 크기(세로 360 x 가변 높이, 가로 800x400) ----
+// 세로: 논리 높이는 화면 비율에 맞게 늘리되 최소 640. 높이 640이면 LAYOUT 과 완전히 같다. 늘어난 높이(E)는 하늘 2/3(땅·타일이 그만큼 아래로)과 땅 아래 띠 1/3로 나눈다.
+//   (뜻·글자 칸·HUD 는 위쪽에 그대로 있고, 땅·타일·점프·장애물의 상대 위치와 경기장 폭은 불변. 하늘이 넓어지면 위쪽 글자와 높은 칸 사이가 비어 보이는 대신 답답하지 않고, 땅 아래 띠는 대결 막대·나가기가 놓일 만큼만 늘린다)
+// 가로: 800x400. 글자 영역은 높이 100 이하(CONTENT_BOTTOM_Y 100), 높은 칸 타일 윗변 112 보다 위. 땅 아래 띠 44.
+const LAYOUT_LAND = { W: 800, H: 400, GROUND: 356, TILE_Y: 248, HIGH_TILE_Y: 141, TILE_H: 58, WORD_AVAIL_W: 420, HUD_SHIFT: 0, INTRO_CENTER_Y: 150, CONTENT_BOTTOM_Y: 100, CW_MAX: 28, MEAN_MAX: 20, SUB_MAX: 11 };
+const SCALE_MAX = 1.5, SCALE_MIN = 0.3;
+// mode: 'port' | 'land', availW/availH: 안전 여백을 뺀 쓸 수 있는 화면 크기(CSS px). 반환: LAYOUT 과 같은 항목 + { scale, mode, extra }
+function layoutFor(mode, availW, availH) {
+  const aw = Math.max(1, availW), ah = Math.max(1, availH);
+  if (mode === 'land') {
+    const scale = Math.max(SCALE_MIN, Math.min(aw / LAYOUT_LAND.W, ah / LAYOUT_LAND.H, SCALE_MAX));
+    return Object.assign({}, LAYOUT_LAND, { scale: scale, mode: 'land', extra: 0 });
+  }
+  const s0 = Math.min(aw / LAYOUT.W, SCALE_MAX);
+  const H = Math.max(LAYOUT.H, Math.floor(ah / s0));
+  const E = H - LAYOUT.H, Es = Math.round(E * 2 / 3);
+  const scale = Math.max(SCALE_MIN, Math.min(s0, ah / H));
+  return Object.assign({}, LAYOUT, { H: H, GROUND: LAYOUT.GROUND + Es, TILE_Y: LAYOUT.TILE_Y + Es, HIGH_TILE_Y: LAYOUT.HIGH_TILE_Y + Es, CW_MAX: 34, MEAN_MAX: 28, SUB_MAX: 12, scale: scale, mode: 'port', extra: E });
+}
+
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz';
 const CONFUSABLE = (() => {
   const groups = ['bd','pq','mn','cs','ie','ao','uv','gj','ck','tf','ou','ae','il'];
@@ -984,7 +1004,7 @@ return {
   speedLevel: speedLevel, speedMult: speedMult, gapSec: gapSec, leadSec: leadSec, speedAfterHit: speedAfterHit, speedAfterFail: speedAfterFail,
   targetSpeed: targetSpeed, planHearts: planHearts, pickHeartSlot: pickHeartSlot, jumpHeight: jumpHeight, judge: judge, buildRound: buildRound,
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
-  ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT,
+  ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT, LAYOUT_LAND: LAYOUT_LAND, layoutFor: layoutFor,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
   survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamDim: streamDim, streamOffscreen: streamOffscreen,
