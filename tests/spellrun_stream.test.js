@@ -118,16 +118,13 @@ test('틀린 뒤 맞는 글자가 오른쪽 끝에서 들어오는 시간(recove
   assert.ok(Math.abs(out['800@169'] - (800 + 29 - R) / 169) < 0.01, '폭 800 최저 속도: 진입 거리 / 속도 = ' + out['800@169']);
 });
 
-test('지금 풀 칸 판정·흐림·화면 밖', () => {
+test('지금 풀 칸 판정·화면 밖(흐림은 작업360에서 없앰)', () => {
   const cur = { wi: 2, si: 1 };
   assert.equal(L.streamIsCorrect({ correct: true, wi: 2, si: 1 }, cur), true);
   assert.equal(L.streamIsCorrect({ correct: true, wi: 2, si: 2 }, cur), false, '다음 칸용 정답');
   assert.equal(L.streamIsCorrect({ correct: true, wi: 3, si: 1 }, cur), false, '다음 단어용 정답');
   assert.equal(L.streamIsCorrect({ correct: false, wi: 2, si: 1 }, cur), false);
-  assert.equal(L.streamDim({ wi: 2, si: 1 }, cur), false); assert.equal(L.streamDim({ wi: 2, si: 2 }, cur), true); assert.equal(L.streamDim({ wi: 3, si: 0 }, cur), true);
-  assert.equal(L.streamDim({ wi: 2, si: 1, dimmed: true }, cur), true, '천사가 흐리게 바꾼 타일');
-  assert.equal(L.streamDim({ kind: 'heart', wi: 3, si: 0 }, cur), false, '아이템은 흐리게 하지 않는다');
-  assert.ok(STREAM.DIM_ALPHA > 0.5 && STREAM.DIM_ALPHA < 0.6 && STREAM.DIM_SCALE < 1);
+  assert.equal(L.streamDim, undefined, '작업360: 흐림 계산은 없앴다'); assert.equal(STREAM.DIM_ALPHA, undefined); assert.equal(STREAM.DIM_SCALE, undefined);
   assert.equal(L.streamOffscreen({ state: 'live', checked: false, x: 430, w: 58 }, 360), true);
   assert.equal(L.streamOffscreen({ state: 'live', checked: false, x: 380, w: 58 }, 360), false, '왼쪽 끝이 화면 안');
   assert.equal(L.streamOffscreen({ state: 'live', checked: true, x: 500, w: 58 }, 360), false);
@@ -163,4 +160,26 @@ test('layoutFor 가로: 800x400 고정, 글자 영역 100 이하가 높은 칸 �
   assert.equal(l.H - l.GROUND, 44);
   assert.ok(Math.abs(l.scale - Math.min(915 / 800, 412 / 400)) < 1e-9);
   assert.equal(L.layoutFor('land', 2000, 1200).scale, 1.5, '상한 1.5');
+});
+
+// 작업360: 가로 타일 75%·캐릭터 1.3배. 판정(점프 높이·러너 위치·장애물)은 크기와 무관하다
+test('작업360 가로 배율: 타일 0.75·캐릭터 1.3은 가로만, 세로는 1(그대로). 간격(MIN_GAP·PAD)은 같은 비율, LOOKAHEAD·판정 상수는 그대로', () => {
+  assert.equal(L.LAYOUT_LAND.TILE_SCALE, 0.75); assert.equal(L.LAYOUT_LAND.CHAR_SCALE, 1.3);
+  assert.equal(L.LAYOUT.TILE_SCALE, 1); assert.equal(L.LAYOUT.CHAR_SCALE, 1);
+  assert.equal(L.layoutFor('port', 360, 640).TILE_SCALE, 1); assert.equal(L.layoutFor('land', 800, 400).TILE_SCALE, 0.75);
+  assert.equal(L.streamMinGap(58, 58), 90, '세로(k 없음)는 이전과 같다');
+  assert.equal(L.streamMinGap(43.5, 43.5, 0, 0.75), 67.5, '가로: 타일 43.5 + PAD 24 = MIN_GAP 67.5');
+  assert.equal(L.streamMinGap(0.75 * 124, 0.75 * 124, 0, 0.75), 0.75 * 124 + 24, '조각 타일(폭 124)도 PAD 만 줄어든 폭 기준');
+  assert.equal(STREAM.LOOKAHEAD, 240); assert.equal(C.GRAB_H, 22); assert.equal(C.HIGH_GRAB_H, 160); assert.equal(C.JUMP_PEAK, 118);
+});
+test('작업360 가로 배치: 타일 폭 75%로 줄어도 모든 객체가 화면 밖에서 시작하고 남은 타일과 간격이 이전과 같은 비율로 남는다', () => {
+  for (const v of SPEEDS) for (const vw of WIDTHS) {
+    const w = 58 * 0.75, k = 0.75;
+    const g0 = L.layoutGroup(C, { R0: R + 300, v, widths: tiles(4, w), item: false, obstacle: null, firstHigh: false });
+    const r = L.streamPlace(C, 'pack', { xc: R, runnerX: R, v, bossNext: false, first: false, viewW: vw, widths: tiles(4, w), item: false, obstacle: null, firstHigh: false, leftover: { x: vw + 20, w }, tileScale: k });
+    const gl = L.groupLeft(r.group);
+    assert.ok(gl.left >= vw - 1e-9, '화면 밖에서 시작');
+    assert.ok(gl.cx - (vw + 20) >= L.streamMinGap(w, w, 0, k) - 1e-9, `남은 타일과 간격 ${(gl.cx - vw - 20).toFixed(1)}`);
+    assert.ok(g0.tiles[0].w === w);
+  }
 });

@@ -224,6 +224,7 @@ function configure(values) { return Object.assign(CONFIG, buildConfig(values)); 
 // 화면 배치(논리 px, 360x640 기준). 글자 칸 줄 아래 끝은 높은 칸(2단 점프) 타일 위쪽보다 위에 있어야 한다.
 const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TILE_H: 58, WORD_AVAIL_W: 332,
   HUD_SHIFT: 24,        // 작업322: 대표 뜻·보조 줄·글자 칸 줄을 위쪽 HUD 줄에서 이만큼(논리 px) 아래로 내린다(한 곳에서 조정)
+  TILE_SCALE: 1, CHAR_SCALE: 1,   // 작업360: 철자 타일·캐릭터 그림 배율(세로는 1 = 그대로. 가로 값은 LAYOUT_LAND). 판정 크기와 무관하게 그림·타일 폭만 바꾼다
   INTRO_CENTER_Y: 250,  // 작업323: 큰 뜻 카드의 가운데 높이(논리 px). 위쪽 HUD 줄 아래, 땅 위의 빈 공간
   CONTENT_BOTTOM_Y: 266 // 글자 칸 줄 아래 끝의 한계: 높은 칸 타일 윗변(HIGH_TILE_Y - TILE_H/2 = 276)보다 위(여유 포함)
 };
@@ -233,7 +234,7 @@ const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TIL
 //   (뜻·글자 칸·HUD 는 위쪽에 그대로 있고, 땅·타일·점프·장애물의 상대 위치와 경기장 폭은 불변. 하늘이 넓어지면 위쪽 글자와 높은 칸 사이가 비어 보이는 대신 답답하지 않고, 땅 아래 띠는 대결 막대·나가기가 놓일 만큼만 늘린다)
 // 가로: 800x400. 글자 영역은 높이 100 이하(CONTENT_BOTTOM_Y 100), 높은 칸 타일 윗변 112 보다 위. 땅 아래 띠 44.
 // 작업356: 뜻(왼쪽)과 글자 칸(오른쪽)을 한 줄에 나란히 둔다(HUD 는 위 한 줄). 글자 칸 줄은 남는 폭(약 440)을 쓰고, 큰 뜻 연출은 위쪽(높은 칸 타일 윗변 112 보다 위)에서 한다. 팝업 글자 크기는 가로 전용 상한
-const LAYOUT_LAND = { W: 800, H: 400, GROUND: 356, TILE_Y: 248, HIGH_TILE_Y: 141, TILE_H: 58, WORD_AVAIL_W: 440, HUD_SHIFT: 0, INTRO_CENTER_Y: 72, INTRO_W: 560, CONTENT_BOTTOM_Y: 100, CW_MAX: 38, MEAN_MAX: 26, SUB_MAX: 12, POPW_MAX: 30, POPM_MAX: 16, POPE_MAX: 10, FIT_PAD: 5 };
+const LAYOUT_LAND = { W: 800, H: 400, GROUND: 356, TILE_Y: 248, HIGH_TILE_Y: 141, TILE_H: 58, WORD_AVAIL_W: 440, HUD_SHIFT: 0, INTRO_CENTER_Y: 72, INTRO_W: 560, CONTENT_BOTTOM_Y: 100, TILE_SCALE: 0.75, CHAR_SCALE: 1.3, CW_MAX: 38, MEAN_MAX: 26, SUB_MAX: 12, POPW_MAX: 30, POPM_MAX: 16, POPE_MAX: 10, FIT_PAD: 5 };
 const SCALE_MAX = 1.5, SCALE_MIN = 0.3;
 // mode: 'port' | 'land', availW/availH: 안전 여백을 뺀 쓸 수 있는 화면 크기(CSS px). 반환: LAYOUT 과 같은 항목 + { scale, mode, extra }
 function layoutFor(mode, availW, availH) {
@@ -760,14 +761,13 @@ const STREAM = {
   PAD: 32,            // 두 타일 폭의 절반 합에 더하는 여유(px). 폭이 큰 조각 타일에서 MIN_GAP 이 모자라지 않게
   HALF_TILE: 29,      // 진입 거리에 쓰는 기본 타일 반폭(px). 실제로는 객체마다 반폭을 쓴다
   HALF_ITEM: 23,      // 하트·번개·구조 아이템 반폭
-  LOOKAHEAD: 240,     // 첫 객체가 진입 지점보다 이만큼 가까워지면 미리 줄에 넣는다(px)
-  DIM_ALPHA: 0.55,    // 지금 풀 묶음이 아닌 타일의 투명도
-  DIM_SCALE: 0.88     // 지금 풀 묶음이 아닌 타일의 크기 배율
+  LOOKAHEAD: 240      // 첫 객체가 진입 지점보다 이만큼 가까워지면 미리 줄에 넣는다(px). 시간(거리) 기준이라 타일 크기와 무관
 };
 // 진입 지점: 객체의 중심이 이 값 이상이면 화면 밖(오른쪽)에서 시작한다. viewW = 화면 논리 폭
 function streamEntryX(viewW, half) { return viewW + (half === undefined ? STREAM.HALF_TILE : half); }
 // minPx: 추가로 요구하는 거리. 다음 묶음의 첫 타일이 높은 칸이면 2단 점프를 위해 첫 점프가 일찍(약 0.46초 전) 시작되므로, 남은 타일이 그 점프 중에 지나가지 않도록 묶음 안 간격(gap)을 요구한다
-function streamMinGap(wA, wB, minPx) { return Math.max(STREAM.MIN_GAP, ((wA || 0) + (wB || 0)) / 2 + STREAM.PAD, minPx || 0); }
+// k: 타일 그림 배율(작업360, 가로 0.75). MIN_GAP·PAD 도 같은 비율로 줄여 줄어든 타일 사이 빈 틈이 그대로(k 기본 1 = 세로·이전과 같다)
+function streamMinGap(wA, wB, minPx, k) { k = k || 1; return Math.max(STREAM.MIN_GAP * k, ((wA || 0) + (wB || 0)) / 2 + STREAM.PAD * k, minPx || 0); }
 // 묶음 하나의 배치(classic 의 spawnPack 산식과 같다). o: { R0, v, widths: 타일 폭 목록, item: 앞에 아이템이 붙는가, obstacle: 'box'|'pit'|null, firstHigh: 첫 타일이 높은 칸인가 }
 function layoutGroup(cfg, o) {
   cfg = cfg || CONFIG;
@@ -800,7 +800,7 @@ function streamShift(cfg, g, o) {
   const gl = groupLeft(g);
   let dx = Math.max(0, o.viewW - gl.left);
   if (o.leftover) {
-    dx = Math.max(dx, o.leftover.x + streamMinGap(o.leftover.w, gl.w, g.firstHigh ? g.gap : 0) - gl.cx);
+    dx = Math.max(dx, o.leftover.x + streamMinGap(o.leftover.w, gl.w, g.firstHigh ? g.gap : 0, o.tileScale) - gl.cx);
     if (g.obstacle && g.lay) {   // 장애물 점프 시작 구간의 가장 이른 시각(lo, 묶음이 생긴 순간 기준)보다 남은 타일이 먼저 러너를 지나가야 한다
       const win = obstacleWindow(cfg, g.lay, g.v);
       dx = Math.max(dx, o.leftover.x + g.lay.D1 - g.v * win.lo - g.x0);
@@ -821,13 +821,12 @@ function streamBaseR0(cfg, kind, o) {
 function streamPlace(cfg, kind, o) {
   cfg = cfg || CONFIG;
   const g0 = layoutGroup(cfg, { R0: streamBaseR0(cfg, kind, o), v: o.v, widths: o.widths, item: o.item, obstacle: o.obstacle, firstHigh: o.firstHigh });
-  const dx = streamShift(cfg, g0, { viewW: o.viewW, leftover: o.leftover });
+  const dx = streamShift(cfg, g0, { viewW: o.viewW, leftover: o.leftover, tileScale: o.tileScale });
   return { group: dx ? shiftGroup(g0, dx) : g0, dx: dx, group0: g0 };
 }
 // 글자 타일이 "지금 풀 칸"의 정답인가. cur: { wi, si }
 function streamIsCorrect(t, cur) { return !!(t.correct && t.wi === cur.wi && t.si === cur.si); }
-// 지금 풀 칸의 묶음이 아닌 글자 타일은 흐리게 보인다(아이템은 그대로)
-function streamDim(t, cur) { return !t.kind && !!(t.dimmed || t.wi !== cur.wi || t.si !== cur.si); }
+// 작업360: 지금 풀 칸이 아닌 타일을 흐리게 하던 streamDim 은 없앴다(모든 타일은 항상 같은 선명도)
 // 화면 밖(왼쪽 가장자리가 viewW 이상)에 있고 아직 러너에 닿지 않은 살아 있는 타일
 function streamOffscreen(t, viewW) { return t.state === 'live' && !t.checked && t.x - t.w / 2 >= viewW; }
 
@@ -1037,7 +1036,7 @@ return {
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT, LAYOUT_LAND: LAYOUT_LAND, layoutFor: layoutFor,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
   survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
-  STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamDim: streamDim, streamOffscreen: streamOffscreen,
+  STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamOffscreen: streamOffscreen,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };
 });

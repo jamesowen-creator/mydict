@@ -259,6 +259,17 @@ body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
 .sr-box.land .word{position:absolute;left:calc(330 * var(--u));width:calc(456 * var(--u));top:calc(36 * var(--u));margin-top:calc(12 * var(--u))}
 .sr-box.land .cell{height:calc(40 * var(--u));line-height:calc(36 * var(--u));border-bottom-width:calc(3 * var(--u))}
 .sr-box.land .ctl,.sr-box.land .hud:not([hidden]) ~ .ctl{left:50%;top:calc(6 * var(--u));transform:translateX(-50%)}
+/* 작업360 가로 상단 정리: 하트(왼쪽)와 점수(오른쪽)만 남기고, 단어 N/M·속도 배지·소리·닫기·화면 단추는 오른쪽 위 [메뉴] 단추 하나로 합친다(세로 CSS 는 건드리지 않는다).
+   나중에 최종 보스 에너지 막대가 들어갈 자리: 아래 .hud 격자의 가운데 1fr 칸(grid-area 1 / 2), 하트와 점수 사이. 지금은 비어 있다 */
+.sr-box .menubtn,.sr-box .srmenu{display:none}
+.sr-box.land .progress,.sr-box.land .speedtag,.sr-box.land .snd,.sr-box.land .ctl,.sr-box.land .hud:not([hidden]) ~ .ctl{display:none}
+.sr-box.land .hud{grid-template-columns:auto 1fr auto;padding-right:calc(14 * var(--u) + 62 * var(--u))}
+.sr-box.land .hearts{grid-area:1 / 1}
+.sr-box.land .scorebox{grid-area:1 / 3}
+.sr-box.land .menubtn{display:block;position:absolute;right:calc(14 * var(--u));top:calc(6 * var(--u));z-index:6}
+.sr-box.land .srmenu:not([hidden]){display:flex;flex-direction:column;gap:calc(4 * var(--u));position:absolute;right:calc(14 * var(--u));top:calc(36 * var(--u));z-index:7;box-sizing:border-box;min-width:calc(150 * var(--u));padding:calc(6 * var(--u));background:var(--paper);border:calc(2 * var(--u)) solid var(--ink);border-radius:calc(14 * var(--u));box-shadow:0 calc(3 * var(--u)) 0 var(--ink)}
+.sr-box.land .menuitem{cursor:pointer;min-height:var(--ctl-min-h,44px);font-family:var(--f-body);font-weight:700;font-size:calc(13 * var(--u));color:var(--ink);background:#fff;border:calc(2 * var(--u)) solid var(--ink);border-radius:calc(10 * var(--u));padding:0 calc(12 * var(--u))}
+.sr-box.land .menuitem:focus-visible,.sr-box.land .menubtn:focus-visible{outline:calc(3 * var(--u)) solid var(--ink);outline-offset:calc(2 * var(--u))}
 /* 완성 단어 카드: 두 열(왼쪽 단어·발음, 오른쪽 뜻·예문), 경기장 가운데 위쪽 줄 높은 칸 타일과 일반 타일 줄 사이(y 104~210). 펭귄(x 72)은 가리지 않는다 */
 /* 작업357 가로 팝업·배너: 위쪽 뜻·글자 칸 영역(y 34~100)에 뜨고 그 자리를 덮는다(뜻·글자 칸은 팝업 아래에 가려진다). 높은 칸 타일 줄(y 112~170)·펭귄·다가오는 타일은 가리지 않는다.
    내용이 많으면 발음 기호 줄은 숨기고 예문은 한 줄로 줄이며, 단어와 뜻은 항상 보인다 */

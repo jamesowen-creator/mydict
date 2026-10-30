@@ -379,12 +379,14 @@ function stopVoices() {
 }
 function syncSndButtons() {
   sndBtns.forEach(b => { b.textContent = SND.on ? '소리 켬' : '소리 끔'; b.setAttribute('aria-pressed', String(SND.on)); });
+  const m = $('srMenuSnd'); if (m) { m.textContent = SND.on ? '소리 끄기' : '소리 켜기'; m.setAttribute('aria-pressed', String(SND.on)); }   // 작업360: 가로 메뉴 항목
 }
-sndBtns.forEach(b => b.addEventListener('click', () => {
+function toggleSound() {
   SND.on = !SND.on;
   if (!SND.on) stopVoices();
   syncSndButtons();
-}));
+}
+sndBtns.forEach(b => b.addEventListener('click', toggleSound));
 syncSndButtons();
 
 // ---------- 게임 상태 ----------
@@ -533,6 +535,7 @@ function planPool(reviewOnly) {
   return { surv: surv, supply: supply, pool: pool, regular: surv ? 0 : plan.regular };
 }
 function startRound(reviewOnly, prepared) {
+  closeMenu();   // 작업360
   const P = prepared || planPool(reviewOnly);
   const surv = P.surv, supply = P.supply, pool = P.pool, regular = P.regular;
   if (!pool.length) return;
@@ -664,7 +667,7 @@ function spawnPack() {
   }
   cands.forEach((c, i) => {
     G.tiles.push({
-      id: G.packId, x: x0 + i * gap, w: slot.chunk ? 20 + slot.text.length * 26 : 58,
+      id: G.packId, x: x0 + i * gap, w: (slot.chunk ? 20 + slot.text.length * 26 : 58) * tileScale(),
       text: c.text, correct: c.correct, chunk: slot.chunk, high: !!slot.high, state: 'live', t: 0, age: 0,
       checked: false, ok: false, color: TILE_COLORS[(i + G.si) % TILE_COLORS.length]
     });
@@ -676,7 +679,9 @@ function spawnPack() {
 // 화면 안에서 생기지 않도록·남은 타일과 겹치지 않도록 그만큼 늦춘다. 한 묶음의 정답 위치는 월드 좌표(x + G.dist)로 기록해 속도가 바뀌어도 어긋나지 않는다.
 const edgeOn = () => !!CONFIG.STREAM_EDGE;
 let streamViewW = W;   // 화면 논리 폭(진입 거리 = 이 값 + 타일 반폭). 355 에서 가로 모드가 키운다
-const dimCur = () => ({ wi: G.wi, si: G.si });
+const dimCur = () => ({ wi: G.wi, si: G.si });   // 지금 풀 칸(판정용. 작업360 전에는 흐림 계산에도 썼다)
+const tileScale = () => LAYOUT.TILE_SCALE || 1;   // 작업360: 가로 0.75(철자 타일 그림·폭). 세로 1
+const charScale = () => LAYOUT.CHAR_SCALE || 1;   // 작업360: 가로 1.3(캐릭터 그림만. 판정 위치·크기는 그대로)
 function edgeWPFor(i) {
   const ec = G.ec;
   if (ec.wps[i]) return ec.wps[i];
@@ -704,8 +709,8 @@ function edgeCommit(key, kind, nearOnly) {
   const spdOk = !heartOk && !resOk && wp.speedPending && key.si >= wp.speedSlot && !slot.high;
   const item = heartOk ? 'heart' : resOk ? wp.rescueKind : spdOk ? 'speed' : null;
   const obKind = (wp.obst && !wp.obst.done && wp.obst.slot === key.si && !heartOk) ? wp.obst.kind : null;   // 하트가 놓이는 묶음에는 장애물을 두지 않는다(classic 과 같다)
-  const ccfg = wp.boss ? bossConfig() : CONFIG, tw = slot.chunk ? 20 + slot.text.length * 26 : 58;
-  const r = L.streamPlace(CONFIG, kind, { xc: tail ? tail.xcW - G.dist : RUNNER_X, runnerX: RUNNER_X, v: v, bossNext: !!wp.boss, first: key.wi === 0, viewW: streamViewW,
+  const ccfg = wp.boss ? bossConfig() : CONFIG, tw = (slot.chunk ? 20 + slot.text.length * 26 : 58) * tileScale();
+  const r = L.streamPlace(CONFIG, kind, { tileScale: tileScale(), xc: tail ? tail.xcW - G.dist : RUNNER_X, runnerX: RUNNER_X, v: v, bossNext: !!wp.boss, first: key.wi === 0, viewW: streamViewW,
     widths: Array.from({ length: ccfg.CANDIDATES }, () => tw), item: !!item, obstacle: obKind, firstHigh: !!slot.high, leftover: edgeRightmost() });
   if (nearOnly && L.groupLeft(r.group).left > streamViewW + L.STREAM.LOOKAHEAD) return false;
   const g = r.group, pid = ++G.packId, rec = { key: key, kind: kind, dx: r.dx, correct: null, xcW: 0 };
@@ -816,7 +821,7 @@ function onRescueItem(t) {
     burst(RUNNER_X + 8, TILE_Y, '#c4b5fd', 12); floatText(RUNNER_X + 70, GROUND - 235, '천사!', '#6d4fd6', 22);
     for (const x of G.tiles) {
       if (x.id !== pack || x.state !== 'live' || x.correct) continue;   // 정답 타일은 그대로 두고 틀린 타일만 치운다
-      if (edgeOn()) { if (L.streamOffscreen(x, streamViewW)) x.dead = true; else x.dimmed = true; continue; }   // 작업354: edge 는 화면 밖 타일만 치우고 보이는 타일은 흐리게만 바꾼다
+      if (edgeOn()) { if (L.streamOffscreen(x, streamViewW)) x.dead = true; continue; }   // 작업354: edge 는 화면 밖 타일만 치운다. 작업360: 보이는 타일은 흐리게도 바꾸지 않고 그대로 둔다
       if (reduce) x.dead = true; else { G.angels.push({ x: x.x, y: x.high ? HIGH_Y : TILE_Y, t: 0 }); x.state = 'fade'; x.t = 0; x.angel = true; }   // 움직임 줄이기에서는 반짝임 없이 바로 사라진다
     }
     if (reduce || edgeOn()) G.tiles = G.tiles.filter(x => !x.dead);
@@ -882,7 +887,8 @@ function doEnd() {
   els.cont.hidden = true; finish(false);
 }
 function onFail(t, kind) {
-  if (kind === 'wrong') { t.state = 'taken'; t.t = 0; t.ok = false; }
+  if (edgeOn()) { if (kind === 'wrong') t.wrong = true; }   // 작업360: 가로(edge)는 틀린·놓친 타일이 희미해지거나 사라지지 않고 같은 선명도로 지나간다(틀린 타일에는 붉은 색조만)
+  else if (kind === 'wrong') { t.state = 'taken'; t.t = 0; t.ok = false; }
   else { t.state = 'fade'; t.t = 0; }
   if (edgeOn()) clearRescue(); else endPack(true);   // 작업354: edge 는 보이는 타일을 그대로 두고 아래에서 화면 밖 줄만 다시 정한다
   G.hp--; G.combo = 0; G.mist[G.wi]++;
@@ -987,6 +993,7 @@ function afterPop() {
   } else { G.state = 'run'; loadWord(G.wi + 1); }
 }
 function finish(cleared) {
+  closeMenu();   // 작업360
   G.state = 'over'; G.bossMode = false; G.cleared = !!cleared; clearIntro(); els.cont.hidden = true;
   box.classList.remove('boss');
   els.pop.hidden = true; els.hud.hidden = true; els.bossBanner.hidden = true;
@@ -1058,7 +1065,7 @@ function startSecondJump() {
   sfx.jump2(); burst(RUNNER_X, GROUND - 27 - G.j2h + 24, '#ffffff', 8);
 }
 function jump() {
-  if (VSG.quitOpen) return;
+  if (VSG.quitOpen || menuPauses()) return;
   if (G.state !== 'run' && G.state !== 'pop' && G.state !== 'intro') return;
   if (G.jumpT < 0) startJump();
   else if (CONFIG.DJ_ENABLED && G.j2 < 0) { if (G.jumpT >= CONFIG.SECOND_JUMP_MIN) startSecondJump(); }   // 첫 점프 직후의 너무 빠른 입력(중복 이벤트)은 무시
@@ -1067,9 +1074,11 @@ function jump() {
 box.addEventListener('pointerdown', e => {
   if (e.target.closest && e.target.closest('button')) return;
   e.preventDefault();
+  if (MENU.open) { closeMenu(); return; }   // 작업360: 메뉴가 열려 있을 때 바깥을 누르면 메뉴만 닫는다(그 누름은 점프로 세지 않는다)
   jump();
 });
 window.addEventListener('keydown', e => {
+  if (MENU.open) { if (e.key === 'Escape') closeMenu(); if (e.target && e.target.closest && e.target.closest('#srMenu')) return; }   // 작업360: 메뉴 안의 키(스페이스·엔터로 항목 누르기)는 점프가 아니다
   if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
     if (G.state === 'run' || G.state === 'pop' || G.state === 'intro') { e.preventDefault(); if (!e.repeat) jump(); }   // 키를 누르고 있어서 생기는 반복 입력은 점프로 세지 않는다
   }
@@ -1095,7 +1104,7 @@ els.resChips.addEventListener('click', e => {
 
 // ---------- 업데이트 ----------
 function step(dt) {
-  if (G.state === 'choice' || VSG.quitOpen) return;   // 작업341: 선택 화면에 머문 시간은 게임 시간(생존 시간)에 들어가지 않는다. 작업348: 대결 나가기 확인 대화상자가 열려 있는 동안도 같다
+  if (G.state === 'choice' || VSG.quitOpen || menuPauses()) return;   // 작업360: 혼자 할 때 메뉴가 열려 있으면 게임 시간·타일·점수가 모두 멈춘다(대결은 멈추지 않는다). 작업341: 선택 화면에 머문 시간은 게임 시간(생존 시간)에 들어가지 않는다. 작업348: 대결 나가기 확인 대화상자가 열려 있는 동안도 같다
   G.time += dt;
   { const tgt = G.bossMode ? 1 : 0, d = tgt - G.bossBlend; G.bossBlend = (reduce || Math.abs(d) <= dt / BG_ART.BLEND_SEC) ? tgt : G.bossBlend + Math.sign(d) * dt / BG_ART.BLEND_SEC; }   // 작업358: 낮 ↔ 보스 배경 약 0.5초 겹쳐 바꿈(움직임 줄이기는 즉시)
   box.classList.toggle('bsky', G.bossBlend >= 0.5);   // 보스 하늘이 절반 이상 보이면 위쪽 글자를 흰색으로(stage_style.js)
@@ -1464,6 +1473,7 @@ function drawTile(t) {
   if (t.kind === 'hint' || t.kind === 'angel') { drawRescueItem(t); return; }
   const h = TILE_H;
   let a = 1, sc = 1;
+  const solid = edgeOn();   // 작업360: 가로(edge)의 철자 타일은 항상 같은 선명도(들어올 때 서서히 나타나지도 않는다)
   if (t.state === 'fade') { const fd = t.angel ? CONFIG.ANGEL_SEC : 0.3; a = 1 - t.t / fd; sc = 1 - 0.2 * Math.min(1, t.t / fd); }
   else if (t.state === 'taken') { a = 1 - t.t / 0.35; sc = 1 + 0.5 * Math.min(1, t.t / 0.35); }
   if (a <= 0) return;
@@ -1473,11 +1483,11 @@ function drawTile(t) {
     ctx.fillStyle = t.high ? 'rgba(0,0,0,.14)' : 'rgba(0,0,0,.28)';
     ctx.beginPath(); ctx.ellipse(t.x, GROUND + 10, t.w * 0.38, 6, 0, 0, Math.PI * 2); ctx.fill();
   }
-  const w = t.w;
+  const w = t.w / tileScale();
   ctx.save();
-  const dim = edgeOn() && L.streamDim(t, dimCur());   // 작업354: 지금 풀 묶음이 아닌 타일(남은 타일·다음 묶음·다음 단어)은 흐리게
-  ctx.globalAlpha = Math.max(0, Math.min(1, a, t.age / 0.2)) * (dim ? L.STREAM.DIM_ALPHA : 1);
-  ctx.translate(t.x, ty + bob); ctx.scale(dim ? sc * L.STREAM.DIM_SCALE : sc, dim ? sc * L.STREAM.DIM_SCALE : sc);
+  ctx.globalAlpha = Math.max(0, Math.min(1, a, solid ? 1 : t.age / 0.2));
+  const ts = tileScale();   // 작업360: 그림은 ts 배(가로 0.75). t.w 는 이미 줄어든 폭이라 그릴 때는 원래 폭(w)으로 그리고 전체를 ts 배 한다
+  ctx.translate(t.x, ty + bob); ctx.scale(sc * ts, sc * ts);
   const hintGlow = G.rescue && G.rescue.kind === 'hint' && t.id === G.rescue.pack && t.correct && t.state === 'live';   // 작업329: 힌트 아이템 효과 중 정답 타일 글로우
   if (t.state === 'hint') { ctx.shadowColor = GOOD; ctx.shadowBlur = 20; }
   else if (hintGlow) { ctx.shadowColor = '#34d399'; ctx.shadowBlur = 26 + 8 * Math.sin(G.time * 8); }
@@ -1509,7 +1519,7 @@ function drawTile(t) {
   if (t.state === 'hint') {
     ctx.strokeStyle = GOOD; ctx.lineWidth = 5; rr(-w / 2 - 2, -h / 2 - 2, w + 4, h + 4, 16); ctx.stroke();
   }
-  if (t.state === 'taken' && !t.ok) { ctx.fillStyle = 'rgba(232,69,79,.45)'; rr(-w / 2, -h / 2, w, h, 14); ctx.fill(); }
+  if ((t.state === 'taken' && !t.ok) || t.wrong) { ctx.fillStyle = 'rgba(232,69,79,.45)'; rr(-w / 2, -h / 2, w, h, 14); ctx.fill(); }
   ctx.restore();
 }
 function drawRunnerShape(h) {   // 기존 도형 캐릭터(스프라이트를 못 불렀을 때의 대체 그림)
@@ -1575,13 +1585,14 @@ function drawRunner() {
   const h = curH();
   const ck = activeChar();
   if (!ck) { drawRunnerShape(h); return; }
-  const P = CHARS[ck], sz = P.size, sx = (G.shake > 0 && !reduce) ? (Math.random() - 0.5) * 6 : 0;
+  const cs = charScale();   // 작업360: 가로 1.3배(그림만. 러너 위치·점프 높이·판정은 그대로, 발끝은 땅에 그대로 닿는다)
+  const P = CHARS[ck], sz = P.size * cs, sx = (G.shake > 0 && !reduce) ? (Math.random() - 0.5) * 6 : 0;
   const idx = penguinFrame({ state: G.state, cleared: G.cleared, air: h > 1, rising: G.rising, runPhase: G.runPhase });
   const angle = spinAngle(G.j2, G.j2Land) + ((G.state === 'ending' || G.state === 'choice') ? 0.25 * 180 / Math.PI : 0);
   G.spriteDraws++; G.spriteFrame = idx; G.spriteAngle = angle;
   ctx.fillStyle = 'rgba(0,0,0,.25)';
-  ctx.beginPath(); ctx.ellipse(RUNNER_X, GROUND + 10, 22 * (1 - h / 260), 6 * (1 - h / 320), 0, 0, Math.PI * 2); ctx.fill();
-  const faceX = RUNNER_X + P.faceDx, footY = GROUND - h;
+  ctx.beginPath(); ctx.ellipse(RUNNER_X, GROUND + 10, 22 * cs * (1 - h / 260), 6 * cs * (1 - h / 320), 0, 0, Math.PI * 2); ctx.fill();
+  const faceX = RUNNER_X + P.faceDx * cs, footY = GROUND - h;
   const left = faceX - P.faceX * sz + sx, top = footY + P.footPad * sz - sz;
   ctx.save();
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
@@ -2501,7 +2512,7 @@ function syncViewUI() {
   document.querySelectorAll('#viewRow [data-view]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.view === want)));
   syncRot();
 }
-function applyViewMode(m) { pendingView = null; viewMode = m; syncStream(); resize(); syncViewUI(); }
+function applyViewMode(m) { pendingView = null; viewMode = m; if (m !== 'land') closeMenu(); syncStream(); resize(); syncViewUI(); }
 function setViewMode(m) {
   if (m !== 'port' && m !== 'land') return;
   try { localStorage.setItem(VIEW_KEY, m); } catch (e) { /* 저장 실패는 무시 */ }   // 선택은 곧바로 기억하고, 적용만 판이 끝난 뒤로 미룰 수 있다
@@ -2522,11 +2533,30 @@ function setChar(k) {
   try { localStorage.setItem('spellrun_char', k); } catch (e) { /* 저장 실패는 무시 */ }
   syncCharUI();
 }
+// ---------- 작업360: 가로 [메뉴] 단추 ----------
+// 가로에서는 닫기·화면 바꾸기·소리를 이 메뉴 하나로 합친다(세로는 예전 단추 그대로). 혼자 할 때는 메뉴가 열려 있는 동안 step 이 멈춘다(위 menuPauses).
+// 대결에서는 멈추지 않는다. 열고 닫는 것은 게임 상태(G)를 건드리지 않아 시간·점수·타일 위치가 어긋나지 않는다(멈춘 시간은 게임 시간에 들어가지 않고, 다시 시작할 때 frame 이 dt 를 0.05초로 제한한다).
+const MENU = { open: false };
+const menuPauses = () => MENU.open && !VSG.on && G.state !== 'idle' && G.state !== 'over';
+function openMenu() {
+  if (viewMode !== 'land' || MENU.open) return;
+  MENU.open = true; $('srMenu').hidden = false; $('srMenuBtn').setAttribute('aria-expanded', 'true');
+  try { $('srMenuCont').focus({ preventScroll: true }); } catch (e) { /* 무시 */ }
+}
+function closeMenu() {
+  if (!MENU.open) return;
+  MENU.open = false; $('srMenu').hidden = true; $('srMenuBtn').setAttribute('aria-expanded', 'false');
+}
 let viewUIReady = false;
 function setupViewUI() {
   if (viewUIReady) return;
   viewUIReady = true;
   $('srClose').addEventListener('click', srClose);
+  $('srMenuBtn').addEventListener('click', () => { if (MENU.open) closeMenu(); else openMenu(); });
+  $('srMenuCont').addEventListener('click', closeMenu);
+  $('srMenuSnd').addEventListener('click', toggleSound);
+  $('srMenuView').addEventListener('click', () => { closeMenu(); tryFs(); setViewMode('port'); });
+  $('srMenuClose').addEventListener('click', () => { closeMenu(); srClose(); });
   $('srView').addEventListener('click', () => { tryFs(); setViewMode((pendingView || viewMode) === 'land' ? 'port' : 'land'); });
   $('rotBtn').addEventListener('click', () => { tryFs(); setViewMode('port'); });
   $('charRow').addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (b && b.dataset.char) setChar(b.dataset.char); });
@@ -2548,6 +2578,7 @@ function frame(ts) {
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
 const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, get HIGH_Y() { return HIGH_Y; }, get TILE_Y() { return TILE_Y; }, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival, continued: G.contUsed }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
 API.art = { charKey: () => charKey, activeChar: activeChar, charReady: charReady, bgOK: bgOK, itemArtReady: itemArtReady, obstArtReady: () => obstArtReady(), blend: () => G.bossBlend, setChar: k => setChar(k) };   // 작업358: 시험용 훅
+API.menu = { open: () => MENU.open, pauses: menuPauses };   // 작업360: 시험용 훅
 API.view = { mode: () => viewMode, pending: () => pendingView, set: setViewMode, scale: () => curScale, layout: () => ({ W: W, H: H, GROUND: GROUND, TILE_Y: TILE_Y, HIGH_Y: HIGH_Y }) };   // 작업355: 시험용 훅
 API.edge = { on: edgeOn, setViewW: w => { streamViewW = w; }, viewW: () => streamViewW, fill: edgeFill };   // 작업354: 시험용 훅
 API.preview = { T: PV_T, state: PV, run: previewRun, isOn: () => previewOn };   // 작업345: 시험용 훅

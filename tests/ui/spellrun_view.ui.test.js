@@ -93,9 +93,10 @@ for (const [mode, w, h] of SIZES) {
     const highTop = m.lay.HIGH_Y - 29;
     assert.ok(it.word.b <= highTop - 5, `글자 칸 줄 아래 끝 ${it.word.b.toFixed(1)} <= 높은 칸 타일 윗변 ${highTop} - 5`);
     if (mode === 'land') assert.ok(it.word.b <= 100.5, `가로 글자 영역 높이 100 이하: ${it.word.b.toFixed(1)}`);
-    assert.ok(it.ctlClose.h * m.u >= 20 && it.ctlView.w > 0);
+    if (mode === 'port') assert.ok(it.ctlClose.h * m.u >= 20 && it.ctlView.w > 0);
+    else assert.ok(it.progress === null && it.speed === null && it.snd === null && it.ctl === null, '작업360: 가로 상단은 하트·점수만(나머지는 [메뉴] 단추로)');
     // 터치 영역: 시각 크기는 작아도 44px 이상(::before)
-    const tap = await page.eval(`(() => { const e = document.getElementById('srClose'), r = e.getBoundingClientRect(), p = getComputedStyle(e, '::before'); return { h: parseFloat(p.height), w: r.width, hh: r.height }; })()`);
+    const tap = await page.eval(`(() => { const e = document.getElementById('${mode === 'land' ? 'srMenuBtn' : 'srClose'}'), r = e.getBoundingClientRect(), p = getComputedStyle(e, '::before'); return { h: parseFloat(p.height), w: r.width, hh: r.height }; })()`);
     assert.ok(tap.h >= 44 - 0.5, '터치 영역 높이 ' + tap.h);
     // 대결 막대·나가기(아래): 서로 겹치지 않고 판 안, 나가기는 44px 이상
     await page.eval(`(() => { const bar = document.getElementById('vsBar'); bar.hidden = false; document.getElementById('vsBarName').textContent = '상대 이름'; document.getElementById('vsBarStats').textContent = '체력 5/5 · 점수 1,234 · 콤보 3 · 단어 2'; document.getElementById('vsQuitBtn').hidden = false; document.getElementById('vsToast').hidden = false; document.getElementById('vsToast').textContent = '안내 문구'; })()`);
@@ -212,7 +213,7 @@ test('355-3) 달리는 중 [가로로]는 판이 끝난 뒤 적용되고 안내�
   const page = await open(915, 412);
   await page.click('#srView');   // 시작 화면: 곧바로
   assert.equal(await page.eval('SpellRun.view.mode()'), 'land');
-  await page.click('#srView');
+  await page.eval("SpellRun.view.set('port')");   // 작업360: 가로에서는 [세로로]가 [메뉴] 안에 있다(메뉴 시험은 spellrun_land360)
   assert.equal(await page.eval('SpellRun.view.mode()'), 'port');
   await run(page);
   await page.click('#srView');
