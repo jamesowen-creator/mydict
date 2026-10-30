@@ -74,3 +74,39 @@ test('스크립트를 다시 돌리면 같은 결과가 나온다(원본 그림 
   for (const k of KEYS) assert.equal(sha(path.join(tmp, REPORT[k].file)), sha(path.join(IMG, REPORT[k].file)), k + ' 결과가 같다');
   assert.deepEqual(JSON.parse(fs.readFileSync(rep, 'utf8')), REPORT);
 });
+
+// ---- 작업359: 여학생·남학생 달리기 4동작 교체(다리가 고정돼 보이던 문제) ----
+// 358 의 달리기 4동작은 모두 같은 도약 자세라 다리가 고정된 채 미끄러져 보였다. 벌림 → 듦 → 벌림 → 듦 이 되도록 새 그림으로 바꿨다. 이 시험은 같은 문제가 다시 생기지 않게 막는다.
+const RUN_KEYS = ['girl', 'boy'];
+
+test('달리기 4동작: 다리 모양이 이웃 동작끼리 크게 다르다(0↔1, 1↔2, 2↔3, 3↔0 모두 0.6 이상) — 모두 같은 자세로 돌아가는 것을 막는다', () => {
+  for (const k of RUN_KEYS) {
+    const d = REPORT[k].run.after.leg_diff;
+    for (const pair of ['0-1', '1-2', '2-3', '3-0']) assert.ok(d[pair] >= 0.6, `${k} 다리 차이 ${pair} = ${d[pair]}`);
+    assert.ok(d['0-2'] < d['0-1'] && d['1-3'] < d['1-2'], k + ' 같은 종류(0·2, 1·3)끼리는 이웃보다 비슷하다');
+  }
+});
+
+test('달리기 4동작: 발끝 기준선 280(차이 2px 이하)·몸 크기(머리 크기) 점프와 비슷·얼굴 가로 차이 6px 이하', () => {
+  for (const k of RUN_KEYS) {
+    const r = REPORT[k].run, a = r.after;
+    assert.ok(Math.max(...a.foot_y) - Math.min(...a.foot_y) <= 2, k + ' 발끝 차이'); assert.ok(a.foot_y.every(y => y === 280), k + ' 발끝 280');
+    assert.ok(Math.max(...a.face_x) - Math.min(...a.face_x) <= 6, k + ' 얼굴 가로 ' + a.face_x);
+    const jump = a.head[5];   // 점프 하강(점프 상승은 올린 팔이 머리카락을 가려 크기를 못 잼)
+    for (let i = 0; i < 4; i++) assert.ok(a.head[i] / jump >= 0.88 && a.head[i] / jump <= 1.12, `${k} ${i}번 칸 머리 크기 ${a.head[i]} (점프 ${jump})`);
+    assert.ok(Math.max(...a.head.slice(0, 4)) / Math.min(...a.head.slice(0, 4)) <= 1.1, k + ' 달리기 4동작끼리 머리 크기');
+    assert.ok(Math.max(...a.heights) <= 250, k + ' 달리기 동작 높이가 펭귄의 가장 큰 동작 이하');
+  }
+});
+
+test('달리기 4동작 수치가 결과 파일과 같다(보고만 믿지 않고 PNG 에서 다시 잼, Python 이 있을 때)', () => {
+  const py = ['python', 'py'].find(c => spawnSync(c, ['-c', 'import PIL, numpy'], { stdio: 'ignore' }).status === 0);
+  if (!py) return;
+  const code = 'import sys,json,importlib.util,numpy as np\nfrom PIL import Image\n' +
+    'sp=importlib.util.spec_from_file_location("b",sys.argv[1]);b=importlib.util.module_from_spec(sp);sp.loader.exec_module(b)\n' +
+    'print(json.dumps({k:b.run_measure(np.array(Image.open(sys.argv[2]+"/spellrun_"+k+"_sheet.png").convert("RGBA"))) for k in ["girl","boy"]}))';
+  const r = spawnSync(py, ['-I', '-c', code, path.join(ROOT, 'scripts', 'spellrun_art_build.py'), IMG], { encoding: 'utf8', maxBuffer: 1 << 26 });
+  assert.equal(r.status, 0, r.stderr);
+  const m = JSON.parse(r.stdout);
+  for (const k of RUN_KEYS) assert.deepEqual(m[k], REPORT[k].run.after, k + ' 다시 잰 수치');
+});

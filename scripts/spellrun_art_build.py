@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# 작업358: 스펠링 런 그림 정리. 원본 그림 9장(reference/spellrun-art, git 무시)에서 게임용 결과물만 public/img/spellrun/ 에 만든다.
+# 작업358: 스펠링 런 그림 정리. 원본 그림 10장(작업359: 달리기 그림 2장 더)(reference/spellrun-art, git 무시)에서 게임용 결과물만 public/img/spellrun/ 에 만든다.
 # 사용: python scripts/spellrun_art_build.py <원본 폴더> [<출력 폴더> [<수치 보고 파일>]]   (출력 폴더 기본값 public/img/spellrun, 보고 파일 기본값 scripts/spellrun_art_report.json)
 # 같은 입력이면 같은 결과가 나온다(난수 없음). 필요한 것: Python 3, Pillow, numpy. 결과 수치는 scripts/spellrun_art_report.json 에 쓴다(시험이 읽는다).
 #
@@ -9,6 +9,7 @@
 #   spellrun_obstacles_sheet.png(1024x256, 칸 256, 흰 테두리 포함, 바닥선 FOOT_Y 237)
 #   items_sheet.png(아이템 4종 한 줄: 하트, 번개, 힌트 전구, 천사 날개와 고리. 칸 112, 겉보기 큰 변 104)
 #   spellrun_girl_sheet.png, spellrun_boy_sheet.png (1728x288, 칸 288, 6동작: 달리기 4 + 점프 상승 + 점프 하강, 발끝 y 280)
+#       작업359: 달리기 4동작(0~3번 칸)은 새 달리기 그림(girl_run, boy_run: 1536x1024, 2x2 격자, 칸 순서 = 벌림 A, 듦 A, 벌림 B, 듦 B)으로 바꾼다. 점프 2동작(4·5번 칸)은 358 그대로.
 import json
 import os
 import sys
@@ -28,6 +29,8 @@ SRC = {
     'girl': '네이비 체육 반바지 치비 러너 스프라이트 시트.png',
     'boy': '한국 고등학생 러너 6프레임 스프라이트-2.png',
     'items': '하트·번개·전구·천사 날개 파워업.png',
+    'girl_run': '치비 여학생 사이드뷰 달리기 4연속.png',   # 작업359: 달리기 4동작 교체용(점프는 girl 그림 그대로)
+    'boy_run': '달리는 소년의 두 포즈 스프라이트.png',
 }
 ALPHA_CUT = 8          # 불투명도 약 3% 이하는 0(빛 번짐·점 얼룩·테두리 색 잔상)
 SPECK_MIN = 400        # 이보다 작은 떨어진 조각(원본 px 면적)은 얼룩으로 보고 지운다
@@ -337,7 +340,7 @@ def build_obstacles(src, out_path):
     report['obstacles'] = {'file': os.path.basename(out_path), 'size': [sheet.shape[1], sheet.shape[0]], 'bytes': size, 'cell': OBST_CELL, 'foot_y': OBST_FOOT, 'border': B, 'scale': round(s, 4), 'objects': meas, 'specks_removed': removed}
 
 
-def build_character(src, out_path, key, ref_penguin_h):
+def build_character(src, out_path, key, ref_penguin_h, run_src=None):
     a, removed = remove_specks(clean_alpha(load(src)))
     lab, items = components_by_bbox(a, 600, 2)
     H, W = a.shape[:2]
@@ -385,13 +388,152 @@ def build_character(src, out_path, key, ref_penguin_h):
         if sx0 > 0 or sy0 > 0 or ww < w - sx0 or hh < h - sy0:
             clipped.append(i)
         sheet[dy0:dy0 + hh, i * CELL_P + dx0:i * CELL_P + dx0 + ww] = r[sy0:sy0 + hh, sx0:sx0 + ww]
-    size = save_png(sheet, out_path, 256)
+    if run_src:
+        ref_sheet = sheet.copy()                       # 358 에서 저장하던 6동작(바꾸기 전)
+        run_report = build_run_frames(run_src, sheet, key)
+        size = save_with_palette_of(sheet, ref_sheet, CELL_P * 4, out_path)
+    else:
+        run_report = None
+        size = save_png(sheet, out_path, 256)
     chk = np.array(Image.open(out_path).convert('RGBA'))
     for i in range(6):
         x0, y0, x1, y1 = bbox(chk[:, i * CELL_P:(i + 1) * CELL_P], 40)
         feet.append(y1)
+        heights[i] = y1 - y0                                   # 작업359: 달리기 칸을 바꾼 뒤의 실제 높이
     report[key] = {'file': os.path.basename(out_path), 'size': [sheet.shape[1], sheet.shape[0]], 'bytes': size, 'cell': CELL_P, 'scale': round(s, 4), 'frame_heights': heights, 'foot_y': feet, 'foot_spread': max(feet) - min(feet),
                    'clipped_frames': clipped, 'source_cross_grid': cut, 'specks_removed': removed}
+    if run_report:
+        report[key]['run'] = run_report
+        report[key]['run']['after'] = run_measure(chk)
+
+
+RUN_SKIN_SPLIT = 0.45   # 얼굴 살색 덩어리는 동작 위쪽 45%에서만 찾는다(다리·주먹과 섞이지 않게)
+LEG_FROM = 0.55         # 다리 영역: 동작 높이의 위에서 55% 아래 전부
+
+
+def skin_face(a):
+    """얼굴(살색 가장 큰 덩어리)의 가운데. 같은 그림 안에서만 비교한다(그림마다 살색 음영이 달라 그림 사이 크기 비교에는 쓰지 않는다)."""
+    r, g, b, al = [a[..., i].astype(int) for i in range(4)]
+    sk = (al > 200) & (r > 200) & (g > 140) & (g < 215) & (b > 100) & (b < 195) & (r > g + 15) & (g > b + 10)
+    ys, xs = np.nonzero(al > 40)
+    y0, y1 = ys.min(), ys.max()
+    sk[int(y0 + (y1 - y0) * RUN_SKIN_SPLIT):] = False
+    lab, n = label(sk, 2 if sk.size > 400000 else 1)
+    ar = np.bincount(lab.ravel(), minlength=n + 1)
+    ar[0] = 0
+    yy, xx = np.nonzero(lab == ar.argmax())
+    return float(xx.mean()), float(yy.mean())
+
+
+def head_size(a):
+    """머리 크기 = 머리카락(어두운 갈색) 가장 큰 덩어리 면적의 제곱근. 위쪽 절반에서만 찾는다. 그림 사이 비교에 쓴다."""
+    r, g, b, al = [a[..., i].astype(int) for i in range(4)]
+    m = (al > 200) & (r < 110) & (b <= r + 6) & (r >= g - 4) & (r + g + b < 330)
+    ys, xs = np.nonzero(al > 40)
+    y0, y1 = ys.min(), ys.max()
+    m[int(y0 + (y1 - y0) * 0.5):] = False
+    st = 2 if m.size > 400000 else 1
+    lab, n = label(m, st)
+    ar = np.bincount(lab.ravel(), minlength=n + 1)
+    ar[0] = 0
+    return float(np.sqrt(ar.max() * st * st))   # 줄여서 센 면적은 step^2 배
+
+
+def leg_mask(cell):
+    ys, xs = np.nonzero(cell[..., 3] > 40)
+    y0, y1 = ys.min(), ys.max() + 1
+    m = np.zeros(cell.shape[:2], bool)
+    ys0 = int(y0 + (y1 - y0) * LEG_FROM)
+    m[ys0:y1] = cell[ys0:y1, :, 3] > 128
+    return m
+
+
+def leg_diff(c1, c2):
+    """두 동작의 다리 영역 불투명 픽셀이 다른 정도 = 서로 다른 픽셀 수 / 합친 픽셀 수(0 = 같음, 1 = 완전히 다름)."""
+    m1, m2 = leg_mask(c1), leg_mask(c2)
+    return float((m1 ^ m2).sum() / max(1, (m1 | m2).sum()))
+
+
+def run_measure(sheet):
+    """시트(RGBA 배열)의 달리기 4동작 수치: 다리 차이(0↔1, 1↔2, 2↔3, 3↔0, 같은 종류 0↔2·1↔3), 머리 크기, 얼굴 가로, 발끝, 동작 높이."""
+    cells = [sheet[:, i * CELL_P:(i + 1) * CELL_P] for i in range(6)]
+    pairs = {'0-1': (0, 1), '1-2': (1, 2), '2-3': (2, 3), '3-0': (3, 0), '0-2': (0, 2), '1-3': (1, 3)}
+    out = {'leg_diff': {k: round(leg_diff(cells[i], cells[j]), 3) for k, (i, j) in pairs.items()}}
+    out['head'] = [round(head_size(c), 1) for c in cells]
+    out['face_x'] = [round(skin_face(c)[0], 1) for c in cells[:4]]
+    out['foot_y'] = [bbox(c, 40)[3] for c in cells[:4]]
+    out['heights'] = [bbox(c, 40)[3] - bbox(c, 40)[1] for c in cells[:4]]
+    return out
+
+
+def build_run_frames(run_src, sheet, key):
+    """작업359: 새 달리기 그림(2x2, 4동작)으로 sheet(점프 포함 6동작, 아직 저장 전)의 0~3번 칸을 바꾼다.
+    크기: 기존 시트에서 머리카락이 가려지지 않은 5동작(옛 달리기 4 + 점프 하강)의 머리 크기 평균에 새 4동작의 머리 크기 평균을 맞춘다(같은 배율 하나).
+    발끝: 가장 아래 불투명 픽셀(딛는 발)을 FOOT_Y 에. 앞뒤: 얼굴 가운데 가로를 네 동작 모두 같은 자리에."""
+    ref_cells = [sheet[:, i * CELL_P:(i + 1) * CELL_P] for i in range(6)]
+    ref_heads = [head_size(c) for c in ref_cells]
+    target = float(np.mean([ref_heads[i] for i in (0, 1, 2, 3, 5)]))
+    a, removed = remove_specks(clean_alpha(load(run_src)))
+    lab, items = components_by_bbox(a, 600, 2)
+    assert len(items) == 4, '달리기 동작 덩어리가 4개가 아님: %d' % len(items)
+    H, W = a.shape[:2]
+    quad = {}
+    for c in items:
+        q = int(((c['y0'] + c['y1']) / 2.0) // (H / 2.0)) * 2 + int(((c['x0'] + c['x1']) / 2.0) // (W / 2.0))
+        assert q not in quad, '같은 칸에 덩어리가 둘: ' + str(q)
+        quad[q] = c['id']
+    assert sorted(quad) == [0, 1, 2, 3], '달리기 칸이 4개가 아님'
+    crops = []
+    for q in range(4):
+        part = comp_pixels(a, lab, [quad[q]], 3)
+        x0, y0, x1, y1 = bbox(part, ALPHA_CUT)
+        crops.append(part[y0:y1, x0:x1])
+    src_heads = [head_size(c) for c in crops]
+    s = target / float(np.mean(src_heads))
+    frames = []
+    for c in crops:
+        h, w = max(1, int(round(c.shape[0] * s))), max(1, int(round(c.shape[1] * s)))
+        r = clean_alpha(resize_rgba(c, (w, h)))
+        frames.append((r, skin_face(r)[0]))
+    maxl = max(fx for r, fx in frames)
+    maxr = max(r.shape[1] - fx for r, fx in frames)
+    anchor = (CELL_P - (maxl + maxr)) / 2.0 + maxl        # 얼굴 가운데가 놓일 칸 안 가로 자리(네 동작의 왼쪽·오른쪽 여유가 같게)
+    sheet[:, :CELL_P * 4] = 0
+    for i, (r, fx) in enumerate(frames):
+        h, w = r.shape[:2]
+        left = int(round(anchor - fx))
+        top = FOOT_Y - bbox(r, 40)[3]                      # 가장 아래 불투명 픽셀(딛는 발)이 FOOT_Y
+        assert left >= 0 and left + w <= CELL_P and top >= 0, '달리기 동작이 칸 밖: %s %d' % (key, i)
+        sheet[top:top + h, i * CELL_P + left:i * CELL_P + left + w] = r
+    return {'source': os.path.basename(run_src), 'scale': round(s, 4), 'head_target': round(target, 2), 'head_ref': [round(x, 1) for x in ref_heads],
+            'head_source': [round(x, 1) for x in src_heads], 'face_anchor_x': round(anchor, 1), 'specks_removed': removed}
+
+
+def save_with_palette_of(a, ref, split, path):
+    """작업359: 점프 2동작(가로 split 이후)의 픽셀이 358 결과와 한 픽셀도 달라지지 않게, 팔레트는 358 과 같은 방식으로 ref(바꾸기 전 시트)에서 만든다.
+    split 앞(새 달리기 4동작)은 같은 캐릭터의 같은 색들이라 그 팔레트에서 가장 가까운 색(디더링 없음)으로 바꾼다."""
+    q = to_img(ref).quantize(colors=256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
+    pal = q.getpalette('RGBA')
+    for i in range(0, len(pal), 4):
+        if pal[i + 3] <= ALPHA_CUT:
+            pal[i:i + 4] = [0, 0, 0, 0]
+    q.putpalette(pal, 'RGBA')
+    idx = np.array(q)
+    pa = np.array(pal, np.int32).reshape(-1, 4)
+    n = len(pa)
+    trans = int(np.nonzero(pa[:, 3] == 0)[0][0])
+    run = a[:, :split].reshape(-1, 4).astype(np.int32)
+    out = np.empty(len(run), np.uint8)
+    for s0 in range(0, len(run), 20000):
+        chunk = run[s0:s0 + 20000]
+        d = ((chunk[:, None, :] - pa[None, :n, :]) ** 2).sum(2)
+        out[s0:s0 + 20000] = d.argmin(1)
+    out[run[:, 3] <= ALPHA_CUT] = trans
+    idx[:, :split] = out.reshape(a.shape[0], split)
+    im = Image.fromarray(idx, 'P')
+    im.putpalette(pal, 'RGBA')
+    im.save(path, optimize=True)
+    return os.path.getsize(path)
 
 
 ITEM_CELL, ITEM_MAX = 112, 104
@@ -456,8 +598,8 @@ def main():
     build_layer(p('boss_near'), o('bg_boss_near.png'), 'boss_near')
     build_obstacles(p('obstacles'), o('spellrun_obstacles_sheet.png'))
     build_items(p('items'), o('items_sheet.png'))
-    build_character(p('girl'), o('spellrun_girl_sheet.png'), 'girl', ref)
-    build_character(p('boy'), o('spellrun_boy_sheet.png'), 'boy', ref)
+    build_character(p('girl'), o('spellrun_girl_sheet.png'), 'girl', ref, p('girl_run'))
+    build_character(p('boy'), o('spellrun_boy_sheet.png'), 'boy', ref, p('boy_run'))
     # 투명 잔여(불투명도 1~8) 확인
     total = 0
     for k, v in report.items():
