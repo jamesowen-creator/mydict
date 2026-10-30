@@ -260,15 +260,17 @@ body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
 .sr-box.land .cell{height:calc(40 * var(--u));line-height:calc(36 * var(--u));border-bottom-width:calc(3 * var(--u))}
 .sr-box.land .ctl,.sr-box.land .hud:not([hidden]) ~ .ctl{left:50%;top:calc(6 * var(--u));transform:translateX(-50%)}
 /* 완성 단어 카드: 두 열(왼쪽 단어·발음, 오른쪽 뜻·예문), 경기장 가운데 위쪽 줄 높은 칸 타일과 일반 타일 줄 사이(y 104~210). 펭귄(x 72)은 가리지 않는다 */
-.sr-box.land .popword{left:calc(130 * var(--u));right:calc(60 * var(--u));top:calc(104 * var(--u));display:grid;grid-template-columns:calc(230 * var(--u)) 1fr;grid-template-areas:"tag pm" "pw pm" "pp pe" "pn pe";column-gap:calc(16 * var(--u));row-gap:calc(2 * var(--u));align-items:center;padding:calc(8 * var(--u)) calc(16 * var(--u)) calc(10 * var(--u));text-align:left}
-.sr-box.land .popword .tag{grid-area:tag;text-align:left;min-height:calc(14 * var(--u))}
-.sr-box.land .popword .pw{grid-area:pw;justify-content:flex-start}
-.sr-box.land .popword .pp{grid-area:pp}
+/* 작업357 가로 팝업·배너: 위쪽 뜻·글자 칸 영역(y 34~100)에 뜨고 그 자리를 덮는다(뜻·글자 칸은 팝업 아래에 가려진다). 높은 칸 타일 줄(y 112~170)·펭귄·다가오는 타일은 가리지 않는다.
+   내용이 많으면 발음 기호 줄은 숨기고 예문은 한 줄로 줄이며, 단어와 뜻은 항상 보인다 */
+.sr-box.land .popword{left:calc(14 * var(--u));right:calc(14 * var(--u));top:calc(34 * var(--u));display:grid;grid-template-columns:calc(250 * var(--u)) 1fr;grid-template-areas:"tag pm" "pw pe";column-gap:calc(16 * var(--u));row-gap:calc(1 * var(--u));align-items:center;padding:calc(3 * var(--u)) calc(16 * var(--u)) calc(3 * var(--u));border-width:calc(2 * var(--u));border-radius:calc(16 * var(--u));box-shadow:0 calc(3 * var(--u)) 0 var(--ink);text-align:left}
+.sr-box.land .popword .tag{grid-area:tag;text-align:left;min-height:calc(12 * var(--u));font-size:calc(11 * var(--u));line-height:1.1}
+.sr-box.land .popword .pw{grid-area:pw;justify-content:flex-start;line-height:1.15;overflow:hidden}
+.sr-box.land .popword .pp{display:none}
 .sr-box.land .popword .pm{grid-area:pm;text-align:left}
-.sr-box.land .popword .pe{grid-area:pe;text-align:left;margin-top:0}
-.sr-box.land .popword .pn{grid-area:pn}
-.sr-box.land .banner{top:calc(104 * var(--u));padding:calc(6 * var(--u)) calc(16 * var(--u));gap:calc(2 * var(--u))}
-.sr-box.land .banner .b1{font-size:calc(34 * var(--u))}
+.sr-box.land .popword .pe{grid-area:pe;text-align:left;margin-top:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;line-clamp:1;overflow:hidden}
+.sr-box.land .popword .pn{position:absolute;right:calc(14 * var(--u));bottom:calc(1 * var(--u));font-size:calc(10 * var(--u))}
+.sr-box.land .banner{top:calc(34 * var(--u));flex-direction:row;align-items:baseline;justify-content:center;gap:calc(14 * var(--u));padding:calc(4 * var(--u)) calc(16 * var(--u));border-block-width:calc(3 * var(--u))}
+.sr-box.land .banner .b1{font-size:calc(30 * var(--u))}
 .sr-box.land .banner .b2{font-size:calc(15 * var(--u))}
 /* 카드: 가로에서는 2열(왼쪽 설명·정보, 오른쪽 선택과 주 버튼)로 한 화면에 */
 .sr-box.land .card{max-width:calc(700 * var(--u));align-self:center;padding:calc(10 * var(--u)) calc(16 * var(--u))}

@@ -82,7 +82,7 @@ for (const [w, h] of LAND) {
 }
 
 // 달리는 중 측정. 새 단어 연출이 끝난 뒤(9초)의 위치. 판 풀(pool)을 직접 넘겨 단어와 뜻을 정한다.
-const POOL = (word, meaning, subs) => ({ word, meaning, hint: { meaning, subs: subs || [] }, pop: { pron: '', meaning, example: '', ranges: [] } });
+const POOL = (word, meaning, subs, example, pron) => ({ word, meaning, hint: { meaning, subs: subs || [] }, pop: { pron: pron || '', meaning, example: example || '', ranges: [] } });
 const LONG_MEAN = '매우 비범하고 특별하여 평범한 수준을 크게 뛰어넘는다는 뜻의 형용사';
 const START = pool => `(() => { const R = SpellRun; R.manual = true; R.startRound(false, { surv: false, supply: null, pool: ${JSON.stringify(pool)}, regular: ${pool.length} }); R.manual = true; })()`;
 const RUNMEASURE = `(() => {
@@ -130,30 +130,60 @@ test('356-3) 세로 390x844 글자 크기(비교용 측정)', { skip: SKIP }, as
   noErr(page); await page.close();
 });
 
+// 작업357: 완성 단어 카드·보스 배너는 위쪽 뜻·글자 칸 영역(y 34~100)에 뜬다. 높은 칸 타일 줄(y 112~170)·펭귄·일반 타일 줄은 가리지 않고, 단어와 뜻은 항상 보인다(발음·예문은 줄어들 수 있다)
+const EX_LONG = 'She is an extraordinary pianist with an extraordinarily long list of awards and a very long career in many countries around the world.';
+const POP_CASES = [
+  { name: '짧은 단어·뜻', pool: () => [POOL('book', '책', ['다른 뜻'], 'I read a book every day.', '/bʊk/'), POOL('apple', '사과'), POOL('water', '물')], word: 'book' },
+  { name: '긴 단어·긴 뜻·긴 예문', pool: () => [POOL('extraordinary', LONG_MEAN, ['비범한'], EX_LONG, '/ɪkˈstrɔːrdəneri/'), POOL('apple', '사과'), POOL('water', '물')], word: 'extraordinary' },
+];
+const FINISH_WORD = `(async () => { const R = SpellRun, G = R.G, C = R.CONFIG; const T = C.JUMP_TIME; let n = 0;
+  while (G.state !== 'pop' && n < 60 * 300) { if (G.state === 'run') { const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && (x.wi === undefined ? x.correct : (x.correct && x.wi === G.wi && x.si === G.si)) && x.x > R.RUNNER_X).sort((a, b) => a.x - b.x)[0]; if (tg && G.jumpT < 0 && (tg.x - R.RUNNER_X) / G.speed <= T / 2) R.jump(); } R.step(1 / 60); n++; }
+  return G.state; })()`;
 for (const [w, h] of LAND) {
-  test(`356-3) 가로 ${w}x${h}: 완성 단어 카드·보스 배너·큰 뜻 연출이 펭귄과 일반 타일 줄을 가리지 않는 경기장 가운데 위쪽에 있다`, { skip: SKIP }, async () => {
-    const page = await open(w, h);
-    const laneTop = 248 - 29;   // 일반 타일 줄 윗변
-    await page.eval('SpellRun.CONFIG.DJ_ENABLED = false; SpellRun.CONFIG.OBST_ENABLED = false');   // 단순 봇이 한 판을 끝낼 수 있게(높은 칸·장애물 없음). 판을 시작하기 전에 꺼야 칸 계획에 반영된다
-    await page.eval(START([POOL('book', '책', ['다른 뜻']), POOL('apple', '사과'), POOL('water', '물')]));
-    // 큰 뜻 연출(hold): 뜻 묶음이 판 가운데 위쪽, 높은 칸 윗변 위
-    await stepN(page, 30);
-    let m = await page.eval(RUNMEASURE);
-    const cx = (m.hint.l + m.hint.r) / 2, cy = (m.hint.t + m.hint.b) / 2;
-    assert.ok(Math.abs(cx - 400) <= 3, `큰 뜻이 가운데(x ${cx.toFixed(1)})`); assert.ok(cy <= 112 - 5 && m.hint.t >= 0, `큰 뜻이 위쪽(y ${cy.toFixed(1)}), 높은 칸 윗변 112 위`);
-    // 완성 단어 카드: 정답을 먹어 단어를 끝낸다
-    const done = await page.eval(`(async () => { const R = SpellRun, G = R.G, C = R.CONFIG; const T = C.JUMP_TIME; let n = 0;
-      while (G.state !== 'pop' && n < 60 * 200) { if (G.state === 'run') { const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.wi === G.wi && x.si === G.si && x.x > R.RUNNER_X).sort((a, b) => a.x - b.x)[0]; if (tg && G.jumpT < 0 && (tg.x - R.RUNNER_X) / G.speed <= T / 2) R.jump(); if (G.jumpT < 0) { const ob = G.obstacles.find(x => !x.hit && x.x + x.w / 2 > R.RUNNER_X); if (ob && (ob.x + ob.w / 2 - R.RUNNER_X) / G.speed <= T / 2) R.jump(); } } R.step(1 / 60); n++; }
-      return G.state; })()`);
-    assert.equal(done, 'pop', '단어를 끝내 팝업까지 간다(상태 ' + done + ')');
-    await sleep(700);   // 등장 애니메이션이 끝날 때까지(실시간)
-    const pop = await page.eval(`(() => { const bx = document.getElementById('box').getBoundingClientRect(), u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')); const r = document.getElementById('pop').getBoundingClientRect(); return { l: (r.left - bx.left) / u, t: (r.top - bx.top) / u, r: (r.right - bx.left) / u, b: (r.bottom - bx.top) / u, hidden: document.getElementById('pop').hidden }; })()`);
-    assert.equal(pop.hidden, false);
-    assert.ok(pop.t >= 100 && pop.b <= laneTop - 4, `팝업 ${pop.t.toFixed(0)}~${pop.b.toFixed(0)} 가 글자 영역(100) 아래, 일반 타일 줄(${laneTop}) 위`);
-    assert.ok(pop.l >= 118 && pop.r <= 800, `팝업 가로 ${pop.l.toFixed(0)}~${pop.r.toFixed(0)}: 펭귄(x 72 ± 46)을 가리지 않는다`);
-    // 보스 배너
-    const ban = await page.eval(`(() => { const e = document.getElementById('bossBanner'); e.hidden = false; const bx = document.getElementById('box').getBoundingClientRect(), u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')); document.getElementById('bossSub').textContent = '긴 단어에 도전! 체력 +1'; const r = e.getBoundingClientRect(); e.hidden = true; return { t: (r.top - bx.top) / u, b: (r.bottom - bx.top) / u }; })()`);
-    assert.ok(ban.t >= 100 && ban.b <= laneTop - 4, `보스 배너 ${ban.t.toFixed(0)}~${ban.b.toFixed(0)}: 글자 영역 아래, 일반 타일 줄 위`);
-    noErr(page); await page.close();
-  });
+  for (const cs of POP_CASES) {
+    test(`357-1) 가로 ${w}x${h} ${cs.name}: 완성 카드가 위쪽 글자 영역(y 34~100)에 뜨고 타일 줄·높은 칸 줄·펭귄을 가리지 않으며 단어와 뜻이 보인다`, { skip: SKIP }, async () => {
+      const page = await open(w, h);
+      await page.eval('SpellRun.CONFIG.DJ_ENABLED = false; SpellRun.CONFIG.OBST_ENABLED = false');   // 단순 봇이 한 판을 끝낼 수 있게(높은 칸·장애물 없음). 판을 시작하기 전에 꺼야 칸 계획에 반영된다
+      await page.eval(START(cs.pool()));
+      if (cs.word === 'book') {   // 큰 뜻 연출(hold): 뜻 묶음이 판 가운데 위쪽, 높은 칸 윗변 위
+        await stepN(page, 30);
+        const m = await page.eval(RUNMEASURE), cx = (m.hint.l + m.hint.r) / 2, cy = (m.hint.t + m.hint.b) / 2;
+        assert.ok(Math.abs(cx - 400) <= 3, `큰 뜻이 가운데(x ${cx.toFixed(1)})`); assert.ok(cy <= 112 - 5 && m.hint.t >= 0, `큰 뜻이 위쪽(y ${cy.toFixed(1)}), 높은 칸 윗변 112 위`);
+      }
+      const done = await page.eval(FINISH_WORD);
+      assert.equal(done, 'pop', '단어를 끝내 팝업까지 간다(상태 ' + done + ')');
+      await sleep(700);   // 등장 애니메이션이 끝날 때까지(실시간)
+      const pop = await page.eval(`(() => { const bx = document.getElementById('box').getBoundingClientRect(), u = parseFloat(document.getElementById('box').style.getPropertyValue('--u'));
+        const rc = e => { const r = e.getBoundingClientRect(); return { l: (r.left - bx.left) / u, t: (r.top - bx.top) / u, r: (r.right - bx.left) / u, b: (r.bottom - bx.top) / u }; };
+        const p = document.getElementById('pop'), kids = ['popWord', 'popMean'].map(id => { const e = document.getElementById(id); return { id, text: e.textContent, rect: rc(e), vis: e.getClientRects().length > 0 }; });
+        const ex = document.getElementById('popEx'), pr = document.getElementById('popPron');
+        return { hidden: p.hidden, rect: rc(p), kids, exHidden: ex.hidden, exH: ex.hidden ? 0 : rc(ex).b - rc(ex).t, pronShown: pr.getClientRects().length > 0, over: p.scrollHeight - p.clientHeight, wordFs: parseFloat(getComputedStyle(document.getElementById('popWord')).fontSize) / u, meanFs: parseFloat(getComputedStyle(document.getElementById('popMean')).fontSize) / u }; })()`);
+      if (process.env.DUMP_POP) console.log('POP', JSON.stringify(await page.eval(`(() => { const u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')); return ['tag', 'popWord', 'popPron', 'popMean', 'popEx', 'popNote'].map(id => { const e = document.getElementById(id) || document.querySelector('#pop .' + id); const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return [id, Math.round(r.height / u), cs.fontSize, cs.display, cs.lineHeight, e.scrollHeight - e.clientHeight]; }); })()`)));
+      assert.equal(pop.hidden, false);
+      assert.ok(pop.rect.t >= 33.5 && pop.rect.b <= 100.5, `팝업 ${pop.rect.t.toFixed(1)}~${pop.rect.b.toFixed(1)}: 글자 영역(34~100) 안`);
+      assert.ok(pop.rect.b <= 112 - 5, '높은 칸 타일 줄(윗변 112)을 가리지 않는다'); assert.ok(pop.rect.b <= 248 - 29 - 4, '일반 타일 줄을 가리지 않는다');
+      assert.ok(pop.rect.l >= 13.5 && pop.rect.r <= 786.5, '판 안'); assert.ok(pop.over <= 1, '팝업 안 내용이 넘치지 않는다: ' + pop.over);
+      for (const k of pop.kids) { assert.ok(k.vis && k.text.length > 0, k.id + ' 가 보인다: ' + k.text); assert.ok(k.rect.t >= pop.rect.t - 0.5 && k.rect.b <= pop.rect.b + 0.5 && k.rect.l >= pop.rect.l - 0.5 && k.rect.r <= pop.rect.r + 0.5, `${k.id} 가 팝업 안: ${JSON.stringify(k.rect)} / ${JSON.stringify(pop.rect)}`); }
+      assert.equal(pop.kids[0].text, cs.word); assert.ok(pop.wordFs >= 14, '단어 글자 ' + pop.wordFs.toFixed(1)); assert.ok(pop.meanFs >= 11, '뜻 글자 ' + pop.meanFs.toFixed(1));
+      assert.equal(pop.pronShown, false, '가로에서는 발음 기호 줄을 숨긴다(자리 부족)');
+      if (cs.word === 'book') assert.ok(!pop.exHidden && pop.exH > 0, '짧은 경우 예문 한 줄이 보인다');
+      const under = await page.eval(`(() => { const w = document.getElementById('word').getBoundingClientRect(), p = document.getElementById('pop').getBoundingClientRect(); return w.top >= p.top - 1 && w.bottom <= p.bottom + 1; })()`);
+      assert.equal(under, true, '글자 칸 줄이 팝업 자리 안(팝업이 덮는다)');
+      const ban = await page.eval(`(() => { const e = document.getElementById('bossBanner'); e.hidden = false; const bx = document.getElementById('box').getBoundingClientRect(), u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')); document.getElementById('bossSub').textContent = '긴 단어에 도전! 체력 +1'; const r = e.getBoundingClientRect(); e.hidden = true; return { t: (r.top - bx.top) / u, b: (r.bottom - bx.top) / u }; })()`);
+      assert.ok(ban.t >= 33.5 && ban.b <= 100.5, `보스 배너 ${ban.t.toFixed(1)}~${ban.b.toFixed(1)}: 글자 영역(34~100) 안`);
+      console.log(['[측정]', `가로 ${w}x${h}`, cs.name, `팝업 y ${pop.rect.t.toFixed(0)}~${pop.rect.b.toFixed(0)}`, `단어 ${pop.wordFs.toFixed(1)} 뜻 ${pop.meanFs.toFixed(1)}(논리 px)`, `예문 ${pop.exHidden ? '없음' : pop.exH.toFixed(0) + 'px'}`].join(' | '));
+      noErr(page); await page.close();
+    });
+  }
 }
+
+test('357-1) 세로 팝업 위치는 그대로(위에서 34%)이고 가로 규칙이 번지지 않는다', { skip: SKIP }, async () => {
+  const page = await open(390, 844, '?mode=0');
+  await page.eval('SpellRun.CONFIG.DJ_ENABLED = false; SpellRun.CONFIG.OBST_ENABLED = false');
+  await page.eval(START([POOL('book', '책', ['다른 뜻'], 'I read a book every day.', '/bʊk/'), POOL('apple', '사과'), POOL('water', '물')]));
+  assert.equal(await page.eval(FINISH_WORD), 'pop');
+  await sleep(700);
+  const r = await page.eval(`(() => { const p = document.getElementById('pop'), b = document.getElementById('box'), cs = getComputedStyle(p); return { top: p.getBoundingClientRect().top - b.getBoundingClientRect().top, H: b.getBoundingClientRect().height, display: cs.display, pronShown: document.getElementById('popPron').getClientRects().length > 0, hidden: p.hidden }; })()`);
+  assert.equal(r.hidden, false); assert.equal(r.display, 'flex', '세로 팝업은 이전처럼 세로 쌓기(flex)'); assert.ok(Math.abs(r.top / r.H - 0.34) < 0.01, `위에서 34%: ${(r.top / r.H).toFixed(3)}`); assert.equal(r.pronShown, true, '세로는 발음 기호 줄이 그대로');
+  noErr(page); await page.close();
+});

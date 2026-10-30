@@ -233,7 +233,7 @@ const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TIL
 //   (뜻·글자 칸·HUD 는 위쪽에 그대로 있고, 땅·타일·점프·장애물의 상대 위치와 경기장 폭은 불변. 하늘이 넓어지면 위쪽 글자와 높은 칸 사이가 비어 보이는 대신 답답하지 않고, 땅 아래 띠는 대결 막대·나가기가 놓일 만큼만 늘린다)
 // 가로: 800x400. 글자 영역은 높이 100 이하(CONTENT_BOTTOM_Y 100), 높은 칸 타일 윗변 112 보다 위. 땅 아래 띠 44.
 // 작업356: 뜻(왼쪽)과 글자 칸(오른쪽)을 한 줄에 나란히 둔다(HUD 는 위 한 줄). 글자 칸 줄은 남는 폭(약 440)을 쓰고, 큰 뜻 연출은 위쪽(높은 칸 타일 윗변 112 보다 위)에서 한다. 팝업 글자 크기는 가로 전용 상한
-const LAYOUT_LAND = { W: 800, H: 400, GROUND: 356, TILE_Y: 248, HIGH_TILE_Y: 141, TILE_H: 58, WORD_AVAIL_W: 440, HUD_SHIFT: 0, INTRO_CENTER_Y: 72, INTRO_W: 560, CONTENT_BOTTOM_Y: 100, CW_MAX: 38, MEAN_MAX: 26, SUB_MAX: 12, POPW_MAX: 36, POPM_MAX: 17, POPE_MAX: 12, FIT_PAD: 5 };
+const LAYOUT_LAND = { W: 800, H: 400, GROUND: 356, TILE_Y: 248, HIGH_TILE_Y: 141, TILE_H: 58, WORD_AVAIL_W: 440, HUD_SHIFT: 0, INTRO_CENTER_Y: 72, INTRO_W: 560, CONTENT_BOTTOM_Y: 100, CW_MAX: 38, MEAN_MAX: 26, SUB_MAX: 12, POPW_MAX: 30, POPM_MAX: 16, POPE_MAX: 10, FIT_PAD: 5 };
 const SCALE_MAX = 1.5, SCALE_MIN = 0.3;
 // mode: 'port' | 'land', availW/availH: 안전 여백을 뺀 쓸 수 있는 화면 크기(CSS px). 반환: LAYOUT 과 같은 항목 + { scale, mode, extra }
 function layoutFor(mode, availW, availH) {
