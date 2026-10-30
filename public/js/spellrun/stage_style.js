@@ -243,17 +243,77 @@ body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
   padding:calc(6px + env(safe-area-inset-top,0px)) calc(10px + env(safe-area-inset-right,0px)) 6px calc(10px + env(safe-area-inset-left,0px));background:var(--ink);color:#fff;font-size:13px;font-weight:700;line-height:1.4;text-align:center}
 .sr-stage .rotbtn{cursor:pointer;min-height:44px;padding:0 14px;font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);background:var(--gold);border:2px solid #fff;border-radius:999px}
 .sr-stage .rotbtn:focus-visible{outline:3px solid #fff;outline-offset:2px}
-/* 가로 800x400 배치: 체력·점수·콤보는 위 모서리, 뜻·보조 줄·글자 칸은 가운데 위쪽 하늘(높이 100 이하), 대결 막대·나가기는 아래 */
-.sr-box.land .hud{padding:calc(4 * var(--u)) calc(14 * var(--u)) 0}
-.sr-box.land .hud .row:nth-child(1){position:absolute;left:calc(14 * var(--u));right:calc(14 * var(--u));top:calc(8 * var(--u));width:auto}
-.sr-box.land .hud .row:nth-child(2){position:absolute;left:calc(14 * var(--u));right:calc(14 * var(--u));top:calc(38 * var(--u));width:auto;justify-content:flex-start}
-.sr-box.land .hud .row:nth-child(2) .snd{margin-left:auto}
-.sr-box.land .hintbox{width:calc(420 * var(--u));gap:calc(2 * var(--u))}
+/* 작업356 가로 800x400 배치. 세로 CSS 는 건드리지 않는다(아래는 모두 .land 아래). 묶음 div(.c1w)는 세로에서 display:contents 라 배치가 같다 */
+.sr-box .c1w{display:contents}
+/* HUD: 위 한 줄(체력·진행·속도 | 닫기·화면 단추(가운데) | 콤보·점수·소리). 둘째 줄: 왼쪽 뜻(위 세 칸 폭), 오른쪽 글자 칸. 글자 영역 아래 끝은 100 이하 */
+.sr-box.land .hud{display:grid;grid-template-columns:auto auto auto 1fr auto auto;grid-template-rows:auto;column-gap:calc(8 * var(--u));align-items:start;padding:calc(6 * var(--u)) calc(14 * var(--u)) 0}
+.sr-box.land .hud .row{display:contents}
+.sr-box.land .hearts{grid-area:1 / 1;align-self:center}
+.sr-box.land .progress{grid-area:1 / 2;align-self:center}
+.sr-box.land .speedtag{grid-area:1 / 3;align-self:center}
+.sr-box.land .scorebox{grid-area:1 / 5;justify-self:end;align-self:center}
+.sr-box.land .snd{grid-area:1 / 6;justify-self:end}
+.sr-box.land .hintbox,.sr-box.land .hintbox.intro{position:absolute;left:calc(14 * var(--u));top:calc(36 * var(--u));width:calc(300 * var(--u));gap:calc(2 * var(--u))}   /* 격자 밖(절대 위치): 긴 뜻이 위쪽 한 줄의 칸 폭을 늘리지 않게 */
+.sr-box.land .meaning{margin-top:0}
 .sr-box.land .sub{margin-top:0}
-.sr-box.land .word{margin-top:calc(16 * var(--u))}
-.sr-box.land .cell{height:calc(34 * var(--u));line-height:calc(30 * var(--u));border-bottom-width:calc(3 * var(--u))}
-.sr-box.land .popword{left:calc(160 * var(--u));right:calc(160 * var(--u));top:calc(60 * var(--u))}
-.sr-box.land .card{max-width:calc(520 * var(--u));align-self:center}
+.sr-box.land .word{position:absolute;left:calc(330 * var(--u));width:calc(456 * var(--u));top:calc(36 * var(--u));margin-top:calc(12 * var(--u))}
+.sr-box.land .cell{height:calc(40 * var(--u));line-height:calc(36 * var(--u));border-bottom-width:calc(3 * var(--u))}
+.sr-box.land .ctl,.sr-box.land .hud:not([hidden]) ~ .ctl{left:50%;top:calc(6 * var(--u));transform:translateX(-50%)}
+/* 완성 단어 카드: 두 열(왼쪽 단어·발음, 오른쪽 뜻·예문), 경기장 가운데 위쪽 줄 높은 칸 타일과 일반 타일 줄 사이(y 104~210). 펭귄(x 72)은 가리지 않는다 */
+.sr-box.land .popword{left:calc(130 * var(--u));right:calc(60 * var(--u));top:calc(104 * var(--u));display:grid;grid-template-columns:calc(230 * var(--u)) 1fr;grid-template-areas:"tag pm" "pw pm" "pp pe" "pn pe";column-gap:calc(16 * var(--u));row-gap:calc(2 * var(--u));align-items:center;padding:calc(8 * var(--u)) calc(16 * var(--u)) calc(10 * var(--u));text-align:left}
+.sr-box.land .popword .tag{grid-area:tag;text-align:left;min-height:calc(14 * var(--u))}
+.sr-box.land .popword .pw{grid-area:pw;justify-content:flex-start}
+.sr-box.land .popword .pp{grid-area:pp}
+.sr-box.land .popword .pm{grid-area:pm;text-align:left}
+.sr-box.land .popword .pe{grid-area:pe;text-align:left;margin-top:0}
+.sr-box.land .popword .pn{grid-area:pn}
+.sr-box.land .banner{top:calc(104 * var(--u));padding:calc(6 * var(--u)) calc(16 * var(--u));gap:calc(2 * var(--u))}
+.sr-box.land .banner .b1{font-size:calc(34 * var(--u))}
+.sr-box.land .banner .b2{font-size:calc(15 * var(--u))}
+/* 카드: 가로에서는 2열(왼쪽 설명·정보, 오른쪽 선택과 주 버튼)로 한 화면에 */
+.sr-box.land .card{max-width:calc(700 * var(--u));align-self:center;padding:calc(10 * var(--u)) calc(16 * var(--u))}
+.sr-box.land #cont .card,.sr-box.land #vsQuit .card,.sr-box.land #help .card{max-width:calc(520 * var(--u))}
+.sr-box.land #result .btn,.sr-box.land #cont .btn{min-height:44px}
+.sr-box.land #start .card,.sr-box.land #result .card{display:grid;grid-template-columns:1fr 1fr;column-gap:calc(18 * var(--u));row-gap:calc(8 * var(--u));align-content:center}
+.sr-box.land #start .title{grid-column:1 / -1;grid-row:1;font-size:calc(32 * var(--u))}
+.sr-box.land #startInfoCol{grid-column:1;grid-row:2 / span 4;display:flex;flex-direction:column;gap:calc(8 * var(--u));justify-content:center}
+.sr-box.land #modeRow{grid-column:2;grid-row:2}
+.sr-box.land #viewRow{grid-column:2;grid-row:3}
+.sr-box.land #optRow{grid-column:2;grid-row:4}
+.sr-box.land #startBtn{grid-column:2;grid-row:5}
+.sr-box.land #resInfo{grid-column:1;grid-row:1;display:flex;flex-direction:column;gap:calc(8 * var(--u));justify-content:center}
+.sr-box.land #resMain{grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:calc(8 * var(--u))}
+.sr-box.land #resTitle{font-size:calc(30 * var(--u))}
+.sr-box.land #pv .card{display:grid;grid-template-columns:1fr 1fr;column-gap:calc(16 * var(--u));row-gap:calc(6 * var(--u));align-content:center}
+.sr-box.land #pv .pvarea{grid-column:1;grid-row:1 / span 6;min-height:0;align-self:stretch}
+.sr-box.land #pvTitle{grid-column:2;grid-row:1;font-size:calc(26 * var(--u))}
+.sr-box.land #pvProg{grid-column:2;grid-row:2}
+.sr-box.land #pvNote{grid-column:2;grid-row:3}
+.sr-box.land #pvCtl{grid-column:2;grid-row:4}
+.sr-box.land #pvStart{grid-column:2;grid-row:5}
+.sr-box.land #pvBack{grid-column:2;grid-row:6}
+/* 대결 화면: 목록·대기·결과를 2열로. 방 목록(내용이 많은 곳)만 영역 안 스크롤 */
+.sr-box.land #vs .title.small{font-size:calc(24 * var(--u))}
+.sr-box.land #vs .vlist{max-height:calc(190 * var(--u))}
+.sr-box.land #vsListView,.sr-box.land #vsRoomView,.sr-box.land #vsFinView{display:grid;grid-template-columns:1.2fr 1fr;column-gap:calc(16 * var(--u));row-gap:calc(6 * var(--u));align-content:start}
+.sr-box.land #vsListView[hidden],.sr-box.land #vsRoomView[hidden],.sr-box.land #vsFinView[hidden]{display:none}
+.sr-box.land #vsList{grid-column:1;grid-row:1 / span 3}
+.sr-box.land #vsEmpty{grid-column:1;grid-row:1 / span 3}
+.sr-box.land #vsCreate{grid-column:2;grid-row:1}
+.sr-box.land #vsListView > .trow{grid-column:2;grid-row:2}
+.sr-box.land #vsRoomText{grid-column:1;grid-row:1}
+.sr-box.land #vsPlayers{grid-column:1;grid-row:2 / span 2}
+.sr-box.land #vsGo{grid-column:2;grid-row:1}
+.sr-box.land #vsLeave{grid-column:2;grid-row:2}
+.sr-box.land #vsFinTitle{grid-column:1;grid-row:1}
+.sr-box.land #vsFinWhy{grid-column:1;grid-row:2}
+.sr-box.land #vsFinList{grid-column:1;grid-row:3;max-height:none}
+.sr-box.land #vsFinNote{grid-column:1;grid-row:4}
+.sr-box.land #vsFinRematchNote{grid-column:2;grid-row:1}
+.sr-box.land #vsFinRematch{grid-column:2;grid-row:2}
+.sr-box.land #vsFinRetry{grid-column:2;grid-row:3}
+.sr-box.land #vsFinView > .trow{grid-column:2;grid-row:4}
+/* 대결 막대·나가기·안내: 아래쪽 줄(막대는 왼쪽, 나가기는 오른쪽 끝), 안내는 막대 위 */
 .sr-box.land .vsbar{bottom:calc(6 * var(--u));right:calc(14 * var(--u) + max(44px, 64 * var(--u)) + 8px)}
 .sr-box.land .vsquit{bottom:calc(6 * var(--u))}
 .sr-box.land .vstoast{bottom:calc(50 * var(--u))}

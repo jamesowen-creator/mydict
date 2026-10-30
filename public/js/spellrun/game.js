@@ -133,7 +133,7 @@ try { if (document.fonts && document.fonts.addEventListener) document.fonts.addE
 // ---------- 작업318-1: 폭을 재서 맞추는 글자 크기 ----------
 // 단계로 줄이지 않고 실제 폭을 재서 한 줄(또는 허용 줄 수)에 들어올 때까지 0.5px 씩 줄인다. 크기는 논리 px(×--u)라 화면 배율과 무관하게 같은 결과가 나온다.
 function lineHeightPx(el) { const cs = getComputedStyle(el); return parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.25; }
-function fitsIn(el, lines) { return el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= lineHeightPx(el) * lines + 2; }
+function fitsIn(el, lines) { return el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= lineHeightPx(el) * lines + (LAYOUT.FIT_PAD || 2); }   // 작업356: 가로는 한글 글자가 줄 높이를 조금 넘는 것을 더 허용해 뜻을 더 크게(세로는 이전과 같은 2)
 function fitFont(el, max, min, linesFor) {
   if (!el || !el.clientWidth) return max;
   el.style.overflowWrap = '';
@@ -152,7 +152,7 @@ function fitSub(items) {
   els.sub.hidden = !items.length;
   if (!items.length) return;
   const limit = LAYOUT.CONTENT_BOTTOM_Y;
-  const bottom = () => (els.word.getBoundingClientRect().bottom - box.getBoundingClientRect().top) / unitPx();
+  const bottom = () => (Math.max(els.word.getBoundingClientRect().bottom, els.hintbox.getBoundingClientRect().bottom) - box.getBoundingClientRect().top) / unitPx();   // 작업356: 가로는 뜻 묶음과 글자 칸이 나란해서 둘 중 더 아래 끝
   for (let n = items.length; n > 0; n--) {
     els.sub.textContent = items.slice(0, n).join(' · ');
     fitFont(els.sub, LAYOUT.SUB_MAX || 12, 10, px => (px > 10.5 ? 1 : 2));
@@ -168,9 +168,9 @@ function fitHud() {
 }
 function fitPop() {
   if (els.pop.hidden) return;
-  fitFont(els.popWord, 44, 16, () => 1);   // 완성한 단어는 반드시 한 줄
-  fitFont(els.popMean, 22, 12, px => (px > 16 ? 1 : 2));
-  if (!els.popEx.hidden) fitFont(els.popEx, 13, 9, () => 3);
+  fitFont(els.popWord, LAYOUT.POPW_MAX || 44, 16, () => 1);   // 완성한 단어는 반드시 한 줄
+  fitFont(els.popMean, LAYOUT.POPM_MAX || 22, 12, px => (px > 16 ? 1 : 2));
+  if (!els.popEx.hidden) fitFont(els.popEx, LAYOUT.POPE_MAX || 13, 9, () => 3);
 }
 function fitResult() {
   if (els.result.hidden) return;
@@ -578,17 +578,17 @@ function clearIntro() {
 function measureIntro() {
   els.hintbox.style.transform = '';
   const u = unitPx(), bx = box.getBoundingClientRect(), r = els.hintbox.getBoundingClientRect();
-  const cy = ((r.top + r.bottom) / 2 - bx.top) / u;
+  const cy = ((r.top + r.bottom) / 2 - bx.top) / u, cx = ((r.left + r.right) / 2 - bx.left) / u;
   let wmax = 0;
   [els.meaning, els.sub].forEach(el => { if (el.hidden || !el.textContent) return; const rg = document.createRange(); rg.selectNodeContents(el); wmax = Math.max(wmax, rg.getBoundingClientRect().width / u); });
-  G.iGeo = { dy: LAYOUT.INTRO_CENTER_Y - cy, k: wmax ? Math.max(1, Math.min(CONFIG.INTRO_SCALE, (LAYOUT.WORD_AVAIL_W - 8) / wmax)) : CONFIG.INTRO_SCALE };
+  G.iGeo = { dy: LAYOUT.INTRO_CENTER_Y - cy, dx: Math.abs(W / 2 - cx) > 0.5 ? W / 2 - cx : 0, k: wmax ? Math.max(1, Math.min(CONFIG.INTRO_SCALE, ((LAYOUT.INTRO_W || LAYOUT.WORD_AVAIL_W) - 8) / wmax)) : CONFIG.INTRO_SCALE };
 }
 function applyIntro() {
   const st = introState(G.iClock, G.iTl, G.iKids, CONFIG);
   if (st.phase === 'done') { clearIntro(); return; }
   const u = unitPx(), k = G.iGeo.k + (1 - G.iGeo.k) * st.e, dy = G.iGeo.dy * (1 - st.e);
   els.hintbox.classList.add('intro');
-  els.hintbox.style.transform = 'translateY(' + (dy * u).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')';
+  els.hintbox.style.transform = G.iGeo.dx ? 'translate(' + (G.iGeo.dx * (1 - st.e) * u).toFixed(2) + 'px, ' + (dy * u).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')' : 'translateY(' + (dy * u).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')';
   const kids = els.word.children;
   for (let i = 0; i < kids.length; i++) {
     kids[i].style.visibility = i < st.visible ? '' : 'hidden';   // 자리는 유지하고 숨긴다(위치가 흔들리지 않게)
@@ -2322,7 +2322,7 @@ function setupModeUI(nWords) {
   const syncPv = () => { bP.textContent = previewOn ? '미리 보기 켬' : '미리 보기 끔'; bP.setAttribute('aria-pressed', String(previewOn)); };
   syncPv();
   if (canVersus) vsModeBtn = mk('대결', 'versus');   // 작업344: 권한이 있을 때만. 모드가 아니라 방 목록을 여는 버튼이라 aria-pressed 도 저장도 하지 않는다
-  $('modeDesc').parentNode.insertBefore(row, $('modeDesc'));
+  $('startInfoCol').parentNode.insertBefore(row, $('startInfoCol'));   // 작업356: 설명 묶음(startInfoCol, 세로에서는 display:contents) 앞 = 이전과 같은 순서
   const apply = () => {
     bN.setAttribute('aria-pressed', String(!survMode)); bS.setAttribute('aria-pressed', String(survMode));
     const need = survMode && nWords < CONFIG.SURV_MIN_WORDS;

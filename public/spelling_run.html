@@ -103,12 +103,14 @@
         <section class="screen" id="start">
           <div class="card">
             <h1 class="title">스펠링 런</h1>
-            <p class="lead" id="modeDesc"></p>
-            <ul class="corelist" id="coreList">
-              <li>탭(스페이스바)으로 점프해서 정답 글자를 먹으면 단어가 완성돼요.</li>
-              <li class="mint">맞힐수록 빨라지고, 틀리거나 놓치면 체력이 줄어요.</li>
-              <li class="red" id="coreCont">체력이 0이 되면 한 번 이어서 할 수 있어요.</li>
-            </ul>
+            <div class="c1w" id="startInfoCol">
+              <p class="lead" id="modeDesc"></p>
+              <ul class="corelist" id="coreList">
+                <li>탭(스페이스바)으로 점프해서 정답 글자를 먹으면 단어가 완성돼요.</li>
+                <li class="mint">맞힐수록 빨라지고, 틀리거나 놓치면 체력이 줄어요.</li>
+                <li class="red" id="coreCont">체력이 0이 되면 한 번 이어서 할 수 있어요.</li>
+              </ul>
+            </div>
             <div class="trow" id="viewRow" role="group" aria-label="화면">
               <span class="vlabel">화면</span>
               <button class="toggle vsbtn" type="button" data-view="port" aria-pressed="true">세로</button>
@@ -239,17 +241,21 @@
 
         <section class="screen" id="result" hidden>
           <div class="card">
-            <h2 class="title small" id="resTitle"></h2>
-            <div class="big" id="resScore">0</div>
-            <div class="stats">
-              <div><b id="resDone">0</b>완성한 단어</div>
-              <div><b id="resCombo">0</b>최고 콤보</div>
+            <div class="c1w" id="resInfo">
+              <h2 class="title small" id="resTitle"></h2>
+              <div class="big" id="resScore">0</div>
+              <div class="stats">
+                <div><b id="resDone">0</b>완성한 단어</div>
+                <div><b id="resCombo">0</b>최고 콤보</div>
+              </div>
             </div>
-            <div class="chips" id="resChips"></div>
-            <div class="legend"><span class="c">한 번에 완성</span><span class="s">실수 후 완성</span><span class="f">미완성</span><span class="k">도전 안 함</span></div>
-            <p class="note">단어를 탭하면 발음을 다시 들을 수 있습니다.</p>
-            <button class="btn alt" id="revBtn" type="button">틀린 단어만 다시 도전</button>
-            <button class="btn" id="againBtn" type="button">새 판 시작</button>
+            <div class="c1w" id="resMain">
+              <div class="chips" id="resChips"></div>
+              <div class="legend"><span class="c">한 번에 완성</span><span class="s">실수 후 완성</span><span class="f">미완성</span><span class="k">도전 안 함</span></div>
+              <p class="note">단어를 탭하면 발음을 다시 들을 수 있습니다.</p>
+              <button class="btn alt" id="revBtn" type="button">틀린 단어만 다시 도전</button>
+              <button class="btn" id="againBtn" type="button">새 판 시작</button>
+            </div>
           </div>
         </section>
         <button class="tune" id="tune" type="button" hidden>조정값 사용 중</button>
@@ -264,8 +270,8 @@
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=80"></script>
-<script src="/js/spellrun/stage_style.js?v=80"></script>
-<script src="/js/spellrun/game.js?v=80"></script>
+<script src="/js/spellrun/logic.js?v=81"></script>
+<script src="/js/spellrun/stage_style.js?v=81"></script>
+<script src="/js/spellrun/game.js?v=81"></script>
 </body>
 </html>
