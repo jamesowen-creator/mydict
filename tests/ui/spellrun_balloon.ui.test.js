@@ -170,3 +170,78 @@ test('361-5) 콤보 칩은 가로에서 숨김, 세로는 그대로. 세로는 �
   assert.equal(await pp.eval('SpellRun.balloon.lift({})'), 0);
   noErr(pp); await pp.close();
 });
+
+// ---- 작업362: 틀린 풍선 위로 올라가기 ----
+// 틀린 철자를 먹을 수 있는 장면을 만든다(난수 고정): 지금 칸의 오답 풍선을 러너 자리로 옮겨 공중에서 먹는다. 먹기 전·후에 화면 안 풍선을 종류별로 기록한다
+//   A = 지금 풀 칸의 정답(여전히 필요) / B = 뒤 칸·다음 단어용 정답(쓸모없어진 것) / C = 처음부터 오답 후보
+const riseScenes = (sd, want) => `(() => { let s = ${sd}; Math.random = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  const R = SpellRun, G = R.G, L = R.view.layout(), out = []; const kind = (t, cur) => !t.correct ? 'C' : (t.wi === cur.wi && t.si === cur.si) ? 'A' : 'B';
+  const vis = () => G.tiles.filter(t => !t.kind && t.state === 'live' && !t.checked && t.x > 100 && t.x < 790);
+  for (let i = 0; i < 6000 && out.length < ${want}; i++) { R.step(1 / 60); if (G.state !== 'run') break;
+    const cur = { wi: G.wi, si: G.si }, v = vis(), w = v.find(t => !t.correct && t.wi === cur.wi && t.si === cur.si);
+    if (i > 120 && i % 60 === 0 && w && v.some(t => kind(t, cur) === 'B')) {
+      const tag = new Map(v.map(t => [t, kind(t, cur)])), score = G.score, combo = G.combo, hp = G.hp;
+      w.x = R.RUNNER_X + 1; G.jumpT = 0.3; G.j2 = -1; R.step(0.01); G.jumpT = -1;
+      out.push({ eaten: !!w.rise, hpDrop: hp - G.hp, score0: score, score1: G.score,
+        rose: v.filter(t => t.rise && t !== w).map(t => tag.get(t)), stayed: v.filter(t => !t.rise).map(t => tag.get(t)), sizes: { A: v.filter(t => tag.get(t) === 'A').length, B: v.filter(t => tag.get(t) === 'B').length, C: v.filter(t => tag.get(t) === 'C').length } });
+      window.__riseTile = w; } }
+  return out; })()`;
+
+test('362-1·2) 틀린 풍선을 먹으면 그 풍선과 쓸모없어진 정답 풍선(B)만 올라가고, 지금 필요한 정답(A)과 처음부터 오답 후보(C)는 남는다. 하트 -1', { skip: SKIP }, async () => {
+  let scenes = 0, risenB = 0;
+  for (const sd of [1, 7, 99, 5, 21]) {
+    const page = await open(844, 390);
+    await startRun(page);
+    const out = await page.eval(riseScenes(sd, 2));
+    for (const sc of out) {
+      if (process.env.RISE_LOG) console.log('SCENE', sd, JSON.stringify(sc));
+      scenes++;
+      assert.equal(sc.eaten, true, '먹은 틀린 풍선이 올라간다'); assert.equal(sc.hpDrop, 1, '하트 -1');
+      assert.ok(sc.rose.every(k => k === 'B'), '올라간 것은 쓸모없어진 풍선뿐: ' + sc.rose);
+      assert.ok(sc.stayed.every(k => k === 'A' || k === 'C'), '남은 것은 A·C: ' + sc.stayed);
+      assert.equal(sc.rose.length, sc.sizes.B, '화면 안의 쓸모없어진 풍선이 모두 올라간다'); risenB += sc.rose.length;
+      assert.equal(sc.stayed.filter(k => k === 'C').length, sc.sizes.C - 1, '처음부터 오답 후보는 먹은 것 하나만 올라가고 나머지는 남는다');
+      assert.equal(sc.stayed.filter(k => k === 'A').length, sc.sizes.A, '지금 필요한 정답은 올리지 않는다');
+    }
+    noErr(page); await page.close();
+  }
+  assert.ok(scenes >= 3 && risenB >= 3, `장면 ${scenes}개, 올라간 쓸모없는 풍선 ${risenB}개`);
+});
+
+test('362-1) 올라가는 모양: 처음엔 느리다가 빨라지고, 약 0.9초 안에 화면 위로 나가며 지워진다. 흐려지지 않고(선명도 1) 둥실 흔들림은 계속, 세계 이동으로 왼쪽으로 밀린다', { skip: SKIP }, async () => {
+  const page = await open(844, 390);
+  await startRun(page);
+  await page.eval(seed);
+  await page.eval(riseScenes(1, 1));
+  await page.eval(spyBalloon);
+  const r = await page.eval(`(() => { const R = SpellRun, G = R.G, w = window.__riseTile, ys = [], xs = [], angs = [], alphas = []; let k = 0;
+    const P = CanvasRenderingContext2D.prototype, ft = P.fillText; P.fillText = function (t) { if (t === w.text) alphas.push(this.globalAlpha); return ft.apply(this, arguments); };
+    const sec = []; for (; k < 120 && G.tiles.includes(w); k++) { R.step(1 / 60); window.__bl.length = 0; R.draw(); const m = window.__bl.find(b => Math.abs(b.x - w.x) < 3); if (m) { ys.push(m.y); angs.push(m.ang); } xs.push(w.x); }
+    P.fillText = ft; return { frames: k, gone: !G.tiles.includes(w), ys, xs, angs, alphas, a: w.rise.a }; })()`);
+  assert.equal(r.gone, true, '화면 위로 나가 지워진다');
+  const sec = r.frames / 60;
+  assert.ok(sec >= 0.8 && sec <= 1.0, `나가는 데 ${sec.toFixed(2)}초(약 0.9초 ±10%)`);
+  assert.ok(r.alphas.every(a => a === 1), '올라가는 동안 선명도 1');
+  const dy = r.ys.map((y, i) => i ? r.ys[i - 1] - y : 0).slice(1);
+  assert.ok(dy.slice(0, 5).reduce((a, b) => a + b, 0) < dy.slice(-5).reduce((a, b) => a + b, 0) / 3, '처음엔 느리고 갈수록 빨라진다');
+  assert.ok(r.xs[r.xs.length - 1] < r.xs[0], '세계 이동으로 왼쪽으로 밀린다');
+  assert.ok(new Set(r.angs.map(a => a.toFixed(2))).size > 3, '흔들림이 계속된다');
+  noErr(page); await page.close();
+});
+
+test('362-1·3) 올라가는 풍선은 먹는 판정에서 빠지고 점수·콤보·체력이 바뀌지 않으며, 메뉴로 멈추면 같이 멈췄다가 닫으면 이어서 올라간다', { skip: SKIP }, async () => {
+  const page = await open(844, 390);
+  await startRun(page);
+  await page.eval(riseScenes(1, 1));
+  const before = await page.eval(`(() => { const G = SpellRun.G, w = window.__riseTile; w.x = SpellRun.RUNNER_X + 1; const s = { score: G.score, combo: G.combo, hp: G.hp, rt: w.rise.t }; G.jumpT = 0.3; SpellRun.step(0.02); G.jumpT = -1; return { s, after: { score: G.score, combo: G.combo, hp: G.hp }, checked: w.checked, state: w.state }; })()`);
+  assert.deepEqual(before.after, { score: before.s.score, combo: before.s.combo, hp: before.s.hp }, '올라가는 풍선을 지나가도 점수·콤보·체력은 그대로');
+  assert.equal(before.checked, true); assert.equal(before.state, 'live');
+  await page.click('#srMenuBtn');
+  const a = await page.eval('window.__riseTile.rise.t');
+  await run(page, 30);
+  assert.equal(await page.eval('window.__riseTile.rise.t'), a, '메뉴가 열린 동안 올라가는 풍선도 멈춘다');
+  await page.click('#srMenuCont');
+  await page.eval('SpellRun.step(0.1)');
+  assert.ok((await page.eval('window.__riseTile.rise ? window.__riseTile.rise.t : 99')) > a, '닫으면 이어서 올라간다');
+  noErr(page); await page.close();
+});

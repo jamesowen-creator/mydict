@@ -27,7 +27,7 @@ try { const q = new URLSearchParams(location.search).get('mode'); if (q === '1')
 const streamPinned = OPT.values.stream !== undefined;
 const syncStream = () => { if (!streamPinned) CONFIG.STREAM_EDGE = viewMode === 'land'; };
 syncStream();
-const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, contHp, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, CHARS, BG_ART, ITEM_ART, BALLOON_ART, balloonColor, balloonPhase, balloonMotion, balloonStretch } = L;
+const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, contHp, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, CHARS, BG_ART, ITEM_ART, BALLOON_ART, balloonColor, balloonPhase, balloonMotion, balloonStretch, balloonRise, balloonRiseY } = L;
 const LAYOUT = Object.assign({}, L.LAYOUT);   // 작업355: 화면 모드·크기에 따라 값이 바뀌는 사본(logic.js 의 LAYOUT 은 세로 640 기준값 그대로)
 
 let W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;   // 작업355: applyLayout 이 화면 모드·크기에 맞게 바꾼다
@@ -896,7 +896,7 @@ function doEnd() {
   els.cont.hidden = true; finish(false);
 }
 function onFail(t, kind) {
-  if (edgeOn()) { if (kind === 'wrong') t.wrong = true; }   // 작업360: 가로(edge)는 틀린·놓친 타일이 희미해지거나 사라지지 않고 같은 선명도로 지나간다(틀린 타일에는 붉은 색조만)
+  if (edgeOn()) { if (kind === 'wrong') { t.wrong = true; riseTile(t); } }   // 작업360: 가로(edge)는 틀린·놓친 타일이 희미해지거나 사라지지 않고 같은 선명도로 지나간다(틀린 타일에는 붉은 색조만)
   else if (kind === 'wrong') { t.state = 'taken'; t.t = 0; t.ok = false; }
   else { t.state = 'fade'; t.t = 0; }
   if (edgeOn()) clearRescue(); else endPack(true);   // 작업354: edge 는 보이는 타일을 그대로 두고 아래에서 화면 밖 줄만 다시 정한다
@@ -907,7 +907,7 @@ function onFail(t, kind) {
   sfx.bad();
   floatText(RUNNER_X + 30, GROUND - 150, kind === 'wrong' ? '오답!' : '놓쳤어요', BAD, 22);
   flashHint(G.si);
-  if (edgeOn()) edgeReplan();
+  if (edgeOn()) { edgeReplan(); if (kind === 'wrong') riseUseless(); }   // 작업362: 틀린 풍선과 쓸모없어진 풍선이 같은 순간에 올라간다(점수·콤보 계산은 그대로)
   renderHearts(); renderScore();
   if (G.hp <= 0) onZeroHp();
 }
@@ -1150,6 +1150,7 @@ function step(dt) {
   for (const t of G.tiles) {
     t.age += dt; t.x -= G.speed * dt;
     if (t.state !== 'live') t.t += dt;
+    if (t.rise) t.rise.t += dt;   // 작업362: 올라가는 시간(게임 시간이라 메뉴로 멈추면 같이 멈춘다)
     if (t.state === 'hint' && t.t > CONFIG.HINT_SEC) { t.state = 'fade'; t.t = 0; }
   }
 
@@ -1187,7 +1188,7 @@ function step(dt) {
 
   if (edgeOn()) edgeStep();   // 작업354
   G.obstacles = G.obstacles.filter(o => o.x + o.w > -80);
-  G.tiles = G.tiles.filter(t => t.x > -140 && !((t.state === 'fade' && t.t > (t.angel ? CONFIG.ANGEL_SEC + 0.05 : 0.35)) || (t.state === 'taken' && t.t > 0.4)));
+  G.tiles = G.tiles.filter(t => t.x > -140 && !(t.rise && balloonRiseY(t.rise.t, t.rise.a) >= t.rise.dist) && !((t.state === 'fade' && t.t > (t.angel ? CONFIG.ANGEL_SEC + 0.05 : 0.35)) || (t.state === 'taken' && t.t > 0.4)));
   updateFx(dt);
 }
 
@@ -1486,6 +1487,19 @@ function balloonK(t) {
   if (!(key in balloonKCache)) { ctx.save(); ctx.font = '700 ' + tileFontPx(t) + 'px ' + FL; balloonKCache[key] = balloonStretch(ctx.measureText(t.text).width); ctx.restore(); }
   return balloonKCache[key];
 }
+// 작업362: 틀린 풍선이 위로 올라가기 시작한다. 즉시 먹는 판정에서 빠지고(checked), 점수·콤보·체력에는 아무 영향이 없다(장식). 화면 위로 나가면 step 이 지운다
+function riseTile(t) {
+  if (t.rise || t.kind) return;
+  const A = BALLOON_ART, ty = (t.high ? HIGH_Y : TILE_Y) - tileLift(t), below = balloonK(t) !== null ? A.BOTTOM_DY + A.BOB + 2 : TILE_H * tileScale() / 2 + 8;   // 풍선은 끈 끝, 기존 타일 모양(조각이 너무 넓을 때)은 타일 아래 끝까지
+  const dist = ty + below, r = balloonRise(dist, t.n || 0);
+  t.checked = true; t.rise = { t: 0, a: r.a, dist: dist };
+}
+// 틀린 철자를 먹고 다시 계획한 직후: 화면 안에 이미 나와 있는 풍선 중 "계획에서는 맞는 풍선이었지만 지금 풀 칸의 정답이 아니게 된" 것(뒤 칸·다음 단어용 정답 풍선)을 함께 올린다.
+// 처음부터 오답 후보였던 풍선과 지금 풀 칸의 정답 풍선은 그대로 둔다
+function riseUseless() {
+  const cur = dimCur();
+  for (const t of G.tiles) if (!t.kind && t.state === 'live' && !t.checked && t.correct && !L.streamIsCorrect(t, cur)) riseTile(t);
+}
 function popBalloon(t) {
   const A = BALLOON_ART, n = reduce ? Math.ceil(A.POP_N / 2) : A.POP_N, y = (t.high ? HIGH_Y : TILE_Y) - tileLift(t);
   for (let i = 0; i < n; i++) {   // 난수 없이 일정한 방향·속도로 퍼진다
@@ -1497,10 +1511,12 @@ function drawBalloon(t) {
   const k = balloonK(t);
   if (k === null) return false;
   if (t.state === 'taken') return true;   // 먹은 풍선은 바로 사라진다(색 조각은 onHit 이 이미 냈다). 틀린 풍선은 taken 이 되지 않고 그대로 지나간다
-  const A = BALLOON_ART, ts = tileScale(), ty = (t.high ? HIGH_Y : TILE_Y) - tileLift(t);
-  const m = balloonMotion(G.time, balloonPhase(t.n || 0));   // 그리기에만 쓰는 움직임. 게임 시간 기준(메뉴로 멈추면 같이 멈춘다)
-  ctx.fillStyle = t.high ? 'rgba(0,0,0,.14)' : 'rgba(0,0,0,.28)';
-  ctx.beginPath(); ctx.ellipse(t.x, GROUND + 10, t.w * 0.38, 6, 0, 0, Math.PI * 2); ctx.fill();
+  const A = BALLOON_ART, ts = tileScale(), ty = (t.high ? HIGH_Y : TILE_Y) - tileLift(t) - (t.rise ? balloonRiseY(t.rise.t, t.rise.a) : 0);   // 작업362: 올라가는 풍선은 그만큼 위
+  const m = balloonMotion(G.time, balloonPhase(t.n || 0));   // 그리기에만 쓰는 움직임. 게임 시간 기준(메뉴로 멈추면 같이 멈춘다). 올라가는 동안도 계속
+  if (!t.rise) {
+    ctx.fillStyle = t.high ? 'rgba(0,0,0,.14)' : 'rgba(0,0,0,.28)';
+    ctx.beginPath(); ctx.ellipse(t.x, GROUND + 10, t.w * 0.38, 6, 0, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.save();
   ctx.translate(t.x, ty + m.dy);
   if (t.high) {   // 2단 점프 칸 표시: 몸통 위쪽 삼각형
@@ -1545,8 +1561,8 @@ function drawTile(t) {
   else if (t.state === 'taken') { a = 1 - t.t / 0.35; sc = 1 + 0.5 * Math.min(1, t.t / 0.35); }
   if (a <= 0) return;
   const bob = t.state === 'live' ? Math.sin(G.time * 4 + t.x * 0.02) * 3 : 0;
-  const ty = (t.high ? HIGH_Y : TILE_Y) - tileLift(t);
-  if (t.state === 'live' || t.state === 'hint') {
+  const ty = (t.high ? HIGH_Y : TILE_Y) - tileLift(t) - (t.rise ? balloonRiseY(t.rise.t, t.rise.a) : 0);
+  if ((t.state === 'live' || t.state === 'hint') && !t.rise) {
     ctx.fillStyle = t.high ? 'rgba(0,0,0,.14)' : 'rgba(0,0,0,.28)';
     ctx.beginPath(); ctx.ellipse(t.x, GROUND + 10, t.w * 0.38, 6, 0, 0, Math.PI * 2); ctx.fill();
   }
@@ -2645,7 +2661,7 @@ function frame(ts) {
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
 const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, get HIGH_Y() { return HIGH_Y; }, get TILE_Y() { return TILE_Y; }, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival, continued: G.contUsed }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
 API.art = { charKey: () => charKey, activeChar: activeChar, charReady: charReady, bgOK: bgOK, itemArtReady: itemArtReady, obstArtReady: () => obstArtReady(), blend: () => G.bossBlend, setChar: k => setChar(k) };   // 작업358: 시험용 훅
-API.balloon = { ready: balloonReady, k: balloonK, lift: tileLift, setLift: v => { LAYOUT.TILE_LIFT = v; } };   // 작업361: 시험용 훅
+API.balloon = { rise: riseTile, ready: balloonReady, k: balloonK, lift: tileLift, setLift: v => { LAYOUT.TILE_LIFT = v; } };   // 작업361: 시험용 훅
 API.menu = { open: () => MENU.open, pauses: menuPauses };   // 작업360: 시험용 훅
 API.view = { mode: () => viewMode, pending: () => pendingView, set: setViewMode, scale: () => curScale, layout: () => ({ W: W, H: H, GROUND: GROUND, TILE_Y: TILE_Y, HIGH_Y: HIGH_Y }) };   // 작업355: 시험용 훅
 API.edge = { on: edgeOn, setViewW: w => { streamViewW = w; }, viewW: () => streamViewW, fill: edgeFill };   // 작업354: 시험용 훅

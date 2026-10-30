@@ -215,3 +215,18 @@ test('작업361 풍선 늘리기·올림: 글자 폭이 몸통의 80%를 넘으�
   assert.equal(L.LAYOUT.TILE_LIFT, 0); assert.equal(L.LAYOUT.BALLOON, false); assert.equal(L.layoutFor('port', 360, 640).TILE_LIFT, 0); assert.equal(L.layoutFor('land', 800, 400).TILE_LIFT, 22);
   assert.equal(C.GRAB_H, 22); assert.equal(C.HIGH_GRAB_H, 160, '먹는 판정 상수는 그대로');
 });
+
+// 작업362: 틀린 풍선 위로 올라가기(순수 로직)
+test('작업362 올라가기: 풍선마다 가속이 ±10% 안에서 타일 번호로만 정해지고(난수 없음) 나가는 시간은 약 0.9초, 처음엔 느리고 갈수록 빨라진다', () => {
+  const B = L.BALLOON_ART;
+  assert.equal(B.RISE_SEC, 0.9); assert.equal(B.RISE_VAR, 0.1);
+  const fs = Array.from({ length: 40 }, (_, n) => L.balloonRise(280, n));
+  assert.ok(fs.every(r => r.f >= 0.9 - 1e-9 && r.f <= 1.1 + 1e-9), '가속 차이 ±10%');
+  assert.ok(new Set(fs.map(r => r.f.toFixed(6))).size > 30, '풍선마다 다르다');
+  assert.ok(fs.every(r => r.sec >= 0.85 && r.sec <= 0.96), '나가는 시간 ' + Math.min(...fs.map(r => r.sec)).toFixed(3) + '~' + Math.max(...fs.map(r => r.sec)).toFixed(3));
+  assert.deepEqual(L.balloonRise(280, 7), L.balloonRise(280, 7), '같은 입력 같은 값');
+  const r = L.balloonRise(280, 3);
+  assert.ok(Math.abs(L.balloonRiseY(r.sec, r.a) - 280) < 1e-6, '나가는 시간에 정확히 거리만큼');
+  assert.equal(L.balloonRiseY(0, r.a), 0);
+  assert.ok(L.balloonRiseY(0.1, r.a) < L.balloonRiseY(r.sec, r.a) - L.balloonRiseY(r.sec - 0.1, r.a), '처음 0.1초 < 마지막 0.1초');
+});

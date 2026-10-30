@@ -876,7 +876,8 @@ const ITEM_ART = { URL: '/img/spellrun/items_sheet.png', SHEET_W: 448, SHEET_H: 
 const BALLOON_ART = { URL: '/img/spellrun/balloons_sheet.png', SHEET_W: 672, SHEET_H: 161, CELL_W: 112, CELL_H: 161, COUNT: 6, PX: 2, ANCHOR_Y: 58,
   BODY_W: 48.0, BODY_H: 52.0, KNOT_DY: 26.0, BOTTOM_DY: 49.0, MAX_STRETCH: 1.4, TEXT_DY: 4, TEXT_FIT: 0.8,
   NAMES: ['pink', 'blue', 'yellow', 'green', 'purple', 'orange'], COLORS: ['#ff8fb1', '#6ec1f7', '#ffd25e', '#8fe08a', '#b78cf5', '#ff9f77'],
-  BOB: 3, BOB_SEC: 1.6, SWAY_DEG: 4, SWAY_SEC: 1.9, POP_N: 7, POP_SEC: 0.3 };
+  BOB: 3, BOB_SEC: 1.6, SWAY_DEG: 4, SWAY_SEC: 1.9, POP_N: 7, POP_SEC: 0.3,
+  RISE_SEC: 0.9, RISE_VAR: 0.1 };   // 작업362: 틀린 풍선이 위로 올라가 화면 위쪽 끝으로 나가는 시간(초)과 풍선마다 가속의 차이(±10%)
 // 풍선 색 번호: 후보 번호(묶음 안 몇 번째)와 칸 번호를 더해 6색을 돌린다. 난수 없음(같은 위치는 항상 같은 색)
 function balloonColor(i, si) { return (i + si) % BALLOON_ART.COUNT; }
 // 풍선마다 어긋나는 위상(0~2π): 타일 번호 n 으로만 정한다(황금비 분수). 난수 없음
@@ -886,6 +887,15 @@ function balloonMotion(time, ph) {
   const A = BALLOON_ART;
   return { dy: Math.sin(time * Math.PI * 2 / A.BOB_SEC + ph) * A.BOB, ang: Math.sin(time * Math.PI * 2 / A.SWAY_SEC + ph * 1.3) * A.SWAY_DEG };
 }
+// 작업362: 틀린 풍선이 위로 올라가는 움직임. 처음엔 느리고(정지에서 출발) 갈수록 빨라지는 등가속. 가속 크기는 풍선마다 ±RISE_VAR 만큼 어긋난다(타일 번호로만 정함, 난수 없음).
+// dist: 올라가야 하는 거리(논리 px, 풍선 맨 아래 끝까지 화면 위로 나가는 거리). 반환: { a: 가속(px/s^2), sec: 나가는 데 걸리는 시간(초) }
+function balloonRise(dist, n) {
+  const A = BALLOON_ART, f = 1 + A.RISE_VAR * (2 * (((n * 0.7548776662) % 1)) - 1);
+  const a = 2 * dist / (A.RISE_SEC * A.RISE_SEC) * f;
+  return { a: a, sec: Math.sqrt(2 * dist / a), f: f };
+}
+// 올라가기 시작한 지 rt 초 뒤에 올라간 거리
+function balloonRiseY(rt, a) { return 0.5 * a * rt * rt; }
 // 몸통을 가로로 늘리는 배율: 글자 폭 textW(논리 px)가 몸통 폭의 TEXT_FIT 안에 들어오게. MAX_STRETCH 를 넘어야 하면 null(풍선 대신 기존 타일 모양)
 function balloonStretch(textW) {
   const A = BALLOON_ART, k = Math.max(1, textW / (A.BODY_W * A.TEXT_FIT));
@@ -1058,7 +1068,7 @@ return {
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT, LAYOUT_LAND: LAYOUT_LAND, layoutFor: layoutFor,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
-  survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
+  survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, balloonRise: balloonRise, balloonRiseY: balloonRiseY, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamOffscreen: streamOffscreen,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };
