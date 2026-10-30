@@ -12,7 +12,9 @@ const ROOT = path.resolve(__dirname, '..', '..');
 
 function run(file) {
   return new Promise(resolve => {
-    const child = spawn(process.execPath, [path.join(__dirname, file + '.js')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+    // 작업358: 352 부터 서버는 JWT_SECRET·SESSION_SECRET 이 비면 시작하지 않는다. 시험용 고정 가짜 값을 준다(실제 값과 무관, 앱 코드는 그대로)
+    const env = Object.assign({}, process.env, { JWT_SECRET: 'test-only-secret', SESSION_SECRET: 'test-only-secret' });
+    const child = spawn(process.execPath, [path.join(__dirname, file + '.js')], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { out += d; });
