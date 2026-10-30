@@ -99,7 +99,7 @@ function buildConfig(v) {
   OBST_MIN_WINDOW: 0.15,  // 장애물을 틀린 글자 없이 넘는 점프 시작 시각 구간(여유 창)의 최소 길이(초)
   OBST_NEXT_MARGIN: 0.1,  // 장애물 점프 뒤 다음 묶음 첫 글자를 위한 점프를 준비할 최소 여유(초)
   // 작업327: 그림·예고 표시(판정과 배치에는 영향 없음)
-  ART_LONG_K: 1.4,        // 바닥 장애물 그림의 긴 변 = OBST_W x 이 값(흰 테두리 제외). pace 로 OBST_W 가 줄면 같은 비율로 줄어든다
+  ART_LONG_K: 2.0,        // 작업358: 1.4 → 2.0 (새 그림은 가로로 긴 모양이라 높이가 판정 높이(28)와 비슷해지게). 바닥 장애물 그림의 긴 변 = OBST_W x 이 값(흰 테두리 제외). pace 로 OBST_W 가 줄면 같은 비율로 줄어든다
   PIT_ART_K: 1.25,        // 구덩이 그림 폭 = PIT_W x 이 값(판정 폭은 PIT_W 그대로)
   // 작업328: 하트 규칙(체력과 무관)·가속 아이템
   HP_FULL_BONUS: 100,     // 체력이 가득일 때 하트를 먹으면 체력 대신 받는 점수(주소 옵션 hpfullbonus)
@@ -689,8 +689,9 @@ function planObstacle(nSlots, highSet, heartSlot, boss, rng, cfg) {
 }
 // ---- 작업327: 바닥 장애물 그림(시트 spellrun_obstacles_sheet.png 1024x256, 256 칸 4개: 돌무더기·통나무·콘·가시덤불) ----
 // 물체 크기(w,h)는 흰 테두리(BORDER) 제외 추정값이고, 화면에서는 시트의 알파로 실제 값을 재서 바꿔 쓴다. 물체 바닥은 칸 아래에서 FOOT_Y 지점이다.
-const OBSTACLE_ART = { URL: '/img/spellrun/spellrun_obstacles_sheet.png', SHEET_W: 1024, SHEET_H: 256, CELL: 256, BORDER: 11, FOOT_Y: 237,
-  OBJECTS: [{ name: 'rocks', w: 202, h: 134 }, { name: 'log', w: 187, h: 136 }, { name: 'cone', w: 158, h: 180 }, { name: 'bush', w: 214, h: 150 }] };
+// 작업358: 새 그림(이끼 돌무더기·버섯 통나무·별 상자·가시덤불). 흰 테두리 3px, 칸 256, 바닥 237. 크기는 scripts/spellrun_art_report.json 의 값(실행 중에도 알파로 다시 잰다)
+const OBSTACLE_ART = { URL: '/img/spellrun/spellrun_obstacles_sheet.png', SHEET_W: 1024, SHEET_H: 256, CELL: 256, BORDER: 3, FOOT_Y: 237,
+  OBJECTS: [{ name: 'rocks', w: 230, h: 100 }, { name: 'log', w: 237, h: 91 }, { name: 'crate', w: 205, h: 96 }, { name: 'bush', w: 234, h: 117 }] };
 // 종류 고르기: 난수를 쓰지 않는다(장애물 배치 난수 흐름을 바꾸지 않기 위해). 단어·장애물이 놓이는 묶음 번호·이번 판의 장애물 순번으로 만든 해시(FNV-1a)를 4로 나눈 나머지
 function obstacleArtIndex(word, slot, seq) {
   const str = String(word) + ':' + slot + ':' + seq;
@@ -840,6 +841,34 @@ function ttsSourceLabel(o) {
     : o.reason === 'timeout' ? '시간 초과' : o.reason === 'play' ? '재생 거부' : '서버 오류';
   return '내장 음성: ' + why;
 }
+
+// ---- 작업358: 그림(캐릭터 3종·배경·아이템). 크기·좌표는 scripts/spellrun_art_build.py 가 만든 scripts/spellrun_art_report.json 과 같다 ----
+// 캐릭터: 펭귄과 같은 시트 형식(1728x288, 칸 288, 6동작: 달리기 4 · 점프 상승 · 점프 하강). 판정 크기는 같고(size 92) 그림만 다르다. 사람은 몸 가운데(faceX 0.5)를 러너 위치 약간 왼쪽(faceDx)에 둔다
+const CHAR_KEYS = ['penguin', 'girl', 'boy'];
+const CHARS = {
+  penguin: Object.assign({ key: 'penguin', name: '펭귄' }, PENGUIN),
+  girl: Object.assign({ key: 'girl', name: '여학생' }, PENGUIN, { URL: '/img/spellrun/spellrun_girl_sheet.png', faceX: 0.5, faceDx: -16, bodyY: 0.55 }),
+  boy: Object.assign({ key: 'boy', name: '남학생' }, PENGUIN, { URL: '/img/spellrun/spellrun_boy_sheet.png', faceX: 0.5, faceDx: -16, bodyY: 0.55 })
+};
+// 주소 옵션 char(0 펭귄 | 1 여학생 | 2 남학생). 저장값(문자열 키)은 모르는 값이면 펭귄
+function charFromOption(v) { return v === '1' ? 'girl' : v === '2' ? 'boy' : v === '0' ? 'penguin' : null; }
+function charFromStored(v) { return CHAR_KEYS.indexOf(v) >= 0 ? v : 'penguin'; }
+// 배경: 층마다 논리 폭 640(그림 폭 1280, 논리 1px = 그림 2px)을 가로로 이어 붙이고 땅 선에 바닥을 맞춘다. 속도는 지금 언덕과 같다(먼 0.22, 가까운 0.45)
+const BG_ART = {
+  PX: 2, TILE_W: 640, BLEND_SEC: 0.5,
+  LAYERS: {
+    dayFar: { URL: '/img/spellrun/bg_day_far.png', W: 1280, H: 329, SPEED: 0.22 },
+    dayMid: { URL: '/img/spellrun/bg_day_mid.png', W: 1280, H: 213, SPEED: 0.45 },
+    bossFar: { URL: '/img/spellrun/bg_boss_far.png', W: 1280, H: 221, SPEED: 0.22 },
+    bossNear: { URL: '/img/spellrun/bg_boss_near.png', W: 1280, H: 334, SPEED: 0.45 }
+  },
+  SKY: { URL: '/img/spellrun/bg_boss_sky.png', W: 1024, H: 704, SPEED: 0.03 },
+  CLOUDS: { URL: '/img/spellrun/clouds_sheet.png', W: 308, H: 614, SPEED: 0.12, ALPHA: 0.92,
+    ITEMS: [{ sx: 4, sy: 4, sw: 196, sh: 126 }, { sx: 4, sy: 134, sw: 206, sh: 120 }, { sx: 4, sy: 258, sw: 300, sh: 181 }, { sx: 4, sy: 443, sw: 136, sh: 89 }, { sx: 4, sy: 536, sw: 109, sh: 74 }],
+    X: [0.05, 0.26, 0.47, 0.69, 0.88], Y: [0.1, 0.7, 0.35, 0.9, 0.55], SCALE: [0.9, 0.8, 0.9, 0.7, 0.6] }
+};
+// 아이템(하트·번개·전구·천사) 한 줄 시트: 칸 112, 겉보기 큰 변 104. 논리 DRAW_MAX 54 로 그린다(판정 크기·효과·연출은 그대로)
+const ITEM_ART = { URL: '/img/spellrun/items_sheet.png', SHEET_W: 448, SHEET_H: 112, CELL: 112, ORDER: ['heart', 'speed', 'hint', 'angel'], DRAW_MAX: 54, MAX_SIDE: 104 };
 
 // ---- 작업323: 새 단어 시작 연출 ----
 // 타임라인: 큰 뜻 유지(hold) → 축소·이동(shrink). 전체(hold+shrink)는 새 단어 대기 시간(delay) 이하로 맞춘다(옵션이 커도 hold 를 줄인다).
@@ -1007,7 +1036,7 @@ return {
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT, LAYOUT_LAND: LAYOUT_LAND, layoutFor: layoutFor,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
-  survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
+  survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamDim: streamDim, streamOffscreen: streamOffscreen,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };

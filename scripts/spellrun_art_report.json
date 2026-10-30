@@ -1,0 +1,316 @@
+{
+ "_total": {
+  "bytes": 513596,
+  "penguin_ref_height": 249
+ },
+ "boss_far": {
+  "bytes": 12867,
+  "file": "bg_boss_far.png",
+  "logical": [
+   640,
+   110.5
+  ],
+  "loop_crop": {
+   "cost": 0.54,
+   "left": 9,
+   "right": 1526
+  },
+  "low_alpha_pixels": 0,
+  "seam": {
+   "alpha_row_mismatch": 0,
+   "inner_mean": 0.42,
+   "rows": 221,
+   "seam": 0.83
+  },
+  "size": [
+   1280,
+   221
+  ],
+  "specks_removed": 0
+ },
+ "boss_near": {
+  "bytes": 26670,
+  "file": "bg_boss_near.png",
+  "logical": [
+   640,
+   167.0
+  ],
+  "loop_crop": {
+   "cost": 0.51,
+   "left": 30,
+   "right": 1493
+  },
+  "low_alpha_pixels": 0,
+  "seam": {
+   "alpha_row_mismatch": 0,
+   "inner_mean": 0.13,
+   "rows": 334,
+   "seam": 0.0
+  },
+  "size": [
+   1280,
+   334
+  ],
+  "specks_removed": 0
+ },
+ "boss_sky": {
+  "aspect": 1.4545,
+  "bytes": 200415,
+  "file": "bg_boss_sky.png",
+  "low_alpha_pixels": 0,
+  "seam": {
+   "alpha_row_mismatch": 0,
+   "inner_mean": 0.41,
+   "rows": 704,
+   "seam": 0.74
+  },
+  "size": [
+   1024,
+   704
+  ]
+ },
+ "boy": {
+  "bytes": 68721,
+  "cell": 288,
+  "clipped_frames": [],
+  "file": "spellrun_boy_sheet.png",
+  "foot_spread": 0,
+  "foot_y": [
+   280,
+   280,
+   280,
+   280,
+   280,
+   280
+  ],
+  "frame_heights": [
+   249,
+   239,
+   248,
+   240,
+   230,
+   208
+  ],
+  "low_alpha_pixels": 0,
+  "scale": 0.499,
+  "size": [
+   1728,
+   288
+  ],
+  "source_cross_grid": [
+   [],
+   [],
+   [],
+   [],
+   [],
+   []
+  ],
+  "specks_removed": 30
+ },
+ "clouds": {
+  "bytes": 9728,
+  "file": "clouds_sheet.png",
+  "items": [
+   {
+    "sh": 126,
+    "sw": 196,
+    "sx": 4,
+    "sy": 4
+   },
+   {
+    "sh": 120,
+    "sw": 206,
+    "sx": 4,
+    "sy": 134
+   },
+   {
+    "sh": 181,
+    "sw": 300,
+    "sx": 4,
+    "sy": 258
+   },
+   {
+    "sh": 89,
+    "sw": 136,
+    "sx": 4,
+    "sy": 443
+   },
+   {
+    "sh": 74,
+    "sw": 109,
+    "sx": 4,
+    "sy": 536
+   }
+  ],
+  "low_alpha_pixels": 0,
+  "px_per_logical": 2,
+  "size": [
+   308,
+   614
+  ],
+  "specks_removed": 0
+ },
+ "day_far": {
+  "bytes": 14652,
+  "file": "bg_day_far.png",
+  "logical": [
+   640,
+   164.5
+  ],
+  "loop_crop": {
+   "cost": 0.54,
+   "left": 6,
+   "right": 1532
+  },
+  "low_alpha_pixels": 0,
+  "seam": {
+   "alpha_row_mismatch": 0,
+   "inner_mean": 0.26,
+   "rows": 329,
+   "seam": 0.15
+  },
+  "size": [
+   1280,
+   329
+  ],
+  "specks_removed": 0
+ },
+ "day_mid": {
+  "bytes": 51181,
+  "file": "bg_day_mid.png",
+  "logical": [
+   640,
+   106.5
+  ],
+  "loop_crop": {
+   "cost": 7.63,
+   "left": 42,
+   "right": 1532
+  },
+  "low_alpha_pixels": 0,
+  "seam": {
+   "alpha_row_mismatch": 0,
+   "inner_mean": 4.76,
+   "rows": 213,
+   "seam": 1.59
+  },
+  "size": [
+   1280,
+   213
+  ],
+  "specks_removed": 0
+ },
+ "girl": {
+  "bytes": 73527,
+  "cell": 288,
+  "clipped_frames": [],
+  "file": "spellrun_girl_sheet.png",
+  "foot_spread": 0,
+  "foot_y": [
+   280,
+   280,
+   280,
+   280,
+   280,
+   280
+  ],
+  "frame_heights": [
+   246,
+   231,
+   239,
+   246,
+   249,
+   225
+  ],
+  "low_alpha_pixels": 0,
+  "scale": 0.5123,
+  "size": [
+   1728,
+   288
+  ],
+  "source_cross_grid": [
+   [],
+   [],
+   [],
+   [],
+   [
+    "위"
+   ],
+   []
+  ],
+  "specks_removed": 20
+ },
+ "items": {
+  "bytes": 11471,
+  "cell": 112,
+  "file": "items_sheet.png",
+  "low_alpha_pixels": 0,
+  "objects": [
+   {
+    "h": 85,
+    "name": "heart",
+    "w": 104
+   },
+   {
+    "h": 104,
+    "name": "speed",
+    "w": 78
+   },
+   {
+    "h": 104,
+    "name": "hint",
+    "w": 77
+   },
+   {
+    "h": 75,
+    "name": "angel",
+    "w": 104
+   }
+  ],
+  "size": [
+   448,
+   112
+  ],
+  "specks_removed": 0
+ },
+ "obstacles": {
+  "border": 3,
+  "bytes": 44364,
+  "cell": 256,
+  "file": "spellrun_obstacles_sheet.png",
+  "foot_y": 237,
+  "low_alpha_pixels": 0,
+  "objects": [
+   {
+    "foot": 237,
+    "h": 100,
+    "name": "rocks",
+    "w": 230
+   },
+   {
+    "foot": 237,
+    "h": 91,
+    "name": "log",
+    "w": 237
+   },
+   {
+    "foot": 236,
+    "h": 96,
+    "name": "crate",
+    "w": 205
+   },
+   {
+    "foot": 237,
+    "h": 117,
+    "name": "bush",
+    "w": 234
+   }
+  ],
+  "scale": 0.4013,
+  "size": [
+   1024,
+   256
+  ],
+  "specks_removed": 0
+ }
+}

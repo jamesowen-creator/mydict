@@ -534,7 +534,7 @@ const hudInfo = async page => { await advance(page, '!G.iActive', {}); return pa
  const G = SpellRun.G, w = G.words[G.wi], u = parseFloat(document.getElementById('box').style.getPropertyValue('--u')), b = document.getElementById('box').getBoundingClientRect();
   const y = id => { const e = document.getElementById(id); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return { top: (r.top - b.top) / u, bottom: (r.bottom - b.top) / u, fs: parseFloat(getComputedStyle(e).fontSize) / u, h: r.height / u }; };
   const sub = document.getElementById('sub');
-  return { word: w.word, meaning: document.getElementById('meaning').textContent, sub: sub.hidden ? null : sub.textContent, subShadow: getComputedStyle(sub).textShadow, subBg: getComputedStyle(sub).backgroundColor, subBorder: getComputedStyle(sub).borderTopWidth,
+  return { word: w.word, meaning: document.getElementById('meaning').textContent, sub: sub.hidden ? null : sub.textContent, subShadow: getComputedStyle(sub).textShadow, bsky: document.getElementById('box').classList.contains('bsky'), subBg: getComputedStyle(sub).backgroundColor, subBorder: getComputedStyle(sub).borderTopWidth,
     hint: document.getElementById('hint'), boxes: document.querySelectorAll('.hint, .h-pos, .h-alt, .h-note, .h-ex').length, row1: y('hud') && null,
     meanY: y('meaning'), subY: y('sub'), wordY: y('word'), progY: (() => { const r = document.getElementById('progress').getBoundingClientRect(); return { bottom: (r.bottom - b.top) / u }; })() }; })()`); };
 
@@ -555,7 +555,7 @@ test('322-1/2) 상세 힌트 박스(흰 배경·품사·품사별 다른 뜻·�
     assert.ok(!text.includes('…'));
     // 보조 줄: 배경·테두리 박스 없음, 흰 외곽(그림자)으로 가독성, 대표 뜻보다 확실히 작고 10px 이상
     if (d.sub !== null) {
-      assert.equal(d.subBg, 'rgba(0, 0, 0, 0)'); assert.equal(d.subBorder, '0px'); assert.match(d.subShadow, /rgb\(255, 255, 255\)/);
+      assert.equal(d.subBg, 'rgba(0, 0, 0, 0)'); assert.equal(d.subBorder, '0px'); assert.match(d.subShadow, d.bsky ? /rgba\(20, 32, 74/ : /rgb\(255, 255, 255\)/);   // 작업358: 보스 하늘에서는 흰 글자 + 어두운 번짐
       assert.ok(d.subY.fs >= 10 - 0.01 && d.subY.fs <= 12.01 && d.subY.fs < d.meanY.fs - 4, `보조 줄 글자 ${d.subY.fs} / 대표 뜻 ${d.meanY.fs}`);
       assert.ok(d.subY.top >= d.meanY.bottom - 0.5 && d.wordY.top >= d.subY.bottom + 12, '대표 뜻 → 보조 줄 → (조각 표시 자리) → 글자 칸 순서');
     } else assert.ok(d.wordY.top - d.meanY.bottom >= 10 && d.wordY.top - d.meanY.bottom <= 30, '보조 줄이 없으면 대표 뜻과 글자 칸 사이가 어색하게 비지 않는다: ' + (d.wordY.top - d.meanY.bottom));
@@ -1804,8 +1804,8 @@ const RUN_UNTIL = (cond, max) => `(async () => { const R = SpellRun, G = R.G, C 
 test('327-1) 시트 파일: public/img/spellrun/spellrun_obstacles_sheet.png 1024×256 RGBA 한 장만 있고(zip·개별 파일 없음), 페이지가 그 주소를 1회만 요청한다', { skip: SKIP }, async () => {
   const f = path.join(PUB, 'img', 'spellrun', 'spellrun_obstacles_sheet.png');
   const b = fs.readFileSync(f);
-  assert.equal(b.subarray(1, 4).toString(), 'PNG'); assert.equal(b.readUInt32BE(16), 1024); assert.equal(b.readUInt32BE(20), 256); assert.equal(b[24], 8); assert.equal(b[25], 6, 'RGBA');
-  assert.deepEqual(fs.readdirSync(path.dirname(f)).sort(), ['spellrun_obstacles_sheet.png', 'spellrun_penguin_sheet.png'], '시트 두 장(펭귄·장애물)만');
+  assert.equal(b.subarray(1, 4).toString(), 'PNG'); assert.equal(b.readUInt32BE(16), 1024); assert.equal(b.readUInt32BE(20), 256); assert.equal(b[24], 8); assert.ok(b[25] === 6 || (b[25] === 3 && b.includes(Buffer.from('tRNS'))), 'RGBA 또는 투명 정보가 있는 팔레트 PNG(작업358: 용량을 줄여 팔레트로 저장)');
+  assert.deepEqual(fs.readdirSync(path.dirname(f)).sort(), ['bg_boss_far.png', 'bg_boss_near.png', 'bg_boss_sky.png', 'bg_day_far.png', 'bg_day_mid.png', 'clouds_sheet.png', 'items_sheet.png', 'spellrun_boy_sheet.png', 'spellrun_girl_sheet.png', 'spellrun_obstacles_sheet.png', 'spellrun_penguin_sheet.png'], '그림 파일 목록(작업358: 배경 5·구름·아이템·캐릭터 3종·장애물, 개별 파일·zip 없음)');
   assert.ok(!fs.readdirSync(PUB, { recursive: true }).some(x => /obstacles_frames\.zip|obstacle_[1-4]_[a-z]+\.png/.test(String(x))), 'zip·개별 파일 없음');
   resetState();
   const page = await openGame({ ids: [1, 2, 3] });
@@ -1814,7 +1814,7 @@ test('327-1) 시트 파일: public/img/spellrun/spellrun_obstacles_sheet.png 102
   const reqs = await page.eval("performance.getEntriesByType('resource').filter(e => /obstacle/.test(e.name)).map(e => new URL(e.name).pathname)");
   assert.deepEqual(reqs, ['/img/spellrun/spellrun_obstacles_sheet.png'], '시트 요청 1회');
   const objs = await page.eval('SpellRun.obstArt().objs');
-  const est = [[202, 134], [187, 136], [158, 180], [214, 150]];
+  const est = [[230, 100], [237, 91], [205, 96], [234, 117]];   // 작업358: 새 그림 4종의 크기(scripts/spellrun_art_report.json)
   objs.forEach((o, i) => { assert.ok(Math.abs(o.w - est[i][0]) <= 3 && Math.abs(o.h - est[i][1]) <= 3, `알파로 잰 ${o.name} 크기 ${o.w}×${o.h} ≈ 추정 ${est[i]}`); assert.ok(Math.abs(o.foot - 237) <= 2, o.name + ' 바닥 ' + o.foot); });
   await page.close();
 });
@@ -1851,9 +1851,9 @@ test('327-2) 시트가 로딩되면 4종(돌무더기·통나무·콘·가시덤
   const draws = out.checks.filter(c => typeof c === 'object');
   assert.ok(draws.length >= 4);
   for (const c of draws) {
-    const [sx, sy, sw, sh, dx, dy, dw, dh] = c.a, o = out.objs[c.art], k = out.W * 1.4 / Math.max(o.w, o.h);
+    const [sx, sy, sw, sh, dx, dy, dw, dh] = c.a, o = out.objs[c.art], k = out.W * 2.0 / Math.max(o.w, o.h);
     assert.equal(sx, c.art * 256); assert.equal(sy, 0); assert.equal(sw, 256); assert.equal(sh, 256);
-    assert.ok(Math.abs(dw - 256 * k) < 0.01 && Math.abs(dh - 256 * k) < 0.01, `크기 ${dw} ≈ ${256 * k} (긴 변 ${Math.max(o.w, o.h) * k} = ${out.W * 1.4})`);
+    assert.ok(Math.abs(dw - 256 * k) < 0.01 && Math.abs(dh - 256 * k) < 0.01, `크기 ${dw} ≈ ${256 * k} (긴 변 ${Math.max(o.w, o.h) * k} = ${out.W * 2.0})`);
     assert.ok(Math.abs(dy + o.foot * k - out.ground) < 0.01, '물체 바닥이 땅 선(' + out.ground + ')'); assert.ok(Math.abs(dx + 128 * k - c.cx) < 0.01, '가로 중앙');
   }
   assert.deepEqual([out.W, out.H, out.PW], [28, 28, 36], '판정 크기 그대로');

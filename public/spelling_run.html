@@ -110,6 +110,12 @@
                 <li class="mint">맞힐수록 빨라지고, 틀리거나 놓치면 체력이 줄어요.</li>
                 <li class="red" id="coreCont">체력이 0이 되면 한 번 이어서 할 수 있어요.</li>
               </ul>
+              <div class="trow" id="charRow" role="group" aria-label="캐릭터">
+                <span class="vlabel">캐릭터</span>
+                <button class="toggle vsbtn chbtn" type="button" data-char="penguin" aria-pressed="true"><span class="chimg penguin" aria-hidden="true"></span>펭귄</button>
+                <button class="toggle vsbtn chbtn" type="button" data-char="girl" aria-pressed="false"><span class="chimg girl" aria-hidden="true"></span>여학생</button>
+                <button class="toggle vsbtn chbtn" type="button" data-char="boy" aria-pressed="false"><span class="chimg boy" aria-hidden="true"></span>남학생</button>
+              </div>
             </div>
             <div class="trow" id="viewRow" role="group" aria-label="화면">
               <span class="vlabel">화면</span>
@@ -270,8 +276,8 @@
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=82"></script>
-<script src="/js/spellrun/stage_style.js?v=82"></script>
-<script src="/js/spellrun/game.js?v=82"></script>
+<script src="/js/spellrun/logic.js?v=83"></script>
+<script src="/js/spellrun/stage_style.js?v=83"></script>
+<script src="/js/spellrun/game.js?v=83"></script>
 </body>
 </html>

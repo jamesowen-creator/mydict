@@ -27,7 +27,7 @@ try { const q = new URLSearchParams(location.search).get('mode'); if (q === '1')
 const streamPinned = OPT.values.stream !== undefined;
 const syncStream = () => { if (!streamPinned) CONFIG.STREAM_EDGE = viewMode === 'land'; };
 syncStream();
-const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, contHp, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount } = L;
+const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, contHp, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, CHARS, BG_ART, ITEM_ART } = L;
 const LAYOUT = Object.assign({}, L.LAYOUT);   // 작업355: 화면 모드·크기에 따라 값이 바뀌는 사본(logic.js 의 LAYOUT 은 세로 640 기준값 그대로)
 
 let W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;   // 작업355: applyLayout 이 화면 모드·크기에 맞게 바꾼다
@@ -58,12 +58,22 @@ const sndBtns = [$('snd'), $('sndStart')];
 const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
 // ---------- 작업321: 펭귄 스프라이트 시트(미리 불러오기). 로딩 전·실패 시에는 기존 도형 캐릭터로 그린다(게임 시작을 막지 않는다) ----------
-const sheet = new Image();
-let sheetOK = false;
-sheet.onload = () => { sheetOK = sheet.naturalWidth === PENGUIN.SHEET_W && sheet.naturalHeight === PENGUIN.SHEET_H; };
-sheet.onerror = () => { sheetOK = false; };
-try { sheet.src = PENGUIN.URL; } catch (e) { sheetOK = false; }
-const penguinReady = () => sheetOK && sheet.complete;
+// 작업358: 캐릭터 3종(펭귄·여학생·남학생). 고른 캐릭터의 시트를 못 읽으면 펭귄, 펭귄도 못 읽으면 기존 도형 캐릭터로 그린다
+const charSheets = {};
+function loadChar(key) {
+  if (charSheets[key] || !CHARS[key]) return;
+  const P = CHARS[key], im = new Image(), st = { img: im, ok: false };
+  im.onload = () => { st.ok = im.naturalWidth === P.SHEET_W && im.naturalHeight === P.SHEET_H; };
+  im.onerror = () => { st.ok = false; };
+  charSheets[key] = st;
+  try { im.src = P.URL; } catch (e) { st.ok = false; }
+}
+const charReady = key => { const st = charSheets[key]; return !!st && st.ok && st.img.complete; };
+let charKey = L.charFromStored(lsGet('spellrun_char'));
+try { const q = L.charFromOption(new URLSearchParams(location.search).get('char')); if (q) charKey = q; } catch (e) { /* 주소를 못 읽으면 저장값 */ }
+loadChar('penguin'); loadChar(charKey);
+const activeChar = () => (charReady(charKey) ? charKey : (charReady('penguin') ? 'penguin' : null));
+const penguinReady = () => activeChar() !== null;
 // 작업327: 장애물 시트(시작할 때 미리 불러온다). 크기가 다르거나 실패하면 기존 코드 그림(상자)으로 그린다. 불러온 뒤 알파로 칸마다 물체의 실제 크기를 재서 쓴다(못 재면 logic.js 의 추정값)
 const obstSheet = new Image();
 let obstSheetOK = false, obstObjs = OBSTACLE_ART.OBJECTS.map(o => Object.assign({}, o));
@@ -86,6 +96,25 @@ obstSheet.onload = () => {
 obstSheet.onerror = () => { obstSheetOK = false; };
 try { obstSheet.src = OBSTACLE_ART.URL; } catch (e) { obstSheetOK = false; }
 const obstArtReady = () => obstSheetOK && obstSheet.complete;
+
+// ---------- 작업358: 배경·아이템 그림(미리 불러오기). 못 읽으면 각각 기존 그림(코드 그라데이션·언덕·타원 구름·도형 아이템)으로 그린다 ----------
+const bgArt = {};
+function loadBg(key, spec) {
+  const im = new Image(), st = { img: im, ok: false, spec: spec, cv: null, cvKey: '' };
+  im.onload = () => { st.ok = im.naturalWidth === spec.W && im.naturalHeight === spec.H; };
+  im.onerror = () => { st.ok = false; };
+  bgArt[key] = st;
+  try { im.src = spec.URL; } catch (e) { st.ok = false; }
+}
+Object.keys(BG_ART.LAYERS).forEach(k => loadBg(k, BG_ART.LAYERS[k]));
+loadBg('sky', BG_ART.SKY); loadBg('clouds', BG_ART.CLOUDS);
+const bgOK = key => { const st = bgArt[key]; return !!st && st.ok && st.img.complete; };
+const itemArt = new Image();
+let itemArtOK = false;
+itemArt.onload = () => { itemArtOK = itemArt.naturalWidth === ITEM_ART.SHEET_W && itemArt.naturalHeight === ITEM_ART.SHEET_H; };
+itemArt.onerror = () => { itemArtOK = false; };
+try { itemArt.src = ITEM_ART.URL; } catch (e) { itemArtOK = false; }
+const itemArtReady = () => itemArtOK && itemArt.complete;
 
 let VALID_WORDS = [];                  // [{ id, word(소문자), meaning }] 단어장에서 고른 영어 단어
 const missedSet = new Set();           // 틀린 단어(소문자). 서버에 저장하지 않고 이 페이지 메모리에만 둔다
@@ -364,7 +393,7 @@ const G = {
   hp: 0, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
   speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, survival: false, supply: null, startTime: 0, speedPending: false, speedSlot: 0, rescuePending: false, rescueSlot: 0, rescueKind: 'hint', speedGroupTaken: -1, groupTakenAtLoad: -1, contUsed: false, rescue: null, angels: [], boost: 0, roundSeq: 0, boostMax: 0, speedMaxSeen: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
   tiles: [], parts: [], floats: [],
-  packActive: false, packId: 0, spawnT: 0, ec: null,   // 작업354: ec = edge 흐름 기록(묶음 목록·미리 정한 단어 계획). classic 에서는 쓰지 않는다
+  packActive: false, packId: 0, spawnT: 0, bossBlend: 0, ec: null,   // 작업354: ec = edge 흐름 기록(묶음 목록·미리 정한 단어 계획). classic 에서는 쓰지 않는다
   runPhase: 0, prevH: 0, rising: true, cleared: false, spriteDraws: 0, spriteFrame: -1, spriteAngle: 0,
   iActive: false, iClock: 0, iTl: null, iGeo: null, iKids: 0, iShown: 0,
   jumpT: -1, j2: -1, j2h: 0, j2Land: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
@@ -515,7 +544,7 @@ function startRound(reviewOnly, prepared) {
     hp: CONFIG.HP, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
     roundSeq: G.roundSeq + 1, boost: 0, speedPending: false, speedMaxSeen: 0, rescuePending: false, speedGroupTaken: -1, groupTakenAtLoad: -1, contUsed: false, rescue: null, angels: [],
     speed: CONFIG.SPEED_MIN, speedTarget: CONFIG.SPEED_MIN, speedBase: CONFIG.SPEED_MIN, shownMult: 0, heartWords: surv ? new Set() : planHearts(regular), tiles: [], parts: [], floats: [],
-    ec: { packs: [], wps: {} }, packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
+    bossBlend: 0, ec: { packs: [], wps: {} }, packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
     obstacles: [], obst: null, obstSeq: 0, invuln: 0, stumble: 0, fall: 0, obstHits: 0,
     review: !!reviewOnly, survival: surv, supply: supply, startTime: G.time
   });
@@ -1068,6 +1097,8 @@ els.resChips.addEventListener('click', e => {
 function step(dt) {
   if (G.state === 'choice' || VSG.quitOpen) return;   // 작업341: 선택 화면에 머문 시간은 게임 시간(생존 시간)에 들어가지 않는다. 작업348: 대결 나가기 확인 대화상자가 열려 있는 동안도 같다
   G.time += dt;
+  { const tgt = G.bossMode ? 1 : 0, d = tgt - G.bossBlend; G.bossBlend = (reduce || Math.abs(d) <= dt / BG_ART.BLEND_SEC) ? tgt : G.bossBlend + Math.sign(d) * dt / BG_ART.BLEND_SEC; }   // 작업358: 낮 ↔ 보스 배경 약 0.5초 겹쳐 바꿈(움직임 줄이기는 즉시)
+  box.classList.toggle('bsky', G.bossBlend >= 0.5);   // 보스 하늘이 절반 이상 보이면 위쪽 글자를 흰색으로(stage_style.js)
   if (G.repeatT > 0) {
     G.repeatT -= dt;
     if (G.repeatT <= 0) { pronounce(G.repeatWord, { slow: true, queue: true }); G.repeatWord = ''; }
@@ -1163,12 +1194,55 @@ function drawHills(color, amp, base, speedF, wl) {
   }
   ctx.lineTo(W + 12, H); ctx.closePath(); ctx.fill();
 }
-function drawScene() {
+// 작업358: 그림을 논리 크기에 맞게 한 번만 줄여 캔버스에 보관하고(크기가 바뀔 때만 다시), 매 프레임은 그 캔버스를 그대로 붙인다
+function bgCanvas(st, dwLog, dhLog) {
+  const w = Math.max(1, Math.round(dwLog * S)), h = Math.max(1, Math.round(dhLog * S)), key = w + 'x' + h;
+  if (st.cvKey === key) return st.cv;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(st.img, 0, 0, w, h);
+  st.cv = c; st.cvKey = key;
+  return c;
+}
+function drawTiled(st, speed, dwLog, dhLog, bottomY) {   // 가로로 이어 붙이고 층마다 속도로 흐른다. 바닥이 bottomY 에 닿는다
+  const cv = bgCanvas(st, dwLog, dhLog), off = ((G.dist * speed) % dwLog + dwLog) % dwLog;
+  for (let x = -off; x < W; x += dwLog) ctx.drawImage(cv, Math.round(x * S) / S, bottomY - dhLog, dwLog + 1 / S, dhLog);
+}
+function drawLayerArt(key) {
+  const st = bgArt[key], sp = st.spec;
+  drawTiled(st, sp.SPEED, BG_ART.TILE_W, sp.H / BG_ART.PX, GROUND + 6);   // 바닥은 땅 띠 아래로 6px 겹쳐 틈이 없다
+}
+function drawCloudsArt() {
+  const st = bgArt.clouds, sp = st.spec, P = BG_ART.PX, cv = bgCanvas(st, sp.W / P, sp.H / P), period = W + 140;
+  const yTop = LAYOUT.CONTENT_BOTTOM_Y + 20, yBot = GROUND - 160;   // 위쪽 뜻·글자 칸 뒤(글자 영역 아래 끝 위)는 비워 둔다
+  ctx.save(); ctx.globalAlpha = sp.ALPHA;
+  sp.ITEMS.forEach((r, i) => {
+    const sc = sp.SCALE[i], dw = r.sw / P * sc, dh = r.sh / P * sc;
+    const x = ((sp.X[i] * period - G.dist * sp.SPEED) % period + period) % period - 70, y = yTop + sp.Y[i] * Math.max(0, yBot - yTop);
+    ctx.drawImage(cv, r.sx / P * S, r.sy / P * S, r.sw / P * S, r.sh / P * S, x - dw / 2, y - dh / 2, dw, dh);
+  });
+  ctx.restore();
+}
+function drawDaySky() {
   const g = ctx.createLinearGradient(0, 0, 0, GROUND);
-  if (G.bossMode) { g.addColorStop(0, '#2b3a7a'); g.addColorStop(0.6, '#e98a6b'); g.addColorStop(1, '#ffd08a'); }
-  else { g.addColorStop(0, '#8fd3f4'); g.addColorStop(1, '#eaf6f0'); }
+  g.addColorStop(0, '#8fd3f4'); g.addColorStop(1, '#eaf6f0');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = G.bossMode ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.85)';
+  if (bgOK('clouds') && bgOK('dayFar') && bgOK('dayMid')) { drawCloudsArt(); drawLayerArt('dayFar'); drawLayerArt('dayMid'); return; }
+  drawSceneOld(false);
+}
+function drawBossSky() {
+  if (bgOK('sky') && bgOK('bossFar') && bgOK('bossNear')) {
+    const st = bgArt.sky, dh = GROUND + 8, dw = dh * st.spec.W / st.spec.H;
+    drawTiled(st, st.spec.SPEED, dw, dh, dh);
+    drawLayerArt('bossFar'); drawLayerArt('bossNear');
+    return;
+  }
+  const g = ctx.createLinearGradient(0, 0, 0, GROUND);
+  g.addColorStop(0, '#2b3a7a'); g.addColorStop(0.6, '#e98a6b'); g.addColorStop(1, '#ffd08a');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  drawSceneOld(true);
+}
+function drawSceneOld(boss) {   // 기존 그림(구름 타원 + 코드 언덕): 그림을 못 읽을 때의 대체
+  ctx.fillStyle = boss ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.85)';
   for (const c of CLOUDS) {
     const x = ((c[0] - G.dist * 0.12) % (W + 140) + (W + 140)) % (W + 140) - 70, y = c[1] * GROUND / 520, s = c[2];
     ctx.beginPath();
@@ -1177,8 +1251,13 @@ function drawScene() {
     ctx.ellipse(x + 22 * s, y + 5 * s, 24 * s, 10 * s, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  drawHills(G.bossMode ? '#7a6f9b' : '#bde7cf', 46, GROUND - 40, 0.22, 70);
-  drawHills(G.bossMode ? '#5a5483' : '#8fd1b0', 36, GROUND - 6, 0.45, 52);
+  drawHills(boss ? '#7a6f9b' : '#bde7cf', 46, GROUND - 40, 0.22, 70);
+  drawHills(boss ? '#5a5483' : '#8fd1b0', 36, GROUND - 6, 0.45, 52);
+}
+function drawScene() {
+  const b = G.bossBlend;
+  if (b < 0.999) drawDaySky();
+  if (b > 0.001) { ctx.save(); ctx.globalAlpha = b; drawBossSky(); ctx.restore(); }
   ctx.fillStyle = INK; ctx.fillRect(0, GROUND, W, H - GROUND);
   ctx.fillStyle = '#3a4c8f'; ctx.fillRect(0, GROUND, W, 8);
   ctx.fillStyle = '#f7e9b7';
@@ -1280,6 +1359,7 @@ function drawRescueItem(t) {   // 작업329: 힌트 = 전구, 천사 = 날개와
   ctx.translate(t.x, TILE_Y + bob); ctx.scale(sc, sc); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   if (t.kind === 'hint') {
     ctx.shadowColor = '#34d399'; ctx.shadowBlur = 16;
+    if (drawItemArt(2)) { ctx.restore(); return; }
     ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.arc(0, -4, 17, 0, Math.PI * 2); ctx.fill();   // 전구
     ctx.shadowBlur = 0; ctx.lineWidth = 3.5; ctx.strokeStyle = INK; ctx.stroke();
     ctx.fillStyle = '#9aa3c2'; rr(-8, 11, 16, 10, 3); ctx.fill(); ctx.stroke();   // 소켓
@@ -1288,6 +1368,7 @@ function drawRescueItem(t) {   // 작업329: 힌트 = 전구, 천사 = 날개와
     for (let k = 0; k < 5; k++) { const ang = -Math.PI / 2 + (k - 2) * 0.62, r1 = 23, r2 = 30; ctx.beginPath(); ctx.moveTo(Math.cos(ang) * r1, -4 + Math.sin(ang) * r1); ctx.lineTo(Math.cos(ang) * r2, -4 + Math.sin(ang) * r2); ctx.stroke(); }
   } else {
     ctx.shadowColor = '#c4b5fd'; ctx.shadowBlur = 16;
+    if (drawItemArt(3)) { ctx.restore(); return; }
     ctx.fillStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeStyle = INK;
     for (const side of [-1, 1]) {   // 날개
       ctx.beginPath(); ctx.moveTo(side * 6, 2); ctx.bezierCurveTo(side * 30, -22, side * 36, 6, side * 22, 16); ctx.bezierCurveTo(side * 16, 10, side * 12, 14, side * 6, 10); ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -1318,6 +1399,7 @@ function drawSpeedItem(t) {   // 작업328: 번개 모양(하트와 구분되는
   ctx.globalAlpha = Math.max(0, Math.min(1, a, t.age / 0.2));
   ctx.translate(t.x, TILE_Y + bob); ctx.scale(sc, sc);
   ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 16;
+  if (drawItemArt(1)) { ctx.restore(); return; }
   ctx.fillStyle = '#1fa8ee'; ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fill();   // 동그란 하늘색 바탕
   ctx.shadowBlur = 0; ctx.lineWidth = 3.5; ctx.strokeStyle = INK; ctx.stroke();
   ctx.fillStyle = '#fff6b0'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';   // 번개
@@ -1343,6 +1425,12 @@ function drawBoost() {
   ctx.beginPath(); ctx.moveTo(26, by - 6); ctx.lineTo(19, by + 4); ctx.lineTo(23.5, by + 4); ctx.lineTo(21, by + 13); ctx.lineTo(30, by + 1); ctx.lineTo(25.5, by + 1); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
 }
+function drawItemArt(i) {   // 작업358: 아이템 그림(칸 i). 중심이 원점이고 변환·투명도·번짐은 부르는 쪽이 이미 정했다. 그림을 못 읽으면 false
+  if (!itemArtReady()) return false;
+  const A = ITEM_ART, k = A.DRAW_MAX / A.MAX_SIDE, d = A.CELL * k;
+  ctx.drawImage(itemArt, i * A.CELL, 0, A.CELL, A.CELL, -d / 2, -d / 2, d, d);
+  return true;
+}
 function drawHeartItem(t) {
   let a = 1, sc = 1;
   if (t.state === 'fade') { a = 1 - t.t / 0.3; sc = 1 - 0.2 * Math.min(1, t.t / 0.3); }
@@ -1357,6 +1445,7 @@ function drawHeartItem(t) {
   ctx.globalAlpha = Math.max(0, Math.min(1, a, t.age / 0.2));
   ctx.translate(t.x, TILE_Y + bob); ctx.scale(sc * (1 + 0.06 * Math.sin(G.time * 8)), sc * (1 + 0.06 * Math.sin(G.time * 8)));
   ctx.shadowColor = '#ff4d5e'; ctx.shadowBlur = 16;
+  if (drawItemArt(0)) { ctx.restore(); return; }   // 작업358: 그림이 있으면 그림으로(없으면 아래 도형)
   ctx.beginPath();
   ctx.moveTo(0, 20);
   ctx.bezierCurveTo(-40, -6, -22, -34, 0, -15);
@@ -1484,8 +1573,9 @@ function drawStar(x, y, r, a) {
 }
 function drawRunner() {
   const h = curH();
-  if (!penguinReady()) { drawRunnerShape(h); return; }
-  const P = PENGUIN, sz = P.size, sx = (G.shake > 0 && !reduce) ? (Math.random() - 0.5) * 6 : 0;
+  const ck = activeChar();
+  if (!ck) { drawRunnerShape(h); return; }
+  const P = CHARS[ck], sz = P.size, sx = (G.shake > 0 && !reduce) ? (Math.random() - 0.5) * 6 : 0;
   const idx = penguinFrame({ state: G.state, cleared: G.cleared, air: h > 1, rising: G.rising, runPhase: G.runPhase });
   const angle = spinAngle(G.j2, G.j2Land) + ((G.state === 'ending' || G.state === 'choice') ? 0.25 * 180 / Math.PI : 0);
   G.spriteDraws++; G.spriteFrame = idx; G.spriteAngle = angle;
@@ -1500,7 +1590,7 @@ function drawRunner() {
   ctx.translate(faceX + sx, footY); ctx.scale(scx, scy); ctx.translate(-(faceX + sx), -footY);   // 늘이기·찌그러짐은 발바닥 기준
   if (angle) { const bx = left + 0.5 * sz, by = top + P.bodyY * sz; ctx.translate(bx, by); ctx.rotate(angle * Math.PI / 180); ctx.translate(-bx, -by); }   // 2단 점프 회전: 몸 중앙 기준
   if (G.hurt > 0 && Math.floor(G.time * 20) % 2 === 0) ctx.globalAlpha = 0.55;
-  ctx.drawImage(sheet, idx * P.CELL, 0, P.CELL, P.CELL, left, top, sz, sz);
+  ctx.drawImage(charSheets[ck].img, idx * P.CELL, 0, P.CELL, P.CELL, left, top, sz, sz);
   ctx.restore();
   const sp = sparkleAlpha(G.j2);   // 2단 점프 정점 부근의 작은 반짝임
   if (sp > 0) {
@@ -2424,6 +2514,14 @@ function srClose() {
   exitFs();
   location.href = '/english_dictionary.html#wordbook';   // 지금의 뒤로가기와 같은 곳
 }
+// 캐릭터 선택: 시작 화면에서만 바뀌고 마지막 선택을 기억한다(주소 옵션 char 는 저장하지 않는다)
+function syncCharUI() { document.querySelectorAll('#charRow [data-char]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.char === charKey))); }
+function setChar(k) {
+  if (!CHARS[k]) return;
+  charKey = k; loadChar(k);
+  try { localStorage.setItem('spellrun_char', k); } catch (e) { /* 저장 실패는 무시 */ }
+  syncCharUI();
+}
 let viewUIReady = false;
 function setupViewUI() {
   if (viewUIReady) return;
@@ -2431,6 +2529,8 @@ function setupViewUI() {
   $('srClose').addEventListener('click', srClose);
   $('srView').addEventListener('click', () => { tryFs(); setViewMode((pendingView || viewMode) === 'land' ? 'port' : 'land'); });
   $('rotBtn').addEventListener('click', () => { tryFs(); setViewMode('port'); });
+  $('charRow').addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (b && b.dataset.char) setChar(b.dataset.char); });
+  syncCharUI();
   $('viewRow').addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (b && b.dataset.view) { tryFs(); setViewMode(b.dataset.view); } });
   syncViewUI();
 }
@@ -2447,6 +2547,7 @@ function frame(ts) {
 
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
 const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, get HIGH_Y() { return HIGH_Y; }, get TILE_Y() { return TILE_Y; }, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival, continued: G.contUsed }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
+API.art = { charKey: () => charKey, activeChar: activeChar, charReady: charReady, bgOK: bgOK, itemArtReady: itemArtReady, obstArtReady: () => obstArtReady(), blend: () => G.bossBlend, setChar: k => setChar(k) };   // 작업358: 시험용 훅
 API.view = { mode: () => viewMode, pending: () => pendingView, set: setViewMode, scale: () => curScale, layout: () => ({ W: W, H: H, GROUND: GROUND, TILE_Y: TILE_Y, HIGH_Y: HIGH_Y }) };   // 작업355: 시험용 훅
 API.edge = { on: edgeOn, setViewW: w => { streamViewW = w; }, viewW: () => streamViewW, fill: edgeFill };   // 작업354: 시험용 훅
 API.preview = { T: PV_T, state: PV, run: previewRun, isOn: () => previewOn };   // 작업345: 시험용 훅

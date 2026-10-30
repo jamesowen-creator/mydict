@@ -320,6 +320,19 @@ body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
 .sr-box.land .vsquit{bottom:calc(6 * var(--u))}
 .sr-box.land .vstoast{bottom:calc(50 * var(--u))}
 .sr-box.land .srtoast{bottom:calc(50 * var(--u))}
+/* 작업358: 캐릭터 선택 줄(작은 그림 + 이름, 터치 44px 이상). 그림은 시트의 서 있는 자세(둘째 칸)를 잘라 보인다 */
+.sr-box .chbtn{display:inline-flex;align-items:center;gap:calc(4 * var(--u));padding:calc(2 * var(--u)) calc(8 * var(--u))}
+.sr-box .chimg{display:inline-block;flex:none;width:calc(30 * var(--u));height:calc(30 * var(--u));background-repeat:no-repeat;background-size:calc(240 * var(--u)) calc(40 * var(--u));background-position:calc(-44 * var(--u)) calc(-5 * var(--u))}
+.sr-box .chimg.penguin{background-image:url(/img/spellrun/spellrun_penguin_sheet.png)}
+.sr-box .chimg.girl{background-image:url(/img/spellrun/spellrun_girl_sheet.png)}
+.sr-box .chimg.boy{background-image:url(/img/spellrun/spellrun_boy_sheet.png)}
+#charRow{flex-wrap:wrap}
+/* 작업358: 보스 하늘(짙은 남색~보라~주황)에서도 위쪽 글자가 읽히게: 뜻·보조 줄·글자 칸·점수는 흰 글자 + 어두운 번짐 */
+.sr-box.bsky .meaning,.sr-box.bsky .sub,.sr-box.bsky .score,.sr-box.bsky .word .cell,.sr-box.bsky .slot.done .cell{color:#fff;text-shadow:0 0 calc(3 * var(--u)) rgba(20,32,74,.95),0 0 calc(6 * var(--u)) rgba(20,32,74,.7)}
+.sr-box.bsky .word .cell{border-bottom-color:rgba(255,255,255,.9)}
+.sr-box.bsky .slot.cur .cell{border-bottom-color:var(--coral)}
+.sr-box.bsky .slot.done .cell{border-bottom-color:#7ee2a8}
+.sr-box.bsky .progress{color:#ffd9d9;text-shadow:0 0 calc(3 * var(--u)) rgba(20,32,74,.95)}
 @media (prefers-reduced-motion:reduce){
 .sr-box .word > .iv,.sr-box .popword.go .pl,.sr-box .slot.cur .cell,.sr-box .slot.done .cell.pop,.sr-box .slot.bad,.sr-box .popword.go,.sr-box .banner.go,.sr-box .meaning.enter{animation:sr-none}
 }
