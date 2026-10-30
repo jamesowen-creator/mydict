@@ -266,6 +266,7 @@ body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
 .sr-box.land .hud{grid-template-columns:auto 1fr auto;padding-right:calc(14 * var(--u) + 62 * var(--u))}
 .sr-box.land .hearts{grid-area:1 / 1}
 .sr-box.land .scorebox{grid-area:1 / 3}
+.sr-box.land .combo{display:none}   /* 작업361: 가로 상단은 하트·점수만(콤보 칩은 가로에서 숨김) */
 .sr-box.land .menubtn{display:block;position:absolute;right:calc(14 * var(--u));top:calc(6 * var(--u));z-index:6}
 .sr-box.land .srmenu:not([hidden]){display:flex;flex-direction:column;gap:calc(4 * var(--u));position:absolute;right:calc(14 * var(--u));top:calc(36 * var(--u));z-index:7;box-sizing:border-box;min-width:calc(150 * var(--u));padding:calc(6 * var(--u));background:var(--paper);border:calc(2 * var(--u)) solid var(--ink);border-radius:calc(14 * var(--u));box-shadow:0 calc(3 * var(--u)) 0 var(--ink)}
 .sr-box.land .menuitem{cursor:pointer;min-height:var(--ctl-min-h,44px);font-family:var(--f-body);font-weight:700;font-size:calc(13 * var(--u));color:var(--ink);background:#fff;border:calc(2 * var(--u)) solid var(--ink);border-radius:calc(10 * var(--u));padding:0 calc(12 * var(--u))}

@@ -183,3 +183,35 @@ test('작업360 가로 배치: 타일 폭 75%로 줄어도 모든 객체가 화�
     assert.ok(g0.tiles[0].w === w);
   }
 });
+
+// 작업361: 풍선 색·위상·움직임·늘리기·올림 상수(순수 로직, 난수 없음)
+test('작업361 풍선: 색은 (후보 번호 + 칸 번호) % 6 으로 위치마다 일정(난수 없음), 위상은 타일 번호로만 정해지고 서로 어긋난다', () => {
+  const B = L.BALLOON_ART;
+  assert.equal(B.COUNT, 6); assert.equal(B.NAMES.length, 6); assert.equal(B.COLORS.length, 6);
+  for (let si = 0; si < 12; si++) for (let i = 0; i < 5; i++) { assert.equal(L.balloonColor(i, si), (i + si) % 6); assert.equal(L.balloonColor(i, si), L.balloonColor(i, si), '같은 입력 같은 색'); }
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map(i => L.balloonColor(i, 0)), [0, 1, 2, 3, 4, 5], '6색을 한 바퀴');
+  assert.equal(L.balloonPhase(7), L.balloonPhase(7));
+  const ph = Array.from({ length: 24 }, (_, n) => L.balloonPhase(n));
+  assert.ok(ph.every(p => p >= 0 && p < Math.PI * 2) && new Set(ph.map(p => p.toFixed(6))).size === 24, '타일마다 위상이 다르다');
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'js', 'spellrun', 'logic.js'), 'utf8');
+  const blk = src.slice(src.indexOf('// ---- 작업361: 풍선'), src.indexOf('// ---- 작업323: 새 단어 시작 연출'));
+  assert.ok(!/Math\.random/.test(blk.replace(/Math\.random 없음|난수 없음/g, '')), '풍선 로직에 Math.random 이 없다');
+});
+test('작업361 풍선 움직임: 위아래 ±3 논리 px·주기 1.6초, 기울기 ±4도, 같은 시간·위상이면 같은 값, 시간이 멈추면 값도 멈춘다', () => {
+  const B = L.BALLOON_ART;
+  assert.equal(B.BOB, 3); assert.equal(B.BOB_SEC, 1.6); assert.equal(B.SWAY_DEG, 4);
+  let maxDy = 0, maxAng = 0;
+  for (let t = 0; t < 8; t += 0.01) { const m = L.balloonMotion(t, 1.1); maxDy = Math.max(maxDy, Math.abs(m.dy)); maxAng = Math.max(maxAng, Math.abs(m.ang)); }
+  assert.ok(maxDy <= 3 + 1e-9 && maxDy > 2.99 && maxAng <= 4 + 1e-9 && maxAng > 3.99, `${maxDy} ${maxAng}`);
+  assert.ok(Math.abs(L.balloonMotion(0.3, 0.5).dy - L.balloonMotion(0.3 + 1.6, 0.5).dy) < 1e-9, '위아래 주기 1.6초');
+  assert.deepEqual(L.balloonMotion(2.5, 0.9), L.balloonMotion(2.5, 0.9));
+  assert.notDeepEqual(L.balloonMotion(2.5, L.balloonPhase(1)), L.balloonMotion(2.5, L.balloonPhase(2)), '풍선마다 어긋남');
+});
+test('작업361 풍선 늘리기·올림: 글자 폭이 몸통의 80%를 넘으면 늘리되 1.4배까지, 넘으면 null(기존 타일 모양). 올림은 가로만(TILE_LIFT)', () => {
+  const B = L.BALLOON_ART, fit = B.BODY_W * B.TEXT_FIT;
+  assert.equal(L.balloonStretch(fit * 0.5), 1); assert.equal(L.balloonStretch(fit), 1);
+  assert.ok(Math.abs(L.balloonStretch(fit * 1.2) - 1.2) < 1e-9); assert.ok(L.balloonStretch(fit * 1.4) <= 1.4 + 1e-9); assert.equal(L.balloonStretch(fit * 1.41), null);
+  assert.equal(L.LAYOUT_LAND.TILE_LIFT, 22); assert.ok(L.LAYOUT_LAND.TILE_LIFT <= 25); assert.equal(L.LAYOUT_LAND.BALLOON, true);
+  assert.equal(L.LAYOUT.TILE_LIFT, 0); assert.equal(L.LAYOUT.BALLOON, false); assert.equal(L.layoutFor('port', 360, 640).TILE_LIFT, 0); assert.equal(L.layoutFor('land', 800, 400).TILE_LIFT, 22);
+  assert.equal(C.GRAB_H, 22); assert.equal(C.HIGH_GRAB_H, 160, '먹는 판정 상수는 그대로');
+});

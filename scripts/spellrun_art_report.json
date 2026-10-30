@@ -1,7 +1,109 @@
 {
  "_total": {
-  "bytes": 509527,
+  "bytes": 525231,
   "penguin_ref_height": 249
+ },
+ "balloons": {
+  "anchor_y": 58,
+  "balloons": [
+   {
+    "body_h": 104,
+    "body_w": 96,
+    "bottom": 156,
+    "center_x": 56.0,
+    "center_y": 58.0,
+    "knot_x": 55.5,
+    "knot_y": 110,
+    "name": "pink"
+   },
+   {
+    "body_h": 104,
+    "body_w": 97,
+    "bottom": 156,
+    "center_x": 56.5,
+    "center_y": 58.0,
+    "knot_x": 55.5,
+    "knot_y": 110,
+    "name": "blue"
+   },
+   {
+    "body_h": 104,
+    "body_w": 97,
+    "bottom": 156,
+    "center_x": 56.5,
+    "center_y": 58.0,
+    "knot_x": 56.0,
+    "knot_y": 110,
+    "name": "yellow"
+   },
+   {
+    "body_h": 104,
+    "body_w": 97,
+    "bottom": 156,
+    "center_x": 56.5,
+    "center_y": 58.0,
+    "knot_x": 55.5,
+    "knot_y": 110,
+    "name": "green"
+   },
+   {
+    "body_h": 104,
+    "body_w": 96,
+    "bottom": 156,
+    "center_x": 56.0,
+    "center_y": 58.0,
+    "knot_x": 55.5,
+    "knot_y": 110,
+    "name": "purple"
+   },
+   {
+    "body_h": 104,
+    "body_w": 97,
+    "bottom": 156,
+    "center_x": 56.5,
+    "center_y": 58.0,
+    "knot_x": 55.5,
+    "knot_y": 110,
+    "name": "orange"
+   }
+  ],
+  "bleed": {
+   "after": 0,
+   "before": 4181,
+   "rule": "알파 8 초과 200 미만 가장자리 픽셀 중 밝기(RGB 평균) 90 초과"
+  },
+  "body_logical": 48,
+  "bytes": 15704,
+  "cell": [
+   112,
+   161
+  ],
+  "count": 6,
+  "file": "balloons_sheet.png",
+  "low_alpha_pixels": 0,
+  "names": [
+   "pink",
+   "blue",
+   "yellow",
+   "green",
+   "purple",
+   "orange"
+  ],
+  "px_per_logical": 2,
+  "scale": 0.3252,
+  "size": [
+   672,
+   161
+  ],
+  "source_center_offset_x": [
+   34.0,
+   -0.5,
+   -34.5,
+   33.5,
+   -0.5,
+   -34.5
+  ],
+  "specks_removed": 0
  },
  "boss_far": {
   "bytes": 12867,

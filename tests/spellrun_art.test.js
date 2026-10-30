@@ -14,7 +14,7 @@ const ROOT = path.join(__dirname, '..');
 const IMG = path.join(ROOT, 'public', 'img', 'spellrun');
 const REPORT = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts', 'spellrun_art_report.json'), 'utf8'));
 const png = f => { const b = fs.readFileSync(path.join(IMG, f)); assert.equal(b.slice(1, 4).toString(), 'PNG'); return { w: b.readUInt32BE(16), h: b.readUInt32BE(20), bytes: b.length }; };
-const KEYS = ['day_far', 'day_mid', 'clouds', 'boss_sky', 'boss_far', 'boss_near', 'obstacles', 'items', 'girl', 'boy'];
+const KEYS = ['day_far', 'day_mid', 'clouds', 'boss_sky', 'boss_far', 'boss_near', 'obstacles', 'items', 'girl', 'boy', 'balloons'];
 
 test('결과 파일: 모두 있고 크기·PNG 헤더가 보고와 같으며 합계는 1.5MB 이하', () => {
   let total = 0;
@@ -109,4 +109,30 @@ test('달리기 4동작 수치가 결과 파일과 같다(보고만 믿지 않�
   assert.equal(r.status, 0, r.stderr);
   const m = JSON.parse(r.stdout);
   for (const k of RUN_KEYS) assert.deepEqual(m[k], REPORT[k].run.after, k + ' 다시 잰 수치');
+});
+
+// ---- 작업361: 풍선 6색 시트 ----
+test('풍선 시트: 6칸 모두 몸통 가운데가 칸 가운데(±1 그림 px)에 맞고 폭이 같으며, 원본은 균일 격자에서 좌우로 치우쳐 있었다', () => {
+  const r = REPORT.balloons;
+  assert.deepEqual(r.size, [r.cell[0] * 6, r.cell[1]]); assert.equal(r.balloons.length, 6);
+  for (const b of r.balloons) {
+    assert.ok(Math.abs(b.center_x - r.cell[0] / 2) <= 1, `${b.name} 가운데 x ${b.center_x}`);
+    assert.equal(b.center_y, r.anchor_y, b.name + ' 가운데 y');
+    assert.ok(b.body_h > b.body_w, b.name + ' 몸통은 세로로 긴 타원');
+    assert.ok(b.body_w >= 87 && b.body_w <= 104, `${b.name} 몸통 폭 ${b.body_w}(그림 px) = 논리 ${b.body_w / 2}: 타일 폭 43.5 이상 52 이하`);
+    assert.ok(Math.abs(b.knot_x - b.center_x) <= 3, b.name + ' 매듭이 몸통 아래 가운데');
+  }
+  assert.ok(Math.max(...r.balloons.map(b => b.body_w)) - Math.min(...r.balloons.map(b => b.body_w)) <= 2, '여섯 풍선 몸통 폭이 같다');
+  // 원본: 1열은 오른쪽(+), 3열은 왼쪽(-)으로 약 30px 치우쳐 있었다(측정값)
+  const o = r.source_center_offset_x;
+  assert.ok(o[0] > 25 && o[3] > 25 && o[2] < -25 && o[5] < -25 && Math.abs(o[1]) < 5 && Math.abs(o[4]) < 5, JSON.stringify(o));
+});
+test('풍선 시트: 가장자리 색 번짐이 크게 줄고(원본 기준), 투명 잔여 0, 코드 상수(logic.js BALLOON_ART)와 같다', () => {
+  const r = REPORT.balloons, B = L.BALLOON_ART;
+  assert.ok(r.bleed.before > 1000 && r.bleed.after <= r.bleed.before * 0.05, JSON.stringify(r.bleed));
+  assert.equal(r.low_alpha_pixels, 0);
+  assert.equal(B.URL, '/img/spellrun/' + r.file); assert.deepEqual([B.SHEET_W, B.SHEET_H], r.size); assert.deepEqual([B.CELL_W, B.CELL_H], r.cell);
+  assert.equal(B.ANCHOR_Y, r.anchor_y); assert.equal(B.BODY_W * B.PX, r.balloons[0].body_w); assert.equal(B.BODY_H * B.PX, r.balloons[0].body_h);
+  assert.equal(B.KNOT_DY * B.PX, r.balloons[0].knot_y - r.anchor_y); assert.equal(B.BOTTOM_DY * B.PX, r.balloons[0].bottom - r.anchor_y);
+  assert.deepEqual(B.NAMES, r.names); assert.ok(B.BODY_W >= 43.5 && B.BODY_W <= 52);
 });

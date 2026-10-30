@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# 작업358: 스펠링 런 그림 정리. 원본 그림 10장(작업359: 달리기 그림 2장 더)(reference/spellrun-art, git 무시)에서 게임용 결과물만 public/img/spellrun/ 에 만든다.
+# 작업358: 스펠링 런 그림 정리. 원본 그림 11장(작업359: 달리기 그림 2장, 작업361: 풍선 1장 더)(reference/spellrun-art, git 무시)에서 게임용 결과물만 public/img/spellrun/ 에 만든다.
 # 사용: python scripts/spellrun_art_build.py <원본 폴더> [<출력 폴더> [<수치 보고 파일>]]   (출력 폴더 기본값 public/img/spellrun, 보고 파일 기본값 scripts/spellrun_art_report.json)
 # 같은 입력이면 같은 결과가 나온다(난수 없음). 필요한 것: Python 3, Pillow, numpy. 결과 수치는 scripts/spellrun_art_report.json 에 쓴다(시험이 읽는다).
 #
@@ -9,6 +9,7 @@
 #   spellrun_obstacles_sheet.png(1024x256, 칸 256, 흰 테두리 포함, 바닥선 FOOT_Y 237)
 #   items_sheet.png(아이템 4종 한 줄: 하트, 번개, 힌트 전구, 천사 날개와 고리. 칸 112, 겉보기 큰 변 104)
 #   spellrun_girl_sheet.png, spellrun_boy_sheet.png (1728x288, 칸 288, 6동작: 달리기 4 + 점프 상승 + 점프 하강, 발끝 y 280)
+#   balloons_sheet.png (작업361: 풍선 6색 한 줄. 칸 BALLOON_CELL_W x 높이 가변, 몸통 폭 BALLOON_BODY 논리 px, 풍선마다 몸통 가운데를 칸 가운데에 맞춤)
 #       작업359: 달리기 4동작(0~3번 칸)은 새 달리기 그림(girl_run, boy_run: 1536x1024, 2x2 격자, 칸 순서 = 벌림 A, 듦 A, 벌림 B, 듦 B)으로 바꾼다. 점프 2동작(4·5번 칸)은 358 그대로.
 import json
 import os
@@ -31,6 +32,7 @@ SRC = {
     'items': '하트·번개·전구·천사 날개 파워업.png',
     'girl_run': '치비 여학생 사이드뷰 달리기 4연속.png',   # 작업359: 달리기 4동작 교체용(점프는 girl 그림 그대로)
     'boy_run': '달리는 소년의 두 포즈 스프라이트.png',
+    'balloons': '파스텔 풍선 6종 스프라이트 시트.png',   # 작업361: 1536x1024, 3열 x 2행, 투명 배경
 }
 ALPHA_CUT = 8          # 불투명도 약 3% 이하는 0(빛 번짐·점 얼룩·테두리 색 잔상)
 SPECK_MIN = 400        # 이보다 작은 떨어진 조각(원본 px 면적)은 얼룩으로 보고 지운다
@@ -536,6 +538,115 @@ def save_with_palette_of(a, ref, split, path):
     return os.path.getsize(path)
 
 
+# ---- 작업361: 풍선 6색 ----
+BALLOON_CELL_W = 112     # 칸 폭(그림 px = 논리 56). 몸통을 가로로 1.4배 늘려도 들어간다
+BALLOON_BODY = 48        # 몸통 폭(논리 px). 현재 타일 폭 43.5 보다 약간 크게(최대 52)
+BALLOON_PAD = 4
+BALLOON_NAMES = ['pink', 'blue', 'yellow', 'green', 'purple', 'orange']   # 원본 읽는 순서(왼쪽 위부터)
+BLEED_LUM = 90           # 가장자리 반투명 픽셀의 밝기(RGB 평균)가 이보다 밝으면 "번짐"(윤곽선은 어두운 갈색)
+
+
+def box_sum(x, r):
+    """한 변 2r+1 상자 합(경계는 0 으로 채움). x: (H, W) 또는 (H, W, C)."""
+    k = 2 * r + 1
+    pad = [(r + 1, r), (r + 1, r)] + [(0, 0)] * (x.ndim - 2)
+    c = np.pad(x.astype(np.float64), pad).cumsum(0).cumsum(1)
+    h, w = x.shape[:2]
+    return c[k:k + h, k:k + w] - c[:h, k:k + w] - c[k:k + h, :w] + c[:h, :w]
+
+
+def local_opaque_mean(a, r, thr=200):
+    """반지름 r 안 불투명(알파 thr 이상) 픽셀의 평균색과, 그런 픽셀이 있는가."""
+    op = (a[..., 3] >= thr).astype(np.float64)
+    n = box_sum(op, r)
+    tot = box_sum(a[..., :3].astype(np.float64) * op[..., None], r)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        m = np.where(n[..., None] > 0, tot / np.maximum(n[..., None], 1), 0)
+    return m, n > 0
+
+
+def bleed_count(a, thr=200):
+    """윤곽선 바깥쪽 색 번짐 수: 반투명(알파 ALPHA_CUT 초과 thr 미만) 가장자리 픽셀 중 밝기가 BLEED_LUM 넘는 것. 풍선의 윤곽선은 어두운 갈색이라 그 바깥 가장자리는 어둡거나 투명해야 한다."""
+    al = a[..., 3]
+    lum = a[..., :3].astype(np.float64).mean(2)
+    return int(((al > ALPHA_CUT) & (al < thr) & (lum > BLEED_LUM)).sum())
+
+
+def defringe(a, r=3, thr=200):
+    """가장자리 색 정리: 반투명 가장자리 픽셀(알파 thr 미만)의 색을 바로 곁(반지름 r)의 단단한 픽셀(알파 thr 이상) 평균색으로 바꾼다. 알파는 그대로, 곁에 단단한 픽셀이 없으면 그대로 둔다(가는 끈이 지워지지 않게)."""
+    al = a[..., 3]
+    fr = (al > 0) & (al < thr)
+    m, has = local_opaque_mean(a, r, thr)
+    out = a.copy()
+    sel = fr & has
+    out[sel, :3] = np.clip(np.rint(m[sel]), 0, 255).astype(np.uint8)
+    return out
+
+
+def balloon_geometry(part):
+    """풍선 하나(잘라낸 그림)의 몸통 범위: 줄마다 불투명 폭을 재서 가장 넓은 줄의 1/4 이상인 줄이 몸통(매듭·끈은 그보다 훨씬 좁다). 매듭 자리(몸통 바로 아래 좁아지는 곳)의 가운데도 구한다."""
+    op = part[..., 3] > 128
+    wid = op.sum(1)
+    body_rows = np.nonzero(wid >= wid.max() * 0.25)[0]
+    y0, y1 = int(body_rows.min()), int(body_rows.max()) + 1
+    xs = np.nonzero(op[y0:y1].any(0))[0]
+    x0, x1 = int(xs.min()), int(xs.max()) + 1
+    kn = op[y1:y1 + 10]
+    kx = float(np.nonzero(kn.any(0))[0].mean()) if kn.any() else (x0 + x1) / 2.0
+    return {'bx0': x0, 'bx1': x1, 'by0': y0, 'by1': y1, 'knot_x': kx, 'h': int(part.shape[0])}
+
+
+def build_balloons(src, out_path):
+    raw = clean_alpha(load(src))
+    a, removed = remove_specks(raw)
+    before = bleed_count(a)
+    a = defringe(a)
+    after = bleed_count(a)
+    lab, items = components_by_bbox(a, 3000, 2)
+    assert len(items) == 6, '풍선 덩어리가 6개가 아님: %d' % len(items)
+    H, W = a.shape[:2]
+    items.sort(key=lambda c: (int(((c['y0'] + c['y1']) / 2.0) // (H / 2.0)), (c['x0'] + c['x1']) / 2.0))   # 위 줄 왼쪽부터
+    offsets, geos, parts = [], [], []
+    for i, c in enumerate(items):
+        part = comp_pixels(a, lab, [c['id']], 3)
+        x0, y0, x1, y1 = bbox(part, ALPHA_CUT)
+        part = part[y0:y1, x0:x1]
+        g = balloon_geometry(part)
+        offsets.append(round((x0 + (g['bx0'] + g['bx1']) / 2.0) - (i % 3 + 0.5) * W / 3.0, 1))   # 균일 격자 칸 가운데에서 몸통 가운데가 벗어난 정도(원본 px)
+        geos.append(g)
+        parts.append(part)
+    body_w = float(np.mean([g['bx1'] - g['bx0'] for g in geos]))
+    s = BALLOON_BODY * PX / body_w
+    scaled, sg = [], []
+    for part, g in zip(parts, geos):
+        w, h = max(1, int(round(part.shape[1] * s))), max(1, int(round(part.shape[0] * s)))
+        scaled.append(clean_alpha(resize_rgba(part, (w, h))))
+        sg.append({k: v * s for k, v in g.items()})
+    up = max((g['by0'] + g['by1']) / 2.0 for g in sg)                    # 몸통 가운데에서 맨 위까지(몸통 가운데 y 가 같게 맞춘다)
+    down = max(r.shape[0] - (g['by0'] + g['by1']) / 2.0 for r, g in zip(scaled, sg))
+    anchor = int(np.ceil(up)) + BALLOON_PAD
+    cell_h = anchor + int(np.ceil(down)) + BALLOON_PAD
+    sheet = np.zeros((cell_h, BALLOON_CELL_W * 6, 4), np.uint8)
+    for i, (r, g) in enumerate(zip(scaled, sg)):
+        h, w = r.shape[:2]
+        left = int(round(BALLOON_CELL_W / 2.0 - (g['bx0'] + g['bx1']) / 2.0))
+        top = int(round(anchor - (g['by0'] + g['by1']) / 2.0))
+        assert left >= 0 and left + w <= BALLOON_CELL_W and top >= 0 and top + h <= cell_h, '풍선이 칸 밖: %d' % i
+        sheet[top:top + h, i * BALLOON_CELL_W + left:i * BALLOON_CELL_W + left + w] = r
+    size = save_png(sheet, out_path, 256, dither=True)
+    chk = np.array(Image.open(out_path).convert('RGBA'))
+    meas = []
+    for i in range(6):
+        cell = chk[:, i * BALLOON_CELL_W:(i + 1) * BALLOON_CELL_W]
+        gm = balloon_geometry(cell)
+        meas.append({'name': BALLOON_NAMES[i], 'body_w': gm['bx1'] - gm['bx0'], 'body_h': gm['by1'] - gm['by0'], 'center_x': round((gm['bx0'] + gm['bx1']) / 2.0, 1), 'center_y': round((gm['by0'] + gm['by1']) / 2.0, 1),
+                     'knot_x': round(gm['knot_x'], 1), 'knot_y': gm['by1'], 'bottom': int(np.nonzero((cell[..., 3] > 40).any(1))[0].max()) + 1})
+    report['balloons'] = {'file': os.path.basename(out_path), 'size': [sheet.shape[1], sheet.shape[0]], 'bytes': size, 'cell': [BALLOON_CELL_W, cell_h], 'count': 6, 'px_per_logical': PX, 'scale': round(s, 4),
+                          'body_logical': BALLOON_BODY, 'anchor_y': anchor, 'names': BALLOON_NAMES, 'balloons': meas,
+                          'source_center_offset_x': offsets, 'bleed': {'before': before, 'after': after, 'rule': '알파 %d 초과 200 미만 가장자리 픽셀 중 밝기(RGB 평균) %d 초과' % (ALPHA_CUT, BLEED_LUM)},
+                          'specks_removed': removed}
+
+
 ITEM_CELL, ITEM_MAX = 112, 104
 
 
@@ -598,6 +709,7 @@ def main():
     build_layer(p('boss_near'), o('bg_boss_near.png'), 'boss_near')
     build_obstacles(p('obstacles'), o('spellrun_obstacles_sheet.png'))
     build_items(p('items'), o('items_sheet.png'))
+    build_balloons(p('balloons'), o('balloons_sheet.png'))
     build_character(p('girl'), o('spellrun_girl_sheet.png'), 'girl', ref, p('girl_run'))
     build_character(p('boy'), o('spellrun_boy_sheet.png'), 'boy', ref, p('boy_run'))
     # 투명 잔여(불투명도 1~8) 확인

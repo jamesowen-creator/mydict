@@ -1805,7 +1805,7 @@ test('327-1) 시트 파일: public/img/spellrun/spellrun_obstacles_sheet.png 102
   const f = path.join(PUB, 'img', 'spellrun', 'spellrun_obstacles_sheet.png');
   const b = fs.readFileSync(f);
   assert.equal(b.subarray(1, 4).toString(), 'PNG'); assert.equal(b.readUInt32BE(16), 1024); assert.equal(b.readUInt32BE(20), 256); assert.equal(b[24], 8); assert.ok(b[25] === 6 || (b[25] === 3 && b.includes(Buffer.from('tRNS'))), 'RGBA 또는 투명 정보가 있는 팔레트 PNG(작업358: 용량을 줄여 팔레트로 저장)');
-  assert.deepEqual(fs.readdirSync(path.dirname(f)).sort(), ['bg_boss_far.png', 'bg_boss_near.png', 'bg_boss_sky.png', 'bg_day_far.png', 'bg_day_mid.png', 'clouds_sheet.png', 'items_sheet.png', 'spellrun_boy_sheet.png', 'spellrun_girl_sheet.png', 'spellrun_obstacles_sheet.png', 'spellrun_penguin_sheet.png'], '그림 파일 목록(작업358: 배경 5·구름·아이템·캐릭터 3종·장애물, 개별 파일·zip 없음)');
+  assert.deepEqual(fs.readdirSync(path.dirname(f)).sort(), ['balloons_sheet.png', 'bg_boss_far.png', 'bg_boss_near.png', 'bg_boss_sky.png', 'bg_day_far.png', 'bg_day_mid.png', 'clouds_sheet.png', 'items_sheet.png', 'spellrun_boy_sheet.png', 'spellrun_girl_sheet.png', 'spellrun_obstacles_sheet.png', 'spellrun_penguin_sheet.png'], '그림 파일 목록(작업358: 배경 5·구름·아이템·캐릭터 3종·장애물, 작업361: 풍선, 개별 파일·zip 없음)');
   assert.ok(!fs.readdirSync(PUB, { recursive: true }).some(x => /obstacles_frames\.zip|obstacle_[1-4]_[a-z]+\.png/.test(String(x))), 'zip·개별 파일 없음');
   resetState();
   const page = await openGame({ ids: [1, 2, 3] });

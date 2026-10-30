@@ -27,7 +27,7 @@ try { const q = new URLSearchParams(location.search).get('mode'); if (q === '1')
 const streamPinned = OPT.values.stream !== undefined;
 const syncStream = () => { if (!streamPinned) CONFIG.STREAM_EDGE = viewMode === 'land'; };
 syncStream();
-const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, contHp, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, CHARS, BG_ART, ITEM_ART } = L;
+const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, contHp, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, CHARS, BG_ART, ITEM_ART, BALLOON_ART, balloonColor, balloonPhase, balloonMotion, balloonStretch } = L;
 const LAYOUT = Object.assign({}, L.LAYOUT);   // 작업355: 화면 모드·크기에 따라 값이 바뀌는 사본(logic.js 의 LAYOUT 은 세로 640 기준값 그대로)
 
 let W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;   // 작업355: applyLayout 이 화면 모드·크기에 맞게 바꾼다
@@ -115,6 +115,13 @@ itemArt.onload = () => { itemArtOK = itemArt.naturalWidth === ITEM_ART.SHEET_W &
 itemArt.onerror = () => { itemArtOK = false; };
 try { itemArt.src = ITEM_ART.URL; } catch (e) { itemArtOK = false; }
 const itemArtReady = () => itemArtOK && itemArt.complete;
+// 작업361: 가로 풍선 시트(못 읽으면 기존 타일 모양으로 그린다)
+const balloonImg = new Image();
+let balloonOK = false;
+balloonImg.onload = () => { balloonOK = balloonImg.naturalWidth === BALLOON_ART.SHEET_W && balloonImg.naturalHeight === BALLOON_ART.SHEET_H; };
+balloonImg.onerror = () => { balloonOK = false; };
+try { balloonImg.src = BALLOON_ART.URL; } catch (e) { balloonOK = false; }
+const balloonReady = () => balloonOK && balloonImg.complete;
 
 let VALID_WORDS = [];                  // [{ id, word(소문자), meaning }] 단어장에서 고른 영어 단어
 const missedSet = new Set();           // 틀린 단어(소문자). 서버에 저장하지 않고 이 페이지 메모리에만 둔다
@@ -669,7 +676,7 @@ function spawnPack() {
     G.tiles.push({
       id: G.packId, x: x0 + i * gap, w: (slot.chunk ? 20 + slot.text.length * 26 : 58) * tileScale(),
       text: c.text, correct: c.correct, chunk: slot.chunk, high: !!slot.high, state: 'live', t: 0, age: 0,
-      checked: false, ok: false, color: TILE_COLORS[(i + G.si) % TILE_COLORS.length]
+      checked: false, ok: false, color: TILE_COLORS[(i + G.si) % TILE_COLORS.length], n: G.packId * 8 + i, bi: balloonColor(i, G.si)
     });
   });
 }
@@ -681,6 +688,7 @@ const edgeOn = () => !!CONFIG.STREAM_EDGE;
 let streamViewW = W;   // 화면 논리 폭(진입 거리 = 이 값 + 타일 반폭). 355 에서 가로 모드가 키운다
 const dimCur = () => ({ wi: G.wi, si: G.si });   // 지금 풀 칸(판정용. 작업360 전에는 흐림 계산에도 썼다)
 const tileScale = () => LAYOUT.TILE_SCALE || 1;   // 작업360: 가로 0.75(철자 타일 그림·폭). 세로 1
+const tileLift = t => (t && t.high) ? 0 : (LAYOUT.TILE_LIFT || 0);   // 작업361: 가로 일반 철자 타일 그림만 위로 올리는 논리 px(판정·배치는 그대로). 높은 칸은 위쪽 글자 카드에 닿아 올리지 않는다
 const charScale = () => LAYOUT.CHAR_SCALE || 1;   // 작업360: 가로 1.3(캐릭터 그림만. 판정 위치·크기는 그대로)
 function edgeWPFor(i) {
   const ec = G.ec;
@@ -723,7 +731,7 @@ function edgeCommit(key, kind, nearOnly) {
   const cands = makeCandidates(slot.text, word.word, Math.random, ccfg);
   cands.forEach((c, i) => {
     const t = { id: pid, x: g.tiles[i].x, w: g.tiles[i].w, text: c.text, correct: c.correct, chunk: slot.chunk, high: !!slot.high, state: 'live', t: 0, age: 0,
-      checked: false, ok: false, color: TILE_COLORS[(i + key.si) % TILE_COLORS.length], wi: key.wi, si: key.si };
+      checked: false, ok: false, color: TILE_COLORS[(i + key.si) % TILE_COLORS.length], wi: key.wi, si: key.si, n: pid * 8 + i, bi: balloonColor(i, key.si) };   // 작업361: n·bi = 풍선 위상·색(난수 없음)
     G.tiles.push(t);
     if (c.correct) { rec.correct = t; rec.xcW = t.x + G.dist; }
   });
@@ -841,6 +849,7 @@ function onSpeedItem(t) {
 }
 function onHit(t) {
   t.state = 'taken'; t.t = 0; t.ok = true;
+  if (balloonK(t) !== null) popBalloon(t);   // 작업361: 풍선은 바로 사라지고 색 조각이 퍼진다
   if (edgeOn()) clearRescue(); else endPack(false);   // 작업354: edge 는 같은 묶음의 남은 타일을 지우지 않는다
   const slot = G.plan.slots[G.si];
   G.combo++; G.maxCombo = Math.max(G.maxCombo, G.combo);
@@ -1467,10 +1476,68 @@ function drawHeartItem(t) {
   ctx.beginPath(); ctx.ellipse(-11, -9, 5, 3, -0.6, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
+// ---------- 작업361: 풍선 타일 ----------
+const balloonKCache = {};
+function tileFontPx(t) { return (t.chunk ? (t.text.length === 2 ? 34 : t.text.length === 3 ? 30 : 26) : 38) * tileScale(); }
+// 이 타일을 풍선으로 그릴 때 몸통을 늘리는 배율(1~1.4). 풍선으로 그리지 않으면(세로·그림 못 읽음·조각이 너무 넓음) null
+function balloonK(t) {
+  if (!LAYOUT.BALLOON || !balloonReady() || t.kind) return null;
+  const key = t.text + '|' + tileFontPx(t);
+  if (!(key in balloonKCache)) { ctx.save(); ctx.font = '700 ' + tileFontPx(t) + 'px ' + FL; balloonKCache[key] = balloonStretch(ctx.measureText(t.text).width); ctx.restore(); }
+  return balloonKCache[key];
+}
+function popBalloon(t) {
+  const A = BALLOON_ART, n = reduce ? Math.ceil(A.POP_N / 2) : A.POP_N, y = (t.high ? HIGH_Y : TILE_Y) - tileLift(t);
+  for (let i = 0; i < n; i++) {   // 난수 없이 일정한 방향·속도로 퍼진다
+    const ang = i / n * Math.PI * 2 + 0.4, sp = 110 + (i % 2) * 40;
+    G.parts.push({ x: t.x, y: y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 40, life: A.POP_SEC, max: A.POP_SEC, color: A.COLORS[t.bi || 0], r: 3.5 });
+  }
+}
+function drawBalloon(t) {
+  const k = balloonK(t);
+  if (k === null) return false;
+  if (t.state === 'taken') return true;   // 먹은 풍선은 바로 사라진다(색 조각은 onHit 이 이미 냈다). 틀린 풍선은 taken 이 되지 않고 그대로 지나간다
+  const A = BALLOON_ART, ts = tileScale(), ty = (t.high ? HIGH_Y : TILE_Y) - tileLift(t);
+  const m = balloonMotion(G.time, balloonPhase(t.n || 0));   // 그리기에만 쓰는 움직임. 게임 시간 기준(메뉴로 멈추면 같이 멈춘다)
+  ctx.fillStyle = t.high ? 'rgba(0,0,0,.14)' : 'rgba(0,0,0,.28)';
+  ctx.beginPath(); ctx.ellipse(t.x, GROUND + 10, t.w * 0.38, 6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.save();
+  ctx.translate(t.x, ty + m.dy);
+  if (t.high) {   // 2단 점프 칸 표시: 몸통 위쪽 삼각형
+    const top = -A.BODY_H / 2;
+    ctx.fillStyle = GOLD; ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(0, top - 10); ctx.lineTo(-6, top - 2); ctx.lineTo(6, top - 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.translate(0, A.KNOT_DY); ctx.rotate(m.ang * Math.PI / 180); ctx.translate(0, -A.KNOT_DY);   // 몸통은 매듭을 축으로 흔들리고 끈도 같이 따라 흔들린다
+  const hintGlow = G.rescue && G.rescue.kind === 'hint' && t.id === G.rescue.pack && t.correct && t.state === 'live';
+  ctx.save();
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  if (hintGlow) { ctx.shadowColor = '#34d399'; ctx.shadowBlur = 26 + 8 * Math.sin(G.time * 8); }
+  ctx.scale(k, 1);
+  ctx.drawImage(balloonImg, (t.bi || 0) * A.CELL_W, 0, A.CELL_W, A.CELL_H, -A.CELL_W / A.PX / 2, -A.ANCHOR_Y / A.PX, A.CELL_W / A.PX, A.CELL_H / A.PX);
+  ctx.restore();
+  ctx.fillStyle = INK; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '700 ' + tileFontPx(t) + 'px ' + FL;
+  ctx.fillText(t.text, 0, A.TEXT_DY);   // 몸통 가운데에서 약간 아래(하이라이트를 피해)
+  if (t.chunk) {
+    ctx.fillStyle = GOLD; ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const cx = A.BODY_W * k / 2 * 0.72, cy = -A.BODY_H / 2 * 0.62;
+    for (let i = 0; i < 10; i++) {
+      const r = (i % 2 ? 4.5 : 10) * ts, ang = -Math.PI / 2 + i * Math.PI / 5;
+      const px = cx + Math.cos(ang) * r, py = cy + Math.sin(ang) * r;
+      if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+  return true;
+}
 function drawTile(t) {
   if (t.kind === 'heart') { drawHeartItem(t); return; }
   if (t.kind === 'speed') { drawSpeedItem(t); return; }
   if (t.kind === 'hint' || t.kind === 'angel') { drawRescueItem(t); return; }
+  if (drawBalloon(t)) return;   // 작업361: 가로는 풍선(조각이 너무 넓으면 아래 기존 타일 모양)
   const h = TILE_H;
   let a = 1, sc = 1;
   const solid = edgeOn();   // 작업360: 가로(edge)의 철자 타일은 항상 같은 선명도(들어올 때 서서히 나타나지도 않는다)
@@ -1478,7 +1545,7 @@ function drawTile(t) {
   else if (t.state === 'taken') { a = 1 - t.t / 0.35; sc = 1 + 0.5 * Math.min(1, t.t / 0.35); }
   if (a <= 0) return;
   const bob = t.state === 'live' ? Math.sin(G.time * 4 + t.x * 0.02) * 3 : 0;
-  const ty = t.high ? HIGH_Y : TILE_Y;
+  const ty = (t.high ? HIGH_Y : TILE_Y) - tileLift(t);
   if (t.state === 'live' || t.state === 'hint') {
     ctx.fillStyle = t.high ? 'rgba(0,0,0,.14)' : 'rgba(0,0,0,.28)';
     ctx.beginPath(); ctx.ellipse(t.x, GROUND + 10, t.w * 0.38, 6, 0, 0, Math.PI * 2); ctx.fill();
@@ -1519,7 +1586,7 @@ function drawTile(t) {
   if (t.state === 'hint') {
     ctx.strokeStyle = GOOD; ctx.lineWidth = 5; rr(-w / 2 - 2, -h / 2 - 2, w + 4, h + 4, 16); ctx.stroke();
   }
-  if ((t.state === 'taken' && !t.ok) || t.wrong) { ctx.fillStyle = 'rgba(232,69,79,.45)'; rr(-w / 2, -h / 2, w, h, 14); ctx.fill(); }
+  if (t.state === 'taken' && !t.ok) { ctx.fillStyle = 'rgba(232,69,79,.45)'; rr(-w / 2, -h / 2, w, h, 14); ctx.fill(); }
   ctx.restore();
 }
 function drawRunnerShape(h) {   // 기존 도형 캐릭터(스프라이트를 못 불렀을 때의 대체 그림)
@@ -2578,6 +2645,7 @@ function frame(ts) {
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
 const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, get HIGH_Y() { return HIGH_Y; }, get TILE_Y() { return TILE_Y; }, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival, continued: G.contUsed }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
 API.art = { charKey: () => charKey, activeChar: activeChar, charReady: charReady, bgOK: bgOK, itemArtReady: itemArtReady, obstArtReady: () => obstArtReady(), blend: () => G.bossBlend, setChar: k => setChar(k) };   // 작업358: 시험용 훅
+API.balloon = { ready: balloonReady, k: balloonK, lift: tileLift, setLift: v => { LAYOUT.TILE_LIFT = v; } };   // 작업361: 시험용 훅
 API.menu = { open: () => MENU.open, pauses: menuPauses };   // 작업360: 시험용 훅
 API.view = { mode: () => viewMode, pending: () => pendingView, set: setViewMode, scale: () => curScale, layout: () => ({ W: W, H: H, GROUND: GROUND, TILE_Y: TILE_Y, HIGH_Y: HIGH_Y }) };   // 작업355: 시험용 훅
 API.edge = { on: edgeOn, setViewW: w => { streamViewW = w; }, viewW: () => streamViewW, fill: edgeFill };   // 작업354: 시험용 훅

@@ -25,3 +25,9 @@ test('spelling_run.html 이 불러오는 /js/spellrun 스크립트는 모두 실
   const files = fs.readdirSync(path.join(PUB, 'js', 'spellrun')).filter(f => f.endsWith('.js')).sort();
   assert.deepEqual([...loaded].sort(), files);
 });
+
+test('작업361: 풍선 그림 파일이 있고 logic.js 의 주소와 같으며 .png 는 sw.js 에서 정적 자산(cache-first)으로 서빙된다(그림은 목록 없이 처음 받을 때 캐시)', () => {
+  const L = require('../public/js/spellrun/logic.js');
+  assert.ok(fs.existsSync(path.join(PUB, L.BALLOON_ART.URL)), L.BALLOON_ART.URL);
+  assert.ok(/cache-first|cache\.match/.test(sw), 'sw.js 에 cache-first 서빙');
+});

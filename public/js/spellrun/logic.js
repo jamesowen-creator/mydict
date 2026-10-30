@@ -224,6 +224,7 @@ function configure(values) { return Object.assign(CONFIG, buildConfig(values)); 
 // 화면 배치(논리 px, 360x640 기준). 글자 칸 줄 아래 끝은 높은 칸(2단 점프) 타일 위쪽보다 위에 있어야 한다.
 const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TILE_H: 58, WORD_AVAIL_W: 332,
   HUD_SHIFT: 24,        // 작업322: 대표 뜻·보조 줄·글자 칸 줄을 위쪽 HUD 줄에서 이만큼(논리 px) 아래로 내린다(한 곳에서 조정)
+  TILE_LIFT: 0, BALLOON: false,   // 작업361: 가로에서만 철자 타일을 풍선 그림으로 그리고 그림만 TILE_LIFT 논리 px 위로 올린다(판정·배치는 그대로)
   TILE_SCALE: 1, CHAR_SCALE: 1,   // 작업360: 철자 타일·캐릭터 그림 배율(세로는 1 = 그대로. 가로 값은 LAYOUT_LAND). 판정 크기와 무관하게 그림·타일 폭만 바꾼다
   INTRO_CENTER_Y: 250,  // 작업323: 큰 뜻 카드의 가운데 높이(논리 px). 위쪽 HUD 줄 아래, 땅 위의 빈 공간
   CONTENT_BOTTOM_Y: 266 // 글자 칸 줄 아래 끝의 한계: 높은 칸 타일 윗변(HIGH_TILE_Y - TILE_H/2 = 276)보다 위(여유 포함)
@@ -234,7 +235,7 @@ const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TIL
 //   (뜻·글자 칸·HUD 는 위쪽에 그대로 있고, 땅·타일·점프·장애물의 상대 위치와 경기장 폭은 불변. 하늘이 넓어지면 위쪽 글자와 높은 칸 사이가 비어 보이는 대신 답답하지 않고, 땅 아래 띠는 대결 막대·나가기가 놓일 만큼만 늘린다)
 // 가로: 800x400. 글자 영역은 높이 100 이하(CONTENT_BOTTOM_Y 100), 높은 칸 타일 윗변 112 보다 위. 땅 아래 띠 44.
 // 작업356: 뜻(왼쪽)과 글자 칸(오른쪽)을 한 줄에 나란히 둔다(HUD 는 위 한 줄). 글자 칸 줄은 남는 폭(약 440)을 쓰고, 큰 뜻 연출은 위쪽(높은 칸 타일 윗변 112 보다 위)에서 한다. 팝업 글자 크기는 가로 전용 상한
-const LAYOUT_LAND = { W: 800, H: 400, GROUND: 356, TILE_Y: 248, HIGH_TILE_Y: 141, TILE_H: 58, WORD_AVAIL_W: 440, HUD_SHIFT: 0, INTRO_CENTER_Y: 72, INTRO_W: 560, CONTENT_BOTTOM_Y: 100, TILE_SCALE: 0.75, CHAR_SCALE: 1.3, CW_MAX: 38, MEAN_MAX: 26, SUB_MAX: 12, POPW_MAX: 30, POPM_MAX: 16, POPE_MAX: 10, FIT_PAD: 5 };
+const LAYOUT_LAND = { W: 800, H: 400, GROUND: 356, TILE_Y: 248, HIGH_TILE_Y: 141, TILE_H: 58, WORD_AVAIL_W: 440, HUD_SHIFT: 0, INTRO_CENTER_Y: 72, INTRO_W: 560, CONTENT_BOTTOM_Y: 100, TILE_SCALE: 0.75, CHAR_SCALE: 1.3, TILE_LIFT: 22, BALLOON: true, CW_MAX: 38, MEAN_MAX: 26, SUB_MAX: 12, POPW_MAX: 30, POPM_MAX: 16, POPE_MAX: 10, FIT_PAD: 5 };
 const SCALE_MAX = 1.5, SCALE_MIN = 0.3;
 // mode: 'port' | 'land', availW/availH: 안전 여백을 뺀 쓸 수 있는 화면 크기(CSS px). 반환: LAYOUT 과 같은 항목 + { scale, mode, extra }
 function layoutFor(mode, availW, availH) {
@@ -869,6 +870,28 @@ const BG_ART = {
 // 아이템(하트·번개·전구·천사) 한 줄 시트: 칸 112, 겉보기 큰 변 104. 논리 DRAW_MAX 54 로 그린다(판정 크기·효과·연출은 그대로)
 const ITEM_ART = { URL: '/img/spellrun/items_sheet.png', SHEET_W: 448, SHEET_H: 112, CELL: 112, ORDER: ['heart', 'speed', 'hint', 'angel'], DRAW_MAX: 54, MAX_SIDE: 104 };
 
+// ---- 작업361: 풍선(가로 철자 타일 그림) ----
+// 시트: 풍선 6색 한 줄(분홍·파랑·노랑·초록·보라·주황), 칸 CELL_W x CELL_H(그림 px, 논리 1px = 그림 2px), 몸통 가운데가 칸 가운데 x 와 ANCHOR_Y 에 오게 맞춤. 숫자는 scripts/spellrun_art_report.json 과 같다
+// 몸통 BODY_W x BODY_H(논리 px, 세로로 긴 타원). KNOT_DY = 몸통 가운데에서 매듭(몸통 아래 끝)까지, BOTTOM_DY = 끈 아래 끝까지. 끈은 판정에 넣지 않는다
+const BALLOON_ART = { URL: '/img/spellrun/balloons_sheet.png', SHEET_W: 672, SHEET_H: 161, CELL_W: 112, CELL_H: 161, COUNT: 6, PX: 2, ANCHOR_Y: 58,
+  BODY_W: 48.0, BODY_H: 52.0, KNOT_DY: 26.0, BOTTOM_DY: 49.0, MAX_STRETCH: 1.4, TEXT_DY: 4, TEXT_FIT: 0.8,
+  NAMES: ['pink', 'blue', 'yellow', 'green', 'purple', 'orange'], COLORS: ['#ff8fb1', '#6ec1f7', '#ffd25e', '#8fe08a', '#b78cf5', '#ff9f77'],
+  BOB: 3, BOB_SEC: 1.6, SWAY_DEG: 4, SWAY_SEC: 1.9, POP_N: 7, POP_SEC: 0.3 };
+// 풍선 색 번호: 후보 번호(묶음 안 몇 번째)와 칸 번호를 더해 6색을 돌린다. 난수 없음(같은 위치는 항상 같은 색)
+function balloonColor(i, si) { return (i + si) % BALLOON_ART.COUNT; }
+// 풍선마다 어긋나는 위상(0~2π): 타일 번호 n 으로만 정한다(황금비 분수). 난수 없음
+function balloonPhase(n) { return ((n * 0.6180339887) % 1) * Math.PI * 2; }
+// 둥실 움직임(그리기에만 쓴다): 시간 time(초, 게임 시간), 위상 ph → { dy: 위아래(논리 px), ang: 매듭을 축으로 한 기울기(도) }
+function balloonMotion(time, ph) {
+  const A = BALLOON_ART;
+  return { dy: Math.sin(time * Math.PI * 2 / A.BOB_SEC + ph) * A.BOB, ang: Math.sin(time * Math.PI * 2 / A.SWAY_SEC + ph * 1.3) * A.SWAY_DEG };
+}
+// 몸통을 가로로 늘리는 배율: 글자 폭 textW(논리 px)가 몸통 폭의 TEXT_FIT 안에 들어오게. MAX_STRETCH 를 넘어야 하면 null(풍선 대신 기존 타일 모양)
+function balloonStretch(textW) {
+  const A = BALLOON_ART, k = Math.max(1, textW / (A.BODY_W * A.TEXT_FIT));
+  return k > A.MAX_STRETCH + 1e-9 ? null : k;
+}
+
 // ---- 작업323: 새 단어 시작 연출 ----
 // 타임라인: 큰 뜻 유지(hold) → 축소·이동(shrink). 전체(hold+shrink)는 새 단어 대기 시간(delay) 이하로 맞춘다(옵션이 커도 hold 를 줄인다).
 // o: { first: 첫 단어, boss: 보스 단어 }
@@ -1035,7 +1058,7 @@ return {
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT, LAYOUT_LAND: LAYOUT_LAND, layoutFor: layoutFor,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
-  survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
+  survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamOffscreen: streamOffscreen,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };
