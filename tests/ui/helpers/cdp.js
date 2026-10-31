@@ -107,7 +107,25 @@ class Page {
     const r = await this.send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync(file, Buffer.from(r.data, 'base64'));
   }
-  async close() { try { this.ws.close(); } catch (e) { /* 무시 */ } }
+  // 작업380: 연결만 끊으면 탭이 살아 있어서(타이머·폴링이 계속 돌아 같은 모의 서버에 요청을 보냄) 탭을 실제로 닫고, 사라질 때까지 잠깐 기다린다.
+  // 두 번 불러도, 이미 닫힌 탭이어도 오류 없이 지나간다. 닫기 실패는 시험을 멈추지 않고 경고만 남긴다.
+  async close() {
+    if (this.closed) return;
+    this.closed = true;
+    try {
+      if (this.port && this.targetId) {
+        await fetch(`http://127.0.0.1:${this.port}/json/close/${this.targetId}`).catch(() => {});
+        for (let i = 0; i < 25; i++) {   // 최대 약 1초
+          const list = await fetch(`http://127.0.0.1:${this.port}/json/list`).then(r => r.json()).catch(() => null);
+          if (!list || !list.some(t => t.id === this.targetId)) break;
+          await sleep(40);
+        }
+        // 탭이 닫히면 앱이 pagehide 에서 보내는 요청(대결 방 leave 등)이 모의 서버에 늦게 닿는다. 다음 시험이 요청 기록을 비운 뒤에 섞이지 않게 잠깐 기다린다.
+        await sleep(150);
+      }
+    } catch (e) { console.warn('[cdp] 탭 닫기 실패(무시): ' + e.message); }
+    try { this.ws.close(); } catch (e) { /* 무시 */ }
+  }
 }
 
 class Browser {
@@ -119,7 +137,7 @@ class Browser {
     await new Promise((resolve, reject) => { ws.addEventListener('open', resolve); ws.addEventListener('error', reject); });
     const page = new Page(ws);
     await page.init({ width, height, token });
-    page.targetId = target.id;
+    page.targetId = target.id; page.port = this.port;
     return page;
   }
   async close() {
