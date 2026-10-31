@@ -346,6 +346,29 @@ body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
 .sr-box.bsky .slot.cur .cell{border-bottom-color:var(--coral)}
 .sr-box.bsky .slot.done .cell{border-bottom-color:#7ee2a8}
 .sr-box.bsky .progress{color:#ffd9d9;text-shadow:0 0 calc(3 * var(--u)) rgba(20,32,74,.95)}
+/* 작업382: 시작 화면 정리(가로·세로 공통). id·판정은 그대로, 보이는 모양만 바꾼다. 핵심 3줄(#coreList)은 [게임 방법] 맨 앞으로 옮겼다(spelling_run.html) */
+.sr-box #start .card{border-width:calc(2 * var(--u));box-shadow:0 calc(10 * var(--u)) calc(28 * var(--u)) rgba(20,32,74,.28)}
+.sr-box #start .lead{font-size:max(11px,calc(14 * var(--u)))}
+.sr-box #start .vlabel,.sr-box #start .note{font-size:max(11px,calc(12 * var(--u)))}
+.sr-box #start .toggle{font-size:max(11px,calc(12 * var(--u)));border-color:#c3cae0;color:var(--ink);position:relative}
+.sr-box #start .toggle::before{content:"";position:absolute;left:0;right:0;top:50%;height:max(44px,100%);transform:translateY(-50%)}   /* 보이는 높이가 44px보다 작아도 터치 영역은 44px */
+.sr-box #start .toggle[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.sr-box #modeRow .toggle,.sr-box #viewRow .toggle{min-height:calc(36 * var(--u));min-width:calc(64 * var(--u));padding:0 calc(18 * var(--u))}
+.sr-box #modeRow .toggle{font-size:max(12px,calc(14 * var(--u)))}
+.sr-box #optRow .toggle{border:0;background:transparent;min-width:0;min-height:calc(36 * var(--u));padding:0 calc(14 * var(--u));color:var(--ink-soft)}
+.sr-box #optRow .toggle[aria-pressed="true"]{background:transparent;color:var(--ink)}
+.sr-box #start .chbtn[aria-pressed="true"]{box-shadow:0 0 0 calc(3 * var(--u)) var(--coral)}   /* 선택된 캐릭터: 코랄 링 */
+.sr-box #start .btn{box-shadow:0 calc(6 * var(--u)) calc(16 * var(--u)) rgba(255,107,90,.35)}
+.sr-box #start .btn:active{transform:translateY(calc(2 * var(--u)));box-shadow:0 calc(2 * var(--u)) calc(6 * var(--u)) rgba(255,107,90,.35)}
+.sr-box #start .btn:disabled{box-shadow:none}
+.sr-box .chimg.girl,.sr-box .chimg.boy{background-size:calc(560 * var(--u)) calc(40 * var(--u))}   /* 여학생·남학생 시트는 14칸 4032x288: 칸 하나가 40px 이 되도록 560x40(펭귄 6칸 1728x288 은 240x40). 비율 유지 */
+.sr-box.land #modeRow{grid-column:1 / -1;grid-row:2}
+.sr-box.land #startInfoCol{grid-column:1;grid-row:3 / span 2}
+.sr-box.land #viewRow{grid-column:2;grid-row:3}
+.sr-box.land #optRow{grid-column:2;grid-row:4}
+.sr-box.land #startBtn{grid-column:1 / -1;grid-row:5}
+.sr-box.land #charRow{gap:calc(6 * var(--u))}
+.sr-box.land #charRow .chbtn{min-width:0;padding:calc(2 * var(--u)) calc(6 * var(--u))}   /* 가로 640x360 에서도 캐릭터 3개가 한 줄에 */
 @media (prefers-reduced-motion:reduce){
 .sr-box .word > .iv,.sr-box .popword.go .pl,.sr-box .slot.cur .cell,.sr-box .slot.done .cell.pop,.sr-box .slot.bad,.sr-box .popword.go,.sr-box .banner.go,.sr-box .meaning.enter{animation:sr-none}
 }

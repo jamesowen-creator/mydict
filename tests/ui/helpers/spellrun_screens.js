@@ -24,8 +24,8 @@ const MEASURE_SCREEN = names => `(() => {
   card.scrollTop = 0; card.querySelectorAll('.helpbody,.vlist').forEach(e => { e.scrollTop = 0; });
   const cr = card.getBoundingClientRect(), sr = card.parentNode.getBoundingClientRect();
   const btns = sc.map(id => document.getElementById(id)).filter(e => e && !e.hidden && e.getClientRects().length);
-  const rects = btns.map(e => { const r = e.getBoundingClientRect(); return { id: e.id, l: r.left, t: r.top, r: r.right, b: r.bottom }; });
+  const rects = btns.map(e => { const r = e.getBoundingClientRect(); return { id: e.id, l: r.left, t: r.top, r: r.right, b: r.bottom, th: Math.max(r.height, parseFloat(getComputedStyle(e, '::before').height) || 0) }; });   // 작업382: 보이는 높이가 작아도 ::before 로 넓힌 터치 영역(44px)을 센다
   let overlap = 0; for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) { const a = rects[i], b = rects[j]; if (a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5) overlap++; }
-  return { overflow: Math.round(card.scrollHeight - card.clientHeight), cardH: Math.round(cr.height), screenH: Math.round(sr.height), hidden: btns.filter(e => !vis(e, card)).map(e => e.id), inBox: cr.left >= box.left - 0.5 && cr.right <= box.right + 0.5 && cr.top >= box.top - 0.5 && cr.bottom <= box.bottom + 0.5, overlap: overlap, minBtn: Math.min(...rects.map(r => Math.min(r.r - r.l, r.b - r.t))), u: u };
+  return { overflow: Math.round(card.scrollHeight - card.clientHeight), cardH: Math.round(cr.height), screenH: Math.round(sr.height), hidden: btns.filter(e => !vis(e, card)).map(e => e.id), inBox: cr.left >= box.left - 0.5 && cr.right <= box.right + 0.5 && cr.top >= box.top - 0.5 && cr.bottom <= box.bottom + 0.5, overlap: overlap, minBtn: Math.min(...rects.map(r => Math.min(r.r - r.l, r.th))), u: u };
 })()`;
 module.exports = { SCREENS, MEASURE_SCREEN };

@@ -66,18 +66,21 @@ const text = (page, sel) => page.eval(`document.querySelector(${JSON.stringify(s
 const helpText = page => page.eval("document.getElementById('help').innerText.replace(/\\s+/g, ' ')");
 const norm = s => s.replace(/\s+/g, ' ');
 
-test('시작 화면 구성과 순서: 제목 → 모드 줄 → 한 줄 설명 → 핵심 3줄 → 게임 방법·미리 보기 → 시작. 규칙 상세·소리 단추는 시작 카드에 없다', { skip: SKIP }, async () => {
+test('시작 화면 구성과 순서: 제목 → 모드 줄 → 한 줄 설명 → 게임 방법·미리 보기 → 시작. 핵심 3줄은 게임 방법 맨 앞(작업382). 규칙 상세·소리 단추는 시작 카드에 없다', { skip: SKIP }, async () => {
   const page = await openGame({ vs: true });
   const order = await page.eval(`(() => {
-    const ids = ['#start .title', '#modeRow', '#modeDesc', '#coreList', '#optRow', '#startBtn'].map(s => document.querySelector(s));
+    const ids = ['#start .title', '#modeRow', '#modeDesc', '#optRow', '#startBtn'].map(s => document.querySelector(s));
     const inOrder = ids.every((e, i) => !i || (ids[i - 1].compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING));
-    return { inOrder, inCard: ids.every(e => document.querySelector('#start .card').contains(e)),
+    const help = document.getElementById('helpBody'), cl = document.getElementById('coreList');
+    return { inOrder, inCard: ids.every(e => document.querySelector('#start .card').contains(e)), coreInHelpFirst: help.firstElementChild === cl, coreInStart: document.getElementById('start').contains(cl),
       opt: [...document.querySelectorAll('#optRow button')].map(b => b.id || b.dataset.mode), modes: [...document.querySelectorAll('#modeRow button')].map(b => b.dataset.mode),
       core: [...document.querySelectorAll('#coreList li')].map(l => l.textContent.trim()),
       inStart: ['startInfo', 'startExcluded', 'sndStart', 'ttsTest', 'ttsStatus', 'speechNote', 'djRule'].filter(id => document.querySelector('#start').contains(document.getElementById(id))),
       startRules: document.querySelectorAll('#start .rules li').length, helpRules: document.querySelectorAll('#help .rules li').length, kids: [...document.querySelector('#start .card').children].map(e => e.id || e.tagName.toLowerCase() + '.' + e.className) };
   })()`);
   assert.ok(order.inOrder && order.inCard, JSON.stringify(order));
+  assert.equal(order.coreInHelpFirst, true, '작업382: 핵심 3줄은 게임 방법 맨 앞');
+  assert.equal(order.coreInStart, false, '핵심 3줄은 시작 화면에 없다');
   assert.deepEqual(order.modes, ['normal', 'survival', 'versus']);
   assert.deepEqual(order.opt, ['helpBtn', 'preview']);
   assert.deepEqual(order.core, ['탭(스페이스바)으로 점프해서 정답 글자를 먹으면 단어가 완성돼요.', '맞힐수록 빨라지고, 틀리거나 놓치면 체력이 줄어요.', '체력이 0이 되면 한 번 이어서 할 수 있어요.']);
@@ -203,4 +206,33 @@ test('모드 한 줄 설명은 선택에 따라 바뀌고, 대결은 설명을 �
   assert.equal(await page.eval("document.getElementById('start').contains(document.getElementById('survNote'))"), true, '막힌 이유는 시작 화면에 보인다');
   assert.equal(await page.eval("(() => { const c = document.querySelector('#start .card'); return c.scrollHeight <= c.clientHeight; })()"), true);
   await page.close();
+});
+
+// 작업382: 시작 화면 정리(칩 터치 영역, 캐릭터 그림 비율, 코랄 링, 글자 11px 이상, 시작 버튼 그림자)
+test('382) 시작 화면: 모든 칩 터치 영역 44px 이상, 캐릭터 그림은 시트 비율대로, 선택 캐릭터 코랄 링, 글자 11px 이상, 시작 버튼 부드러운 그림자·카드 테두리 2px', { skip: SKIP }, async () => {
+  for (const [w, h, q] of [[360, 640, ''], [844, 390, '?mode=1'], [640, 360, '?mode=1']]) {
+    const page = await openGame({ width: w, height: h, vs: true, query: q });
+    await page.waitFor("!document.getElementById('startBtn').disabled", 6000);   // 비활성이면 그림자를 없앤다
+    await new Promise(r => setTimeout(r, 250));   // 버튼의 box-shadow 전환(.08s)이 끝난 뒤 읽는다
+    const m = await page.eval(`(() => {
+      const cs = (e, p, ps) => getComputedStyle(e, ps)[p];
+      const touch = e => Math.max(e.getBoundingClientRect().height, parseFloat(cs(e, 'height', '::before')) || 0);
+      const chips = [...document.querySelectorAll('#start .toggle')];
+      const imgs = [...document.querySelectorAll('.chimg')].map(e => { const bs = cs(e, 'backgroundSize').split(' ').map(parseFloat); return { k: e.className.split(' ').pop(), ratio: bs[0] / bs[1] }; });
+      const start = document.getElementById('start'), card = start.querySelector('.card'), btn = document.getElementById('startBtn');
+      const fonts = [...start.querySelectorAll('.title ~ *, .title ~ * *')].filter(e => e.textContent.trim() && e.children.length === 0 && !e.hidden && e.getClientRects().length).map(e => parseFloat(cs(e, 'fontSize')));
+      return { minTouch: Math.min(...chips.map(touch)), n: chips.length, imgs, ring: cs(document.querySelector('#charRow [aria-pressed=true]'), 'boxShadow'), minFont: Math.min(...fonts),
+        btnShadow: cs(btn, 'boxShadow'), cardBorder: cs(card, 'borderTopWidth'), cardShadow: cs(card, 'boxShadow'), cardScroll: card.scrollHeight - card.clientHeight, btnH: btn.getBoundingClientRect().height, corelistInStart: !!start.querySelector('#coreList') };
+    })()`);
+    assert.ok(m.minTouch >= 43.5, `${w}x${h} 칩 터치 영역 ${m.minTouch}`);
+    const ratio = { penguin: 1728 / 288, girl: 4032 / 288, boy: 4032 / 288 };   // 시트 한 장 가로:세로
+    for (const i of m.imgs) assert.ok(Math.abs(i.ratio - ratio[i.k]) < 0.01, `${w}x${h} ${i.k} 그림 비율 ${i.ratio} (시트 ${ratio[i.k]})`);
+    assert.match(m.ring, /rgb\(255, 107, 90\)/, '선택된 캐릭터는 코랄 링');
+    assert.ok(m.minFont >= 10.99, `${w}x${h} 시작 화면 글자 11px 이상: ${m.minFont}`);
+    assert.match(m.btnShadow, /rgba\(255, 107, 90, 0\.35\)/, '시작 버튼 그림자는 코랄 계열 부드러운 그림자: ' + m.btnShadow);
+    assert.ok(parseFloat(m.cardBorder) >= 1 && parseFloat(m.cardBorder) <= 2, '카드 테두리는 2px 이하(화면 배율이 작으면 1px로 내림): ' + m.cardBorder); assert.ok(/28px|\d+(\.\d+)?px 2/.test(m.cardShadow) && !/ 0px 7px 0px/.test(m.cardShadow), '카드 그림자: ' + m.cardShadow);
+    assert.ok(m.cardScroll <= 0, `${w}x${h} 카드 스크롤 없음`);
+    assert.ok(m.btnH >= 43.5, '시작 버튼 높이');
+    await page.close();
+  }
 });

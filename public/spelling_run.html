@@ -114,11 +114,6 @@
             <h1 class="title">스펠링 런</h1>
             <div class="c1w" id="startInfoCol">
               <p class="lead" id="modeDesc"></p>
-              <ul class="corelist" id="coreList">
-                <li>탭(스페이스바)으로 점프해서 정답 글자를 먹으면 단어가 완성돼요.</li>
-                <li class="mint">맞힐수록 빨라지고, 틀리거나 놓치면 체력이 줄어요.</li>
-                <li class="red" id="coreCont">체력이 0이 되면 한 번 이어서 할 수 있어요.</li>
-              </ul>
               <div class="trow" id="charRow" role="group" aria-label="캐릭터">
                 <span class="vlabel">캐릭터</span>
                 <button class="toggle vsbtn chbtn" type="button" data-char="penguin" aria-pressed="true"><span class="chimg penguin" aria-hidden="true"></span>펭귄</button>
@@ -145,6 +140,11 @@
               <button class="toggle vsbtn" id="helpClose" type="button">닫기</button>
             </div>
             <div class="helpbody" id="helpBody" tabindex="0">
+              <ul class="corelist" id="coreList" aria-label="핵심 세 줄">
+                <li>탭(스페이스바)으로 점프해서 정답 글자를 먹으면 단어가 완성돼요.</li>
+                <li class="mint">맞힐수록 빨라지고, 틀리거나 놓치면 체력이 줄어요.</li>
+                <li class="red" id="coreCont">체력이 0이 되면 한 번 이어서 할 수 있어요.</li>
+              </ul>
               <p class="note" id="startInfo"></p>
               <p class="note" id="startExcluded" hidden></p>
               <h3 class="rhead">기본 조작</h3>
@@ -286,8 +286,8 @@
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=94"></script>
-<script src="/js/spellrun/stage_style.js?v=94"></script>
-<script src="/js/spellrun/game.js?v=94"></script>
+<script src="/js/spellrun/logic.js?v=95"></script>
+<script src="/js/spellrun/stage_style.js?v=95"></script>
+<script src="/js/spellrun/game.js?v=95"></script>
 </body>
 </html>
