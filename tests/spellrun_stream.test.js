@@ -230,3 +230,35 @@ test('작업362 올라가기: 풍선마다 가속이 ±10% 안에서 타일 번�
   assert.equal(L.balloonRiseY(0, r.a), 0);
   assert.ok(L.balloonRiseY(0.1, r.a) < L.balloonRiseY(r.sec, r.a) - L.balloonRiseY(r.sec - 0.1, r.a), '처음 0.1초 < 마지막 0.1초');
 });
+
+// 작업363: 캐릭터 동작 효과(순수 로직, 가로만, 난수 없음)
+test('작업363 효과 값: 점프 시작 0.1초 1.12/0.92, 정점 1.0, 착지 0.85/1.12 → 1.0, 출렁임 ±1.5, 그림자는 높을수록 작고 연함, 먼지 상한 24', () => {
+  const F = L.CHAR_FX, apex = C.JUMP_TIME / 2;
+  const a = L.charSquash(0.1, apex, 0); assert.ok(Math.abs(a.sy - 1.12) < 1e-9 && Math.abs(a.sx - 0.92) < 1e-9);
+  const z = L.charSquash(0, apex, 0); assert.equal(z.sy, 1); assert.equal(z.sx, 1);
+  const p = L.charSquash(apex, apex, 0); assert.ok(Math.abs(p.sy - 1) < 1e-9 && Math.abs(p.sx - 1) < 1e-9, '정점 1.0');
+  const mid = L.charSquash(0.05, apex, 0); assert.ok(Math.abs(mid.sy - 1.06) < 1e-9);
+  const l = L.charSquash(-1, apex, F.SQUASH_SEC); assert.ok(Math.abs(l.sy - 0.85) < 1e-9 && Math.abs(l.sx - 1.12) < 1e-9, '착지');
+  assert.deepEqual(L.charSquash(-1, apex, 0), { sx: 1, sy: 1 });
+  let mx = 0; for (let ph = 0; ph < 4; ph += 0.01) mx = Math.max(mx, Math.abs(L.runBob(ph))); assert.ok(mx <= 1.5 + 1e-9 && mx > 1.49);
+  assert.ok(Math.abs(L.runBob(0)) < 1e-9 && Math.abs(L.runBob(1)) < 1e-9 && Math.abs(L.runBob(0.5) - 1.5) < 1e-9 && Math.abs(L.runBob(1.5) + 1.5) < 1e-9);
+  const s0 = L.charShadow(0), s1 = L.charShadow(118), s2 = L.charShadow(236);
+  assert.equal(s0.k, 1); assert.ok(s1.k < s0.k && s2.k < s1.k && s1.a < s0.a && s2.a < s1.a, '높을수록 작고 연하다'); assert.ok(L.charShadow(999).k >= F.SHADOW_MIN - 1e-9);
+  assert.equal(F.DUST_MAX, 24); assert.equal(F.DUST_LAND.length, 3); assert.equal(F.DUST_RUN_SEC, 0.2);
+  assert.ok([...F.DUST_LAND, ...F.DUST_RUN].every(d => d.vx < 0), '먼지는 모두 뒤쪽(왼쪽)으로');
+});
+test('작업363 반응 상태·맞는/틀린 글자 값: 길이 happy 0.4·hurt 0.5·surprise 0.3, 우선순위, 폴짝 6, 별 4개 0.4초, 틀린 글자 3번 흔들림 ±3·기울어짐 -6도 0.3초', () => {
+  const F = L.CHAR_FX;
+  assert.deepEqual(F.REACT, { happy: 0.4, hurt: 0.5, surprise: 0.3 });
+  let cur = L.reactNext(null, 'hurt', 10); assert.deepEqual(cur, { kind: 'hurt', t0: 10, dur: 0.5 });
+  assert.equal(L.reactKind(cur, 10.49), 'hurt'); assert.equal(L.reactKind(cur, 10.5), '');
+  assert.equal(L.reactNext(cur, 'happy', 10.2), cur, '진행 중인 hurt 는 happy 가 덮지 않는다');
+  assert.equal(L.reactNext(cur, 'surprise', 10.2), cur);
+  assert.equal(L.reactNext(cur, 'happy', 10.6).kind, 'happy', '끝난 뒤에는 새 반응');
+  const h = L.reactNext(L.reactNext(null, 'happy', 1), 'surprise', 1.1); assert.equal(h.kind, 'surprise', '높은 우선순위가 덮는다');
+  assert.equal(F.RIGHT_HOP, 6); assert.ok(Math.abs(L.rightHop(0.5) - 6) < 1e-9 && L.rightHop(0) < 1e-9 && L.rightHop(1) < 1e-9); assert.equal(F.STAR_N, 4); assert.equal(F.STAR_SEC, 0.4);
+  const w0 = L.wrongFx(0); assert.equal(w0.ang, -6); assert.ok(Math.abs(L.wrongFx(1).ang) < 1e-9); assert.ok(Math.abs(L.wrongFx(1).dx) < 1e-9);
+  assert.equal(F.WRONG_SEC, 0.3); assert.equal(F.WRONG_CYCLES, 3); assert.equal(F.WRONG_SHAKE, 3);
+  assert.deepEqual(L.wrongFx(0.2), L.wrongFx(0.2), '난수 없음'); assert.deepEqual(L.starFx(1, 0.3), L.starFx(1, 0.3));
+  assert.equal(L.LAYOUT_LAND.FX, true); assert.equal(L.LAYOUT.FX, false); assert.equal(L.layoutFor('port', 360, 640).FX, false);
+});

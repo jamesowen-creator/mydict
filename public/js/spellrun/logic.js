@@ -224,6 +224,7 @@ function configure(values) { return Object.assign(CONFIG, buildConfig(values)); 
 // 화면 배치(논리 px, 360x640 기준). 글자 칸 줄 아래 끝은 높은 칸(2단 점프) 타일 위쪽보다 위에 있어야 한다.
 const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TILE_H: 58, WORD_AVAIL_W: 332,
   HUD_SHIFT: 24,        // 작업322: 대표 뜻·보조 줄·글자 칸 줄을 위쪽 HUD 줄에서 이만큼(논리 px) 아래로 내린다(한 곳에서 조정)
+  FX: false,   // 작업363: 캐릭터 동작 효과(가로만). 그리기·표시 상태에만 쓰고 판정·점수·타일 위치와 무관
   TILE_LIFT: 0, BALLOON: false,   // 작업361: 가로에서만 철자 타일을 풍선 그림으로 그리고 그림만 TILE_LIFT 논리 px 위로 올린다(판정·배치는 그대로)
   TILE_SCALE: 1, CHAR_SCALE: 1,   // 작업360: 철자 타일·캐릭터 그림 배율(세로는 1 = 그대로. 가로 값은 LAYOUT_LAND). 판정 크기와 무관하게 그림·타일 폭만 바꾼다
   INTRO_CENTER_Y: 250,  // 작업323: 큰 뜻 카드의 가운데 높이(논리 px). 위쪽 HUD 줄 아래, 땅 위의 빈 공간
@@ -235,7 +236,7 @@ const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TIL
 //   (뜻·글자 칸·HUD 는 위쪽에 그대로 있고, 땅·타일·점프·장애물의 상대 위치와 경기장 폭은 불변. 하늘이 넓어지면 위쪽 글자와 높은 칸 사이가 비어 보이는 대신 답답하지 않고, 땅 아래 띠는 대결 막대·나가기가 놓일 만큼만 늘린다)
 // 가로: 800x400. 글자 영역은 높이 100 이하(CONTENT_BOTTOM_Y 100), 높은 칸 타일 윗변 112 보다 위. 땅 아래 띠 44.
 // 작업356: 뜻(왼쪽)과 글자 칸(오른쪽)을 한 줄에 나란히 둔다(HUD 는 위 한 줄). 글자 칸 줄은 남는 폭(약 440)을 쓰고, 큰 뜻 연출은 위쪽(높은 칸 타일 윗변 112 보다 위)에서 한다. 팝업 글자 크기는 가로 전용 상한
-const LAYOUT_LAND = { W: 800, H: 400, GROUND: 356, TILE_Y: 248, HIGH_TILE_Y: 141, TILE_H: 58, WORD_AVAIL_W: 440, HUD_SHIFT: 0, INTRO_CENTER_Y: 72, INTRO_W: 560, CONTENT_BOTTOM_Y: 100, TILE_SCALE: 0.75, CHAR_SCALE: 1.3, TILE_LIFT: 22, BALLOON: true, CW_MAX: 38, MEAN_MAX: 26, SUB_MAX: 12, POPW_MAX: 30, POPM_MAX: 16, POPE_MAX: 10, FIT_PAD: 5 };
+const LAYOUT_LAND = { W: 800, H: 400, GROUND: 356, TILE_Y: 248, HIGH_TILE_Y: 141, TILE_H: 58, WORD_AVAIL_W: 440, HUD_SHIFT: 0, INTRO_CENTER_Y: 72, INTRO_W: 560, CONTENT_BOTTOM_Y: 100, TILE_SCALE: 0.75, CHAR_SCALE: 1.3, TILE_LIFT: 22, BALLOON: true, FX: true, CW_MAX: 38, MEAN_MAX: 26, SUB_MAX: 12, POPW_MAX: 30, POPM_MAX: 16, POPE_MAX: 10, FIT_PAD: 5 };
 const SCALE_MAX = 1.5, SCALE_MIN = 0.3;
 // mode: 'port' | 'land', availW/availH: 안전 여백을 뺀 쓸 수 있는 화면 크기(CSS px). 반환: LAYOUT 과 같은 항목 + { scale, mode, extra }
 function layoutFor(mode, availW, availH) {
@@ -902,6 +903,50 @@ function balloonStretch(textW) {
   return k > A.MAX_STRETCH + 1e-9 ? null : k;
 }
 
+// ---- 작업363: 캐릭터 동작 효과(가로만, 그림 없이 코드로) ----
+// 모두 그리기와 표시 상태에만 쓴다(판정 크기·높이·위치·점수·체력·타일 위치는 그대로). 시간은 게임 시간이라 메뉴로 멈추면 같이 멈춘다. 난수 없음.
+const CHAR_FX = {
+  STRETCH_SEC: 0.1, STRETCH_Y: 1.12, STRETCH_X: 0.92,     // 점프 시작: 0.1초 세로로 늘어남(정점에서 1.0 으로 돌아옴)
+  SQUASH_SEC: 0.12, SQUASH_Y: 0.85, SQUASH_X: 1.12,       // 착지: 납작해졌다 1.0 으로
+  BOB: 1.5,                                                // 달릴 때 위아래 출렁임(논리 px, 캐릭터 배율을 곱한다)
+  SHADOW_MIN: 0.45, SHADOW_ALPHA: 0.28, SHADOW_FADE: 0.6, SHADOW_H: 236,   // 그림자: 높이 SHADOW_H 에서 크기 SHADOW_MIN 배, 투명도 (1-SHADOW_FADE) 배
+  DUST_MAX: 24, DUST_SEC: 0.35, DUST_RUN_SEC: 0.2,
+  DUST_LAND: [{ dx: -6, vx: -45, vy: -22, r: 2.6 }, { dx: -2, vx: -80, vy: -14, r: 2.2 }, { dx: 2, vx: -115, vy: -26, r: 1.9 }],
+  DUST_RUN: [{ dx: -8, vx: -55, vy: -12, r: 1.5 }, { dx: -6, vx: -65, vy: -8, r: 1.3 }, { dx: -10, vx: -50, vy: -14, r: 1.6 }],
+  REACT: { happy: 0.4, hurt: 0.5, surprise: 0.3 }, REACT_PRIO: { happy: 1, surprise: 2, hurt: 3 },   // 반응 상태 길이(초)와 우선순위(364 에서 표정 프레임을 연결)
+  RIGHT_HOP: 6, RIGHT_HOP_SEC: 0.25, STAR_N: 4, STAR_SEC: 0.4,   // 맞는 글자: 폴짝(논리 px)·별
+  WRONG_SEC: 0.3, WRONG_SHAKE: 3, WRONG_CYCLES: 3, WRONG_PUSH: 2, WRONG_TILT: -6                   // 틀린 글자: 좌우 3번 흔들림(±px)·뒤로 밀림·기울어짐(도)
+};
+// 점프·착지 때 늘었다 줄기. ts: 지금 점프(첫 점프 또는 2단 점프)를 시작한 지 지난 초(공중이 아니면 -1), apex: 정점까지 걸리는 초, landLeft: 착지 납작함이 남은 초
+function charSquash(ts, apex, landLeft) {
+  const F = CHAR_FX;
+  if (ts >= 0) { const s = ts < F.STRETCH_SEC ? ts / F.STRETCH_SEC : Math.max(0, 1 - (ts - F.STRETCH_SEC) / Math.max(1e-6, apex - F.STRETCH_SEC)); return { sx: 1 - (1 - F.STRETCH_X) * s, sy: 1 + (F.STRETCH_Y - 1) * s }; }
+  if (landLeft > 0) { const k = Math.min(1, landLeft / F.SQUASH_SEC); return { sx: 1 + (F.SQUASH_X - 1) * k, sy: 1 - (1 - F.SQUASH_Y) * k }; }
+  return { sx: 1, sy: 1 };
+}
+// 달리기 박자(runPhase 0~4)에 맞춘 위아래 출렁임(논리 px, 배율 전). 두 걸음에 한 번씩 오르내린다
+function runBob(phase) { return CHAR_FX.BOB * Math.sin(Math.PI * phase); }
+// 그림자: 점프 높이 h 가 높을수록 작고 연하다. { k: 크기 배율, a: 투명도 }
+function charShadow(h) {
+  const F = CHAR_FX, u = Math.max(0, Math.min(1, h / F.SHADOW_H));
+  return { k: 1 - (1 - F.SHADOW_MIN) * u, a: F.SHADOW_ALPHA * (1 - F.SHADOW_FADE * u) };
+}
+// 틀린 글자: u(0~1) 때의 가로 흔들림·밀림(논리 px, 배율 전)과 기울어짐(도)
+function wrongFx(u) {
+  const F = CHAR_FX, e = 1 - u;
+  return { dx: -F.WRONG_PUSH * Math.sin(Math.PI * u) + F.WRONG_SHAKE * Math.sin(Math.PI * 2 * F.WRONG_CYCLES * u) * e, ang: F.WRONG_TILT * e };
+}
+// 맞는 글자: 폴짝 높이(논리 px, 배율 전), 별 i 의 각도·반지름 비율·투명도(깜박임)
+function rightHop(u) { return CHAR_FX.RIGHT_HOP * Math.sin(Math.PI * Math.max(0, Math.min(1, u))); }
+function starFx(i, u) { return { ang: i * Math.PI * 2 / CHAR_FX.STAR_N + u * Math.PI, rad: 0.45 + 0.25 * u, a: (1 - u) * (0.65 + 0.35 * Math.sin(u * Math.PI * 4 + i)) }; }
+// 반응 상태(한 곳에서 관리): cur = { kind, t0, dur } 와 새 반응. 아직 진행 중인 더 높은 우선순위 반응은 덮어쓰지 않는다. 지금 반응을 돌려준다
+function reactNext(cur, kind, now) {
+  const F = CHAR_FX, on = cur && cur.kind && now - cur.t0 < cur.dur;
+  if (on && F.REACT_PRIO[cur.kind] > F.REACT_PRIO[kind]) return cur;
+  return { kind: kind, t0: now, dur: F.REACT[kind] };
+}
+function reactKind(cur, now) { return cur && cur.kind && now - cur.t0 < cur.dur ? cur.kind : ''; }
+
 // ---- 작업323: 새 단어 시작 연출 ----
 // 타임라인: 큰 뜻 유지(hold) → 축소·이동(shrink). 전체(hold+shrink)는 새 단어 대기 시간(delay) 이하로 맞춘다(옵션이 커도 hold 를 줄인다).
 // o: { first: 첫 단어, boss: 보스 단어 }
@@ -1068,7 +1113,7 @@ return {
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT, LAYOUT_LAND: LAYOUT_LAND, layoutFor: layoutFor,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
-  survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, balloonRise: balloonRise, balloonRiseY: balloonRiseY, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
+  survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, balloonRise: balloonRise, balloonRiseY: balloonRiseY, CHAR_FX: CHAR_FX, charSquash: charSquash, runBob: runBob, charShadow: charShadow, wrongFx: wrongFx, rightHop: rightHop, starFx: starFx, reactNext: reactNext, reactKind: reactKind, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamOffscreen: streamOffscreen,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };

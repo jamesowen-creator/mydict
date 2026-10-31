@@ -113,6 +113,7 @@ test('361-3) 둥실 움직임은 게임 시간 기준: 메뉴로 멈춘 동안 �
 
 test('361-4) 맞는 풍선을 먹으면 사라지고 풍선 색 조각 7개가 퍼진다. 틀린 풍선은 조각 없이 그대로 지나가고 계속 그려진다(체력 -1은 그대로)', { skip: SKIP }, async () => {
   const page = await open(844, 390);
+  await page.eval(seed);   // 난수 고정: 같은 판이 나오게
   await startRun(page);
   await run(page, 300);
   const okRes = await page.eval(`(() => { const R = SpellRun, G = R.G, C = ${BCOL}; const t = G.tiles.find(x => !x.kind && x.correct && !x.checked && x.state === 'live' && x.wi === G.wi && x.si === G.si); if (!t) return null; t.x = R.RUNNER_X + 1; G.jumpT = 0.3; G.j2 = -1; G.parts = []; R.step(0.02); return { state: t.state, parts: G.parts.filter(p => p.color === C[t.bi] && p.max === 0.3).length }; })()`);
@@ -191,7 +192,8 @@ test('362-1·2) 틀린 풍선을 먹으면 그 풍선과 쓸모없어진 정답 
   let scenes = 0, risenB = 0;
   for (const sd of [1, 7, 99, 5, 21]) {
     const page = await open(844, 390);
-    await startRun(page);
+    await page.eval(seed);   // 난수 고정: 같은 판이 나오게
+  await startRun(page);
     const out = await page.eval(riseScenes(sd, 2));
     for (const sc of out) {
       if (process.env.RISE_LOG) console.log('SCENE', sd, JSON.stringify(sc));
@@ -210,6 +212,7 @@ test('362-1·2) 틀린 풍선을 먹으면 그 풍선과 쓸모없어진 정답 
 
 test('362-1) 올라가는 모양: 처음엔 느리다가 빨라지고, 약 0.9초 안에 화면 위로 나가며 지워진다. 흐려지지 않고(선명도 1) 둥실 흔들림은 계속, 세계 이동으로 왼쪽으로 밀린다', { skip: SKIP }, async () => {
   const page = await open(844, 390);
+  await page.eval(seed);   // 난수 고정: 같은 판이 나오게
   await startRun(page);
   await page.eval(seed);
   await page.eval(riseScenes(1, 1));
@@ -231,6 +234,7 @@ test('362-1) 올라가는 모양: 처음엔 느리다가 빨라지고, 약 0.9�
 
 test('362-1·3) 올라가는 풍선은 먹는 판정에서 빠지고 점수·콤보·체력이 바뀌지 않으며, 메뉴로 멈추면 같이 멈췄다가 닫으면 이어서 올라간다', { skip: SKIP }, async () => {
   const page = await open(844, 390);
+  await page.eval(seed);   // 난수 고정: 같은 판이 나오게
   await startRun(page);
   await page.eval(riseScenes(1, 1));
   const before = await page.eval(`(() => { const G = SpellRun.G, w = window.__riseTile; w.x = SpellRun.RUNNER_X + 1; const s = { score: G.score, combo: G.combo, hp: G.hp, rt: w.rise.t }; G.jumpT = 0.3; SpellRun.step(0.02); G.jumpT = -1; return { s, after: { score: G.score, combo: G.combo, hp: G.hp }, checked: w.checked, state: w.state }; })()`);

@@ -27,7 +27,7 @@ try { const q = new URLSearchParams(location.search).get('mode'); if (q === '1')
 const streamPinned = OPT.values.stream !== undefined;
 const syncStream = () => { if (!streamPinned) CONFIG.STREAM_EDGE = viewMode === 'land'; };
 syncStream();
-const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, contHp, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, CHARS, BG_ART, ITEM_ART, BALLOON_ART, balloonColor, balloonPhase, balloonMotion, balloonStretch, balloonRise, balloonRiseY } = L;
+const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, contHp, planRescue, heartEffect, planSpeedItem, boostTarget, boostWordBonus, OBSTACLE_ART, obstacleArtIndex, obstacleArtRect, obstacleLayout, obstacleOverlaps, obstacleHit, planObstacle, afterObstacleHit, PENGUIN, advanceRunPhase, penguinFrame, spinAngle, sparkleAlpha, introTimeline, introState, planSlots, makeCandidates, slotPoints, speedMult, gapSec, leadSec, speedAfterHit, speedAfterFail, targetSpeed, planHearts, pickHeartSlot, airHeight, secondJumpLandTime, planHighSlots, fitWord, buildHint, judge, bossConfig, planRound, letterCount, CHARS, BG_ART, ITEM_ART, BALLOON_ART, balloonColor, balloonPhase, balloonMotion, balloonStretch, balloonRise, balloonRiseY, CHAR_FX, charSquash, runBob, charShadow, wrongFx, rightHop, starFx, reactNext, reactKind } = L;
 const LAYOUT = Object.assign({}, L.LAYOUT);   // 작업355: 화면 모드·크기에 따라 값이 바뀌는 사본(logic.js 의 LAYOUT 은 세로 640 기준값 그대로)
 
 let W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;   // 작업355: applyLayout 이 화면 모드·크기에 맞게 바꾼다
@@ -401,7 +401,7 @@ const G = {
   state: 'idle', words: [], wi: 0, plan: null, si: 0, mist: [],
   hp: 0, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
   speed: 60, speedTarget: 60, speedBase: 60, shownMult: 0, heartWords: new Set(), heartPending: false, heartSlot: 0, survival: false, supply: null, startTime: 0, speedPending: false, speedSlot: 0, rescuePending: false, rescueSlot: 0, rescueKind: 'hint', speedGroupTaken: -1, groupTakenAtLoad: -1, contUsed: false, rescue: null, angels: [], boost: 0, roundSeq: 0, boostMax: 0, speedMaxSeen: 0, lastPts: 0, lastSpeedMult: 1, dist: 0, time: 0,
-  tiles: [], parts: [], floats: [],
+  tiles: [], parts: [], floats: [], react: null, fxRight: -9, fxWrong: -9, dust: [], dustT: 0, dustN: 0,   // 작업363: 반응 상태·맞는/틀린 글자 효과 시작 시각·먼지
   packActive: false, packId: 0, spawnT: 0, bossBlend: 0, ec: null,   // 작업354: ec = edge 흐름 기록(묶음 목록·미리 정한 단어 계획). classic 에서는 쓰지 않는다
   runPhase: 0, prevH: 0, rising: true, cleared: false, spriteDraws: 0, spriteFrame: -1, spriteAngle: 0,
   iActive: false, iClock: 0, iTl: null, iGeo: null, iKids: 0, iShown: 0,
@@ -522,6 +522,8 @@ function updateFx(dt) {
   G.parts = G.parts.filter(p => p.life > 0);
   for (const f of G.floats) { f.y -= 42 * dt; f.life -= dt; }
   G.floats = G.floats.filter(f => f.life > 0);
+  for (const p of G.dust) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }   // 작업363
+  G.dust = G.dust.filter(p => p.life > 0);
   for (const g of G.angels) g.t += dt;
   G.angels = G.angels.filter(g => g.t < CONFIG.ANGEL_SEC);
 }
@@ -553,7 +555,7 @@ function startRound(reviewOnly, prepared) {
     state: 'run', words: pool, wi: 0, mist: pool.map(() => 0),
     hp: CONFIG.HP, score: 0, combo: 0, maxCombo: 0, wordsDone: 0,
     roundSeq: G.roundSeq + 1, boost: 0, speedPending: false, speedMaxSeen: 0, rescuePending: false, speedGroupTaken: -1, groupTakenAtLoad: -1, contUsed: false, rescue: null, angels: [],
-    speed: CONFIG.SPEED_MIN, speedTarget: CONFIG.SPEED_MIN, speedBase: CONFIG.SPEED_MIN, shownMult: 0, heartWords: surv ? new Set() : planHearts(regular), tiles: [], parts: [], floats: [],
+    speed: CONFIG.SPEED_MIN, speedTarget: CONFIG.SPEED_MIN, speedBase: CONFIG.SPEED_MIN, shownMult: 0, heartWords: surv ? new Set() : planHearts(regular), tiles: [], parts: [], floats: [], react: null, fxRight: -9, fxWrong: -9, dust: [], dustT: 0, dustN: 0,
     bossBlend: 0, ec: { packs: [], wps: {} }, packActive: false, jumpT: -1, j2: -1, j2h: 0, jumpBuf: 0, land: 0, hurt: 0, eat: 0, shake: 0, popT: 0, endT: 0,
     obstacles: [], obst: null, obstSeq: 0, invuln: 0, stumble: 0, fall: 0, obstHits: 0,
     review: !!reviewOnly, survival: surv, supply: supply, startTime: G.time
@@ -689,7 +691,18 @@ let streamViewW = W;   // 화면 논리 폭(진입 거리 = 이 값 + 타일 반
 const dimCur = () => ({ wi: G.wi, si: G.si });   // 지금 풀 칸(판정용. 작업360 전에는 흐림 계산에도 썼다)
 const tileScale = () => LAYOUT.TILE_SCALE || 1;   // 작업360: 가로 0.75(철자 타일 그림·폭). 세로 1
 const tileLift = t => (t && t.high) ? 0 : (LAYOUT.TILE_LIFT || 0);   // 작업361: 가로 일반 철자 타일 그림만 위로 올리는 논리 px(판정·배치는 그대로). 높은 칸은 위쪽 글자 카드에 닿아 올리지 않는다
-const charScale = () => LAYOUT.CHAR_SCALE || 1;   // 작업360: 가로 1.3(캐릭터 그림만. 판정 위치·크기는 그대로)
+const charScale = () => LAYOUT.CHAR_SCALE || 1;
+const fxOn = () => !!LAYOUT.FX;   // 작업363: 가로 캐릭터 동작 효과(그리기·표시 상태만. 판정·점수·체력·타일 위치와 무관)
+// 반응 상태(364 에서 표정 프레임을 연결할 자리): kind = 'happy' | 'hurt' | 'surprise' | '', 시작 시각(게임 시간)·길이는 CHAR_FX.REACT
+function setReact(kind) { if (fxOn()) G.react = reactNext(G.react, kind, G.time); }
+const reactNow = () => reactKind(G.react, G.time);
+function spawnDust(kind) {
+  const pat = kind === 'land' ? CHAR_FX.DUST_LAND : [CHAR_FX.DUST_RUN[G.dustN++ % CHAR_FX.DUST_RUN.length]], cs = charScale(), P = CHARS[charKey] || CHARS.penguin;
+  for (const d of pat) {
+    G.dust.push({ x: RUNNER_X + P.faceDx * cs + d.dx * cs, y: GROUND - 2, vx: d.vx * cs, vy: d.vy * cs, r: d.r * cs, life: CHAR_FX.DUST_SEC, max: CHAR_FX.DUST_SEC });
+    if (G.dust.length > CHAR_FX.DUST_MAX) G.dust.shift();   // 먼지 총 24개 이하
+  }
+}   // 작업360: 가로 1.3(캐릭터 그림만. 판정 위치·크기는 그대로)
 function edgeWPFor(i) {
   const ec = G.ec;
   if (ec.wps[i]) return ec.wps[i];
@@ -856,6 +869,7 @@ function onHit(t) {
   const sm = speedMult(G.speed);
   const pts = Math.round(slotPoints(slot.text.length, G.combo, CONFIG, t.high ? CONFIG.HIGH_BONUS : 0) * sm * (G.words[G.wi].boss ? CONFIG.BOSS_MULT : 1));
   G.lastPts = pts; G.lastSpeedMult = sm;
+  if (fxOn()) { setReact('happy'); G.fxRight = G.time; }   // 작업363: 맞는 글자 — 폴짝·별
   G.speedBase = speedAfterHit(G.speedBase, slot.chunk);
   G.speedTarget = targetSpeed(G.speedBase, G.combo);
   G.score += pts; G.eat = 0.3;
@@ -903,11 +917,12 @@ function onFail(t, kind) {
   G.hp--; G.combo = 0; G.mist[G.wi]++;
   G.speedBase = speedAfterFail(G.speedBase);
   G.speedTarget = targetSpeed(G.speedBase, G.combo);
-  G.hurt = 0.5; G.shake = 0.3;
+  G.hurt = 0.5; if (!fxOn()) G.shake = 0.3;   // 작업363: 가로는 캐릭터·화면의 무작위 흔들림 대신 아래 정해진 틀린 글자 효과 하나만 쓴다
+  setReact('hurt'); if (kind === 'wrong' && fxOn()) G.fxWrong = G.time;
   sfx.bad();
   floatText(RUNNER_X + 30, GROUND - 150, kind === 'wrong' ? '오답!' : '놓쳤어요', BAD, 22);
   flashHint(G.si);
-  if (edgeOn()) { edgeReplan(); if (kind === 'wrong') riseUseless(); }   // 작업362: 틀린 풍선과 쓸모없어진 풍선이 같은 순간에 올라간다(점수·콤보 계산은 그대로)
+  if (edgeOn()) { edgeReplan(); if (kind === 'wrong' || kind === 'miss') riseUseless(); }   // 작업363: 정답을 놓쳤을 때도 쓸모없어진 풍선이 함께 올라간다(놓친 풍선 자신은 그대로 지나감)   // 작업362: 틀린 풍선과 쓸모없어진 풍선이 같은 순간에 올라간다(점수·콤보 계산은 그대로)
   renderHearts(); renderScore();
   if (G.hp <= 0) onZeroHp();
 }
@@ -917,7 +932,7 @@ function onObstacleHit(ob) {
   const r = afterObstacleHit({ hp: G.hp, speed: G.speed, speedBase: G.speedBase, combo: G.combo });
   G.hp = r.hp; G.speed = r.speed; G.speedBase = r.speedBase; G.speedTarget = r.speedTarget;
   G.invuln = CONFIG.OBST_INVULN_SEC;
-  G.hurt = 0.5; G.shake = 0.3;
+  G.hurt = 0.5; G.shake = 0.3; setReact('hurt');   // 작업363: 하트가 줄면 hurt
   if (ob.kind === 'pit') G.fall = FALL_SEC; else G.stumble = STUMBLE_SEC;
   sfx.bad();
   burst(RUNNER_X, GROUND - 6, ob.kind === 'pit' ? '#8a93c4' : '#c8791f', 10);
@@ -1067,10 +1082,14 @@ function finishRest(cleared) {
 }
 
 // ---------- 입력 ----------
-function startJump() { G.jumpT = 0; G.j2 = -1; G.j2h = 0; G.jumpBuf = 0; sfx.jump(); }
+function startJump() {
+  G.jumpT = 0; G.j2 = -1; G.j2h = 0; G.jumpBuf = 0; sfx.jump();
+  const sl = G.plan && G.plan.slots[G.si]; if (sl && sl.high) setReact('surprise');   // 작업363: 높은 칸 타일을 향해 뛴다
+}
 // 작업318-4: 공중에서 한 번 더 누르면 2단 점프(공중에서 1회만). 점프 버퍼는 2단 점프를 쓴 뒤의 착지 직전 입력에만 쓴다. 2단 점프가 꺼져 있으면 예전 그대로
 function startSecondJump() {
   G.j2h = curH(); G.j2 = 0; G.j2Land = secondJumpLandTime(G.j2h); G.jumpBuf = 0;
+  setReact('surprise');   // 작업363
   sfx.jump2(); burst(RUNNER_X, GROUND - 27 - G.j2h + 24, '#ffffff', 8);
 }
 function jump() {
@@ -1136,9 +1155,11 @@ function step(dt) {
     if (G.j2 >= 0) G.j2 += dt;
     if (G.j2 >= 0 ? G.j2 >= G.j2Land : G.jumpT >= CONFIG.JUMP_TIME) {
       G.jumpT = -1; G.j2 = -1; G.land = 0.12;
+      if (fxOn()) spawnDust('land');   // 작업363: 착지할 때 먼지 3개가 뒤로 퍼진다
       if (G.jumpBuf > 0) startJump();
     }
   }
+  if (fxOn() && G.state === 'run' && G.jumpT < 0 && curH() <= 1) { G.dustT += dt; if (G.dustT >= CHAR_FX.DUST_RUN_SEC) { G.dustT -= CHAR_FX.DUST_RUN_SEC; spawnDust('run'); } }   // 달리는 동안 0.2초마다 아주 작은 먼지 1개
   if (G.jumpBuf > 0) G.jumpBuf -= dt;
   { const nh = curH(); if (nh !== G.prevH) G.rising = nh > G.prevH; G.prevH = nh; if (nh <= 1) G.runPhase = advanceRunPhase(G.runPhase, dt, G.speed); }   // 작업321: 게임 시간 기준(일시정지 중 정지)
   G.hurt = Math.max(0, G.hurt - dt);
@@ -1659,6 +1680,12 @@ function drawRunnerShape(h) {   // 기존 도형 캐릭터(스프라이트를 �
   ctx.restore();
 }
 // 펭귄 스프라이트: 발바닥이 땅 선(GROUND)에 닿고 점프 중에는 airHeight 를 따라 오른다. 판정·충돌 위치는 그대로(그림만 교체). 피격 깜빡임·흔들림·게임 오버 기울임은 기존 효과를 그대로 쓴다.
+function drawDust() {   // 작업363: 발밑 먼지(서서히 사라진다. 캐릭터·풍선은 투명해지지 않는다)
+  if (!G.dust.length) return;
+  ctx.save(); ctx.fillStyle = '#e3d6b6';
+  for (const p of G.dust) { ctx.globalAlpha = 0.65 * Math.max(0, p.life / p.max); ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
+}
 function drawStar(x, y, r, a) {
   ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = '#fff6b0'; ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.beginPath();
   for (let i = 0; i < 8; i++) { const rr = i % 2 ? r * 0.35 : r, ang = -Math.PI / 2 + i * Math.PI / 4; const px = x + Math.cos(ang) * rr, py = y + Math.sin(ang) * rr; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); }
@@ -1669,23 +1696,40 @@ function drawRunner() {
   const ck = activeChar();
   if (!ck) { drawRunnerShape(h); return; }
   const cs = charScale();   // 작업360: 가로 1.3배(그림만. 러너 위치·점프 높이·판정은 그대로, 발끝은 땅에 그대로 닿는다)
-  const P = CHARS[ck], sz = P.size * cs, sx = (G.shake > 0 && !reduce) ? (Math.random() - 0.5) * 6 : 0;
+  const fx = fxOn(), P = CHARS[ck], sz = P.size * cs, sx = (G.shake > 0 && !reduce && !fx) ? (Math.random() - 0.5) * 6 : 0;
+  // 작업363: 가로 동작 효과(그리기만). 틀린 글자 흔들림·뒤로 밀림·기울어짐, 맞는 글자 폴짝, 달릴 때 출렁임, 점프·착지 늘었다 줄기
+  let fdx = 0, fdy = 0, ftilt = 0, fsq = null;
+  if (fx) {
+    const uw = (G.time - G.fxWrong) / CHAR_FX.WRONG_SEC, ur = (G.time - G.fxRight) / CHAR_FX.RIGHT_HOP_SEC;
+    if (uw >= 0 && uw < 1) { const w = wrongFx(uw); fdx = w.dx * cs; ftilt = w.ang; }
+    if (ur >= 0 && ur < 1) fdy -= rightHop(ur) * cs;
+    if (G.jumpT < 0 && h <= 1 && G.state === 'run') fdy += runBob(G.runPhase) * cs;
+    fsq = charSquash(G.jumpT >= 0 ? (G.j2 >= 0 ? G.j2 : G.jumpT) : -1, CONFIG.JUMP_TIME / 2, G.land);
+  }
   const idx = penguinFrame({ state: G.state, cleared: G.cleared, air: h > 1, rising: G.rising, runPhase: G.runPhase });
   const angle = spinAngle(G.j2, G.j2Land) + ((G.state === 'ending' || G.state === 'choice') ? 0.25 * 180 / Math.PI : 0);
   G.spriteDraws++; G.spriteFrame = idx; G.spriteAngle = angle;
-  ctx.fillStyle = 'rgba(0,0,0,.25)';
-  ctx.beginPath(); ctx.ellipse(RUNNER_X, GROUND + 10, 22 * cs * (1 - h / 260), 6 * cs * (1 - h / 320), 0, 0, Math.PI * 2); ctx.fill();
-  const faceX = RUNNER_X + P.faceDx * cs, footY = GROUND - h;
+  if (fx) { const sh = charShadow(h); ctx.fillStyle = 'rgba(0,0,0,' + sh.a + ')'; ctx.beginPath(); ctx.ellipse(RUNNER_X + fdx, GROUND + 10, 22 * cs * sh.k, 6 * cs * sh.k, 0, 0, Math.PI * 2); ctx.fill(); }   // 작업363: 높을수록 작고 연한 그림자(캐릭터 본체는 그대로)
+  else {
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.beginPath(); ctx.ellipse(RUNNER_X, GROUND + 10, 22 * cs * (1 - h / 260), 6 * cs * (1 - h / 320), 0, 0, Math.PI * 2); ctx.fill();
+  }
+  const faceX = RUNNER_X + P.faceDx * cs + fdx, footY = GROUND - h;
   const left = faceX - P.faceX * sz + sx, top = footY + P.footPad * sz - sz;
   ctx.save();
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   let scx = 1, scy = 1;
-  if (h > 1) { scx = 0.97; scy = 1.04; } else if (G.land > 0) { scx = 1.08; scy = 0.92; }
-  ctx.translate(faceX + sx, footY); ctx.scale(scx, scy); ctx.translate(-(faceX + sx), -footY);   // 늘이기·찌그러짐은 발바닥 기준
+  if (fsq) { scx = fsq.sx; scy = fsq.sy; }
+  else if (h > 1) { scx = 0.97; scy = 1.04; } else if (G.land > 0) { scx = 1.08; scy = 0.92; }
+  ctx.translate(faceX + sx, footY + fdy); if (ftilt) ctx.rotate(ftilt * Math.PI / 180); ctx.scale(scx, scy); ctx.translate(-(faceX + sx), -footY);   // 늘이기·찌그러짐·기울어짐은 발바닥 기준
   if (angle) { const bx = left + 0.5 * sz, by = top + P.bodyY * sz; ctx.translate(bx, by); ctx.rotate(angle * Math.PI / 180); ctx.translate(-bx, -by); }   // 2단 점프 회전: 몸 중앙 기준
-  if (G.hurt > 0 && Math.floor(G.time * 20) % 2 === 0) ctx.globalAlpha = 0.55;
+  if (G.hurt > 0 && !fx && Math.floor(G.time * 20) % 2 === 0) ctx.globalAlpha = 0.55;   // 작업363: 가로는 깜박이거나 투명해지지 않는다
   ctx.drawImage(charSheets[ck].img, idx * P.CELL, 0, P.CELL, P.CELL, left, top, sz, sz);
   ctx.restore();
+  if (fx) {   // 작업363: 맞는 글자 별 4개(0.4초)
+    const us = (G.time - G.fxRight) / CHAR_FX.STAR_SEC;
+    if (us >= 0 && us < 1) { const bx = left + 0.5 * sz, by = top + P.bodyY * sz + fdy; for (let i = 0; i < CHAR_FX.STAR_N; i++) { const s = starFx(i, us); drawStar(bx + Math.cos(s.ang) * sz * s.rad, by + Math.sin(s.ang) * sz * s.rad * 0.85, 3.5 * cs, Math.max(0, s.a)); } }
+  }
   const sp = sparkleAlpha(G.j2);   // 2단 점프 정점 부근의 작은 반짝임
   if (sp > 0) {
     const bx = left + 0.5 * sz, by = top + P.bodyY * sz, t = G.time * 6;
@@ -1735,6 +1779,7 @@ function draw() {
   for (const o of G.obstacles) if (o.kind === 'pit') drawPit(o);
   for (const o of G.obstacles) if (o.kind === 'box') drawObstacleArt(o);
   for (const t of G.tiles) drawTile(t);
+  drawDust();
   drawRunnerFx();
   drawObstWarn();
   drawBoost();
@@ -2661,6 +2706,7 @@ function frame(ts) {
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
 const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, get HIGH_Y() { return HIGH_Y; }, get TILE_Y() { return TILE_Y; }, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival, continued: G.contUsed }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
 API.art = { charKey: () => charKey, activeChar: activeChar, charReady: charReady, bgOK: bgOK, itemArtReady: itemArtReady, obstArtReady: () => obstArtReady(), blend: () => G.bossBlend, setChar: k => setChar(k) };   // 작업358: 시험용 훅
+API.fx = { on: fxOn, setOn: v => { LAYOUT.FX = !!v; }, react: reactNow, setReact: setReact, state: () => G.react, dust: () => G.dust.length };   // 작업363: 시험용 훅
 API.balloon = { rise: riseTile, ready: balloonReady, k: balloonK, lift: tileLift, setLift: v => { LAYOUT.TILE_LIFT = v; } };   // 작업361: 시험용 훅
 API.menu = { open: () => MENU.open, pauses: menuPauses };   // 작업360: 시험용 훅
 API.view = { mode: () => viewMode, pending: () => pendingView, set: setViewMode, scale: () => curScale, layout: () => ({ W: W, H: H, GROUND: GROUND, TILE_Y: TILE_Y, HIGH_Y: HIGH_Y }) };   // 작업355: 시험용 훅
