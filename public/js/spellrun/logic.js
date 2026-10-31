@@ -956,6 +956,173 @@ function reactNext(cur, kind, now) {
 }
 function reactKind(cur, now) { return cur && cur.kind && now - cur.t0 < cur.dur ? cur.kind : ''; }
 
+// ---- 작업365: 소리(효과음·배경음악). 모두 코드로 만든다(파일·저작권·비용 없음). 순수 계산은 시험이 직접 부르고, 소리 노드를 만드는 함수(buildSoundGraph·playVoices)는 실제와 OfflineAudioContext 가 같은 코드를 쓴다 ----
+// 상수는 여기 한 곳에: 버스 음량, 음악 기본 음량(효과음의 약 40%), 한꺼번에 울릴 수 있는 소리 수, 발음 때 음악 줄임(덕킹), 시작 화면 음량, 박자 변화 범위
+const SOUND = {
+  SFX_BUS: 1.0,            // 효과음 버스 음량(발음보다 항상 작게: 효과음 한 소리의 최대 진폭은 아래 VOL 과 소리마다 0.3 이하)
+  MUSIC_VS_SFX: 0.4,       // 음악 버스 = 효과음 버스 x 이 값(기본 음악 음량은 효과음의 약 40%)
+  MASTER: 0.9,             // 마지막 한 곳의 음량
+  LIMIT: { threshold: -6, knee: 0, ratio: 20, attack: 0.003, release: 0.1 },   // 최대치를 눌러 주는 컴프레서(리미터)
+  MAX_NODES: 24,           // 동시에 울리는 소리 노드(발진기·잡음) 상한
+  LOOKAHEAD: 0.12, TICK_MS: 25,   // 25ms 마다 앞으로 0.12초치를 예약
+  IDLE_LEVEL: 0.5, FADE_IN: 0.5, FADE_OUT: 0.4, BOSS_FADE: 0.4,   // 시작·대기 화면 음량, 게임 시작 페이드 인, 끝날 때 페이드 아웃, 낮↔보스 곡 바뀌는 시간(초)
+  TEMPO_MAX: 0.12, TEMPO_STEP: 0.02,   // 속도에 따른 박자 빠르기 최대 +12%, 마디마다 바뀌는 최대 폭
+  DUCK: 0.35, DUCK_IN: 0.15, DUCK_HOLD: 0.2, DUCK_OUT: 0.3,   // 발음이 나올 때 음악을 평소의 35%로(0.15초), 발음이 끝난 뒤 0.2초 뒤에 0.3초에 걸쳐 돌려놓음
+  HOLD_FADE: 0.04, RESUME_FADE: 0.08,   // 일시정지·재개 때 음량이 바뀌는 시간(초)
+  VOL: { jump: 1, jump2: 1, land: 1, pop: 1, rise: 1, bad: 1, speed: 1, hint: 1, angel: 1, heart: 1, hit: 1, over: 1, boss: 1, word: 1, tick: 1, win: 1.6, fail: 1.4 },   // 효과음의 상대 음량(한 곳에서 조정)
+  NOISE_SEC: 0.5, NOISE_SEED: 20241031
+};
+// 5음계(도레미솔라): 콤보 0~10 → 반음 수(0,2,4,7,9, 12,14,16,19,21, 24 = 2옥타브). 기준음 C4. 콤보 규칙은 기존 good() 과 같은 입력(G.combo)
+const PENTA = [0, 2, 4, 7, 9];
+function comboNote(combo) {
+  const n = Math.max(0, Math.min(10, Math.floor(combo || 0))), semi = PENTA[n % 5] + 12 * Math.floor(n / 5);
+  return { semi: semi, freq: 261.6256 * Math.pow(2, semi / 12) };
+}
+// 달리는 속도 → 박자 계수(1.00 ~ 1.12). 마디가 바뀔 때만 한 걸음(최대 TEMPO_STEP)씩 따라가서 튀지 않는다
+function tempoCoef(speed, cfg) {
+  cfg = cfg || CONFIG;
+  const u = Math.max(0, Math.min(1, (speed - cfg.SPEED_MIN) / Math.max(1, cfg.SPEED_MAX - cfg.SPEED_MIN)));
+  return 1 + SOUND.TEMPO_MAX * u;
+}
+function tempoStep(cur, target, maxStep) {
+  maxStep = maxStep === undefined ? SOUND.TEMPO_STEP : maxStep;
+  const d = target - cur;
+  return Math.abs(d) <= maxStep ? target : cur + Math.sign(d) * maxStep;
+}
+// 8분음표 하나의 길이(초) = 60 / (BPM x 계수) / 2
+function slotSec(bpm, coef) { return 60 / (bpm * (coef || 1)) / 2; }
+// 시작 위치: 예약해 둔 칸 목록 pending = [{ pos, t }] 에서 아직 시작하지 않은 첫 칸(now 이후 시작)의 번호. 없으면 fallback
+function resumePos(pending, now, fallback) {
+  let best = null;
+  for (const p of pending) if (p.t > now && (best === null || p.pos < best)) best = p.pos;
+  return best === null ? fallback : best;
+}
+// 덕킹(발음이 나올 때 음악 줄이기): st = { start, end(null 이면 아직 발음 중), from(시작할 때 음량), endLevel(끝날 때 음량) }. now 의 음악 배율(0~1)을 돌려준다
+function duckLevel(now, st) {
+  if (!st) return 1;
+  const D = SOUND, clamp = x => Math.max(0, Math.min(1, x));
+  if (st.end === null || st.end === undefined) return st.from + (D.DUCK - st.from) * clamp((now - st.start) / D.DUCK_IN);
+  const rel = now - st.end - D.DUCK_HOLD;
+  return rel <= 0 ? st.endLevel : st.endLevel + (1 - st.endLevel) * clamp(rel / D.DUCK_OUT);
+}
+// 음량 이어가기: r = { from, to, t0, dur } 의 t 시각 값
+function rampValue(r, t) { return r.dur <= 0 ? r.to : r.from + (r.to - r.from) * Math.max(0, Math.min(1, (t - r.t0) / r.dur)); }
+// 고정된 값으로 만든 잡음(난수 아님): 같은 시드는 항상 같은 샘플. 범위 -1~1
+function noiseSamples(n, seed) {
+  const out = new Float32Array(n); let s = (seed === undefined ? SOUND.NOISE_SEED : seed) >>> 0;
+  for (let i = 0; i < n; i++) { s = (s * 1664525 + 1013904223) >>> 0; out[i] = s / 2147483648 - 1; }
+  return out;
+}
+// ---- 곡 데이터: 8분음표 칸 8개 = 한 마디(4/4). 'c5' = 도(5옥타브), '.' = 쉼, '-' = 앞 음 늘임. 5음계 위주(c d e g a)와 코드 뿌리음(f b) ----
+const NOTE_SEMI = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+function noteMidi(tok) { const m = /^([a-g])(\d)$/.exec(tok); return m ? 12 * (parseInt(m[2], 10) + 1) + NOTE_SEMI[m[1]] : null; }
+const CHORD = { C: [48, 55], G: [43, 50], Am: [45, 52], F: [41, 48], Em: [40, 47] };   // 코드 뿌리음·5도(낮은 베이스)
+const SONGS = {
+  day: { bpm: 120, bars: 8, order: ['A', 'B'], hat: [1, 3, 5, 7], sections: {
+    A: { mel: ['c5 . e5 . g5 . e5 .', 'a5 . g5 . e5 . d5 .', 'c5 . e5 . g5 . a5 .', 'g5 - - . e5 . d5 .', 'e5 . g5 . a5 . g5 .', 'e5 . d5 . c5 . d5 .', 'e5 . g5 . a5 . c6 .', 'a5 - g5 - e5 - - .'], chords: ['C', 'G', 'Am', 'F', 'C', 'G', 'F', 'G'] },
+    B: { mel: ['g5 . a5 . c6 . a5 .', 'g5 . e5 . d5 . e5 .', 'g5 . a5 . c6 . d6 .', 'c6 - - . a5 . g5 .', 'a5 . c6 . a5 . g5 .', 'e5 . g5 . e5 . d5 .', 'c5 . d5 . e5 . g5 .', 'e5 - d5 - c5 - - .'], chords: ['F', 'G', 'C', 'Am', 'F', 'G', 'C', 'C'] } } },
+  boss: { bpm: 140, bars: 8, order: ['A'], hat: [0, 1, 2, 3, 4, 5, 6, 7], eighthBass: true, sections: {
+    A: { mel: ['a4 . c5 . e5 . c5 .', 'd5 . e5 . g5 . e5 .', 'a4 . c5 . e5 . g5 .', 'a5 - - . g5 . e5 .', 'd5 . e5 . g5 . a5 .', 'g5 . e5 . d5 . c5 .', 'a4 . c5 . d5 . e5 .', 'a5 - g5 - e5 - - .'], chords: ['Am', 'Am', 'F', 'G', 'Am', 'Am', 'G', 'Em'] } } }
+};
+// 한 구간(section)의 음 목록: { slot(0~bars*8-1), midi, len(칸), voice: 'mel'|'bass'|'hat', vol }. 멜로디는 사인·삼각파, 베이스는 사인, 잡음 박자는 아주 작게
+function songEvents(name, section) {
+  const sg = SONGS[name], sec = sg.sections[section], ev = [];
+  for (let b = 0; b < sg.bars; b++) {
+    const toks = sec.mel[b].split(' ');
+    let cur = null;
+    toks.forEach((tk, i) => {
+      if (tk === '-') { if (cur) cur.len++; return; }
+      cur = null;
+      if (tk === '.') return;
+      cur = { slot: b * 8 + i, midi: noteMidi(tk), len: 1, voice: 'mel', vol: 0.11 };
+      ev.push(cur);
+    });
+    const [root, fifth] = CHORD[sec.chords[b]];
+    if (sg.eighthBass) { [root, root, root + 12, root, root, root, fifth, root].forEach((m, i) => ev.push({ slot: b * 8 + i, midi: m, len: 1, voice: 'bass', vol: 0.12 })); }
+    else { ev.push({ slot: b * 8, midi: root, len: 3, voice: 'bass', vol: 0.13 }); ev.push({ slot: b * 8 + 4, midi: fifth, len: 3, voice: 'bass', vol: 0.11 }); }
+    for (const i of sg.hat) ev.push({ slot: b * 8 + i, midi: 0, len: 1, voice: 'hat', vol: sg.eighthBass ? 0.03 : 0.025 });
+  }
+  return ev;
+}
+const midiFreq = m => 440 * Math.pow(2, (m - 69) / 12);
+// 곡 이벤트 하나를 소리 목록(voices)으로: t0(초, 그 칸의 시작 기준), sec = 칸 길이
+function eventVoices(e, sec) {
+  const d = e.len * sec;
+  if (e.voice === 'hat') return [{ noise: true, dur: 0.04, vol: e.vol, filter: { type: 'highpass', f: 6500, q: 0.7 }, att: 0.002 }];
+  if (e.voice === 'bass') return [{ type: 'sine', f0: midiFreq(e.midi), dur: Math.max(0.12, d * 0.92), vol: e.vol, att: 0.012 }];
+  return [{ type: e.midi % 2 ? 'sine' : 'triangle', f0: midiFreq(e.midi), dur: Math.max(0.1, d * 0.95), vol: e.vol, att: 0.01 }];
+}
+// ---- 효과음 계획(순수): 소리 목록 [{ type, f0, f1?, dur, vol, att, t0, wob?:{hz,cents}, noise?, filter? }] ----
+function sfxPlan(name, arg) {
+  const V = (SOUND.VOL[name] === undefined ? 1 : SOUND.VOL[name]), out = [];
+  const add = v => out.push(Object.assign({ type: 'sine', att: 0.008, t0: 0 }, v, { vol: v.vol * V }));
+  const seq = (freqs, o) => freqs.forEach((f, i) => add(Object.assign({}, o, { f0: f, t0: (o.t0 || 0) + i * o.gap })));
+  switch (name) {
+    case 'jump': add({ f0: 400, f1: 700, dur: 0.12, vol: 0.12, att: 0.01 }); break;                                                       // 용수철 "뿅"
+    case 'jump2': add({ f0: 620, f1: 1100, dur: 0.12, type: 'triangle', vol: 0.11, att: 0.01 }); add({ f0: 1568, dur: 0.1, vol: 0.06, t0: 0.06 }); add({ f0: 2093, dur: 0.1, vol: 0.04, t0: 0.1 }); break;   // 더 높고 반짝
+    case 'land': add({ f0: 190, f1: 110, dur: 0.07, vol: 0.14, att: 0.004 }); break;                                                       // 낮고 짧은 "톡"
+    case 'pop': { const f = comboNote(arg).freq; add({ noise: true, dur: 0.05, vol: 0.07, filter: { type: 'highpass', f: 1500, q: 0.7 }, att: 0.002 }); add({ f0: f * 1.6, f1: f, dur: 0.14, vol: 0.15, att: 0.004 }); add({ f0: f * 2, dur: 0.09, vol: 0.05, t0: 0.02 }); break; }   // 터짐 + 내려가는 "뽕"
+    case 'rise': add({ f0: 400, f1: 1200, dur: 0.9, type: 'triangle', vol: 0.1, att: 0.15, wob: { hz: 6, cents: 25 } }); break;           // 약 0.9초 "슈우웅"
+    case 'bad': add({ f0: 300, f1: 160, dur: 0.28, type: 'triangle', vol: 0.13, att: 0.01, wob: { hz: 9, cents: 35 } }); break;          // 부드러운 "뿌잉"
+    case 'speed': add({ noise: true, dur: 0.12, vol: 0.08, filter: { type: 'bandpass', f: 2600, q: 2 }, att: 0.003 }); add({ f0: 500, f1: 1400, dur: 0.18, type: 'triangle', vol: 0.09, t0: 0.03 }); break;   // "지직"
+    case 'hint': seq([1318.5, 1760], { dur: 0.5, vol: 0.09, att: 0.004, gap: 0.14 }); seq([3636, 4858], { dur: 0.2, vol: 0.02, att: 0.003, gap: 0.14 }); break;   // 종 "띵" 두 음
+    case 'angel': seq([523.25, 587.33, 659.25, 783.99, 880, 1046.5], { dur: 0.35, vol: 0.08, att: 0.008, gap: 0.07 }); break;            // 하프처럼 위로 쓸어 올리는 6음
+    case 'heart': [660, 880, 1320].forEach((f, i) => add({ f0: f * 0.97, f1: f, dur: 0.16, vol: 0.07, att: 0.012, t0: i * 0.07 })); break;
+    case 'hit': add({ f0: 130, f1: 60, dur: 0.2, vol: 0.2, att: 0.005 }); add({ noise: true, dur: 0.08, vol: 0.09, filter: { type: 'lowpass', f: 400, q: 0.7 }, att: 0.003 }); add({ f0: 520, f1: 210, dur: 0.32, type: 'triangle', vol: 0.1, t0: 0.08, wob: { hz: 8, cents: 40 } }); break;   // "쿵" + "뾰잉"
+    case 'over': seq([392, 330, 262], { dur: 0.3, type: 'triangle', vol: 0.09, att: 0.015, gap: 0.18 }); break;                          // 부드럽게 내려가는 3음
+    case 'boss': seq([220, 220, 262, 330], { dur: 0.13, type: 'triangle', vol: 0.1, att: 0.006, gap: 0.1 }); add({ f0: 110, dur: 0.5, vol: 0.1, att: 0.02 }); break;   // 짧고 긴박
+    case 'word': seq([523.25, 659.25, 783.99, 1046.5], { dur: 0.14, type: 'triangle', vol: 0.09, att: 0.006, gap: 0.08 }); [523.25, 659.25, 783.99].forEach(f => add({ f0: f, dur: 0.3, type: 'triangle', vol: 0.06, att: 0.01, t0: 0.36 })); add({ f0: 1046.5, dur: 0.3, vol: 0.05, att: 0.01, t0: 0.36 }); break;   // 약 0.6초 팡파르(도미솔 화음)
+    case 'tick': add({ f0: 1800, dur: 0.025, vol: 0.04, att: 0.002 }); break;
+    case 'win': seq([523.25, 659.25, 783.99, 1046.5], { dur: 0.3, type: 'triangle', vol: 0.09, att: 0.01, gap: 0.12 }); seq([659.25, 783.99, 1046.5, 1318.5], { dur: 0.3, type: 'triangle', vol: 0.08, att: 0.01, gap: 0.12, t0: 0.6 }); [523.25, 659.25, 783.99, 1046.5].forEach(f => add({ f0: f, dur: 1.5, vol: 0.06, att: 0.02, t0: 1.2 })); break;   // 밝은 마무리(약 3초)
+    case 'fail': seq([392, 330], { dur: 0.5, vol: 0.08, att: 0.02, gap: 0.3 }); break;                                                   // 짧고 부드러운 마무리
+  }
+  return out;
+}
+// 그래프: 효과음 버스·음악 버스 → 합침 → 컴프레서(최대치 누름) → 마지막 음량 → 출력. 실제와 OfflineAudioContext 가 같은 함수를 쓴다
+function buildSoundGraph(ac) {
+  const sfx = ac.createGain(), music = ac.createGain(), mix = ac.createGain(), comp = ac.createDynamicsCompressor(), master = ac.createGain();
+  sfx.gain.value = SOUND.SFX_BUS; music.gain.value = SOUND.SFX_BUS * SOUND.MUSIC_VS_SFX; mix.gain.value = 1; master.gain.value = SOUND.MASTER;
+  const T = SOUND.LIMIT;
+  comp.threshold.value = T.threshold; comp.knee.value = T.knee; comp.ratio.value = T.ratio; comp.attack.value = T.attack; comp.release.value = T.release;
+  sfx.connect(mix); music.connect(mix); mix.connect(comp); comp.connect(master); master.connect(ac.destination);
+  return { sfx: sfx, music: music, mix: mix, comp: comp, master: master };
+}
+function makeNoiseBuffer(ac) {
+  const n = Math.floor(ac.sampleRate * SOUND.NOISE_SEC), b = ac.createBuffer(1, n, ac.sampleRate);
+  b.getChannelData(0).set(noiseSamples(n));
+  return b;
+}
+// 소리 목록을 dest 에 t 시각(t0 + 각 소리의 t0)부터 울린다. env: { noise(AudioBuffer), canStart(), onStart(), onEnd() }. 노드 수 상한은 env.canStart 가 지킨다
+function playVoices(ac, dest, voices, t, env) {
+  env = env || {};
+  for (const v of voices) {
+    if (env.canStart && !env.canStart()) continue;
+    const s = t + (v.t0 || 0), end = s + v.dur;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, s);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, v.vol), s + Math.min(v.att || 0.008, v.dur * 0.5));
+    g.gain.exponentialRampToValueAtTime(0.0001, end);
+    let src;
+    if (v.noise) { src = ac.createBufferSource(); src.buffer = env.noise; }
+    else {
+      src = ac.createOscillator(); src.type = v.type || 'sine';
+      src.frequency.setValueAtTime(v.f0, s);
+      if (v.f1) src.frequency.exponentialRampToValueAtTime(v.f1, end);
+      if (v.wob) {   // 살짝 떨림(음높이 출렁임): 고정된 곡선
+        const n = 24, cv = new Float32Array(n);
+        for (let i = 0; i < n; i++) cv[i] = v.wob.cents * Math.sin(Math.PI * 2 * v.wob.hz * v.dur * i / (n - 1));
+        src.detune.setValueCurveAtTime(cv, s, v.dur);
+      }
+    }
+    let node = src;
+    if (v.filter) { const f = ac.createBiquadFilter(); f.type = v.filter.type; f.frequency.value = v.filter.f; f.Q.value = v.filter.q || 0.7; src.connect(f); node = f; }
+    node.connect(g); g.connect(dest);
+    if (env.onStart) env.onStart();
+    if (env.onEnd) src.onended = env.onEnd;
+    src.start(s); src.stop(end + 0.03);
+  }
+}
+
 // ---- 작업323: 새 단어 시작 연출 ----
 // 타임라인: 큰 뜻 유지(hold) → 축소·이동(shrink). 전체(hold+shrink)는 새 단어 대기 시간(delay) 이하로 맞춘다(옵션이 커도 hold 를 줄인다).
 // o: { first: 첫 단어, boss: 보스 단어 }
@@ -1122,7 +1289,7 @@ return {
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT, LAYOUT_LAND: LAYOUT_LAND, layoutFor: layoutFor,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
-  survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, balloonRise: balloonRise, balloonRiseY: balloonRiseY, CHAR_FX: CHAR_FX, charSquash: charSquash, runBob: runBob, charShadow: charShadow, wrongFx: wrongFx, rightHop: rightHop, starFx: starFx, reactNext: reactNext, reactKind: reactKind, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
+  survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, balloonRise: balloonRise, balloonRiseY: balloonRiseY, SOUND: SOUND, PENTA: PENTA, comboNote: comboNote, tempoCoef: tempoCoef, tempoStep: tempoStep, slotSec: slotSec, resumePos: resumePos, duckLevel: duckLevel, rampValue: rampValue, noiseSamples: noiseSamples, noteMidi: noteMidi, midiFreq: midiFreq, SONGS: SONGS, songEvents: songEvents, eventVoices: eventVoices, sfxPlan: sfxPlan, buildSoundGraph: buildSoundGraph, makeNoiseBuffer: makeNoiseBuffer, playVoices: playVoices, CHAR_FX: CHAR_FX, charSquash: charSquash, runBob: runBob, charShadow: charShadow, wrongFx: wrongFx, rightHop: rightHop, starFx: starFx, reactNext: reactNext, reactKind: reactKind, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamOffscreen: streamOffscreen,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
 };

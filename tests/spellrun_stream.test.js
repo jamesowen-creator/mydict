@@ -290,3 +290,73 @@ test('작업364 프레임 선택: 표정 프레임은 표정이 있는 캐릭터
   assert.equal(L.penguinFrame({ state: 'run', air: false, runPhase: 2.5, react: 'happy' }), 2, 'P 를 안 주면 펭귄');
   assert.deepEqual(L.CHARS.boy.EXPR, { base: 10, happy: 11, hurt: 12, surprise: 13 }); assert.equal(P.EXPR, undefined);
 });
+
+// 작업365: 소리(순수 계산) — 콤보→음계, 속도→박자, 곡 데이터, 덕킹, 일시정지·재개 위치, 고정 잡음, 효과음 계획
+test('작업365 콤보→음계: 5음계(도레미솔라) 0~10 → 반음 0,2,4,7,9,12,14,16,19,21,24(2옥타브 안), 같은 입력 같은 값, 10 넘는 콤보는 10', () => {
+  const semis = Array.from({ length: 11 }, (_, i) => L.comboNote(i).semi);
+  assert.deepEqual(semis, [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24]);
+  assert.ok(Math.abs(L.comboNote(0).freq - 261.6256) < 1e-3); assert.ok(Math.abs(L.comboNote(10).freq / L.comboNote(0).freq - 4) < 1e-9, '2옥타브 = 4배');
+  assert.deepEqual(L.comboNote(25), L.comboNote(10)); assert.deepEqual(L.comboNote(-3), L.comboNote(0)); assert.deepEqual(L.comboNote(4), L.comboNote(4));
+  for (let i = 1; i <= 10; i++) assert.ok(L.comboNote(i).freq > L.comboNote(i - 1).freq, '콤보가 쌓일수록 음이 올라간다');
+});
+test('작업365 속도→박자: 계수 1.00~1.12(최대 +12%), 마디마다 최대 0.02씩만 따라간다(튀지 않음), 칸 길이는 60/(BPM x 계수)/2', () => {
+  assert.equal(L.tempoCoef(C.SPEED_MIN), 1); assert.ok(Math.abs(L.tempoCoef(C.SPEED_MAX) - 1.12) < 1e-12); assert.equal(L.tempoCoef(C.SPEED_MIN - 50), 1); assert.ok(L.tempoCoef(C.SPEED_MAX + 500) <= 1.12 + 1e-12);
+  let prev = 0; for (let v = C.SPEED_MIN; v <= C.SPEED_MAX; v += 5) { const k = L.tempoCoef(v); assert.ok(k >= prev - 1e-12 && k >= 1 && k <= 1.12 + 1e-12); prev = k; }
+  let cur = 1; const steps = []; for (let i = 0; i < 10; i++) { const n = L.tempoStep(cur, 1.12); steps.push(Math.abs(n - cur)); cur = n; }
+  assert.ok(steps.every(d => d <= 0.02 + 1e-12), '마디마다 변화 폭 ' + steps); assert.equal(cur, 1.12); assert.equal(L.tempoStep(1.05, 1.06), 1.06); assert.ok(Math.abs(L.tempoStep(1.1, 1.0) - 1.08) < 1e-12);
+  assert.ok(Math.abs(L.slotSec(120, 1) - 0.25) < 1e-12); assert.ok(Math.abs(L.slotSec(140, 1) - 60 / 140 / 2) < 1e-12); assert.ok(Math.abs(L.slotSec(120, 1.12) - 0.25 / 1.12) < 1e-12);
+});
+test('작업365 곡 데이터: 낮 곡 120BPM(A·B 각 8마디), 보스 곡 140BPM(8마디), 마디마다 8칸, 음 범위, 베이스·잡음 박자, 보스 베이스는 8분음표, A와 B가 다르다', () => {
+  assert.equal(L.SONGS.day.bpm, 120); assert.equal(L.SONGS.boss.bpm, 140); assert.deepEqual(L.SONGS.day.order, ['A', 'B']);
+  for (const [name, sg] of Object.entries(L.SONGS)) for (const [sec, d] of Object.entries(sg.sections)) {
+    assert.equal(d.mel.length, 8, `${name}${sec} 8마디`); assert.equal(d.chords.length, 8);
+    for (const bar of d.mel) assert.equal(bar.split(' ').length, 8, '한 마디 = 8분음표 8칸: ' + bar);
+    const ev = L.songEvents(name, sec);
+    assert.ok(ev.every(e => e.slot >= 0 && e.slot + e.len <= 64 && e.len >= 1), '음이 구간(64칸) 안에 들어간다');
+    const mel = ev.filter(e => e.voice === 'mel'), bass = ev.filter(e => e.voice === 'bass'), hat = ev.filter(e => e.voice === 'hat');
+    assert.ok(mel.length >= 24 && mel.every(e => e.midi >= 60 && e.midi <= 90), '멜로디 음 범위');
+    assert.ok(bass.length >= 16 && bass.every(e => e.midi >= 36 && e.midi <= 60), '베이스 낮은 음');
+    assert.ok(hat.length >= 32 && hat.every(e => e.vol <= 0.04), '잡음 박자는 아주 작게');
+    assert.ok(mel.every(e => e.vol <= 0.12) && bass.every(e => e.vol <= 0.14));
+    for (let b = 0; b < 8; b++) assert.ok(mel.some(e => Math.floor(e.slot / 8) === b), '모든 마디에 멜로디가 있다');
+  }
+  assert.equal(L.songEvents('boss', 'A').filter(e => e.voice === 'bass').length, 64, '보스 베이스는 8분음표(마디당 8개)');
+  assert.ok(L.songEvents('day', 'A').filter(e => e.voice === 'bass').length === 16);
+  assert.notDeepEqual(L.songEvents('day', 'A').map(e => e.midi), L.songEvents('day', 'B').map(e => e.midi), 'A 와 B 는 다르다');
+  assert.deepEqual(L.songEvents('day', 'A'), L.songEvents('day', 'A'), '같은 입력 같은 결과');
+  assert.equal(L.noteMidi('c5'), 72); assert.equal(L.noteMidi('a4'), 69); assert.equal(L.noteMidi('x9'), null); assert.ok(Math.abs(L.midiFreq(69) - 440) < 1e-9);
+});
+test('작업365 덕킹·재개 위치·음량 이어가기·고정 잡음: 발음 때 35%(0.15초), 끝난 뒤 0.2초 뒤 0.3초에 복귀, 시작하지 않은 첫 칸에서 이어가기, 잡음은 시드가 같으면 같다', () => {
+  const S = L.SOUND, st = { start: 10, end: null, from: 1, endLevel: null };
+  assert.equal(L.duckLevel(5, null), 1); assert.equal(L.duckLevel(10, st), 1);
+  assert.ok(Math.abs(L.duckLevel(10.075, st) - (1 + (S.DUCK - 1) / 2)) < 1e-9); assert.ok(Math.abs(L.duckLevel(10.15, st) - S.DUCK) < 1e-9); assert.equal(L.duckLevel(12, st), S.DUCK, '발음 중에는 계속 35%');
+  const en = { start: 10, end: 11, from: 1, endLevel: S.DUCK };
+  assert.equal(L.duckLevel(11.1, en), S.DUCK, '끝난 뒤 0.2초는 그대로'); assert.equal(L.duckLevel(11.2, en), S.DUCK);
+  assert.ok(Math.abs(L.duckLevel(11.35, en) - (S.DUCK + (1 - S.DUCK) / 2)) < 1e-9, '복귀 중간'); assert.equal(L.duckLevel(11.5, en), 1); assert.equal(L.duckLevel(20, en), 1);
+  assert.deepEqual([S.DUCK, S.DUCK_IN, S.DUCK_HOLD, S.DUCK_OUT], [0.35, 0.15, 0.2, 0.3]);
+  const pend = [{ pos: 5, t: 1.0 }, { pos: 6, t: 1.25 }, { pos: 7, t: 1.5 }];
+  assert.equal(L.resumePos(pend, 1.1, 99), 6, '아직 시작하지 않은 첫 칸'); assert.equal(L.resumePos(pend, 0.5, 99), 5); assert.equal(L.resumePos(pend, 2, 42), 42, '다 지났으면 fallback'); assert.equal(L.resumePos([], 1, 3), 3);
+  assert.equal(L.rampValue({ from: 0, to: 1, t0: 10, dur: 0.5 }, 10.25), 0.5); assert.equal(L.rampValue({ from: 0, to: 1, t0: 10, dur: 0.5 }, 9), 0); assert.equal(L.rampValue({ from: 0, to: 1, t0: 10, dur: 0.5 }, 11), 1); assert.equal(L.rampValue({ from: 0.3, to: 0.9, t0: 1, dur: 0 }, 1), 0.9);
+  const a = L.noiseSamples(2000), b = L.noiseSamples(2000), c = L.noiseSamples(2000, 7);
+  assert.deepEqual(Array.from(a), Array.from(b)); assert.notDeepEqual(Array.from(a), Array.from(c)); assert.ok(a.every(x => x >= -1 && x <= 1 && !Number.isNaN(x)));
+  const mean = a.reduce((x, y) => x + y, 0) / a.length; assert.ok(Math.abs(mean) < 0.1 && Math.max(...a) > 0.9 && Math.min(...a) < -0.9, '잡음답게 고르게 퍼진다');
+});
+test('작업365 효과음 계획: 모든 종류가 있고 날카로운 톱니파·네모파가 없으며, 올라가는 소리 약 0.9초(400→1200Hz 삼각파·떨림), 팡파르 약 0.6초, 상수가 한 곳에 있다', () => {
+  const names = ['jump', 'jump2', 'land', 'pop', 'rise', 'bad', 'speed', 'hint', 'angel', 'heart', 'hit', 'over', 'boss', 'word', 'tick', 'win', 'fail'];
+  for (const n of names) {
+    const p = L.sfxPlan(n, 3); assert.ok(p.length >= 1, n);
+    for (const v of p) { assert.ok(!v.type || ['sine', 'triangle'].includes(v.type), `${n} 파형 ${v.type}`); assert.ok(v.dur > 0 && v.vol > 0 && v.vol <= 0.4 && (v.noise || v.f0 > 20), n); assert.ok(!Number.isNaN(v.vol + v.dur + (v.t0 || 0))); }
+  }
+  const r = L.sfxPlan('rise')[0]; assert.equal(r.type, 'triangle'); assert.equal(r.f0, 400); assert.equal(r.f1, 1200); assert.ok(r.dur >= 0.85 && r.dur <= 0.95); assert.ok(r.wob && r.wob.cents > 0);
+  assert.equal(L.sfxPlan('rise').length, 1, '올라가는 소리는 한 번 = 소리 하나');
+  const end = n => Math.max(...L.sfxPlan(n, 0).map(v => (v.t0 || 0) + v.dur)); assert.ok(end('word') >= 0.55 && end('word') <= 0.7, '팡파르 길이 ' + end('word')); assert.ok(end('win') >= 2.5 && end('win') <= 3.2, '완주 마무리 약 3초');
+  assert.equal(L.sfxPlan('angel').length, 6, '천사 6음'); assert.ok(L.sfxPlan('word').filter(v => (v.t0 || 0) >= 0.35).length >= 3, '도미솔 화음');
+  assert.equal(L.sfxPlan('bad')[0].f0, 300); assert.equal(L.sfxPlan('bad')[0].f1, 160); assert.deepEqual([L.sfxPlan('jump')[0].f0, L.sfxPlan('jump')[0].f1], [400, 700]);
+  assert.ok(L.sfxPlan('jump2')[0].f0 > L.sfxPlan('jump')[0].f0, '2단 점프는 더 높다');
+  const S = L.SOUND; assert.equal(S.MAX_NODES, 24); assert.equal(S.MUSIC_VS_SFX, 0.4); assert.ok(S.MASTER <= 0.9); assert.ok(S.VOL && Object.keys(S.VOL).length >= names.length);
+  assert.equal(S.LOOKAHEAD, 0.12); assert.equal(S.TICK_MS, 25); assert.equal(S.IDLE_LEVEL, 0.5); assert.equal(S.FADE_IN, 0.5); assert.equal(S.BOSS_FADE, 0.4);
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'js', 'spellrun', 'logic.js'), 'utf8');
+  const blk = src.slice(src.indexOf('// ---- 작업365'), src.indexOf('// ---- 작업323: 새 단어 시작 연출'));
+  assert.ok(!/Math\.random/.test(blk.replace(/난수 아님|Math\.random 없음/g, '')), '소리 로직에 Math.random 이 없다');
+  assert.ok(!/sawtooth|'square'/.test(blk.replace(/톱니파·네모파/g, '')), '날카로운 파형을 쓰지 않는다');
+});

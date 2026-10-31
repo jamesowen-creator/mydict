@@ -219,37 +219,132 @@ function fitAll() {
 }
 
 // ---------- 소리 ----------
-const SND = { on: true, ac: null };
+const SND = { on: true, bgm: lsGet('spellrun_bgm') !== '0', ac: null, g: null, noise: null, nodes: 0, created: 0, timer: 0 };   // 작업365: bgm = [배경음] 켜짐(기본 켜짐, 마지막 선택을 localStorage spellrun_bgm 에 저장)
+// 하나의 AudioContext: 효과음 버스·음악 버스 → 합침 → 컴프레서 → 마지막 음량(logic.js buildSoundGraph). 음악 예약 시계는 처음 만들 때 시작한다
 function audioCtx() {
-  if (!SND.ac) { try { SND.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (!SND.ac) {
+    try {
+      SND.ac = new (window.AudioContext || window.webkitAudioContext)();
+      SND.g = L.buildSoundGraph(SND.ac); SND.noise = L.makeNoiseBuffer(SND.ac);
+      MUS.lvl = SND.ac.createGain(); MUS.lvl.connect(SND.g.music);
+      SND.timer = setInterval(musicTick, SOUND.TICK_MS);
+    } catch (e) { SND.ac = null; }
+  }
   return SND.ac;
 }
-function tone(f, d, type, v, delay) {
+// 소리를 깨운다(iPhone·Android: 사용자가 누른 탭에서 resume)
+function wakeAudio() {
+  const a = audioCtx();
+  try { if (a && a.state === 'suspended') a.resume(); } catch (e) { /* 무시 */ }
+  return a;
+}
+const sndEnv = { canStart: () => SND.nodes < SOUND.MAX_NODES, onStart: () => { SND.nodes++; }, onEnd: () => { SND.nodes = Math.max(0, SND.nodes - 1); } };   // 동시에 울리는 노드 24개 이하, 끝난 노드는 정리
+function playPlan(plan, dest, t) { L.playVoices(SND.ac, dest, plan, t, { noise: SND.noise, canStart: sndEnv.canStart, onStart: sndEnv.onStart, onEnd: sndEnv.onEnd }); }
+function sfxRun(name, arg) {
   if (!SND.on) return;
-  const a = audioCtx(); if (!a) return;
-  try {
-    if (a.state === 'suspended') a.resume();
-    const t = a.currentTime + (delay || 0);
-    const o = a.createOscillator(), g = a.createGain();
-    o.type = type || 'sine';
-    o.frequency.setValueAtTime(f, t);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(v || 0.07, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-    o.connect(g); g.connect(a.destination);
-    o.start(t); o.stop(t + d + 0.02);
-  } catch (e) {}
+  if (SND.log) SND.log.push(name);   // 시험용 기록(켜져 있을 때만)
+  const plan = L.sfxPlan(name, arg);
+  SND.created += plan.length;   // 예약한 소리 수(시험이 센다)
+  const a = wakeAudio(); if (!a || a.state !== 'running') return;
+  try { playPlan(plan, SND.g.sfx, a.currentTime + 0.005); } catch (e) { /* 소리가 안 나도 게임은 계속 */ }
 }
 const sfx = {
-  jump: () => tone(520, 0.08, 'triangle', 0.05),
-  jump2: () => tone(780, 0.09, 'triangle', 0.05),
-  good: c => { const k = Math.min(c, 10) * 30; tone(660 + k, 0.1, 'sine', 0.08); tone(880 + k, 0.12, 'sine', 0.07, 0.07); },
-  bad: () => tone(170, 0.22, 'sawtooth', 0.05),
-  word: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, 'triangle', 0.08, i * 0.09)),
-  over: () => [392, 330, 262].forEach((f, i) => tone(f, 0.22, 'triangle', 0.07, i * 0.15)),
-  heart: () => [660, 880, 1320].forEach((f, i) => tone(f, 0.12, 'sine', 0.08, i * 0.07)),
-  boss: () => [196, 196, 262, 330].forEach((f, i) => tone(f, 0.2, 'sawtooth', 0.05, i * 0.16))
+  jump: () => sfxRun('jump'), jump2: () => sfxRun('jump2'), land: () => sfxRun('land'),
+  good: c => sfxRun('pop', c),            // 맞는 풍선 터짐(콤보가 쌓일수록 5음계로 올라감)
+  rise: () => sfxRun('rise'), bad: () => sfxRun('bad'), speed: () => sfxRun('speed'), hint: () => sfxRun('hint'), angel: () => sfxRun('angel'), heart: () => sfxRun('heart'),
+  hit: () => sfxRun('hit'), over: () => sfxRun('over'), boss: () => sfxRun('boss'), word: () => sfxRun('word'), tick: () => sfxRun('tick')
 };
+
+// ---------- 작업365: 배경음악(코드로 만든 반복 곡, 25ms 마다 앞으로 0.12초치를 오디오 시계 기준으로 예약) ----------
+// 낮 곡(120 BPM, A 8마디 + B 8마디 번갈아)·보스 곡(140 BPM). 시작·대기 화면은 낮 곡 A 만 50% 음량. 박자는 속도에 따라 1.00~1.12배(마디마다 조금씩).
+// 발음이 나올 때 음악 35%(0.15초), 끝나고 0.2초 뒤 0.3초에 걸쳐 복귀. 혼자 할 때 [메뉴]를 열면 같은 자리에서 멈추고 닫으면 이어서. 화면이 숨겨지면 멈추고 보이면 이어서.
+const SOUND = L.SOUND;
+const MUS = { lvl: null, cur: null, all: [], hold: { menu: false, hidden: false }, heldNow: false, hm: { from: 1, to: 1, t0: 0, dur: 0 }, coef: 1, duck: null, voice: { audio: false, tts: false }, evCache: {}, count: 0 };   // count = 예약한 곡 소리 수(시험이 센다)
+function slotEvents(song, sec) {
+  const k = song + sec;
+  if (!MUS.evCache[k]) { const by = {}; for (const e of L.songEvents(song, sec)) (by[e.slot] = by[e.slot] || []).push(e); MUS.evCache[k] = by; }
+  return MUS.evCache[k];
+}
+function musicWanted() {
+  if (!SND.on || !SND.bgm) return null;
+  const st = G.state;
+  if (st === 'over') return null;
+  if (st === 'idle') return { mode: 'idle', song: 'day', secs: ['A'], level: SOUND.IDLE_LEVEL };
+  return { mode: 'game', song: G.bossMode ? 'boss' : 'day', secs: G.bossMode ? ['A'] : ['A', 'B'], level: 1 };
+}
+function newPlayer(w, level0, dur, t) {
+  const a = SND.ac, gn = a.createGain();
+  gn.gain.value = level0; gn.connect(MUS.lvl);
+  return { mode: w.mode, song: w.song, secs: w.secs, pos: 0, nextT: t + 0.05, pending: [], gn: gn, ramp: { from: level0, to: w.level, t0: t, dur: dur }, level: w.level, dying: false };
+}
+function fadePlayer(pl, to, dur, t, keep) { pl.ramp = { from: L.rampValue(pl.ramp, t), to: to, t0: t, dur: dur }; if (to === 0) { pl.dying = true; pl.keep = !!keep; } }   // keep: 낮↔보스 겹침처럼 사라지는 동안에도 계속 예약. 아니면(끔·끝) 새 음 예약을 바로 멈추고 음량만 줄인다
+function schedulePlayer(pl, now) {
+  const sg = L.SONGS[pl.song], perSec = sg.bars * 8, total = perSec * pl.secs.length;
+  while (pl.nextT < now + SOUND.LOOKAHEAD) {
+    const local = pl.pos % perSec, sec = pl.secs[Math.floor(pl.pos / perSec) % pl.secs.length];
+    if (local % 8 === 0) MUS.coef = L.tempoStep(MUS.coef, L.tempoCoef(G.speed));   // 마디가 바뀔 때만 속도에 맞춰 조금씩
+    const ss = L.slotSec(sg.bpm, MUS.coef), evs = slotEvents(pl.song, sec)[local];
+    if (evs) MUS.count += evs.length;
+    if (evs) for (const e of evs) L.playVoices(SND.ac, pl.gn, L.eventVoices(e, ss), pl.nextT, { noise: SND.noise, canStart: sndEnv.canStart, onStart: sndEnv.onStart, onEnd: sndEnv.onEnd });
+    pl.pending.push({ pos: pl.pos, t: pl.nextT }); if (pl.pending.length > 12) pl.pending.shift();
+    pl.nextT += ss; pl.pos = (pl.pos + 1) % total;
+  }
+}
+function musicTick() {
+  const a = SND.ac;
+  if (!a || a.state !== 'running') { if (a && SND.nodes) SND.nodes = 0; return; }
+  const now = a.currentTime, want = musicWanted(), held = MUS.hold.menu || MUS.hold.hidden;
+  // 1) 지금 나와야 할 곡으로 바꾼다(없으면 페이드 아웃). 일시정지·숨김 중에는 바꾸지 않는다
+  if (!held) {
+    const cur = MUS.cur;
+    if (!want) { if (cur) { fadePlayer(cur, 0, SOUND.FADE_OUT, now); MUS.cur = null; } }
+    else if (!cur || cur.mode !== want.mode || cur.song !== want.song) {
+      if (cur) {
+        const cross = cur.mode === 'game' && want.mode === 'game';   // 낮 ↔ 보스: 0.4초 겹쳐 바뀐다
+        fadePlayer(cur, 0, cross ? SOUND.BOSS_FADE : 0.15, now, cross);
+        MUS.cur = newPlayer(want, 0, cross ? SOUND.BOSS_FADE : (want.mode === 'game' ? SOUND.FADE_IN : 0.3), now);
+      } else MUS.cur = newPlayer(want, 0, want.mode === 'game' ? SOUND.FADE_IN : 0.3, now);
+      MUS.all.push(MUS.cur);
+    } else if (cur.level !== want.level) { cur.level = want.level; fadePlayer(cur, want.level, 0.3, now); cur.dying = false; }
+  }
+  // 2) 일시정지·숨김: 아직 시작하지 않은 첫 칸에서 멈추고(같은 위치), 풀리면 거기서 이어서
+  if (held && !MUS.heldNow) {
+    MUS.heldNow = true; MUS.hm = { from: L.rampValue(MUS.hm, now), to: 0, t0: now, dur: SOUND.HOLD_FADE };
+    for (const pl of MUS.all) { pl.pos = L.resumePos(pl.pending, now, pl.pos); pl.pending = []; }
+  } else if (!held && MUS.heldNow) {
+    MUS.heldNow = false; MUS.hm = { from: L.rampValue(MUS.hm, now), to: 1, t0: now, dur: SOUND.RESUME_FADE };
+    for (const pl of MUS.all) pl.nextT = now + 0.05;
+  }
+  // 3) 예약하고 음량을 갱신한다
+  for (const pl of MUS.all) {
+    const v = L.rampValue(pl.ramp, now);
+    if (pl.dying && v <= 0.001 && now >= pl.ramp.t0 + pl.ramp.dur) { pl.dead = true; continue; }
+    if (!held && !(pl.dying && !pl.keep)) schedulePlayer(pl, now);
+    pl.gn.gain.value = v;
+  }
+  if (MUS.all.some(p => p.dead)) { for (const p of MUS.all) if (p.dead) { try { p.gn.disconnect(); } catch (e) { /* 무시 */ } } MUS.all = MUS.all.filter(p => !p.dead); }
+  MUS.lvl.gain.value = L.duckLevel(now, MUS.duck) * L.rampValue(MUS.hm, now);
+}
+// 발음(서버 audio·내장 음성)이 나오는 동안 음악을 줄인다. 두 출처 중 하나라도 나오는 중이면 줄인 상태
+function voiceDuck(src, on) {
+  const was = MUS.voice.audio || MUS.voice.tts;
+  MUS.voice[src] = on;
+  const is = MUS.voice.audio || MUS.voice.tts, a = SND.ac;
+  if (!a || was === is) return;
+  const now = a.currentTime, lv = L.duckLevel(now, MUS.duck);
+  if (is) MUS.duck = { start: now, end: null, from: lv, endLevel: null };
+  else if (MUS.duck) { MUS.duck.end = now; MUS.duck.endLevel = lv; }
+}
+function musicHold(reason, on) { MUS.hold[reason] = on; }
+function musicSyncMenu() { MUS.hold.menu = menuPauses(); }
+// 결과 화면: 완주하면 밝은 마무리(약 3초), 아니면 짧고 부드러운 마무리. [배경음]을 끄면 나오지 않는다
+function musicJingle(cleared) {
+  if (!SND.on || !SND.bgm) return;
+  const plan = L.sfxPlan(cleared ? 'win' : 'fail');
+  SND.created += plan.length;
+  const a = wakeAudio(); if (!a || a.state !== 'running') return;
+  try { playPlan(plan, SND.g.music, a.currentTime + 0.15); } catch (e) { /* 무시 */ }
+}
 
 // ---------- 발음: 서버 TTS 우선, 실패 시 브라우저 내장 음성 ----------
 const hasSpeech = () => ('speechSynthesis' in window) && typeof window.SpeechSynthesisUtterance !== 'undefined';
@@ -274,8 +369,9 @@ function speakBuiltin(text, rate, queue, onResult) {
     u.lang = 'en-US'; u.rate = rate || 0.85;
     if (voice) u.voice = voice;
     let started = false;
-    u.onstart = () => { started = true; report(true); };
-    u.onerror = e => { if (!started) report(false, (e && e.error) || '오류'); };
+    u.onstart = () => { started = true; voiceDuck('tts', true); report(true); };   // 작업365: 내장 음성이 나오는 동안 음악을 줄인다
+    u.onend = () => voiceDuck('tts', false);
+    u.onerror = e => { voiceDuck('tts', false); if (!started) report(false, (e && e.error) || '오류'); };
     lastUtt = u;
     speechSynthesis.speak(u);
     if (speechSynthesis.paused) speechSynthesis.resume();
@@ -285,6 +381,8 @@ function speakBuiltin(text, rate, queue, onResult) {
 
 // 서버 발음 오디오는 하나의 <audio> 요소로 재생한다(iOS는 사용자 탭에서 한 번 재생한 요소만 이후 자동 재생을 허용한다).
 const player = new Audio();
+player.addEventListener('playing', () => { if (player.src !== SILENT_WAV) voiceDuck('audio', true); });   // 작업365: 서버 발음이 나오는 동안 음악을 줄이고, 끝나면(ended·pause·error) 돌려놓는다
+for (const ev of ['ended', 'pause', 'error', 'emptied', 'abort']) player.addEventListener(ev, () => voiceDuck('audio', false));
 const audioCache = new Map();   // 단어 → 오디오 주소(Promise). 작업325: 실패한 요청은 지워 다음 호출에서 다시 시도한다(실패가 방문 동안 반복되지 않게)
 const audioMeta = new Map();    // 단어 → 서버 응답 헤더 X-TTS-Cache(HIT/MISS). 점검 옵션 ttsdebug 의 출처 문구용
 let serverTtsOff = false;       // 401·403·503을 받으면 이번 방문에서는 서버 발음을 더 부르지 않는다
@@ -374,7 +472,7 @@ function pronounce(word, opts, onResult) {
 }
 // 시작·재도전 버튼을 누른 순간 호출: 소리 재생 권한(자동 재생 제한)을 미리 확보한다
 function primeAudio() {
-  audioCtx();
+  wakeAudio();   // 작업365: 시작 버튼을 누른 탭에서 AudioContext 를 깨운다
   try { player.src = SILENT_WAV; const pr = player.play(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {}
   if (hasSpeech()) {
     try { const u = new SpeechSynthesisUtterance('a'); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
@@ -384,16 +482,25 @@ function stopVoices() {
   try { player.pause(); } catch (e) {}
   if (hasSpeech()) { try { speechSynthesis.cancel(); } catch (e) {} }
 }
+const bgmBtns = [$('bgm'), $('bgmStart')];
 function syncSndButtons() {
   sndBtns.forEach(b => { b.textContent = SND.on ? '소리 켬' : '소리 끔'; b.setAttribute('aria-pressed', String(SND.on)); });
   const m = $('srMenuSnd'); if (m) { m.textContent = SND.on ? '소리 끄기' : '소리 켜기'; m.setAttribute('aria-pressed', String(SND.on)); }   // 작업360: 가로 메뉴 항목
+  bgmBtns.forEach(b => { b.textContent = SND.bgm ? '배경음 켬' : '배경음 끔'; b.setAttribute('aria-pressed', String(SND.bgm)); });   // 작업365: 효과음과 따로
+  const mb = $('srMenuBgm'); if (mb) { mb.textContent = SND.bgm ? '배경음 끄기' : '배경음 켜기'; mb.setAttribute('aria-pressed', String(SND.bgm)); }
 }
 function toggleSound() {
-  SND.on = !SND.on;
+  SND.on = !SND.on;   // 전체 [소리 끔]이면 효과음·음악·내장 음성이 모두 꺼진다(음악은 musicWanted 가 null 이라 페이드 아웃)
   if (!SND.on) stopVoices();
   syncSndButtons();
 }
+function toggleBgm() {   // 작업365: [배경음]만 켜고 끈다. 마지막 선택은 저장한다(읽기·쓰기 실패는 무시)
+  SND.bgm = !SND.bgm;
+  try { localStorage.setItem('spellrun_bgm', SND.bgm ? '1' : '0'); } catch (e) { /* 저장 실패는 무시 */ }
+  syncSndButtons();
+}
 sndBtns.forEach(b => b.addEventListener('click', toggleSound));
+bgmBtns.forEach(b => b.addEventListener('click', toggleBgm));
 syncSndButtons();
 
 // ---------- 게임 상태 ----------
@@ -833,7 +940,7 @@ function onRescueItem(t) {
   t.state = 'taken'; t.t = 0; t.ok = true;
   const pack = -t.id, slot = G.plan.slots[G.si];
   G.rescue = { kind: t.kind, pack: pack };
-  sfx.heart();
+  if (t.kind === 'hint') sfx.hint(); else sfx.angel();   // 작업365: 힌트 전구는 종, 천사는 하프
   if (t.kind === 'hint') {
     burst(RUNNER_X + 8, TILE_Y, '#34d399', 12); floatText(RUNNER_X + 70, GROUND - 235, '힌트!', '#0f8a5f', 22);
     const el = slotEls[G.si];
@@ -856,7 +963,7 @@ function clearRescue() {   // 묶음이 끝나면 효과가 사라진다
 function onSpeedItem(t) {
   t.state = 'taken'; t.t = 0; t.ok = true;
   G.boost = CONFIG.BOOST_SEC; G.boostMax = CONFIG.BOOST_SEC;
-  sfx.heart();
+  sfx.speed();   // 작업365: 번개 "지직"
   burst(RUNNER_X + 8, TILE_Y, '#38bdf8', 14);
   floatText(RUNNER_X + 70, GROUND - 235, '빨라요!', '#0b7fc0', 22);
 }
@@ -922,7 +1029,8 @@ function onFail(t, kind) {
   sfx.bad();
   floatText(RUNNER_X + 30, GROUND - 150, kind === 'wrong' ? '오답!' : '놓쳤어요', BAD, 22);
   flashHint(G.si);
-  if (edgeOn()) { edgeReplan(); if (kind === 'wrong' || kind === 'miss') riseUseless(); }   // 작업363: 정답을 놓쳤을 때도 쓸모없어진 풍선이 함께 올라간다(놓친 풍선 자신은 그대로 지나감)   // 작업362: 틀린 풍선과 쓸모없어진 풍선이 같은 순간에 올라간다(점수·콤보 계산은 그대로)
+  if (edgeOn()) { edgeReplan(); if (kind === 'wrong' || kind === 'miss') riseUseless(); }
+  if (G.riseSnd) { G.riseSnd = false; sfx.rise(); }   // 작업365: 풍선이 몇 개 올라가도 "슈우웅"은 한 번   // 작업363: 정답을 놓쳤을 때도 쓸모없어진 풍선이 함께 올라간다(놓친 풍선 자신은 그대로 지나감)   // 작업362: 틀린 풍선과 쓸모없어진 풍선이 같은 순간에 올라간다(점수·콤보 계산은 그대로)
   renderHearts(); renderScore();
   if (G.hp <= 0) onZeroHp();
 }
@@ -934,7 +1042,7 @@ function onObstacleHit(ob) {
   G.invuln = CONFIG.OBST_INVULN_SEC;
   G.hurt = 0.5; G.shake = 0.3; setReact('hurt');   // 작업363: 하트가 줄면 hurt
   if (ob.kind === 'pit') G.fall = FALL_SEC; else G.stumble = STUMBLE_SEC;
-  sfx.bad();
+  sfx.hit();   // 작업365: 낮은 "쿵" + "뾰잉"
   burst(RUNNER_X, GROUND - 6, ob.kind === 'pit' ? '#8a93c4' : '#c8791f', 10);
   floatText(RUNNER_X + 30, GROUND - 150, ob.kind === 'pit' ? '구덩이!' : '걸렸어요', BAD, 22);
   renderHearts();
@@ -1018,6 +1126,7 @@ function afterPop() {
 }
 function finish(cleared) {
   closeMenu();   // 작업360
+  musicJingle(!!cleared);   // 작업365: 결과 화면 마무리 소리(음악은 상태가 over 가 되면 페이드 아웃)
   G.state = 'over'; G.bossMode = false; G.cleared = !!cleared; clearIntro(); els.cont.hidden = true;
   box.classList.remove('boss');
   els.pop.hidden = true; els.hud.hidden = true; els.bossBanner.hidden = true;
@@ -1156,6 +1265,7 @@ function step(dt) {
     if (G.j2 >= 0 ? G.j2 >= G.j2Land : G.jumpT >= CONFIG.JUMP_TIME) {
       G.jumpT = -1; G.j2 = -1; G.land = 0.12;
       if (fxOn()) spawnDust('land');   // 작업363: 착지할 때 먼지 3개가 뒤로 퍼진다
+      sfx.land();   // 작업365: 낮고 짧은 "톡"
       if (G.jumpBuf > 0) startJump();
     }
   }
@@ -1513,7 +1623,7 @@ function riseTile(t) {
   if (t.rise || t.kind) return;
   const A = BALLOON_ART, ty = (t.high ? HIGH_Y : TILE_Y) - tileLift(t), below = balloonK(t) !== null ? A.BOTTOM_DY + A.BOB + 2 : TILE_H * tileScale() / 2 + 8;   // 풍선은 끈 끝, 기존 타일 모양(조각이 너무 넓을 때)은 타일 아래 끝까지
   const dist = ty + below, r = balloonRise(dist, t.n || 0);
-  t.checked = true; t.rise = { t: 0, a: r.a, dist: dist };
+  t.checked = true; t.rise = { t: 0, a: r.a, dist: dist }; G.riseSnd = true;   // 작업365: 올라가는 소리는 한 번 처리에서 한 번만(onFail 이 낸다)
 }
 // 틀린 철자를 먹고 다시 계획한 직후: 화면 안에 이미 나와 있는 풍선 중 "계획에서는 맞는 풍선이었지만 지금 풀 칸의 정답이 아니게 된" 것(뒤 칸·다음 단어용 정답 풍선)을 함께 올린다.
 // 처음부터 오답 후보였던 풍선과 지금 풀 칸의 정답 풍선은 그대로 둔다
@@ -2670,11 +2780,13 @@ const menuPauses = () => MENU.open && !VSG.on && G.state !== 'idle' && G.state !
 function openMenu() {
   if (viewMode !== 'land' || MENU.open) return;
   MENU.open = true; $('srMenu').hidden = false; $('srMenuBtn').setAttribute('aria-expanded', 'true');
+  musicSyncMenu(); sfx.tick();   // 작업365: 혼자 할 때는 음악도 멈춘다. 아주 작은 틱
   try { $('srMenuCont').focus({ preventScroll: true }); } catch (e) { /* 무시 */ }
 }
 function closeMenu() {
   if (!MENU.open) return;
   MENU.open = false; $('srMenu').hidden = true; $('srMenuBtn').setAttribute('aria-expanded', 'false');
+  musicSyncMenu(); sfx.tick();
 }
 let viewUIReady = false;
 function setupViewUI() {
@@ -2683,7 +2795,8 @@ function setupViewUI() {
   $('srClose').addEventListener('click', srClose);
   $('srMenuBtn').addEventListener('click', () => { if (MENU.open) closeMenu(); else openMenu(); });
   $('srMenuCont').addEventListener('click', closeMenu);
-  $('srMenuSnd').addEventListener('click', toggleSound);
+  $('srMenuSnd').addEventListener('click', () => { toggleSound(); sfx.tick(); });
+  $('srMenuBgm').addEventListener('click', () => { toggleBgm(); sfx.tick(); });
   $('srMenuView').addEventListener('click', () => { closeMenu(); tryFs(); setViewMode('port'); });
   $('srMenuClose').addEventListener('click', () => { closeMenu(); srClose(); });
   $('srView').addEventListener('click', () => { tryFs(); setViewMode((pendingView || viewMode) === 'land' ? 'port' : 'land'); });
@@ -2709,11 +2822,22 @@ const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRou
 API.art = { charKey: () => charKey, activeChar: activeChar, charReady: charReady, bgOK: bgOK, itemArtReady: itemArtReady, obstArtReady: () => obstArtReady(), blend: () => G.bossBlend, setChar: k => setChar(k) };   // 작업358: 시험용 훅
 API.fx = { on: fxOn, setOn: v => { LAYOUT.FX = !!v; }, react: reactNow, setReact: setReact, state: () => G.react, dust: () => G.dust.length };   // 작업363: 시험용 훅
 API.balloon = { rise: riseTile, ready: balloonReady, k: balloonK, lift: tileLift, setLift: v => { LAYOUT.TILE_LIFT = v; } };   // 작업361: 시험용 훅
+API.sound = { SND: SND, MUS: MUS, tick: musicTick, wake: wakeAudio, nodes: () => SND.nodes, created: () => SND.created, wanted: musicWanted, hold: musicHold, bgm: () => SND.bgm, setBgm: v => { if (SND.bgm !== !!v) toggleBgm(); }, jingle: musicJingle };   // 작업365: 시험용 훅
 API.menu = { open: () => MENU.open, pauses: menuPauses };   // 작업360: 시험용 훅
 API.view = { mode: () => viewMode, pending: () => pendingView, set: setViewMode, scale: () => curScale, layout: () => ({ W: W, H: H, GROUND: GROUND, TILE_Y: TILE_Y, HIGH_Y: HIGH_Y }) };   // 작업355: 시험용 훅
 API.edge = { on: edgeOn, setViewW: w => { streamViewW = w; }, viewW: () => streamViewW, fill: edgeFill };   // 작업354: 시험용 훅
 API.preview = { T: PV_T, state: PV, run: previewRun, isOn: () => previewOn };   // 작업345: 시험용 훅
 API.vs = { T: VS_T, state: VS, open: vsOpen, game: VSG, renderHearts: renderHearts };   // 작업344: 시험용 훅(조회 간격 단축·상태 확인)
+// 작업365: 첫 누름·키 입력에서 AudioContext 를 깨워 시작·대기 화면 음악이 나오게 한다(자동 재생 제한). 화면이 숨겨지거나 앱을 나가면 음악을 멈추고, 돌아오면 이어서(350·351 의 0.5초 중복 방지와 같은 규칙)
+for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, () => { wakeAudio(); }, { capture: true, passive: true });
+{
+  let bgmResumedAt = 0;
+  const bgmHide = () => musicHold('hidden', true);
+  const bgmShow = () => { bgmResumedAt = Date.now(); musicHold('hidden', false); wakeAudio(); };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) bgmHide(); else bgmShow(); });
+  window.addEventListener('pagehide', () => bgmHide());
+  window.addEventListener('pageshow', e => { if (document.hidden || Date.now() - bgmResumedAt < 500) return; bgmShow(); });
+}
 window.SpellRun = API;
 boot();
 })();

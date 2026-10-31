@@ -87,7 +87,7 @@ test('360-5) 메뉴: 계속하기 / 소리 켜기·끄기 / 세로로 바꾸기 
   await page.click('#srMenuBtn');
   assert.equal(await page.eval('SpellRun.menu.open()'), true);
   const items = await page.eval(`Array.from(document.querySelectorAll('#srMenu button')).map(b => { const r = b.getBoundingClientRect(), bx = document.getElementById('box').getBoundingClientRect(); return { t: b.textContent, h: r.height, inBox: r.left >= bx.left && r.right <= bx.right && r.top >= bx.top && r.bottom <= bx.bottom }; })`);
-  assert.deepEqual(items.map(i => i.t), ['계속하기', '소리 끄기', '세로로 바꾸기', '닫기']);
+  assert.deepEqual(items.map(i => i.t), ['계속하기', '소리 끄기', '배경음 끄기', '세로로 바꾸기', '닫기']);
   assert.ok(items.every(i => i.h >= 43.5 && i.inBox), JSON.stringify(items));
   await page.click('#srMenuSnd');
   assert.equal(await page.eval("document.getElementById('srMenuSnd').textContent"), '소리 켜기');

@@ -65,6 +65,7 @@
             <span class="progress" id="progress"></span>
             <span class="speedtag" id="speedTag"></span>
             <button class="snd" id="snd" type="button">소리 켬</button>
+            <button class="snd" id="bgm" type="button">배경음 켬</button>
           </div>
           <div class="hintbox" id="hintbox">
             <div class="meaning" id="meaning"></div>
@@ -90,6 +91,7 @@
         <div class="srmenu" id="srMenu" role="group" aria-label="메뉴" hidden>
           <button class="menuitem" id="srMenuCont" type="button">계속하기</button>
           <button class="menuitem" id="srMenuSnd" type="button" aria-pressed="true">소리 끄기</button>
+          <button class="menuitem" id="srMenuBgm" type="button" aria-pressed="true">배경음 끄기</button>
           <button class="menuitem" id="srMenuView" type="button">세로로 바꾸기</button>
           <button class="menuitem" id="srMenuClose" type="button">닫기</button>
         </div>
@@ -171,6 +173,7 @@
               <h3 class="rhead">소리</h3>
               <div class="trow">
                 <button class="toggle vsbtn" id="sndStart" type="button">소리 켬</button>
+                <button class="toggle vsbtn" id="bgmStart" type="button">배경음 켬</button>
                 <button class="toggle vsbtn" id="ttsTest" type="button">발음 테스트</button>
               </div>
               <p class="note" id="ttsStatus" aria-live="polite"></p>
@@ -283,8 +286,8 @@
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=89"></script>
-<script src="/js/spellrun/stage_style.js?v=89"></script>
-<script src="/js/spellrun/game.js?v=89"></script>
+<script src="/js/spellrun/logic.js?v=90"></script>
+<script src="/js/spellrun/stage_style.js?v=90"></script>
+<script src="/js/spellrun/game.js?v=90"></script>
 </body>
 </html>

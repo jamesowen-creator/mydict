@@ -548,7 +548,7 @@ test('322-1/2) 상세 힌트 박스(흰 배경·품사·품사별 다른 뜻·�
     const d = await hudInfo(page);
     seen.push(d.word);
     assert.equal(d.hint, null, '#hint 요소가 없다'); assert.equal(d.boxes, 0, '.hint/.h-pos/.h-alt/.h-note/.h-ex 요소 없음');
-    assert.equal(await page.eval("[...document.querySelectorAll('#hud *')].filter(e => { const c = getComputedStyle(e).backgroundColor; return /rgba?\\(255, 255, 255, 0\\.\\d+\\)/.test(c) && e.id !== 'snd'; }).length"), 0, '흰 반투명 배경 박스 없음');
+    assert.equal(await page.eval("[...document.querySelectorAll('#hud *')].filter(e => { const c = getComputedStyle(e).backgroundColor; return /rgba?\\(255, 255, 255, 0\\.\\d+\\)/.test(c) && e.id !== 'snd' && e.id !== 'bgm'; }).length"), 0, '흰 반투명 배경 박스 없음');
     const text = d.meaning + ' ' + (d.sub || '');
     const re = new RegExp('(?<![A-Za-z])' + d.word + '(s|es|ed|d|ing|ly|er|ers|est)?(?![A-Za-z])', 'i');
     assert.ok(!re.test(text), d.word + ': 힌트에 정답이 보임: ' + text);

@@ -51,6 +51,7 @@
   background:var(--gold);border:calc(2 * var(--u)) solid var(--ink);border-radius:999px;
   padding:calc(2 * var(--u)) calc(9 * var(--u));font-variant-numeric:tabular-nums;
 }
+.sr-box .progress,.sr-box .speedtag,.sr-box .snd{white-space:nowrap}   /* 작업365: [배경음] 단추가 늘어도 글자가 두 줄로 꺾이지 않게 */
 .sr-box .snd{
   pointer-events:auto;cursor:pointer;
   font-family:var(--f-body);font-weight:700;font-size:calc(11 * var(--u));color:var(--ink);
@@ -232,7 +233,7 @@ body.sr-full .sr-box{border-radius:0;box-shadow:none}
 body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
 /* 위쪽 작은 단추: 시각 크기는 작게, 터치 영역은 44px 이상(::before). 달리는 중에는 HUD 둘째 줄 아래, 아닐 때는 맨 위 */
 .sr-box .ctl{position:absolute;left:calc(8 * var(--u));top:calc(6 * var(--u));display:flex;gap:calc(8 * var(--u));z-index:6}
-.sr-box .hud:not([hidden]) ~ .ctl{left:calc(14 * var(--u));top:calc(64 * var(--u))}
+.sr-box .hud:not([hidden]) ~ .ctl{left:calc(14 * var(--u));top:calc(67 * var(--u))}   /* 작업365: 둘째 줄에 [배경음]이 늘어 속도 배지가 왼쪽으로 와서, 위쪽 단추를 3px 내림(뜻 시작 y 97 보다 위) */
 .sr-box .ctlb{position:relative;cursor:pointer;font-family:var(--f-body);font-weight:700;font-size:calc(12 * var(--u));line-height:1;color:var(--ink);background:rgba(255,255,255,.78);border:calc(2 * var(--u)) solid var(--ink);border-radius:999px;padding:calc(5 * var(--u)) calc(12 * var(--u));height:calc(26 * var(--u))}
 .sr-box .ctlb::before{content:"";position:absolute;left:-4px;right:-4px;top:50%;height:max(44px,100%);transform:translateY(-50%)}
 .sr-box .ctlb:focus-visible{outline:calc(3 * var(--u)) solid var(--ink);outline-offset:calc(2 * var(--u))}
