@@ -369,6 +369,10 @@ body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
 .sr-box.land #startBtn{grid-column:1 / -1;grid-row:5}
 .sr-box.land #charRow{gap:calc(6 * var(--u))}
 .sr-box.land #charRow .chbtn{min-width:0;padding:calc(2 * var(--u)) calc(6 * var(--u))}   /* 가로 640x360 에서도 캐릭터 3개가 한 줄에 */
+/* 작업383: 가로에서 줄 사이 터치 영역(::before 로 44px 까지 넓힌 부분)이 겹치지 않게 줄 사이를 벌린다. 보이는 높이·터치 영역은 그대로.
+   칩의 보이는 높이는 36u 라서 위아래로 (44px - 36u)/2 씩 넓어진다 → 화면 칩 줄과 보조 버튼 줄 사이는 둘의 합(44px - 36u), 보조 버튼 줄과 시작 버튼(넓힘 없음) 사이는 그 절반 */
+.sr-box.land #optRow{margin-top:max(0px,calc(44px - 36 * var(--u)))}
+.sr-box.land #startBtn{margin-top:max(0px,calc((44px - 36 * var(--u)) / 2))}
 @media (prefers-reduced-motion:reduce){
 .sr-box .word > .iv,.sr-box .popword.go .pl,.sr-box .slot.cur .cell,.sr-box .slot.done .cell.pop,.sr-box .slot.bad,.sr-box .popword.go,.sr-box .banner.go,.sr-box .meaning.enter{animation:sr-none}
 }
