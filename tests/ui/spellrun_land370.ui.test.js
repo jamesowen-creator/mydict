@@ -74,18 +74,18 @@ const crossScene = `(() => { const R = SpellRun, G = R.G, out = [];
   }
   return out; })()`;
 
-test('370-1) 가로: 캐릭터 기준 x 149, 몸 중심 약 16%(여학생·남학생·펭귄), 풍선은 GRAB_DX 36.75 만큼 오른쪽에 그려지고 그 순간 먹는다. 세로는 72·0', { skip: SKIP }, async () => {
+test('370-1) 가로: 캐릭터 기준 x 149, 몸 중심 약 16%(여학생·남학생·펭귄), 풍선은 GRAB_DX 18(기본, 작업372) 만큼 오른쪽에 그려지고 그 순간 먹는다. 세로는 72·0', { skip: SKIP }, async () => {
   const page = await open(844, 390);
   await startRun(page); await page.eval(seed); await page.eval(spyBalloon);
   const r = await page.eval('({ rx: SpellRun.RUNNER_X, dx: SpellRun.GRAB_DX, W: SpellRun.view.layout().W, fx: ["girl", "boy", "penguin"].map(k => { const P = SpellRunLogic.CHARS[k]; return RX(P); }) })'.replace('RX(P)', '(SpellRun.RUNNER_X + P.faceDx * 1.3)'));
-  assert.equal(r.rx, 149); assert.equal(r.dx, 36.75); assert.equal(r.W, 800);
+  assert.equal(r.rx, 149); assert.equal(r.dx, 18); assert.equal(r.W, 800);
   assert.ok(Math.abs(r.fx[0] / r.W - 0.16) < 0.01 && Math.abs(r.fx[1] / r.W - 0.16) < 0.01, `여학생·남학생 몸 중심 ${r.fx.map(x => (x / r.W * 100).toFixed(1) + '%')}`);
   const sc = await page.eval(crossScene);
   assert.ok(sc.length >= 1, '풍선을 먹은 프레임이 있다');
   let drawn = 0;
   for (const c of sc) {
     assert.ok(c.logicalX <= 149 + 0.05 && c.logicalX > 149 - c.speed / 60 - 0.5, `먹는 순간 논리 x ${c.logicalX} 는 149 를 막 지난 값`);
-    if (c.drawX !== null && Math.abs(c.drawX - (c.logicalX + 36.75)) < 1) { drawn++; assert.ok(c.drawX <= 149 + 36.75 + 0.05 && c.drawX > 149 + 36.75 - c.speed / 60 - 0.5, `먹는 순간 풍선이 그려진 x ${c.drawX} ≈ 185.75`); }   // 맞아서 터진 풍선은 그림이 없으니 지나가기만 한 풍선으로 확인
+    if (c.drawX !== null && Math.abs(c.drawX - (c.logicalX + 18)) < 1) { drawn++; assert.ok(c.drawX <= 149 + 18 + 0.05 && c.drawX > 149 + 18 - c.speed / 60 - 0.5, `먹는 순간 풍선이 그려진 x ${c.drawX} ≈ 167`); }   // 맞아서 터진 풍선은 그림이 없으니 지나가기만 한 풍선으로 확인
   }
   noErr(page); await page.close();
 });
@@ -95,5 +95,56 @@ test('370-1) 세로: RUNNER_X 72, GRAB_DX 0, 풍선·AIR_GAP 없음(이전과 �
   await startRun(page);
   const r = await page.eval('({ rx: SpellRun.RUNNER_X, dx: SpellRun.GRAB_DX, W: SpellRun.view.layout().W, gap: SpellRun.view.layout().AIR_GAP })');
   assert.equal(r.rx, 72); assert.equal(r.dx, 0); assert.equal(r.W, 360); assert.ok(!r.gap);
+  noErr(page); await page.close();
+});
+
+// ---- 작업372: grabdx 주소 옵션 ----
+const popScene = `(() => { const R = SpellRun, G = R.G; let hit = null;
+  for (let i = 0; i < 6000 && !hit; i++) {
+    R.step(1 / 60);
+    const v = G.tiles.filter(t => !t.kind && t.state === 'live' && !t.checked && t.x > R.RUNNER_X + 5 && t.x < 700);
+    const w = v.find(t => t.correct && t.wi === G.wi && t.si === G.si);
+    if (w && i > 60) { w.x = R.RUNNER_X + 1; G.jumpT = 0.2; G.j2 = -1; const n0 = G.parts.length; R.step(0.01); hit = { n: G.parts.length - n0, xs: G.parts.slice(n0).filter(p => p.max === 0.3).map(p => p.x), dx: R.GRAB_DX, rx: R.RUNNER_X }; }
+    if (G.state !== 'run') break;
+  }
+  return hit; })()`;
+
+for (const [q, want] of [['?mode=1&grabdx=36.75', 36.75], ['?mode=1&grabdx=0', 0], ['?mode=1&grabdx=99', 40], ['?mode=1&grabdx=-3', 0], ['?mode=1&grabdx=abc', 18], ['?mode=1', 18]]) {
+  test(`372-2) 가로 ${q}: GRAB_DX ${want}, 판정 순간 풍선이 그려진 x = RUNNER_X + ${want}, 터지는 조각도 같은 기준`, { skip: SKIP }, async () => {
+    const page = await open(844, 390, q);
+    await startRun(page); await page.eval(seed); await page.eval(spyBalloon);
+    const r = await page.eval('({ rx: SpellRun.RUNNER_X, dx: SpellRun.GRAB_DX })');
+    assert.equal(r.rx, 149); assert.equal(r.dx, want);
+    const sc = await page.eval(crossScene);
+    assert.ok(sc.length >= 1);
+    // 풍선 몸통은 매듭을 축으로 ±4도 흔들려 그림 호출의 x 가 최대 약 2px 어긋난다
+    for (const c of sc) if (c.drawX !== null && Math.abs(c.drawX - (c.logicalX + want)) < 2.5) assert.ok(c.drawX <= 149 + want + 2.5 && c.drawX > 149 + want - c.speed / 60 - 2.5, `먹는 순간 그려진 x ${c.drawX}`);
+    noErr(page); await page.close();
+    const page2 = await open(844, 390, q);   // 터지는 조각은 새 판에서(앞 장면이 체력을 깎았을 수 있다)
+    await startRun(page2); await page2.eval(seed);
+    const pop = await page2.eval(popScene);
+    assert.ok(pop && pop.n >= 1, '맞는 풍선이 터지며 조각이 생긴다');
+    for (const x of pop.xs) assert.ok(Math.abs(x - (149 + want)) < 3, `터지는 조각 x ${x} ≈ ${149 + want}`);
+    noErr(page2); await page2.close();
+  });
+}
+
+test('372-2) 세로: grabdx 를 줘도 GRAB_DX 0, RUNNER_X 72 (옵션은 가로에만 적용)', { skip: SKIP }, async () => {
+  const page = await open(390, 844, '?mode=0&grabdx=30');
+  await startRun(page);
+  const r = await page.eval('({ rx: SpellRun.RUNNER_X, dx: SpellRun.GRAB_DX, saved: localStorage.getItem("spellrun_opts") })');
+  assert.equal(r.rx, 72); assert.equal(r.dx, 0);
+  assert.ok(/"grabdx":30/.test(r.saved), '옵션은 저장되지만 세로에는 쓰지 않는다');
+  noErr(page); await page.close();
+});
+
+test('372-2) grabdx 는 spellrun_opts 에 저장되고(주소 없이도 쓰임), reset=1 이면 지워져 기본 18 로 돌아간다. 기본값이 아니면 "조정값 사용 중" 대상(applied)', { skip: SKIP }, async () => {
+  const page = await open(844, 390, '?mode=1&grabdx=30');   // 시험 도우미가 문서를 열 때마다 저장값을 지우므로 다시 열지 않고 같은 규칙 함수로 확인한다
+  await startRun(page);
+  const a = await page.eval('({ dx: SpellRun.GRAB_DX, saved: localStorage.getItem("spellrun_opts"), opt: SpellRunLogic.resolveOptions("", localStorage.getItem("spellrun_opts")), reset: SpellRunLogic.resolveOptions("?reset=1", localStorage.getItem("spellrun_opts")), def: SpellRunLogic.resolveOptions("?grabdx=18", null) })');
+  assert.equal(a.dx, 30); assert.ok(/"grabdx":30/.test(a.saved));
+  assert.equal(a.opt.values.grabdx, 30, '주소 없이도 저장값'); assert.deepEqual(a.opt.applied, ['grabdx']);
+  assert.equal(a.reset.reset, true); assert.deepEqual(a.reset.values, {});
+  assert.deepEqual(a.def.applied, [], '기본값이면 조정값 표시 없음');
   noErr(page); await page.close();
 });

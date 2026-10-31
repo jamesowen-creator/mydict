@@ -141,7 +141,7 @@ function applyLayout(lo) {
   W = LAYOUT.W; H = LAYOUT.H; GROUND = LAYOUT.GROUND; TILE_Y = LAYOUT.TILE_Y; TILE_H = LAYOUT.TILE_H; HIGH_Y = LAYOUT.HIGH_TILE_Y;
   box.style.setProperty('--hs', LAYOUT.HUD_SHIFT);
   box.classList.toggle('land', lo.mode === 'land');
-  RUNNER_X = LAYOUT.RUNNER_X || 72; GRAB_DX = LAYOUT.GRAB_DX || 0;   // 작업370
+  RUNNER_X = LAYOUT.RUNNER_X || 72; GRAB_DX = lo.mode === 'land' ? (OPT.values.grabdx !== undefined ? OPT.values.grabdx : (LAYOUT.GRAB_DX || 0)) : 0; LAYOUT.GRAB_DX = GRAB_DX;   // 작업372: 세로는 옵션과 상관없이 0, 가로는 grabdx(기본 18). 작업370
   streamViewW = W;   // edge 진입 지점 = 판 폭 + 타일 반폭 (작업370: 풍선은 그릴 때 GRAB_DX 만큼 더 오른쪽이라 화면 밖에서 시작하는 것은 그대로이고, 장애물은 이전과 같은 자리에서 들어온다)
 }
 function resize() {

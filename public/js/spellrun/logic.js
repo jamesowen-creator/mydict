@@ -166,6 +166,8 @@ function buildConfig(v) {
 const CONFIG = buildConfig();
 
 // 작업318-5: 주소 옵션(?pace=1.1&hp=7&startdelay=2.6&popsec=2&highprob=0.3&heartevery=3&dj=1). 허용 범위를 벗어나거나 숫자가 아니면 무시(기본값).
+// 작업372(가로만): 풍선을 그릴 때 더하는 오른쪽 이동의 기본값(px). 370 에서는 36.75(풍선 반폭 21.75 + 그림 앞쪽 끝 15)였는데 풍선이 너무 일찍 터져 18 로 줄였다(주소 옵션 grabdx 0~40 으로 조정, 세로는 항상 0).
+const LAND_GRAB_DX = 18;
 const OPTION_RULES = {
   pace: { min: 0.7, max: 1.8, def: DEFAULT_PACE }, hp: { min: 1, max: 10, int: true, def: 5 }, startdelay: { min: 0.5, max: 6, def: 2.2 },
   popsec: { min: 0.5, max: 5, def: 1.6 }, highprob: { min: 0, max: 1, def: 0.2 }, heartevery: { min: 1, max: 10, int: true, def: 3 }, dj: { min: 0, max: 1, int: true, def: 1 }, maxcombo: { min: 3, max: 12, int: true, def: 5 },
@@ -175,7 +177,8 @@ const OPTION_RULES = {
   survheart: { min: 0, max: 5, int: true, def: 3 }, survramp: { min: 0, max: 0.2, def: 0.05 },
   rescue: { min: 0, max: 1, int: true, def: 1 }, itemhp: { min: 0, max: 1, def: 0.6 }, rescueevery: { min: 1, max: 10, int: true, def: 2 }, rescuehigh: { min: 1, max: 10, int: true, def: 5 },
   continue: { min: 0, max: 1, int: true, def: 1 },
-  stream: { min: 0, max: 1, int: true, def: 0 }   // 작업354: stream=edge(=1) / classic(=0)
+  stream: { min: 0, max: 1, int: true, def: 0 },   // 작업354: stream=edge(=1) / classic(=0)
+  grabdx: { min: 0, max: 40, def: LAND_GRAB_DX, clamp: true }   // 작업372: 가로 풍선을 그리는 오른쪽 이동(px). 범위 밖은 가까운 값으로 맞춘다(clamp). 세로에는 적용하지 않는다
 };
 // 반환 { values: 유효한 값(기본값과 같아도 포함), applied: 기본값과 다른 옵션 이름 }
 function parseOptions(search) {
@@ -187,7 +190,8 @@ function parseOptions(search) {
     const rule = OPTION_RULES[k];
     if (k === 'stream' && raw !== null) raw = raw.trim() === 'edge' ? '1' : raw.trim() === 'classic' ? '0' : raw;   // 작업354: 낱말로도 받는다
     if (raw === null || !/^\s*-?\d+(\.\d+)?\s*$/.test(raw)) return;
-    const n = Number(raw);
+    let n = Number(raw);
+    if (rule.clamp && Number.isFinite(n)) n = Math.min(rule.max, Math.max(rule.min, n));   // 작업372: 범위 밖은 가까운 값
     if (!Number.isFinite(n) || n < rule.min || n > rule.max || (rule.int && !Number.isInteger(n))) return;
     values[k] = n;
     if (n !== rule.def) applied.push(k);
@@ -204,7 +208,9 @@ function storedOptions(raw) {
   const out = {};
   if (!o || typeof o !== 'object' || Array.isArray(o)) return out;
   Object.keys(OPTION_RULES).forEach(function (k) {
-    const rule = OPTION_RULES[k], n = o[k];
+    const rule = OPTION_RULES[k];
+    let n = o[k];
+    if (typeof n === 'number' && rule.clamp && Number.isFinite(n)) n = Math.min(rule.max, Math.max(rule.min, n));   // 작업372
     if (typeof n !== 'number' || !Number.isFinite(n) || n < rule.min || n > rule.max || (rule.int && !Number.isInteger(n))) return;
     out[k] = n;
   });
@@ -238,8 +244,8 @@ const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TIL
 // 가로: 800x400. 글자 영역은 높이 100 이하(CONTENT_BOTTOM_Y 100), 높은 칸 타일 윗변 112 보다 위. 땅 아래 띠 44.
 // 작업356: 뜻(왼쪽)과 글자 칸(오른쪽)을 한 줄에 나란히 둔다(HUD 는 위 한 줄). 글자 칸 줄은 남는 폭(약 440)을 쓰고, 큰 뜻 연출은 위쪽(높은 칸 타일 윗변 112 보다 위)에서 한다. 팝업 글자 크기는 가로 전용 상한
 // 작업370(가로만): LAND_RUNNER_X = 캐릭터 기준 x. 그림 알파 측정으로 여학생·남학생 몸 중심(그림 범위 가운데)이 기준 x 보다 약 19~22px 왼쪽이라, 몸 중심이 화면 폭의 약 16%(128px)가 되게 149 로 한다(세로는 72 그대로).
-// LAND_GRAB_DX = 풍선을 그릴 때만 더하는 오른쪽 이동. 풍선 반폭 21.75(타일 폭 43.5 / 2) + 그림 앞쪽 끝(기준 x 보다 앞 13~16.6px, 여학생·남학생·펭귄 측정 평균 약 15) = 36.75. 논리 좌표는 그대로라 먹는 순간·도착 거리·장애물·아이템 계산이 같은 기준을 쓰고, 풍선 가장자리가 캐릭터 앞쪽 끝에 닿는 순간 터진다.
-const LAND_RUNNER_X = 149, LAND_GRAB_DX = 36.75, AIR_GAP_MARGIN = 0.08;
+// LAND_GRAB_DX(작업372: 기본 18, 370 에서는 36.75 였다) = 풍선을 그릴 때만 더하는 오른쪽 이동. 풍선 반폭 21.75(타일 폭 43.5 / 2) + 그림 앞쪽 끝(기준 x 보다 앞 13~16.6px, 여학생·남학생·펭귄 측정 평균 약 15) = 36.75. 논리 좌표는 그대로라 먹는 순간·도착 거리·장애물·아이템 계산이 같은 기준을 쓰고, 풍선 가장자리가 캐릭터 앞쪽 끝에 닿는 순간 터진다.
+const LAND_RUNNER_X = 149, AIR_GAP_MARGIN = 0.08;   // 작업372: LAND_GRAB_DX 는 옵션 규칙 앞에서 정의(기본 18)
 const LAYOUT_LAND = { W: 800, H: 400, GROUND: 356, TILE_Y: 248, HIGH_TILE_Y: 141, TILE_H: 58, WORD_AVAIL_W: 440, HUD_SHIFT: 0, INTRO_CENTER_Y: 72, INTRO_W: 560, CONTENT_BOTTOM_Y: 100, TILE_SCALE: 0.75, CHAR_SCALE: 1.3, TILE_LIFT: 22, BALLOON: true, FX: true, RUNNER_X: LAND_RUNNER_X, GRAB_DX: LAND_GRAB_DX, AIR_GAP: true, CW_MAX: 38, MEAN_MAX: 26, SUB_MAX: 12, POPW_MAX: 30, POPM_MAX: 16, POPE_MAX: 10, FIT_PAD: 5 };
 const SCALE_MAX = 1.5, SCALE_MIN = 0.3;
 // mode: 'port' | 'land', availW/availH: 안전 여백을 뺀 쓸 수 있는 화면 크기(CSS px). 반환: LAYOUT 과 같은 항목 + { scale, mode, extra }

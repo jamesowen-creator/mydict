@@ -6,10 +6,10 @@ const L = require('../public/js/spellrun/logic.js');
 const C = L.CONFIG;
 const NORMAL = L.airSeconds(C) + L.AIR_GAP_MARGIN;
 
-test('370-1) 가로 값: RUNNER_X 149, GRAB_DX 36.75(풍선 반폭 21.75 + 그림 앞쪽 끝 15), 몸 중심(기준 x + faceDx×1.3)이 화면 폭의 약 16%. 세로는 72·0·간격 하한 없음', () => {
+test('370-1) 가로 값: RUNNER_X 149, GRAB_DX 기본 18(작업372에서 36.75 -> 18), 몸 중심(기준 x + faceDx×1.3)이 화면 폭의 약 16%. 세로는 72·0·간격 하한 없음', () => {
   const land = L.layoutFor('land', 800, 400), port = L.layoutFor('port', 360, 640);
-  assert.equal(land.RUNNER_X, 149); assert.equal(land.GRAB_DX, 36.75); assert.equal(land.AIR_GAP, true);
-  assert.equal(L.LAND_GRAB_DX, 21.75 + 15);
+  assert.equal(land.RUNNER_X, 149); assert.equal(land.GRAB_DX, 18); assert.equal(land.AIR_GAP, true);
+  assert.equal(L.LAND_GRAB_DX, 18);   // 작업372: 370 의 36.75(21.75 + 15)에서 줄임
   assert.equal(port.RUNNER_X, 72); assert.equal(port.GRAB_DX, 0); assert.equal(port.AIR_GAP, false);
   assert.equal(L.LAYOUT.RUNNER_X, 72); assert.equal(L.LAYOUT.GRAB_DX, 0);
   for (const k of ['girl', 'boy']) {
