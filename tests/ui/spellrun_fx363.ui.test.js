@@ -106,11 +106,12 @@ test('363-2) 달릴 때 출렁임은 달리기 박자(runPhase)에 맞춰 ±1.5 
   const page = await open(844, 390, '?mode=1&char=1');
   await startRun(page);
   const GR = await page.eval('SpellRun.view.layout().GROUND'), ys = [];
-  for (let ph = 0; ph < 4; ph += 0.25) { const r = await drawChar(page, `G.state = 'run'; G.jumpT = -1; G.j2 = -1; G.land = 0; G.runPhase = ${ph}; G.shake = 0; G.hurt = 0; G.fxRight = -9; G.fxWrong = -9`); ys.push(r.fy - GR); }
+  // 여학생은 달리기가 8동작(작업364)이라 한 바퀴(4동작 기준 박자)가 runPhase 4 → 8 로 늘었다. 박자 위치는 같다
+  for (let ph = 0; ph < 8; ph += 0.5) { const r = await drawChar(page, `G.state = 'run'; G.jumpT = -1; G.j2 = -1; G.land = 0; G.runPhase = ${ph}; G.shake = 0; G.hurt = 0; G.fxRight = -9; G.fxWrong = -9`); ys.push(r.fy - GR); }
   const max = Math.max(...ys.map(Math.abs));
   near(max, 1.5 * 1.3, 0.02, '출렁임 최대'); assert.ok(Math.min(...ys) < -1 && Math.max(...ys) > 1, '위아래로 출렁임');
-  near(ys[0], 0, 0.01, 'runPhase 0 에서 0'); near(ys[2], ys[10], 0.01, '두 걸음 주기(0.5 와 2.5 는 같다)'); near(ys[4], 0, 0.02, 'runPhase 1 에서 0');
-  const air = await drawChar(page, `G.state = 'run'; G.jumpT = 0.3; G.j2 = -1; G.land = 0; G.runPhase = 1.5; G.shake = 0; G.hurt = 0`);
+  near(ys[0], 0, 0.01, 'runPhase 0 에서 0'); near(ys[2], ys[10], 0.01, '두 걸음 주기(박자 0.5 와 2.5 는 같다)'); near(ys[4], 0, 0.02, '박자 1 에서 0');
+  const air = await drawChar(page, `G.state = 'run'; G.jumpT = 0.3; G.j2 = -1; G.land = 0; G.runPhase = 3; G.shake = 0; G.hurt = 0`);
   const h = await page.eval('SpellRun.curH()'); near(air.fy, GR - h, 0.01, '점프 중에는 출렁임 없음');
   noErr(page); await page.close();
 });
@@ -251,3 +252,42 @@ test('363-8) 한 프레임 그리는 시간(헤드리스, 추정): 효과 끔과
   assert.ok(t.on < 8, '프레임 그리기 ' + t.on + 'ms');
   noErr(page); await page.close();
 });
+
+// ---- 작업364: 표정 프레임 연결(가로 효과의 반응 상태에만) ----
+const frameOf = async (page, setup) => page.eval(`(() => { const R = SpellRun, G = R.G; ${setup}; R.draw(); return G.spriteFrame; })()`);
+for (const [ch, name] of [['1', '여학생'], ['2', '남학생']]) {
+  test(`364-4) 가로 ${name}: 반응 상태 happy·hurt·surprise 가 땅 위에서만 표정 프레임 11·12·13 으로 그려지고, 점프 중·반응 끝·반응 없음은 기존 칸이다`, { skip: SKIP }, async () => {
+    const page = await open(844, 390, `?mode=1&char=${ch}`);
+    await startRun(page);
+    const base = `G.state = 'run'; G.jumpT = -1; G.j2 = -1; G.land = 0; G.shake = 0; G.hurt = 0; G.runPhase = 2.5;`;
+    assert.equal(await frameOf(page, base), 2, '반응 없음: 달리기 칸');
+    for (const [k, fr] of [['happy', 11], ['hurt', 12], ['surprise', 13]]) {
+      await page.eval(`SpellRun.G.react = null; SpellRun.fx.setReact('${k}')`);
+      assert.equal(await frameOf(page, base), fr, k + ' 땅 위');
+      assert.equal(await frameOf(page, base + 'G.jumpT = 0.3'), 8 + (await page.eval('SpellRun.G.rising ? 0 : 1')), k + ' 점프 중에는 표정 안 씀(점프 칸)');
+      assert.equal(await frameOf(page, base + `G.time += ${{ happy: 0.41, hurt: 0.51, surprise: 0.31 }[k]}`), 2, k + ' 반응 시간이 끝나면 달리기 칸');
+    }
+    // 대기·결과 화면 프레임은 새 지도로 옮긴 번호(대기 1, 완주 기쁨 8)
+    assert.equal(await frameOf(page, "G.state = 'idle'; G.jumpT = -1"), 1);
+    noErr(page); await page.close();
+  });
+}
+
+test('364-4) 펭귄과 세로 화면은 표정 프레임을 쓰지 않는다(반응 상태가 비어 있거나 표정 칸이 없다), 펭귄 달리기는 4칸 그대로', { skip: SKIP }, async () => {
+  const pg = await open(844, 390, '?mode=1&char=0');
+  await startRun(pg);
+  await pg.eval("SpellRun.fx.setReact('happy')");
+  const f = await frameOf(pg, "G.state = 'run'; G.jumpT = -1; G.j2 = -1; G.land = 0; G.runPhase = 2.5");
+  assert.equal(f, 2, '펭귄: 표정 없이 달리기 칸'); assert.equal(await pg.eval('SpellRun.G.runPhase < 4'), true);
+  noErr(pg); await pg.close();
+  const pp = await open(390, 844, '?mode=0&char=1');
+  await startRun(pp);
+  await pp.eval("SpellRun.fx.setReact('happy')");
+  assert.equal(await pp.eval('SpellRun.fx.react()'), '', '세로: 반응 상태 없음');
+  assert.equal(await frameOf(pp, "G.state = 'run'; G.jumpT = -1; G.j2 = -1; G.land = 0; G.runPhase = 2.5"), 2, '세로 여학생: 표정 안 씀, 달리기 8칸 그대로');
+  await run(pp, 600);
+  const seen = await pp.eval(`(() => { const R = SpellRun, G = R.G, s = new Set(); for (let i = 0; i < 400; i++) { R.step(1 / 60); if (i % 3 === 0) { R.draw(); s.add(G.spriteFrame); } if (G.state !== 'run') break; } return [...s]; })()`);
+  assert.ok(seen.every(x => x >= 0 && x <= 9), '세로 한 판에서 표정 칸(10~13)은 나오지 않는다: ' + seen);
+  noErr(pp); await pp.close();
+});
+

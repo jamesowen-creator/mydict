@@ -262,3 +262,31 @@ test('작업363 반응 상태·맞는/틀린 글자 값: 길이 happy 0.4·hurt 
   assert.deepEqual(L.wrongFx(0.2), L.wrongFx(0.2), '난수 없음'); assert.deepEqual(L.starFx(1, 0.3), L.starFx(1, 0.3));
   assert.equal(L.LAYOUT_LAND.FX, true); assert.equal(L.LAYOUT.FX, false); assert.equal(L.layoutFor('port', 360, 640).FX, false);
 });
+
+// 작업364: 여학생·남학생 달리기 8동작·표정 프레임(순수 로직)
+test('작업364 프레임 길이: 8동작 캐릭터는 한 바퀴 시간이 펭귄(4칸 x 0.11)과 같다(길이 4/8, 제한값 0.03~0.07), 위상은 8 에서 돌아가고 속도가 바뀌어도 이어진다', () => {
+  const P = L.CHARS.penguin, G8 = L.CHARS.girl, B8 = L.CHARS.boy;
+  assert.equal(P.RUN_LEN, 0.11); assert.equal(P.RUN_FRAMES, 4);
+  for (const C8 of [G8, B8]) { assert.equal(C8.RUN_FRAMES, 8); assert.equal(C8.RUN_LEN, 0.055); assert.equal(C8.RUN_LEN_MIN, 0.03); assert.equal(C8.RUN_LEN_MAX, 0.07); }
+  for (const v of [C.SPEED_MIN, 80, 100, 130, C.SPEED_MAX, 400]) {
+    const lp = L.runFrameLength(v, C, P) * P.RUN_FRAMES, lg = L.runFrameLength(v, C, G8) * G8.RUN_FRAMES, lb = L.runFrameLength(v, C, B8) * B8.RUN_FRAMES;
+    assert.ok(Math.abs(lp - lg) < 1e-9 && Math.abs(lp - lb) < 1e-9, `속도 ${v}: 한 바퀴 ${lp} / ${lg} / ${lb}`);
+  }
+  assert.equal(L.runFrameLength(C.SPEED_MIN, C), 0.11, '기본(펭귄)은 그대로');
+  assert.ok(Math.abs(L.runFrameLength(C.SPEED_MIN, C, G8) - 0.055) < 1e-12);
+  let ph = 0, seen = new Set(); for (let i = 0; i < 400; i++) { const nxt = L.advanceRunPhase(ph, 0.01, C.SPEED_MIN + (i % 50), C, G8); assert.ok(nxt >= 0 && nxt < 8); assert.ok(((nxt - ph + 8) % 8) < 1, '한 걸음에 한 칸을 넘지 않는다(위상 이어짐)'); seen.add(Math.floor(nxt)); ph = nxt; }
+  assert.equal(seen.size, 8, '8칸 모두 나온다');
+  assert.equal(L.advanceRunPhase(7.99, 0.02, C.SPEED_MIN, C, G8) < 1, true, '8 에서 0 으로 돌아간다');
+  assert.ok(Math.abs(L.advanceRunPhase(0, 0.01, C.SPEED_MIN, C) - 0.01 / 0.11) < 1e-12, 'P 를 안 주면 펭귄 4칸 그대로');
+});
+test('작업364 프레임 선택: 표정 프레임은 표정이 있는 캐릭터가 땅 위에서 반응이 있을 때만(점프 중·반응 없음·펭귄·대기·결과 화면은 기존 그대로)', () => {
+  const G8 = L.CHARS.girl, P = L.CHARS.penguin;
+  const f = o => L.penguinFrame(Object.assign({ state: 'run', cleared: false, air: false, rising: true, runPhase: 2.5, P: G8 }, o));
+  assert.equal(f({}), 2, '반응 없음: 달리기 칸'); assert.equal(f({ runPhase: 7.9 }), 7); assert.equal(f({ runPhase: 8 }), 0);
+  assert.equal(f({ react: 'happy' }), 11); assert.equal(f({ react: 'hurt' }), 12); assert.equal(f({ react: 'surprise' }), 13); assert.equal(f({ react: '' }), 2);
+  assert.equal(f({ air: true, rising: true, react: 'happy' }), 8, '점프 중에는 표정 안 씀(상승)'); assert.equal(f({ air: true, rising: false, react: 'hurt' }), 9, '하강');
+  assert.equal(f({ state: 'idle', react: 'happy' }), 1, '대기'); assert.equal(f({ state: 'over', cleared: true }), 8); assert.equal(f({ state: 'over', cleared: false }), 1);
+  assert.equal(L.penguinFrame({ state: 'run', air: false, runPhase: 2.5, P: P, react: 'happy' }), 2, '펭귄은 표정 칸이 없어 달리기 그대로');
+  assert.equal(L.penguinFrame({ state: 'run', air: false, runPhase: 2.5, react: 'happy' }), 2, 'P 를 안 주면 펭귄');
+  assert.deepEqual(L.CHARS.boy.EXPR, { base: 10, happy: 11, hurt: 12, surprise: 13 }); assert.equal(P.EXPR, undefined);
+});

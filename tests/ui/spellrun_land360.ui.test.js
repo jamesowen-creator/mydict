@@ -171,6 +171,7 @@ test('360-3) 가로 타일: 폭이 75%(일반 43.5, 조각은 줄어든 폭), �
 
 test('360-4) 가로: 다음 묶음·다른 칸 타일도 흐리지 않고(모두 선명도 1), 틀린 타일을 먹어도 희미해지거나 사라지지 않는다(체력 -1 규칙은 그대로)', { skip: SKIP }, async () => {
   const page = await open(844, 390);
+  await page.eval('(() => { let s = 12345; Math.random = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })()');   // 난수 고정: 같은 판이 나오게(가끔 장면이 안 만들어지던 것을 막는다)
   await startRun(page);
   await page.eval('(() => { for (let i = 0; i < 400; i++) { SpellRun.step(1 / 60); const G = SpellRun.G; if (G.state !== "run") break; for (const t of G.tiles) if (!t.kind && t.x <= SpellRun.RUNNER_X) t.checked = true; } })()');
   await page.eval(spyDraw);

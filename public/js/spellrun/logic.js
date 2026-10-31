@@ -725,22 +725,27 @@ function afterObstacleHit(s, cfg) {
 const PENGUIN = { URL: '/img/spellrun/spellrun_penguin_sheet.png', SHEET_W: 1728, SHEET_H: 288, CELL: 288, FRAMES: 6, size: 92, faceX: 0.55, footPad: 8 / 288, faceDx: -10, bodyY: 0.58,
   RUN_FRAMES: 4, JUMP_UP: 4, JUMP_DOWN: 5, IDLE: 1, JOY: 4, RUN_LEN: 0.11, RUN_LEN_MIN: 0.06, RUN_LEN_MAX: 0.14 };
 // 달리기 한 프레임의 길이(초): 기본 0.11초를 속도에 반비례해 줄이고(빠를수록 빨리 바뀜) 0.06~0.14초로 제한한다. 기준 속도는 최저 속도(SPEED_MIN)
-function runFrameLength(speed, cfg) {
-  cfg = cfg || CONFIG;
-  const len = PENGUIN.RUN_LEN * cfg.SPEED_MIN / Math.max(1, speed);
-  return Math.max(PENGUIN.RUN_LEN_MIN, Math.min(PENGUIN.RUN_LEN_MAX, len));
+// 작업364: P = 캐릭터(CHARS 항목, 기본 펭귄). 달리기가 8동작인 캐릭터는 한 바퀴 시간이 같도록 길이와 제한값이 4/8(0.055, 0.03~0.07)
+function runFrameLength(speed, cfg, P) {
+  cfg = cfg || CONFIG; P = P || PENGUIN;
+  const len = P.RUN_LEN * cfg.SPEED_MIN / Math.max(1, speed);
+  return Math.max(P.RUN_LEN_MIN, Math.min(P.RUN_LEN_MAX, len));
 }
-// 달리기 위상(0~4 미만). 프레임 번호 = floor(위상). 속도가 바뀌어도 위상이 이어져 번호가 튀지 않는다
-function advanceRunPhase(phase, dt, speed, cfg) {
-  const p = (phase + dt / runFrameLength(speed, cfg)) % PENGUIN.RUN_FRAMES;
-  return p < 0 ? p + PENGUIN.RUN_FRAMES : p;
+// 달리기 위상(0~RUN_FRAMES 미만). 프레임 번호 = floor(위상). 속도가 바뀌어도 위상이 이어져 번호가 튀지 않는다
+function advanceRunPhase(phase, dt, speed, cfg, P) {
+  P = P || PENGUIN;
+  const p = (phase + dt / runFrameLength(speed, cfg, P)) % P.RUN_FRAMES;
+  return p < 0 ? p + P.RUN_FRAMES : p;
 }
-// 그릴 프레임 번호(0부터). o: { state, cleared, air, rising, runPhase }
+// 그릴 프레임 번호(0부터). o: { state, cleared, air, rising, runPhase, P?(캐릭터, 기본 펭귄), react?(표정 종류: 'happy'|'hurt'|'surprise'|'') }
+// 작업364: 표정 프레임은 표정이 있는 캐릭터(P.EXPR)이고 반응이 있으며 땅 위(점프 중 아님)이고 달리는 중·결과 연출이 아닐 때만 쓴다. 가로 효과가 꺼진 곳(세로·펭귄)은 react 가 비어 있어 쓰지 않는다
 function penguinFrame(o) {
-  if (o.state === 'idle' || o.state === 'intro' || o.state === 'ending') return PENGUIN.IDLE;   // 대기·보스 배너·게임 오버 연출(기존 회전 유지)은 서 있는 자세
-  if (o.state === 'over') return o.cleared ? PENGUIN.JOY : PENGUIN.IDLE;                       // 결과 화면: 완주는 기쁨(5번), 아니면 서 있는 자세
-  if (o.air) return o.rising ? PENGUIN.JUMP_UP : PENGUIN.JUMP_DOWN;
-  return Math.floor(o.runPhase || 0) % PENGUIN.RUN_FRAMES;
+  const P = o.P || PENGUIN;
+  if (o.state === 'idle' || o.state === 'intro' || o.state === 'ending') return P.IDLE;   // 대기·보스 배너·게임 오버 연출(기존 회전 유지)은 서 있는 자세
+  if (o.state === 'over') return o.cleared ? P.JOY : P.IDLE;                             // 결과 화면: 완주는 기쁨, 아니면 서 있는 자세
+  if (o.air) return o.rising ? P.JUMP_UP : P.JUMP_DOWN;
+  if (o.react && P.EXPR && P.EXPR[o.react] !== undefined) return P.EXPR[o.react];
+  return Math.floor(o.runPhase || 0) % P.RUN_FRAMES;
 }
 // 2단 점프 회전(도): 두 번째 점프가 시작되면 체공 시간(land)에 맞춰 0 → 360 으로 단조 증가, 착지(또는 점프 아님)하면 정확히 0
 function spinAngle(j2, land) {
@@ -846,10 +851,14 @@ function ttsSourceLabel(o) {
 // ---- 작업358: 그림(캐릭터 3종·배경·아이템). 크기·좌표는 scripts/spellrun_art_build.py 가 만든 scripts/spellrun_art_report.json 과 같다 ----
 // 캐릭터: 펭귄과 같은 시트 형식(1728x288, 칸 288, 6동작: 달리기 4 · 점프 상승 · 점프 하강). 판정 크기는 같고(size 92) 그림만 다르다. 사람은 몸 가운데(faceX 0.5)를 러너 위치 약간 왼쪽(faceDx)에 둔다
 const CHAR_KEYS = ['penguin', 'girl', 'boy'];
+// 작업364: 여학생·남학생 시트는 14칸 한 줄(4032x288): 달리기 8(0~7) · 점프 상승(8) · 점프 하강(9) · 표정 4(10 기본, 11 기쁨, 12 아야, 13 놀람). 달리기 프레임 길이는 펭귄(4동작 0.11초)의 4/8
+// 칸 번호 지도는 scripts/spellrun_art_report.json 의 sheet14.map 과 같다. 표정(EXPR)은 가로 효과의 반응 상태(CHAR_FX.REACT)에만 연결한다
+const HUMAN_SHEET = { SHEET_W: 4032, SHEET_H: 288, FRAMES: 14, RUN_FRAMES: 8, JUMP_UP: 8, JUMP_DOWN: 9, IDLE: 1, JOY: 8, RUN_LEN: 0.055, RUN_LEN_MIN: 0.03, RUN_LEN_MAX: 0.07,
+  EXPR: { base: 10, happy: 11, hurt: 12, surprise: 13 } };
 const CHARS = {
   penguin: Object.assign({ key: 'penguin', name: '펭귄' }, PENGUIN),
-  girl: Object.assign({ key: 'girl', name: '여학생' }, PENGUIN, { URL: '/img/spellrun/spellrun_girl_sheet.png', faceX: 0.5, faceDx: -16, bodyY: 0.55 }),
-  boy: Object.assign({ key: 'boy', name: '남학생' }, PENGUIN, { URL: '/img/spellrun/spellrun_boy_sheet.png', faceX: 0.5, faceDx: -16, bodyY: 0.55 })
+  girl: Object.assign({ key: 'girl', name: '여학생' }, PENGUIN, { URL: '/img/spellrun/spellrun_girl_sheet.png', faceX: 0.5, faceDx: -16, bodyY: 0.55 }, HUMAN_SHEET),
+  boy: Object.assign({ key: 'boy', name: '남학생' }, PENGUIN, { URL: '/img/spellrun/spellrun_boy_sheet.png', faceX: 0.5, faceDx: -16, bodyY: 0.55 }, HUMAN_SHEET)
 };
 // 주소 옵션 char(0 펭귄 | 1 여학생 | 2 남학생). 저장값(문자열 키)은 모르는 값이면 펭귄
 function charFromOption(v) { return v === '1' ? 'girl' : v === '2' ? 'boy' : v === '0' ? 'penguin' : null; }

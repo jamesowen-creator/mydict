@@ -1161,7 +1161,7 @@ function step(dt) {
   }
   if (fxOn() && G.state === 'run' && G.jumpT < 0 && curH() <= 1) { G.dustT += dt; if (G.dustT >= CHAR_FX.DUST_RUN_SEC) { G.dustT -= CHAR_FX.DUST_RUN_SEC; spawnDust('run'); } }   // 달리는 동안 0.2초마다 아주 작은 먼지 1개
   if (G.jumpBuf > 0) G.jumpBuf -= dt;
-  { const nh = curH(); if (nh !== G.prevH) G.rising = nh > G.prevH; G.prevH = nh; if (nh <= 1) G.runPhase = advanceRunPhase(G.runPhase, dt, G.speed); }   // 작업321: 게임 시간 기준(일시정지 중 정지)
+  { const nh = curH(); if (nh !== G.prevH) G.rising = nh > G.prevH; G.prevH = nh; if (nh <= 1) G.runPhase = advanceRunPhase(G.runPhase, dt, G.speed, undefined, CHARS[activeChar() || 'penguin']); }   // 작업321: 게임 시간 기준(일시정지 중 정지)
   G.hurt = Math.max(0, G.hurt - dt);
   G.eat = Math.max(0, G.eat - dt);
   G.shake = Math.max(0, G.shake - dt);
@@ -1703,10 +1703,11 @@ function drawRunner() {
     const uw = (G.time - G.fxWrong) / CHAR_FX.WRONG_SEC, ur = (G.time - G.fxRight) / CHAR_FX.RIGHT_HOP_SEC;
     if (uw >= 0 && uw < 1) { const w = wrongFx(uw); fdx = w.dx * cs; ftilt = w.ang; }
     if (ur >= 0 && ur < 1) fdy -= rightHop(ur) * cs;
-    if (G.jumpT < 0 && h <= 1 && G.state === 'run') fdy += runBob(G.runPhase) * cs;
+    if (G.jumpT < 0 && h <= 1 && G.state === 'run') fdy += runBob(G.runPhase * 4 / P.RUN_FRAMES) * cs;   // 작업364: 8동작 캐릭터도 한 바퀴(4동작 기준) 박자에 맞춘다
     fsq = charSquash(G.jumpT >= 0 ? (G.j2 >= 0 ? G.j2 : G.jumpT) : -1, CONFIG.JUMP_TIME / 2, G.land);
   }
-  const idx = penguinFrame({ state: G.state, cleared: G.cleared, air: h > 1, rising: G.rising, runPhase: G.runPhase });
+  // 작업364: 표정 프레임은 가로 효과의 반응 상태(reactNow)가 있고 땅 위(점프 중 아님)일 때만. 세로·펭귄은 reactNow 가 비어 있거나 EXPR 가 없어 쓰지 않는다
+  const idx = penguinFrame({ state: G.state, cleared: G.cleared, air: h > 1, rising: G.rising, runPhase: G.runPhase, P: P, react: (fx && G.jumpT < 0) ? reactNow() : '' });
   const angle = spinAngle(G.j2, G.j2Land) + ((G.state === 'ending' || G.state === 'choice') ? 0.25 * 180 / Math.PI : 0);
   G.spriteDraws++; G.spriteFrame = idx; G.spriteAngle = angle;
   if (fx) { const sh = charShadow(h); ctx.fillStyle = 'rgba(0,0,0,' + sh.a + ')'; ctx.beginPath(); ctx.ellipse(RUNNER_X + fdx, GROUND + 10, 22 * cs * sh.k, 6 * cs * sh.k, 0, 0, Math.PI * 2); ctx.fill(); }   // 작업363: 높을수록 작고 연한 그림자(캐릭터 본체는 그대로)
