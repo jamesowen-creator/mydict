@@ -701,6 +701,30 @@
   .empty-state-icon { font-size: 48px; margin-bottom: 12px; }
   .empty-state-text { font-size: 14px; line-height: 1.6; }
 
+  /* 작업374: 게임 랜딩. 박스 없이 흰 면 + 구분선 행(퀴즈 유형 행과 같은 방식), 색은 토큰만 */
+  .game-intro { font-size: 14px; color: var(--text2); line-height: 1.6; padding: 4px 0 16px; }
+  .game-count { display: flex; align-items: center; gap: 10px; padding: 0 0 12px; }
+  .game-count-label { font-size: 13px; color: var(--text2); margin-right: auto; }
+  .game-count-btn {
+    min-width: 56px; min-height: 44px; padding: 0 14px; background: transparent; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text); font-size: 14px; cursor: pointer; font-family: 'Sora', sans-serif;
+  }
+  .game-count-btn[aria-pressed="true"] { color: var(--accent-text); border-color: var(--accent-text); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+  .game-count-btn:focus-visible, .game-src:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+  .game-src {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 56px; padding: 12px 0;
+    background: transparent; border: none; border-bottom: 1px solid var(--border); border-radius: 0; text-align: left;
+    color: var(--text); cursor: pointer; font-family: 'Noto Sans KR', sans-serif;
+  }
+  .game-src:last-child { border-bottom: none; }
+  .game-src:hover .game-src-name { text-decoration: underline; text-underline-offset: 3px; }
+  .game-src[aria-disabled="true"] { cursor: not-allowed; }
+  .game-src[aria-disabled="true"] .game-src-name { color: var(--text2); text-decoration: none; }
+  .game-src-name { font-size: 15px; font-weight: 600; }
+  .game-src-desc, .game-src-why { display: block; font-size: 12px; color: var(--text2); margin-top: 3px; line-height: 1.5; }
+  .game-src-n { font-size: 14px; color: var(--text2); white-space: nowrap; font-family: 'Sora', sans-serif; }
+  .wb-side-btn[hidden] { display: none; }
+
   /* QUIZ */
   /* 작업221: 퀴즈 화면도 다른 화면과 같이 박스(테두리·둥근 모서리·색 바탕) 없이 흰 면 + 구분선만 */
   .quiz-start-card {
@@ -1543,6 +1567,10 @@
       <span class="nav-tab-label">단어장</span>
       <span class="nav-tab-badge-slot"><span class="badge" id="wordbook-count">0</span></span>
     </button>
+    <button class="nav-tab" onclick="showPage('game')">
+      <span class="nav-tab-label">게임</span>
+      <span class="nav-tab-badge-slot"></span>
+    </button>
     <button class="nav-tab" onclick="showPage('quiz')">
       <span class="nav-tab-label">퀴즈</span>
       <span class="nav-tab-badge-slot"></span>
@@ -1613,7 +1641,8 @@
         <div class="wb-side-group">
           <button class="wb-side-btn" id="wb-mode-listen-btn" onclick="setWordbookMode('listen')"><span class="wb-side-icon">🎙</span><span>선택 듣기</span></button>
           <button class="wb-side-btn" id="wb-mode-quiz-btn" onclick="setWordbookMode('quiz')"><span class="wb-side-icon">🎯</span><span>선택 퀴즈</span></button>
-          <button class="wb-side-btn" id="wb-mode-spell-btn" onclick="setWordbookMode('spell')"><span>선택 게임</span></button>
+          <!-- 작업374: 새 "게임" 탭의 "선택"이 같은 선택 모드(setWordbookMode('spell'))로 들어오므로 이 버튼은 숨긴다(삭제하지 않음: 시험과 선택 모드 코드가 그대로 쓴다) -->
+          <button class="wb-side-btn" id="wb-mode-spell-btn" hidden onclick="setWordbookMode('spell')"><span>선택 게임</span></button>
         </div>
 
         <div class="wb-side-group wb-side-gap-before">
@@ -1632,6 +1661,20 @@
         <div id="wordbook-list"></div>
       </div>
     </div>
+  </div>
+
+  <!-- GAME PAGE (작업374): 출처를 고르면 바로 스펠링 런을 시작한다 -->
+  <div class="page" id="page-game">
+    <div class="section-header">
+      <div class="section-title">게임</div>
+    </div>
+    <p class="game-intro">단어장의 영어 단어로 철자 게임을 해요. 출처를 고르면 바로 시작해요.</p>
+    <div class="game-count" role="group" aria-label="한 번에 풀 단어 수">
+      <span class="game-count-label">한 번에 풀 단어 수</span>
+      <button type="button" class="game-count-btn" id="game-count-10" aria-pressed="true" aria-label="10개" onclick="setGameCount(10)">10</button>
+      <button type="button" class="game-count-btn" id="game-count-20" aria-pressed="false" aria-label="20개" onclick="setGameCount(20)">20</button>
+    </div>
+    <div id="game-sources" class="game-sources"></div>
   </div>
 
   <!-- QUIZ PAGE -->
@@ -1702,6 +1745,7 @@
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let wordbook = [];
 let wrongNote = JSON.parse(localStorage.getItem('mydict_wrong') || '[]');
+let wordbookForbidden = false;   // 작업374: /api/wordbook 이 403(단어장 권한 없음)이었는가
 let quizState = null;
 let currentResult = null;
 let wordbookTab = 'en'; // 'en' | 'ko'
@@ -1794,6 +1838,9 @@ async function initAuth() {
   if (location.hash === '#wordbook') {
     showPage('wordbook', false);
     try { history.replaceState({ page: 'wordbook' }, '', location.pathname + location.search); } catch (e) { /* 무시 */ }
+  } else if (location.hash === '#game') {
+    showPage('game', false);   // 작업374: 게임 랜딩도 #wordbook 과 같은 방식으로 복원
+    try { history.replaceState({ page: 'game' }, '', location.pathname + location.search); } catch (e) { /* 무시 */ }
   } else {
     showPage('search');
   }
@@ -1807,6 +1854,7 @@ function showLoginScreen() {
 async function loadWordbookFromDB() {
   try {
     const res = await fetch('/api/wordbook', { headers: authHeaders() });
+    wordbookForbidden = res.status === 403;   // 작업374: 게임 랜딩이 권한 없음 안내를 보이는 데 쓴다
     if (!res.ok) return;
     const rows = await res.json();
     wordbook = rows.map(r => ({ ...(r.data || {}), id: r.id, word: r.word, lang: r.lang, savedAt: new Date(r.created_at).getTime(), source: r.source || 'manual' }));
@@ -1913,11 +1961,12 @@ function showPage(name, push = true) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   target.classList.add('active');
-  const tabIdx = ['search','wordbook','quiz','metacog','wrong'].indexOf(name);
+  const tabIdx = ['search','wordbook','game','quiz','metacog','wrong'].indexOf(name);   // 작업374: DOM 의 .nav-tab 순서와 같아야 한다
   if (tabIdx >= 0) document.querySelectorAll('.nav-tab')[tabIdx].classList.add('active');
 
   if (name === 'home')     initDashboard();
   if (name === 'wordbook') { resetWordbookSort(); renderWordbook(); }
+  if (name === 'game')     renderGamePage();
   if (name === 'quiz')     renderQuizStart(false);
   if (name === 'wrong')    renderWrongNote();
   if (name === 'metacog')  initMetacogPage();
@@ -3094,6 +3143,134 @@ function startSpellRunSelected() {
   try { sessionStorage.setItem('spellrun_ids', JSON.stringify(ids)); }
   catch (e) { showToast('게임을 시작하지 못했습니다. 브라우저 저장 설정을 확인해 주세요.'); return; }
   location.href = '/spelling_run.html';
+}
+
+// ─── 작업374: 게임 랜딩 (선택 / 랜덤 / 오답 / 최근) ──────────────────────────────
+// 출제 가능 조건은 spelling_run 의 pickWords(game.js:1919)와 같은 규칙: 영어, 공백 없는 영문 2자 이상(WORD_RE, game.js:1909), 뜻 있음(meaningOf, game.js:1910), 소문자 기준 중복은 하나.
+// 단어장에 실제로 있는 단어만(오답 노트의 옛 단어는 현재 단어장과 단어 철자로 맞춰 id 를 새로 얻는다).
+const GAME_COUNT_KEY = 'spellrun_landing_count';   // 한 번에 풀 단어 수(10|20), localStorage
+const GAME_MIN_WORDS = 3;                            // 게임 페이지의 MIN_WORDS(game.js:1945)와 같은 값
+const GAME_WORD_RE = /^[A-Za-z][A-Za-z'-]*$/;
+let gameCount = 10;
+try { const v = Number(localStorage.getItem(GAME_COUNT_KEY)); if (v === 10 || v === 20) gameCount = v; } catch (e) { /* 저장값을 못 읽어도 기본 10 */ }
+
+// 랜딩에서 쓰는 난수는 여기 한 곳이다(시험에서 gameRandom 을 바꿔 넣는다). 게임 내부는 건드리지 않는다
+function gameRandom() { return Math.random(); }
+
+function gameMeaning(w) {
+  const sm = typeof w.short_meaning === 'string' ? w.short_meaning.trim() : '';
+  if (sm) return sm;
+  const m0 = Array.isArray(w.meanings) && w.meanings[0] ? w.meanings[0].definition : '';
+  return typeof m0 === 'string' ? m0.trim() : '';
+}
+// 저장 시각이 최근인 순서로 정렬된 출제 가능 단어
+function gameEligible() {
+  const seen = new Set(), out = [];
+  const sorted = wordbook.slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+  for (const w of sorted) {
+    if (!w || (w.lang || 'en') !== 'en' || w.id == null) continue;
+    const word = String(w.word == null ? '' : w.word).trim();
+    if (word.length < 2 || !GAME_WORD_RE.test(word) || !gameMeaning(w)) continue;
+    const key = word.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(w);
+  }
+  return out;
+}
+function gamePools() {
+  const el = gameEligible();
+  const byWord = new Map(el.map(w => [String(w.word).trim().toLowerCase(), w]));
+  const wrongEl = [], seen = new Set();
+  for (const q of wrongNote) {
+    const k = String(q && q.word != null ? q.word : '').trim().toLowerCase();
+    const w = byWord.get(k);
+    if (w && !seen.has(k)) { seen.add(k); wrongEl.push(w); }
+  }
+  return { el: el, wrongEl: wrongEl };
+}
+// 비복원 무작위 n개(Fisher-Yates 앞쪽 n개)
+function gameSample(items, n) {
+  const a = items.slice();
+  const k = Math.min(n, a.length);
+  for (let i = 0; i < k; i++) { const j = i + Math.floor(gameRandom() * (a.length - i)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+  return a.slice(0, k);
+}
+// 가중치 비복원 추출: 최근 저장한 단어(최근 순 앞쪽 n개)이거나 오답 노트에 있는 단어는 2배, 둘 다여도 2배(곱하지 않는다)
+function gameWeighted(el, wrongEl, n) {
+  const hot = new Set(el.slice(0, n).concat(wrongEl).map(w => w.id));
+  const pool = el.slice(), out = [];
+  const wt = w => (hot.has(w.id) ? 2 : 1);
+  let total = pool.reduce((s, w) => s + wt(w), 0);
+  while (out.length < n && pool.length) {
+    let r = gameRandom() * total, idx = pool.length - 1;
+    for (let i = 0; i < pool.length; i++) { r -= wt(pool[i]); if (r < 0) { idx = i; break; } }
+    const w = pool.splice(idx, 1)[0];
+    total -= wt(w); out.push(w);
+  }
+  return out;
+}
+// 출처별 정보(이름·설명·사용 가능 수·누를 수 없는 이유). reason 이 있으면 누를 수 없다
+function gameSources() {
+  const { el, wrongEl } = gamePools();
+  const lack = '단어장에 영어 단어가 ' + GAME_MIN_WORDS + '개 이상 필요해요 (지금 ' + el.length + '개)';
+  const noPerm = '단어장 사용 권한이 없어요. 관리자에게 문의해 주세요.';
+  const base = el.length >= GAME_MIN_WORDS ? '' : lack;
+  let wrongWhy = '';
+  if (wrongNote.length === 0) wrongWhy = '오답 노트가 비어 있어요';
+  else if (wrongEl.length < GAME_MIN_WORDS) wrongWhy = '오답 노트에서 출제할 수 있는 단어가 ' + GAME_MIN_WORDS + '개 이상 필요해요 (지금 ' + wrongEl.length + '개)';
+  const gate = r => (wordbookForbidden ? noPerm : r);
+  return [
+    { key: 'select', name: '선택', desc: '단어장에서 직접 고르기', n: el.length, reason: gate(base) },
+    { key: 'random', name: '랜덤', desc: '단어장 영어 단어 중 무작위 (최근 저장·오답 단어는 2배 확률)', n: el.length, reason: gate(base) },
+    { key: 'wrong', name: '오답', desc: '오답 노트의 단어', n: wrongEl.length, reason: gate(wrongWhy) },
+    { key: 'recent', name: '최근', desc: '최근 저장한 단어', n: el.length, reason: gate(base) }
+  ];
+}
+function gameIds(key) {
+  const { el, wrongEl } = gamePools();
+  if (key === 'random') return gameWeighted(el, wrongEl, gameCount).map(w => w.id);
+  if (key === 'wrong') return (wrongEl.length <= gameCount ? wrongEl : gameSample(wrongEl, gameCount)).map(w => w.id);
+  if (key === 'recent') return el.slice(0, gameCount).map(w => w.id);
+  return [];
+}
+function setGameCount(n) {
+  gameCount = n === 20 ? 20 : 10;
+  try { localStorage.setItem(GAME_COUNT_KEY, String(gameCount)); } catch (e) { /* 저장 못 해도 이번 화면에서는 동작 */ }
+  renderGamePage();
+}
+function renderGamePage() {
+  const box = document.getElementById('game-sources');
+  if (!box) return;
+  for (const n of [10, 20]) { const b = document.getElementById('game-count-' + n); if (b) b.setAttribute('aria-pressed', String(gameCount === n)); }
+  box.innerHTML = gameSources().map(s => {
+    const off = !!s.reason;
+    return '<button type="button" class="game-src" data-src="' + s.key + '" aria-disabled="' + off + '" onclick="startGame(\'' + s.key + '\')">' +
+      '<span class="game-src-text"><span class="game-src-name">' + s.name + '</span>' +
+      '<span class="game-src-desc">' + s.desc + '</span>' +
+      (off ? '<span class="game-src-why">' + s.reason + '</span>' : '') + '</span>' +
+      '<span class="game-src-n">' + s.n + '개</span></button>';
+  }).join('');
+}
+function launchSpellRunIds(ids) {
+  try { sessionStorage.setItem('spellrun_ids', JSON.stringify(ids)); }
+  catch (e) { showToast('게임을 시작하지 못했습니다. 브라우저 저장 설정을 확인해 주세요.'); return; }
+  location.href = '/spelling_run.html';
+}
+function startGame(key) {
+  const src = gameSources().find(s => s.key === key);
+  if (!src) return;
+  if (src.reason) { showToast(src.reason); return; }
+  if (key === 'select') {
+    // 단어장 화면의 기존 선택 모드로 들어간다(선택 후 시작은 기존 "게임 시작 (N개)")
+    if (currentWordbookTab !== 'en') switchWordbookTab('en');
+    showPage('wordbook');
+    if (wordbookMode !== 'spell') setWordbookMode('spell');
+    return;
+  }
+  const ids = gameIds(key);
+  if (ids.length < GAME_MIN_WORDS) { showToast(src.reason || ('단어가 ' + GAME_MIN_WORDS + '개 이상 필요해요')); return; }
+  launchSpellRunIds(ids);
 }
 
 async function confirmDeleteSelectedWords() {

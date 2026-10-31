@@ -139,14 +139,18 @@ test('1) 사전 단어장에서 영어 3개를 골라 "게임 시작"을 누르�
   await page.waitFor("document.querySelectorAll('.word-chip-text').length > 5", 5000);
   // 영어 아닌 탭에서는 모드에 들어가지 않고 토스트로 안내
   await page.eval("switchWordbookTab('ko')");
-  await page.click('#wb-mode-spell-btn');
+  await page.eval("setWordbookMode('spell')");   // 작업374: "선택 게임" 버튼은 숨겨졌으므로 같은 함수를 직접 부른다
   assert.equal(await page.eval('wordbookMode'), 'none', '한국어 탭에서는 선택 게임 모드에 들어가지 않는다');
   assert.match(await page.text('#toast'), /영어 단어장에서만/);
   await page.eval("switchWordbookTab('en')");
   // 이모지·인라인 style 없는 새 버튼
   assert.equal(await page.text('#wb-mode-spell-btn'), '선택 게임');
-  await page.click('#wb-mode-spell-btn');
+  assert.equal(await page.eval("document.getElementById('wb-mode-spell-btn').hidden"), true, '작업374: 단어장 옆 "선택 게임" 버튼은 숨겨졌다');
+  // 작업374: 새 "게임" 탭의 "선택"으로 들어간다 → 단어장 화면의 같은 선택 모드
+  await page.eval("showPage('game')");
+  await page.click('.game-src[data-src="select"]');
   assert.equal(await page.eval('wordbookMode'), 'spell');
+  assert.equal(await page.eval("document.getElementById('page-wordbook').classList.contains('active')"), true, '선택은 단어장 화면으로 이동');
   assert.equal(await page.eval("document.getElementById('wb-selected-action-btn').textContent"), '게임 시작 (0개)');
   // 마크업에는 style 속성이 없다(기존 updateSelectedBtn 이 실행 중에 투명도를 바꾸는 시작 버튼 하나만 예외)
   assert.deepEqual(await page.eval("[...document.querySelectorAll('#wb-select-row [style]')].map(e => e.id)"), ['wb-selected-action-btn'], '선택 줄에 인라인 style 없음');
@@ -808,7 +812,8 @@ test('319-1) 옵션만으로 직접 열어(안내 화면) 저장 → 사전에�
     await page.eval("showPage('wordbook')");
     await page.waitFor("document.querySelectorAll('.word-chip-text').length > 5", 5000);
     await page.eval("switchWordbookTab('en')");
-    await page.click('#wb-mode-spell-btn');
+    await page.eval("showPage('game')");
+    await page.click('.game-src[data-src="select"]');   // 작업374: 숨겨진 "선택 게임" 버튼 대신 새 랜딩의 "선택"
     for (const w of ['apple', 'book', 'environment']) { const i = await page.eval(`[...document.querySelectorAll('.word-chip-text')].map(e => e.textContent).indexOf(${JSON.stringify(w)})`); await page.click('.word-chip', { index: i }); }
     await page.click('#wb-selected-action-btn');
     await page.waitFor("location.pathname === '/spelling_run.html'", 8000);

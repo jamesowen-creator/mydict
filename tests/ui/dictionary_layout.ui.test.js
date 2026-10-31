@@ -82,13 +82,13 @@ for (const w of [768, 820, 1024, 1280]) {
     assert.ok(near(d.tabs[0].x0, d.bar.x0 + 16), `첫 탭 x ${d.tabs[0].x0} (내비 시작 ${d.bar.x0} + 16)`);
     // 내비 항목이 서로 겹치지 않음
     for (let i = 1; i < d.tabs.length; i++) assert.ok(d.tabs[i - 1].x1 <= d.tabs[i].x0 + 0.5, `탭 ${i} 와 ${i + 1} 이 겹침`);
-    assert.equal(d.tabs.length, 5, '탭 개수는 그대로 5개');
+    assert.equal(d.tabs.length, 6, '탭 개수 6개(작업374: 게임 탭 추가)');
     // 작업222: 팟캐스트 플레이어는 내비와 같은 680px 열, OCR 버튼은 그 열의 오른쪽 끝에서 16px 안쪽
     assert.ok(near(d.player.x0, d.bar.x0) && near(d.player.x1, d.bar.x1), `플레이어 ${d.player.x0}~${d.player.x1} vs 내비 ${d.bar.x0}~${d.bar.x1}`);
     assert.ok(near(d.ocr.x1, d.bar.x1 - 16), `OCR 버튼 오른쪽 ${d.ocr.x1} (열 오른쪽 ${d.bar.x1} - 16)`);
     assert.ok(d.ocr.x0 >= d.bar.x0, 'OCR 버튼이 열 안에 있음');
-    // 5탭이 내비 안쪽 폭(좌우 16px 제외)에 모두 들어오고 라벨이 잘리지 않음
-    assert.ok(d.tabs[4].x1 <= d.bar.x1 - 16 + 0.5, `마지막 탭 오른쪽 ${d.tabs[4].x1} ≤ 내비 안쪽 ${d.bar.x1 - 16}`);
+    // 6탭이 내비 안쪽 폭(좌우 16px 제외)에 모두 들어오고 라벨이 잘리지 않음
+    assert.ok(d.tabs[5].x1 <= d.bar.x1 - 16 + 0.5, `마지막 탭 오른쪽 ${d.tabs[5].x1} ≤ 내비 안쪽 ${d.bar.x1 - 16}`);
     for (const t of d.labels) { assert.ok(t.labelFits, `라벨 "${t.text}" 잘림`); assert.ok(t.contentX0 >= t.tabX0 - 0.5 && t.contentX1 <= t.tabX1 + 0.5, `"${t.text}" 내용이 탭 폭을 넘음`); }
     assert.equal(d.tabsOverflow, false, '탭 줄이 가로로 넘치지 않음');
     assert.ok(d.scrollW <= d.vw + 1, '가로 스크롤 없음');
@@ -96,11 +96,11 @@ for (const w of [768, 820, 1024, 1280]) {
 }
 
 // 폰 폭: 수정 전과 같은 값(수정 전 측정: 작업219 1단계). 320px에서는 사전 콘텐츠 최소 폭 때문에 고정 내비가 387px로 그려지는 기존 동작이 그대로임.
-test('222 사전 5탭: 320 / 390 / 768px에서 5개 탭이 모두 내비 안에 들어오고, 라벨이 잘리지 않고, 서로 겹치지 않음, 폭이 균등', { skip: SKIP }, async () => {
+test('222 사전 6탭(작업374): 320 / 390 / 768px에서 6개 탭이 모두 내비 안에 들어오고, 라벨이 잘리지 않고, 서로 겹치지 않음, 폭이 균등', { skip: SKIP }, async () => {
   for (const w of [320, 390, 768]) {
     const d = await measure('dict', w);
-    assert.equal(d.tabs.length, 5, w + 'px: 탭 5개');
-    assert.ok(d.tabs[4].x1 <= d.bar.x1 - 16 + 0.5, `${w}px: 마지막 탭 오른쪽 ${d.tabs[4].x1} ≤ 내비 안쪽 ${d.bar.x1 - 16}`);
+    assert.equal(d.tabs.length, 6, w + 'px: 탭 6개');
+    assert.ok(d.tabs[5].x1 <= d.bar.x1 - 16 + 0.5, `${w}px: 마지막 탭 오른쪽 ${d.tabs[5].x1} ≤ 내비 안쪽 ${d.bar.x1 - 16}`);
     assert.ok(d.tabs[0].x0 >= d.bar.x0 + 16 - 0.5, `${w}px: 첫 탭이 내비 안쪽에서 시작`);
     for (const t of d.labels) { assert.ok(t.labelFits, `${w}px: 라벨 "${t.text}" 잘림`); assert.ok(t.contentX0 >= t.tabX0 - 0.5 && t.contentX1 <= t.tabX1 + 0.5, `${w}px: "${t.text}" 내용(라벨·숫자)이 탭 폭을 넘음`); }
     for (let i = 1; i < d.tabs.length; i++) assert.ok(d.tabs[i - 1].x1 <= d.tabs[i].x0 + 0.5, `${w}px: 탭 ${i}·${i + 1} 겹침`);
@@ -122,7 +122,7 @@ test('219 사전 320px·390px: 수정 전과 같은 위치(헤더·본문 전체
   const d320 = await measure('dict', 320);
   assert.deepEqual(d320.header, { x0: 0, x1: 320 }); assert.deepEqual(d320.main, { x0: 0, x1: 320 });
   assert.deepEqual(d320.bar, { x0: 0, x1: 320 }, '320px 내비는 화면 폭(수정 전에는 387px로 넘쳤음)'); assert.equal(d320.logo.x0, 16); assert.equal(d320.tabs[0].x0, 16);
-  assert.equal(d320.tabs.length, 5);
+  assert.equal(d320.tabs.length, 6);   // 작업374: 게임 탭 추가
   // 작업222: 320px에서 검색 버튼이 화면 밖으로 나가던 문제(문서 폭 387px)를 고쳐서 다시 "가로 스크롤 없음"으로 되돌림(작업219에서는 ≤387로 완화했던 기대)
   assert.ok(d320.scrollW <= 320, `320px: 문서 폭 ${d320.scrollW} ≤ 320`);
   for (let i = 1; i < d320.tabs.length; i++) assert.ok(d320.tabs[i - 1].x1 <= d320.tabs[i].x0 + 0.5, `320px 탭 ${i} 와 ${i + 1} 이 겹침`);

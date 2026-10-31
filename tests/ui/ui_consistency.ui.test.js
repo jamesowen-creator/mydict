@@ -300,15 +300,15 @@ test('222 (i) 하단 내비(작업226-2 갱신): 문학 홈/퀴즈/사전, 과�
   }
 });
 
-// ───────────────────────── (j) 사전 5탭 ─────────────────────────
-test('222 (j) 사전 5번째 탭 "오답노트"가 잘리지 않음: 320 / 390 / 768px에서 마지막 탭이 내비 안, 라벨 scrollWidth ≤ clientWidth', { skip: SKIP }, async () => {
+// ───────────────────────── (j) 사전 6탭 (작업374: 게임 탭 추가) ─────────────────────────
+test('222 (j) 사전 6번째 탭 "오답노트"가 잘리지 않음: 320 / 390 / 768px에서 마지막 탭이 내비 안, 라벨 scrollWidth ≤ clientWidth', { skip: SKIP }, async () => {
   for (const w of [320, 390, 768]) {
     const page = await openDict(w);
     const r = await page.eval(`(() => { const nav = document.querySelector('nav').getBoundingClientRect(); const tabs = [...document.querySelectorAll('.nav-tab')]; const last = tabs[tabs.length - 1].getBoundingClientRect();
       return { navRight: nav.right, lastRight: last.right, count: tabs.length, labels: tabs.map(t => { const l = t.querySelector('.nav-tab-label'); return [l.textContent, l.scrollWidth <= l.clientWidth]; }), lastText: tabs[tabs.length - 1].textContent.trim() }; })()`);
-    assert.equal(r.count, 5); assert.ok(r.lastRight <= r.navRight - 16 + 0.5, `${w}px: 마지막 탭 오른쪽 ${r.lastRight} ≤ 내비 안쪽 ${r.navRight - 16}`);
+    assert.equal(r.count, 6); assert.deepEqual(r.labels.map(l => l[0]), ['검색', '단어장', '게임', '퀴즈', '복습', '오답노트'], '작업374: 탭 순서'); assert.ok(r.lastRight <= r.navRight - 16 + 0.5, `${w}px: 마지막 탭 오른쪽 ${r.lastRight} ≤ 내비 안쪽 ${r.navRight - 16}`);
     for (const [t, ok] of r.labels) assert.ok(ok, `${w}px: 라벨 "${t}" 잘림`);
-    assert.match(r.lastText, /^오답노트/, '5번째 라벨 전체가 보임');
+    assert.match(r.lastText, /^오답노트/, '6번째 라벨 전체가 보임');
     await done(page);
   }
 });

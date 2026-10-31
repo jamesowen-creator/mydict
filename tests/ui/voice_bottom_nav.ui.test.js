@@ -298,7 +298,9 @@ for (const w of [390, 1024]) {
     const dm = await d.eval(NAV_SPEC('nav', '.nav-tab', '.nav-tab.active'));
     await d.close();
     const same = (k, tol = 0.6) => typeof vm[k] === 'number' ? assert.ok(Math.abs(vm[k] - dm[k]) <= tol, `${k}: 음성 ${vm[k]} vs 사전 ${dm[k]}`) : assert.equal(vm[k], dm[k], `${k}: 음성 ${vm[k]} vs 사전 ${dm[k]}`);
-    for (const k of ['vw', 'x0', 'x1', 'h', 'borderTop', 'shadow', 'padB', 'padL', 'z', 'pos', 'count', 'tabW', 'font', 'weight', 'padT', 'tabTopBorder', 'activeTopBorder', 'gap']) same(k);
+    for (const k of ['vw', 'x0', 'x1', 'h', 'borderTop', 'shadow', 'padB', 'padL', 'z', 'pos', 'font', 'weight', 'padT', 'tabTopBorder', 'activeTopBorder', 'gap']) same(k);
+    // 작업374: 사전은 게임 탭이 늘어 6탭(음성은 5탭)이라 탭 수·탭 폭은 같을 수 없다. 나머지 사양(높이·윗선·그림자·라벨 크기·활성 선 등)은 그대로 같아야 한다
+    assert.equal(dm.count, 6, '사전 탭 6개'); assert.equal(vm.count, 5, '음성 탭 5개');
     // 탭 높이: 사전은 ≤460px 에서 라벨 아래에 숫자 배지 줄(14px)을 예약해 56px, 음성은 배지가 없어 44px(둘 다 ≥ 44px). 넓은 화면에서는 같아야 함
     if (w > 460) same('tabH'); else assert.ok(vm.tabH >= 43.5 && dm.tabH >= 43.5);
     assert.equal(vm.count, 5); assert.equal(vm.font, w <= 460 ? '13px' : '15px'); assert.equal(vm.activeTopBorder, '3px'); assert.equal(vm.borderTop, '1px');
