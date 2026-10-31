@@ -1768,7 +1768,7 @@ test('326-2) 그림(시트를 못 불러온 대체 그림): 상자·구덩이·�
   const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: O_Q, dodge: false, blockObst: true });   // 작업327: 시트가 있으면 상자 대신 그림이 나오므로, 코드 그림(대체) 검사는 시트를 막고 한다
   await gameReady(page);
   await page.click('#startBtn'); await page.waitFor("SpellRun.G.state === 'run'", 4000); await page.eval('SpellRun.manual = true');
-  const px = await page.eval(`(() => { const R = SpellRun, G = R.G, cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360; const seenKinds = {};
+  const PROBE = `(() => { const R = SpellRun, G = R.G, cv = document.getElementById('cv'), cx = cv.getContext('2d'), S = cv.width / 360; const seenKinds = {};
     const colorAt = (x, y) => Array.from(cx.getImageData(Math.round(x * S), Math.round(y * S), 1, 1).data);
     for (let n = 0; n < 60 * 600 && Object.keys(seenKinds).length < 2; n++) {
       const tg = G.tiles.filter(x => x.state === 'live' && !x.checked && x.correct && x.x > R.RUNNER_X).sort((a, b) => a.x - b.x)[0];
@@ -1779,8 +1779,15 @@ test('326-2) 그림(시트를 못 불러온 대체 그림): 상자·구덩이·�
       if (o && !seenKinds[o.kind]) { R.draw(); const mid = o.x + o.w / 2;
         seenKinds[o.kind] = o.kind === 'pit' ? { hole: colorAt(mid, R.view.layout().GROUND + 40), road: colorAt(mid - o.w, R.view.layout().GROUND + 40), sign: colorAt(mid + 6, R.obstTop(o) + 20) } : { face: colorAt(o.x + 4, R.view.layout().GROUND - 6), outline: colorAt(mid, R.view.layout().GROUND - R.CONFIG.OBST_H - 1), sign: colorAt(mid + 6, R.obstTop(o) + 20) }; }
     }
-    return seenKinds; })()`);
-  assert.ok(px.pit && px.box, '두 종류를 그렸다: ' + JSON.stringify(Object.keys(px)));
+    return seenKinds; })()`;
+  // 작업379: 상자와 구덩이는 난수로 정해져서 한 판에 한 종류만 나올 수 있다(작업378: 단독 실행 1/20 실패). 형제 시험(326-2 장애물이 나타난다)처럼 판을 다시 돌려 두 종류가 모두 모일 때까지 최대 8번 시도한다.
+  const px = {}; let tries = 0;
+  for (; tries < 8 && !(px.pit && px.box); tries++) {
+    if (tries > 0) await page.eval("SpellRun.G.state = 'idle'; SpellRun.startRound(false); SpellRun.manual = true");
+    const one = await page.eval(PROBE);
+    for (const k of Object.keys(one)) if (!px[k]) px[k] = one[k];
+  }
+  assert.ok(px.pit && px.box, `두 종류를 그렸다(${tries}번 시도): ` + JSON.stringify(Object.keys(px)));
   const lum = c => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   assert.ok(lum(px.pit.hole) < 25 && lum(px.pit.road) > 25 || lum(px.pit.hole) < lum(px.pit.road), '구덩이는 도로보다 어둡다: ' + JSON.stringify(px.pit));
   assert.ok(px.pit.sign[0] > 180 && px.pit.sign[1] < 120, '경고 표지는 빨강: ' + px.pit.sign);

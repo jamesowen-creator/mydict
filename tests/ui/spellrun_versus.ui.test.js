@@ -75,6 +75,8 @@ async function openGame({ width = 360, height = 640 } = {}) {
   const page = await browser.newPage({ width, height, token: jwt() });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); } catch (e) {}" });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(state.rows.map(r => r.id)))}); } catch (e) {}` });
+  // 작업379: 이 페이지가 보낸 대결 조회(GET)의 시각을 페이지 안에서 기록한다(요청은 바꾸지 않는다). Page.close() 는 탭을 닫지 않고 연결만 끊으므로 앞선 시험의 탭이 같은 모의 서버에 계속 조회를 보낸다 — 서버가 받은 요청 수로는 이 페이지의 조회와 구분할 수 없다.
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "window.__sentGets = []; const of = window.fetch; window.fetch = function (u, o) { if (/versus/.test(String(u)) && (!o || !o.method || o.method === 'GET')) window.__sentGets.push(performance.now()); return of.apply(this, arguments); };" });
   await page.goto(base + '/spelling_run.html');
   await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled || document.getElementById('gateMsg').textContent !== '불러오는 중...'", 8000);
   return page;
@@ -313,14 +315,17 @@ test('닫기: 내 방이 있으면 leave 를 부르고 시작 화면으로 돌�
   page = await openGame(); await fast(page);
   await openVs(page); await click(page, '#vsCreate');
   await waitFor(page, "!document.getElementById('vsRoomView').hidden");
+  await page.eval('window.__closedAt = performance.now()');   // 작업379: 닫기를 누르는 시각(바로 이어서 Escape 키가 닫기를 실행한다)
   await page.eval("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); document.getElementById('vs').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
   await waitFor(page, "document.getElementById('vs').hidden");
   for (let i = 0; i < 60 && !calls("POST", /leave$/).length; i++) await sleep(50);   // leave 요청이 서버에 닿을 때까지 기다린다(부하가 큰 실행에서도 안정)
   assert.equal(calls('POST', new RegExp('^/api/versus/rooms/' + ROOM_ID + '/leave$')).length, 1, '닫을 때 leave 호출');
   assert.equal(await visible(page, 'start'), true);
-  await sleep(200);   // 닫는 순간 이미 나간 조회 요청이 서버에 닿을 시간(기존에도 가끔 이 요청이 집계에 섞여 불안정했다)
-  const n = state.requests.length; await sleep(300);
-  assert.equal(state.requests.slice(n).filter(r => r.method === 'GET' && /versus/.test(r.url)).length, 0, '닫은 뒤에는 조회 없음');
+  // 작업379: 닫은 뒤에 "이 페이지가" 보낸 조회가 없는지를 본다(보낸 시각 기준). 서버 도착 수로 세던 예전 방식(고정 대기 200+300ms 뒤 집계)은 앞선 시험의 탭이 보낸 조회가 섞여 파일 전체 실행에서 자주 실패했다(작업378).
+  // 조회 간격이 60ms 이므로 닫은 뒤 300ms 동안 지켜보면 폴링이 남아 있을 경우 5번 안팎 보낼 시간이다.
+  await sleep(300);
+  const sentAfterClose = await page.eval('window.__sentGets.filter(t => t > window.__closedAt).length');
+  assert.equal(sentAfterClose, 0, '닫은 뒤에는 이 페이지가 조회를 보내지 않는다');
   // 닫은 뒤에도 게임 시작 버튼이 살아 있다
   assert.equal(await page.eval("document.getElementById('startBtn').disabled"), false);
   assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
