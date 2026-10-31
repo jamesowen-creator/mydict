@@ -166,8 +166,8 @@ function buildConfig(v) {
 const CONFIG = buildConfig();
 
 // 작업318-5: 주소 옵션(?pace=1.1&hp=7&startdelay=2.6&popsec=2&highprob=0.3&heartevery=3&dj=1). 허용 범위를 벗어나거나 숫자가 아니면 무시(기본값).
-// 작업372(가로만): 풍선을 그릴 때 더하는 오른쪽 이동의 기본값(px). 370 에서는 36.75(풍선 반폭 21.75 + 그림 앞쪽 끝 15)였는데 풍선이 너무 일찍 터져 18 로 줄였다(주소 옵션 grabdx 0~40 으로 조정, 세로는 항상 0).
-const LAND_GRAB_DX = 18;
+// 작업372(가로만): 풍선을 그릴 때 더하는 오른쪽 이동의 기본값(px, 작업376: 10). 370 에서는 36.75(풍선 반폭 21.75 + 그림 앞쪽 끝 15)였는데 풍선이 너무 일찍 터져 18 로 줄였고 376 에서 다시 10 으로 낮췄다(주소 옵션 grabdx 0~40 으로 조정, 세로는 항상 0).
+const LAND_GRAB_DX = 10;
 const OPTION_RULES = {
   pace: { min: 0.7, max: 1.8, def: DEFAULT_PACE }, hp: { min: 1, max: 10, int: true, def: 5 }, startdelay: { min: 0.5, max: 6, def: 2.2 },
   popsec: { min: 0.5, max: 5, def: 1.6 }, highprob: { min: 0, max: 1, def: 0.2 }, heartevery: { min: 1, max: 10, int: true, def: 3 }, dj: { min: 0, max: 1, int: true, def: 1 }, maxcombo: { min: 3, max: 12, int: true, def: 5 },

@@ -141,7 +141,7 @@ function applyLayout(lo) {
   W = LAYOUT.W; H = LAYOUT.H; GROUND = LAYOUT.GROUND; TILE_Y = LAYOUT.TILE_Y; TILE_H = LAYOUT.TILE_H; HIGH_Y = LAYOUT.HIGH_TILE_Y;
   box.style.setProperty('--hs', LAYOUT.HUD_SHIFT);
   box.classList.toggle('land', lo.mode === 'land');
-  RUNNER_X = LAYOUT.RUNNER_X || 72; GRAB_DX = lo.mode === 'land' ? (OPT.values.grabdx !== undefined ? OPT.values.grabdx : (LAYOUT.GRAB_DX || 0)) : 0; LAYOUT.GRAB_DX = GRAB_DX;   // 작업372: 세로는 옵션과 상관없이 0, 가로는 grabdx(기본 18). 작업370
+  RUNNER_X = LAYOUT.RUNNER_X || 72; GRAB_DX = lo.mode === 'land' ? (OPT.values.grabdx !== undefined ? OPT.values.grabdx : (LAYOUT.GRAB_DX || 0)) : 0; LAYOUT.GRAB_DX = GRAB_DX;   // 작업372: 세로는 옵션과 상관없이 0, 가로는 grabdx(기본 10). 작업370
   streamViewW = W;   // edge 진입 지점 = 판 폭 + 타일 반폭 (작업370: 풍선은 그릴 때 GRAB_DX 만큼 더 오른쪽이라 화면 밖에서 시작하는 것은 그대로이고, 장애물은 이전과 같은 자리에서 들어온다)
 }
 function resize() {
@@ -2764,7 +2764,7 @@ function setViewMode(m) {
 function srClose() {
   if (VSG.on && VSG.running && !VSG.ended) { vsgQuitOpen(); return; }   // 대결 중이면 기존 나가기 확인을 거친다
   exitFs();
-  location.href = '/english_dictionary.html#wordbook';   // 지금의 뒤로가기와 같은 곳
+  location.href = '/english_dictionary.html#game';   // 작업376: 게임을 마치거나 닫으면 게임 랜딩으로
 }
 // 캐릭터 선택: 시작 화면에서만 바뀌고 마지막 선택을 기억한다(주소 옵션 char 는 저장하지 않는다)
 function syncCharUI() { document.querySelectorAll('#charRow [data-char]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.char === charKey))); }

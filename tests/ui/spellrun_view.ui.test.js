@@ -225,7 +225,7 @@ test('355-3) 달리는 중 [가로로]는 판이 끝난 뒤 적용되고 안내�
   noErr(page); await page.close();
 });
 
-test('355-3) [닫기]: 단어장으로 돌아간다. 대결 중이면 기존 나가기 확인 대화상자를 먼저 연다', { skip: SKIP }, async () => {
+test('355-3) [닫기]: 게임 랜딩으로 돌아간다(작업376). 대결 중이면 기존 나가기 확인 대화상자를 먼저 연다', { skip: SKIP }, async () => {
   let page = await open(390, 844);
   await page.click('#srClose');
   await page.waitFor("location.pathname === '/english_dictionary.html'", 8000);

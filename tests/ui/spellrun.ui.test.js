@@ -357,17 +357,17 @@ test('7) 하트: 체력이 줄어든 상태에서 점프로 먹으면 +1, 점프
 });
 
 // ───────── 8. 뒤로가기 ─────────
-test('8) 뒤로가기 링크는 /english_dictionary.html#wordbook 이고, 사전은 해시가 있으면 단어장을, 없으면 검색 탭을 연다', { skip: SKIP }, async () => {
+test('8) 뒤로가기 링크는 /english_dictionary.html#game(작업376) 이고, 사전은 해시가 있으면 게임 랜딩을, 없으면 검색 탭을 연다', { skip: SKIP }, async () => {
   resetState();
   const page = await openGame({ ids: [1, 2, 3] });
-  assert.equal(await page.eval("document.querySelector('.screen-bar-back').getAttribute('href')"), '/english_dictionary.html#wordbook');
+  assert.equal(await page.eval("document.querySelector('.screen-bar-back').getAttribute('href')"), '/english_dictionary.html#game');
   assert.equal(await page.eval("getComputedStyle(document.querySelector('.screen-bar')).display"), 'none', '작업355: 꽉 찬 화면이라 화면 바(뒤로가기)는 숨겨진다');
   await page.click('#srClose');   // 같은 곳으로 돌아가는 [닫기]
   await page.waitFor("location.pathname === '/english_dictionary.html'", 8000);
-  await page.waitFor("document.getElementById('page-wordbook') && document.getElementById('page-wordbook').classList.contains('active')", 8000);
+  await page.waitFor("document.getElementById('page-game') && document.getElementById('page-game').classList.contains('active')", 8000);
   assert.equal(await page.eval("document.getElementById('page-search').classList.contains('active')"), false);
-  assert.equal(await page.eval("document.querySelectorAll('.nav-tab')[1].classList.contains('active')"), true, '하단 탭도 단어장');
-  assert.equal(await page.eval('history.state && history.state.page'), 'wordbook');
+  assert.equal(await page.eval("document.querySelectorAll('.nav-tab')[2].classList.contains('active')"), true, '하단 탭도 게임(작업376)');
+  assert.equal(await page.eval('history.state && history.state.page'), 'game');
   assert.equal(await page.eval('location.hash'), '', '주소의 해시는 지워진다');
   await page.close();
   // 해시가 없으면 기존처럼 검색 탭
