@@ -146,7 +146,7 @@ for (const [mode, label] of [[1, '가로'], [0, '세로']]) {
       const r = await page.eval('(() => { const s = window.__sp.img.pop(), L = SpellRun.view.layout(); return { dw: s.dw, foot: s.dy + s.dh - 8 / 288 * s.dh, ground: L.GROUND, rx: SpellRun.RUNNER_X }; })()');
       assert.ok(Math.abs(r.dw - 92 * (mode ? 1.3 : 1)) < 1e-6, `${label} char=${ch} 그림 크기 ${r.dw}`);
       assert.ok(Math.abs(r.foot - r.ground) < 0.01, `${label} char=${ch} 발끝 ${r.foot} = 땅 ${r.ground}`);
-      assert.equal(r.rx, 72, '러너 위치(판정)는 그대로');
+      assert.equal(r.rx, mode ? 149 : 72, '러너 위치: 가로는 작업370에서 149(몸 중심 약 16%), 세로는 72 그대로');
       noErr(page); await page.close();
     }
   });

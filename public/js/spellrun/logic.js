@@ -227,7 +227,8 @@ const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TIL
   FX: false,   // 작업363: 캐릭터 동작 효과(가로만). 그리기·표시 상태에만 쓰고 판정·점수·타일 위치와 무관
   TILE_LIFT: 0, BALLOON: false,   // 작업361: 가로에서만 철자 타일을 풍선 그림으로 그리고 그림만 TILE_LIFT 논리 px 위로 올린다(판정·배치는 그대로)
   TILE_SCALE: 1, CHAR_SCALE: 1,   // 작업360: 철자 타일·캐릭터 그림 배율(세로는 1 = 그대로. 가로 값은 LAYOUT_LAND). 판정 크기와 무관하게 그림·타일 폭만 바꾼다
-  INTRO_CENTER_Y: 250,  // 작업323: 큰 뜻 카드의 가운데 높이(논리 px). 위쪽 HUD 줄 아래, 땅 위의 빈 공간
+  RUNNER_X: 72, GRAB_DX: 0, AIR_GAP: false,   // 작업370: 캐릭터 기준 x · 풍선을 그리는 오른쪽 이동(먹는 순간을 눈에 보이는 접촉에 맞춤) · 이웃 간격의 공중 시간 하한. 세로는 이전 값 그대로
+  INTRO_CENTER_Y: 250, // 작업323: 큰 뜻 카드의 가운데 높이(논리 px). 위쪽 HUD 줄 아래, 땅 위의 빈 공간
   CONTENT_BOTTOM_Y: 266 // 글자 칸 줄 아래 끝의 한계: 높은 칸 타일 윗변(HIGH_TILE_Y - TILE_H/2 = 276)보다 위(여유 포함)
 };
 
@@ -236,7 +237,10 @@ const LAYOUT = { W: 360, H: 640, GROUND: 520, TILE_Y: 412, HIGH_TILE_Y: 305, TIL
 //   (뜻·글자 칸·HUD 는 위쪽에 그대로 있고, 땅·타일·점프·장애물의 상대 위치와 경기장 폭은 불변. 하늘이 넓어지면 위쪽 글자와 높은 칸 사이가 비어 보이는 대신 답답하지 않고, 땅 아래 띠는 대결 막대·나가기가 놓일 만큼만 늘린다)
 // 가로: 800x400. 글자 영역은 높이 100 이하(CONTENT_BOTTOM_Y 100), 높은 칸 타일 윗변 112 보다 위. 땅 아래 띠 44.
 // 작업356: 뜻(왼쪽)과 글자 칸(오른쪽)을 한 줄에 나란히 둔다(HUD 는 위 한 줄). 글자 칸 줄은 남는 폭(약 440)을 쓰고, 큰 뜻 연출은 위쪽(높은 칸 타일 윗변 112 보다 위)에서 한다. 팝업 글자 크기는 가로 전용 상한
-const LAYOUT_LAND = { W: 800, H: 400, GROUND: 356, TILE_Y: 248, HIGH_TILE_Y: 141, TILE_H: 58, WORD_AVAIL_W: 440, HUD_SHIFT: 0, INTRO_CENTER_Y: 72, INTRO_W: 560, CONTENT_BOTTOM_Y: 100, TILE_SCALE: 0.75, CHAR_SCALE: 1.3, TILE_LIFT: 22, BALLOON: true, FX: true, CW_MAX: 38, MEAN_MAX: 26, SUB_MAX: 12, POPW_MAX: 30, POPM_MAX: 16, POPE_MAX: 10, FIT_PAD: 5 };
+// 작업370(가로만): LAND_RUNNER_X = 캐릭터 기준 x. 그림 알파 측정으로 여학생·남학생 몸 중심(그림 범위 가운데)이 기준 x 보다 약 19~22px 왼쪽이라, 몸 중심이 화면 폭의 약 16%(128px)가 되게 149 로 한다(세로는 72 그대로).
+// LAND_GRAB_DX = 풍선을 그릴 때만 더하는 오른쪽 이동. 풍선 반폭 21.75(타일 폭 43.5 / 2) + 그림 앞쪽 끝(기준 x 보다 앞 13~16.6px, 여학생·남학생·펭귄 측정 평균 약 15) = 36.75. 논리 좌표는 그대로라 먹는 순간·도착 거리·장애물·아이템 계산이 같은 기준을 쓰고, 풍선 가장자리가 캐릭터 앞쪽 끝에 닿는 순간 터진다.
+const LAND_RUNNER_X = 149, LAND_GRAB_DX = 36.75, AIR_GAP_MARGIN = 0.08;
+const LAYOUT_LAND = { W: 800, H: 400, GROUND: 356, TILE_Y: 248, HIGH_TILE_Y: 141, TILE_H: 58, WORD_AVAIL_W: 440, HUD_SHIFT: 0, INTRO_CENTER_Y: 72, INTRO_W: 560, CONTENT_BOTTOM_Y: 100, TILE_SCALE: 0.75, CHAR_SCALE: 1.3, TILE_LIFT: 22, BALLOON: true, FX: true, RUNNER_X: LAND_RUNNER_X, GRAB_DX: LAND_GRAB_DX, AIR_GAP: true, CW_MAX: 38, MEAN_MAX: 26, SUB_MAX: 12, POPW_MAX: 30, POPM_MAX: 16, POPE_MAX: 10, FIT_PAD: 5 };
 const SCALE_MAX = 1.5, SCALE_MIN = 0.3;
 // mode: 'port' | 'land', availW/availH: 안전 여백을 뺀 쓸 수 있는 화면 크기(CSS px). 반환: LAYOUT 과 같은 항목 + { scale, mode, extra }
 function layoutFor(mode, availW, availH) {
@@ -657,6 +661,32 @@ function obstacleLayout(cfg, kind) {
   const Do = doMin + extra / 2;
   return { kind: sp.kind, w: sp.w, clearH: sp.clearH, Do: Do, post: D1 - Do - sp.w, D1: D1 };
 }
+// 작업370: 한 번 점프로 높이 GRAB_H 를 넘어 떠 있는 시간(초) = airWindow(cfg, GRAB_H).len. pace 옵션(JUMP_TIME)을 그대로 따른다
+function airSeconds(cfg) { cfg = cfg || CONFIG; return airWindow(cfg, cfg.GRAB_H).len; }
+// 2단 점프(첫 점프 중 SECOND_JUMP_MIN 이후 어느 때든 한 번 더 누름)로 높이가 GRAB_H 를 넘는 첫 순간부터 마지막 순간까지의 시간 중 가장 긴 값(초)
+const _dbl = {};
+function doubleAirSeconds(cfg) {
+  cfg = cfg || CONFIG;
+  const key = cfg.JUMP_TIME + '|' + cfg.JUMP_PEAK + '|' + cfg.GRAB_H + '|' + cfg.SECOND_JUMP_MIN;
+  if (key in _dbl) return _dbl[key];
+  let best = 0;
+  for (let s = cfg.SECOND_JUMP_MIN; s <= cfg.JUMP_TIME + 1e-9; s += 0.004) {
+    const h2 = airHeight(s, -1, 0, cfg), end = s + secondJumpLandTime(h2, cfg);
+    let first = -1, last = -1;
+    for (let t = 0; t <= end; t += 0.002) {
+      const h = t < s ? airHeight(t, -1, 0, cfg) : airHeight(s, t - s, h2, cfg);
+      if (h > cfg.GRAB_H) { if (first < 0) first = t; last = t; }
+    }
+    if (first >= 0 && last - first > best) best = last - first;
+  }
+  return (_dbl[key] = best);
+}
+// 가로 이웃 풍선 사이 최소 시간 간격: 일반 = 점프 공중 시간 + 여유, 높은 칸 옆 = 1단·2단 중 긴 공중 시간 + 여유
+function airGapSeconds(cfg) {
+  cfg = cfg || CONFIG;
+  const a = airSeconds(cfg), d = doubleAirSeconds(cfg);
+  return { normal: a + AIR_GAP_MARGIN, high: Math.max(a, d) + AIR_GAP_MARGIN };
+}
 // 일정한 속도 v 에서 장애물을 틀린 글자를 먹지 않고 넘는 점프 시작 시각의 구간(초). width 가 여유 창이다(음수면 불가능).
 function obstacleWindow(cfg, layout, v) {
   cfg = cfg || CONFIG;
@@ -778,7 +808,7 @@ function streamMinGap(wA, wB, minPx, k) { k = k || 1; return Math.max(STREAM.MIN
 // 묶음 하나의 배치(classic 의 spawnPack 산식과 같다). o: { R0, v, widths: 타일 폭 목록, item: 앞에 아이템이 붙는가, obstacle: 'box'|'pit'|null, firstHigh: 첫 타일이 높은 칸인가 }
 function layoutGroup(cfg, o) {
   cfg = cfg || CONFIG;
-  const v = o.v, gap = v * gapSec(v, cfg);
+  const v = o.v, gap = Math.max(v * gapSec(v, cfg), o.airGap ? v * (o.firstHigh ? o.airGap.high : o.airGap.normal) : 0);   // 작업370: 가로는 묶음 안 이웃 간격도 점프 공중 시간 + 여유 이상
   let x0 = o.R0 + v * leadSec(v, cfg), itemX = null, ob = null, lay = null;
   if (o.item) { itemX = x0; x0 += gap; }
   if (o.obstacle) {
@@ -807,7 +837,8 @@ function streamShift(cfg, g, o) {
   const gl = groupLeft(g);
   let dx = Math.max(0, o.viewW - gl.left);
   if (o.leftover) {
-    dx = Math.max(dx, o.leftover.x + streamMinGap(o.leftover.w, gl.w, g.firstHigh ? g.gap : 0, o.tileScale) - gl.cx);
+    const airPx = o.airGap ? g.v * ((o.leftover.high || g.firstHigh) ? o.airGap.high : o.airGap.normal) : 0;   // 작업370: 이웃 풍선 시간 간격 하한을 현재 속도의 거리로
+    dx = Math.max(dx, o.leftover.x + streamMinGap(o.leftover.w, gl.w, Math.max(g.firstHigh ? g.gap : 0, airPx), o.tileScale) - gl.cx);
     if (g.obstacle && g.lay) {   // 장애물 점프 시작 구간의 가장 이른 시각(lo, 묶음이 생긴 순간 기준)보다 남은 타일이 먼저 러너를 지나가야 한다
       const win = obstacleWindow(cfg, g.lay, g.v);
       dx = Math.max(dx, o.leftover.x + g.lay.D1 - g.v * win.lo - g.x0);
@@ -827,8 +858,8 @@ function streamBaseR0(cfg, kind, o) {
 // 한 번에 배치: 배치 결과(g)와 classic 대비 늦춤(dx, px)을 돌려준다
 function streamPlace(cfg, kind, o) {
   cfg = cfg || CONFIG;
-  const g0 = layoutGroup(cfg, { R0: streamBaseR0(cfg, kind, o), v: o.v, widths: o.widths, item: o.item, obstacle: o.obstacle, firstHigh: o.firstHigh });
-  const dx = streamShift(cfg, g0, { viewW: o.viewW, leftover: o.leftover, tileScale: o.tileScale });
+  const g0 = layoutGroup(cfg, { R0: streamBaseR0(cfg, kind, o), v: o.v, widths: o.widths, item: o.item, obstacle: o.obstacle, firstHigh: o.firstHigh, airGap: o.airGap });
+  const dx = streamShift(cfg, g0, { viewW: o.viewW, leftover: o.leftover, tileScale: o.tileScale, airGap: o.airGap });
   return { group: dx ? shiftGroup(g0, dx) : g0, dx: dx, group0: g0 };
 }
 // 글자 타일이 "지금 풀 칸"의 정답인가. cur: { wi, si }
@@ -1287,7 +1318,7 @@ return {
   speedLevel: speedLevel, speedMult: speedMult, gapSec: gapSec, leadSec: leadSec, speedAfterHit: speedAfterHit, speedAfterFail: speedAfterFail,
   targetSpeed: targetSpeed, planHearts: planHearts, pickHeartSlot: pickHeartSlot, jumpHeight: jumpHeight, judge: judge, buildRound: buildRound,
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
-  ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT, LAYOUT_LAND: LAYOUT_LAND, layoutFor: layoutFor,
+  ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT, LAYOUT_LAND: LAYOUT_LAND, layoutFor: layoutFor, LAND_RUNNER_X: LAND_RUNNER_X, LAND_GRAB_DX: LAND_GRAB_DX, AIR_GAP_MARGIN: AIR_GAP_MARGIN, airSeconds: airSeconds, doubleAirSeconds: doubleAirSeconds, airGapSeconds: airGapSeconds,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
   survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, balloonRise: balloonRise, balloonRiseY: balloonRiseY, SOUND: SOUND, PENTA: PENTA, comboNote: comboNote, tempoCoef: tempoCoef, tempoStep: tempoStep, slotSec: slotSec, resumePos: resumePos, duckLevel: duckLevel, rampValue: rampValue, noiseSamples: noiseSamples, noteMidi: noteMidi, midiFreq: midiFreq, SONGS: SONGS, songEvents: songEvents, eventVoices: eventVoices, sfxPlan: sfxPlan, buildSoundGraph: buildSoundGraph, makeNoiseBuffer: makeNoiseBuffer, playVoices: playVoices, CHAR_FX: CHAR_FX, charSquash: charSquash, runBob: runBob, charShadow: charShadow, wrongFx: wrongFx, rightHop: rightHop, starFx: starFx, reactNext: reactNext, reactKind: reactKind, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamOffscreen: streamOffscreen,

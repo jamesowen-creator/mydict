@@ -31,7 +31,7 @@ const { survHeartWord, survHeartSlot, survRampCfg, makeSurvSupply, runState, con
 const LAYOUT = Object.assign({}, L.LAYOUT);   // 작업355: 화면 모드·크기에 따라 값이 바뀌는 사본(logic.js 의 LAYOUT 은 세로 640 기준값 그대로)
 
 let W = LAYOUT.W, H = LAYOUT.H, GROUND = LAYOUT.GROUND, TILE_Y = LAYOUT.TILE_Y, TILE_H = LAYOUT.TILE_H, HIGH_Y = LAYOUT.HIGH_TILE_Y;   // 작업355: applyLayout 이 화면 모드·크기에 맞게 바꾼다
-const RUNNER_X = 72;
+let RUNNER_X = 72, GRAB_DX = 0;   // 작업370: 가로만 applyLayout 이 LAYOUT.RUNNER_X(149)·GRAB_DX(36.75)로 바꾼다. 세로는 72·0 그대로. 풍선은 논리 좌표 그대로 두고 그릴 때만 GRAB_DX 를 더한다(먹는 순간 = 눈에 보이는 접촉)
 const FALL_SEC = 0.55, STUMBLE_SEC = 0.5, FALL_DEPTH = 46;   // 작업326: 연출 시간(초)·구덩이에 빠지는 깊이(논리 px)
 const INK = '#1d2b53', CORAL = '#ff6b5a', GOLD = '#ffb700', GOOD = '#1fae68', BAD = '#e8454f';
 const TILE_COLORS = ['#ffd25e', '#ff9fb2', '#7ed9c3', '#a8c0ff'];
@@ -141,7 +141,8 @@ function applyLayout(lo) {
   W = LAYOUT.W; H = LAYOUT.H; GROUND = LAYOUT.GROUND; TILE_Y = LAYOUT.TILE_Y; TILE_H = LAYOUT.TILE_H; HIGH_Y = LAYOUT.HIGH_TILE_Y;
   box.style.setProperty('--hs', LAYOUT.HUD_SHIFT);
   box.classList.toggle('land', lo.mode === 'land');
-  streamViewW = W;   // edge 진입 지점 = 판 폭 + 타일 반폭
+  RUNNER_X = LAYOUT.RUNNER_X || 72; GRAB_DX = LAYOUT.GRAB_DX || 0;   // 작업370
+  streamViewW = W;   // edge 진입 지점 = 판 폭 + 타일 반폭 (작업370: 풍선은 그릴 때 GRAB_DX 만큼 더 오른쪽이라 화면 밖에서 시작하는 것은 그대로이고, 장애물은 이전과 같은 자리에서 들어온다)
 }
 function resize() {
   if ($('app').hidden) return;   // 아직 보이지 않는 상태
@@ -825,7 +826,7 @@ function edgeNextKey(key) {
 }
 function edgeRightmost() {
   let best = null;
-  for (const t of G.tiles) if (t.x > RUNNER_X && (!best || t.x > best.x)) best = { x: t.x, w: t.w };
+  for (const t of G.tiles) if (t.x > RUNNER_X && (!best || t.x > best.x)) best = { x: t.x, w: t.w, high: !!t.high };
   return best;
 }
 // key 묶음(아이템·장애물 포함)을 줄에 넣는다. nearOnly 이면 첫 객체가 아직 진입 지점에서 멀면(LOOKAHEAD 보다) 넣지 않고 false.
@@ -839,7 +840,7 @@ function edgeCommit(key, kind, nearOnly) {
   const obKind = (wp.obst && !wp.obst.done && wp.obst.slot === key.si && !heartOk) ? wp.obst.kind : null;   // 하트가 놓이는 묶음에는 장애물을 두지 않는다(classic 과 같다)
   const ccfg = wp.boss ? bossConfig() : CONFIG, tw = (slot.chunk ? 20 + slot.text.length * 26 : 58) * tileScale();
   const r = L.streamPlace(CONFIG, kind, { tileScale: tileScale(), xc: tail ? tail.xcW - G.dist : RUNNER_X, runnerX: RUNNER_X, v: v, bossNext: !!wp.boss, first: key.wi === 0, viewW: streamViewW,
-    widths: Array.from({ length: ccfg.CANDIDATES }, () => tw), item: !!item, obstacle: obKind, firstHigh: !!slot.high, leftover: edgeRightmost() });
+    widths: Array.from({ length: ccfg.CANDIDATES }, () => tw), item: !!item, obstacle: obKind, firstHigh: !!slot.high, leftover: edgeRightmost(), airGap: LAYOUT.AIR_GAP ? L.airGapSeconds(CONFIG) : null });   // 작업370: 가로는 이웃 풍선 간격을 점프 공중 시간 + 여유 이상으로
   if (nearOnly && L.groupLeft(r.group).left > streamViewW + L.STREAM.LOOKAHEAD) return false;
   const g = r.group, pid = ++G.packId, rec = { key: key, kind: kind, dx: r.dx, correct: null, xcW: 0 };
   if (heartOk) wp.heartPending = false; else if (resOk) wp.rescuePending = false; else if (spdOk) wp.speedPending = false;
@@ -1635,7 +1636,7 @@ function popBalloon(t) {
   const A = BALLOON_ART, n = reduce ? Math.ceil(A.POP_N / 2) : A.POP_N, y = (t.high ? HIGH_Y : TILE_Y) - tileLift(t);
   for (let i = 0; i < n; i++) {   // 난수 없이 일정한 방향·속도로 퍼진다
     const ang = i / n * Math.PI * 2 + 0.4, sp = 110 + (i % 2) * 40;
-    G.parts.push({ x: t.x, y: y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 40, life: A.POP_SEC, max: A.POP_SEC, color: A.COLORS[t.bi || 0], r: 3.5 });
+    G.parts.push({ x: t.x + GRAB_DX, y: y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 40, life: A.POP_SEC, max: A.POP_SEC, color: A.COLORS[t.bi || 0], r: 3.5 });
   }
 }
 function drawBalloon(t) {
@@ -1889,7 +1890,8 @@ function draw() {
   drawScene();
   for (const o of G.obstacles) if (o.kind === 'pit') drawPit(o);
   for (const o of G.obstacles) if (o.kind === 'box') drawObstacleArt(o);
-  for (const t of G.tiles) drawTile(t);
+  if (GRAB_DX) { ctx.save(); ctx.translate(GRAB_DX, 0); for (const t of G.tiles) drawTile(t); ctx.restore(); }   // 작업370: 가로는 풍선(·아이템)을 GRAB_DX 만큼 오른쪽에 그린다(판정은 논리 좌표 그대로)
+  else for (const t of G.tiles) drawTile(t);
   drawDust();
   drawRunnerFx();
   drawObstWarn();
@@ -2818,7 +2820,7 @@ function frame(ts) {
 }
 
 // 테스트 훅(시제품과 같은 이름). manual=true이면 화면 갱신 루프가 step()을 부르지 않는다.
-const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, RUNNER_X: RUNNER_X, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, get HIGH_Y() { return HIGH_Y; }, get TILE_Y() { return TILE_Y; }, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival, continued: G.contUsed }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
+const API = { CONFIG: CONFIG, G: G, step: step, draw: draw, jump: jump, startRound: startRound, missedSet: missedSet, get RUNNER_X() { return RUNNER_X; }, get GRAB_DX() { return GRAB_DX; }, manual: false, lastTtsError: null, pronounce: pronounce, setTtsTimeout: ms => { ttsTimeoutMs = ms; }, lastTtsSource: null, pickWords: pickWords, penguin: () => ({ ready: penguinReady(), draws: G.spriteDraws, frame: G.spriteFrame, angle: G.spriteAngle, phase: G.runPhase }), curH: curH, OPT: OPT, fitAll: fitAll, get HIGH_Y() { return HIGH_Y; }, get TILE_Y() { return TILE_Y; }, getRunState: () => runState({ score: G.score, hp: G.hp, combo: G.combo, wi: G.wi, state: G.state, startTime: G.startTime, time: G.time, survival: G.survival, continued: G.contUsed }), obstTop: obstTop, obstArt: () => ({ ready: obstArtReady(), objs: obstObjs }), obstWarnActive: obstWarnActive };
 API.art = { charKey: () => charKey, activeChar: activeChar, charReady: charReady, bgOK: bgOK, itemArtReady: itemArtReady, obstArtReady: () => obstArtReady(), blend: () => G.bossBlend, setChar: k => setChar(k) };   // 작업358: 시험용 훅
 API.fx = { on: fxOn, setOn: v => { LAYOUT.FX = !!v; }, react: reactNow, setReact: setReact, state: () => G.react, dust: () => G.dust.length };   // 작업363: 시험용 훅
 API.balloon = { rise: riseTile, ready: balloonReady, k: balloonK, lift: tileLift, setLift: v => { LAYOUT.TILE_LIFT = v; } };   // 작업361: 시험용 훅

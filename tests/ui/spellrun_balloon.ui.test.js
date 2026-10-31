@@ -210,6 +210,7 @@ test('362-1·2) 틀린 풍선을 먹으면 그 풍선과 쓸모없어진 정답 
   assert.ok(scenes >= 3 && risenB >= 3, `장면 ${scenes}개, 올라간 쓸모없는 풍선 ${risenB}개`);
 });
 
+// 작업370: 가로는 풍선을 GRAB_DX 만큼 오른쪽에 그리므로 그림 호출 위치는 w.x + GRAB_DX 로 찾는다
 test('362-1) 올라가는 모양: 처음엔 느리다가 빨라지고, 약 0.9초 안에 화면 위로 나가며 지워진다. 흐려지지 않고(선명도 1) 둥실 흔들림은 계속, 세계 이동으로 왼쪽으로 밀린다', { skip: SKIP }, async () => {
   const page = await open(844, 390);
   await page.eval(seed);   // 난수 고정: 같은 판이 나오게
@@ -219,7 +220,7 @@ test('362-1) 올라가는 모양: 처음엔 느리다가 빨라지고, 약 0.9�
   await page.eval(spyBalloon);
   const r = await page.eval(`(() => { const R = SpellRun, G = R.G, w = window.__riseTile, ys = [], xs = [], angs = [], alphas = []; let k = 0;
     const P = CanvasRenderingContext2D.prototype, ft = P.fillText; P.fillText = function (t) { if (t === w.text) alphas.push(this.globalAlpha); return ft.apply(this, arguments); };
-    const sec = []; for (; k < 120 && G.tiles.includes(w); k++) { R.step(1 / 60); window.__bl.length = 0; R.draw(); const m = window.__bl.find(b => Math.abs(b.x - w.x) < 3); if (m) { ys.push(m.y); angs.push(m.ang); } xs.push(w.x); }
+    const sec = []; for (; k < 120 && G.tiles.includes(w); k++) { R.step(1 / 60); window.__bl.length = 0; R.draw(); const m = window.__bl.find(b => Math.abs(b.x - (w.x + R.GRAB_DX)) < 3); if (m) { ys.push(m.y); angs.push(m.ang); } xs.push(w.x); }
     P.fillText = ft; return { frames: k, gone: !G.tiles.includes(w), ys, xs, angs, alphas, a: w.rise.a }; })()`);
   assert.equal(r.gone, true, '화면 위로 나가 지워진다');
   const sec = r.frames / 60;
