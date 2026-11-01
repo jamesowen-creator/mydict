@@ -347,7 +347,7 @@ test('보관 복귀: 사용자가 직접 멈춘 미리 보기는 돌아와도 �
   resetState();
   let page = await openGame(); await fast(page, { maxMs: 3000, gapMs: 100 });
   await click(page, '#startBtn');
-  await waitFor(page, "document.getElementById('pvProg').textContent === '2/10'");
+  await waitFor(page, "parseInt(document.getElementById('pvProg').textContent, 10) >= 2");   // 작업386: '2/10' 정확 일치는 부하에서 지나쳐 시간 초과가 났다. 2번째 이상이면 통과
   await click(page, '#pvPause');
   await sleep(200);
   const idx = await page.eval('SpellRun.preview.state.idx'), n = state.requests.length, shownN = (await pvShown(page)).length;

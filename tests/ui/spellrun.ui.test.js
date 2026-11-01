@@ -83,7 +83,7 @@ const SPEECH = `(() => {
 })();`;
 
 // 게임 페이지를 직접 연다. ids 가 있으면 sessionStorage 에 넣고, token=false 면 로그인 토큰 없이 연다.
-async function openGame({ ids, token = true, width = 390, height = 844, speech = false, query = '', dodge = true, blockObst = false } = {}) {
+async function openGame({ ids, token = true, width = 390, height = 844, speech = false, query = '', dodge = true, blockObst = false, seed } = {}) {   // 작업386: seed 가 있으면 Math.random 을 그 숫자로 고정한 난수로 바꾼다(358-6 과 같은 방식)
   state.requests.length = 0;
   const page = await browser.newPage({ width, height, token: token ? jwt() : null });
   await withDodge(page, dodge);
@@ -92,6 +92,7 @@ async function openGame({ ids, token = true, width = 390, height = 844, speech =
   if (!token) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('mydict_token'); } catch (e) {}" });   // 같은 Chrome 프로필을 쓰는 앞선 시험이 남긴 토큰 제거
   if (speech) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
   if (ids) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` });
+  if (seed !== undefined) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => { let a = ${seed >>> 0}; Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })()` });
   await page.goto(base + '/spelling_run.html' + query);
   await page.waitFor("!!document.querySelector('.metis-app-header-logo') && document.getElementById('gateMsg').textContent !== '불러오는 중...' || !document.getElementById('app').hidden", 8000);
   if (!/continue=/.test(query)) await page.eval('window.SpellRun && (SpellRun.CONFIG.CONT_ENABLED = false)');   // 작업341: 체력 0 에서 곧바로 끝나는 기존 시험은 이어하기를 끄고 본다(주소 옵션이 아니라 설정값만 바꿔 "조정값 사용 중" 표시에는 영향 없음)
@@ -166,7 +167,7 @@ test('1) 사전 단어장에서 영어 3개를 골라 "게임 시작"을 누르�
   await page.click('#wb-selected-action-btn');
   await page.waitFor("location.pathname === '/spelling_run.html'", 8000);
   assert.deepEqual(JSON.parse(await page.eval("sessionStorage.getItem('spellrun_ids')")).sort(), [1, 2, 3]);
-  await gameReady(page);
+  await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 30000);   // 작업386: 평소 0.6~1.8초지만 전체 시험을 동시에 돌리면 8초를 넘겨 실패한 적이 있다(385). 이 시험만 30초
   await page.click('#startBtn');
   await page.waitFor("SpellRun.G.state === 'run'", 4000);
   assert.deepEqual(await page.eval('SpellRun.G.words.map(w => w.word).sort()'), ['apple', 'book', 'environment'], '선택한 단어만 출제');
@@ -2039,7 +2040,7 @@ test('328-1) 하트: 체력이 가득이어도 나오고, 가득일 때 먹으�
 
 test('328-2) 가속 아이템(speedevery=1·boostsec=10): 번개 칸이 나오고 먹으면 가속(속도 상승·SPEED_MAX 이하·기본 속도 누적 불변), 가속 중 완성 점수 x1.5, 끝나면 돌아온다. 속도가 SPEED_MAX 를 넘은 적이 없다', { skip: SKIP }, async () => {
   resetState();
-  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?speedevery=1&boostsec=10&dj=0', dodge: false });
+  const page = await openGame({ ids: [1, 2, 3, 4, 11, 12, 13, 14], query: '?speedevery=1&boostsec=10&dj=0', dodge: false, seed: 1 });   // 작업386: 장애물·하트가 난수로 정해져 번개 칸 수가 3~12로 흔들렸다(시드 1~60 중 1회가 4 미만). 시드 1 은 9개
   await startManual(page);
   let all = null;
   for (let rd = 0; rd < 4; rd++) {
