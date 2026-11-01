@@ -478,6 +478,8 @@ test('318-1) 최악 입력(13글자 단어·25자 넘는 뜻·보스 7칸·긴 �
       seen.push(info);
       assert.ok(info.word);
       await advance(page, "G.state === 'pop'", {});
+      // 작업388: 완성 글자 효과(sr-pop, scale 1.25 까지)가 도는 중에는 scrollWidth 가 확대된 자식을 포함해 가로 넘침으로 잡힌다. 끝난 뒤에 잰다(상한 2초)
+      await page.waitFor("!document.getAnimations().some(a => a.animationName === 'sr-pop' && a.playState === 'running')", 2000);
       const badP = await page.eval(OVERFLOW);
       assert.deepEqual(badP, [], `${width}px 팝업: ${JSON.stringify(badP)}`);
       // 완성 팝업의 단어는 한 줄: 모든 글자의 윗변이 같다

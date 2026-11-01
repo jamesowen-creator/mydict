@@ -91,7 +91,7 @@ test('켜짐(기본): 시작 → 미리 보기가 이번 판 순서대로 나오
   await waitFor(page, "!document.getElementById('pv').hidden");
   assert.notEqual(await page.eval('SpellRun.G.state'), 'run', '미리 보기 동안 판은 시작되지 않음');
   assert.equal(await page.eval("document.getElementById('start').hidden"), true);
-  await waitFor(page, "document.getElementById('pvProg').textContent === '1/10'");
+  await waitFor(page, "parseInt(document.getElementById('pvProg').textContent, 10) >= 1");   // 작업388: '1/10' 정확 일치는 부하에서 지나쳐 시간 초과가 났다
   const first = await page.eval("({ w: document.getElementById('pvWord').textContent, m: document.getElementById('pvMean').textContent })");
   assert.equal(first.m, first.w + ' 뜻', '단어와 대표 뜻이 함께 나옴');
   await ready(page);
