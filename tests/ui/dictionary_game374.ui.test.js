@@ -105,8 +105,7 @@ test('374-2) 게임 랜딩: 설명·10/20 칩(기본 10)·출처 4개 행(이름
   assert.deepEqual(rows.map(r => [r.key, r.name, r.n, r.off]), [['select', '선택', '12개', 'false'], ['random', '랜덤', '12개', 'false'], ['wrong', '오답', '3개', 'false'], ['recent', '최근', '12개', 'false']],
     '오답 노트의 zebra(단어장에 없음)는 빠지고 대소문자 다른 Book 은 book 으로 센다');
   assert.equal(await page.eval("[...document.querySelectorAll('.game-src-desc')].map(e => e.textContent).join('|')"), '단어장에서 직접 고르기|단어장 영어 단어 중 무작위 (최근 저장·오답 단어는 2배 확률)|오답 노트의 단어|최근 저장한 단어');
-  assert.equal(await page.eval("getComputedStyle(document.getElementById('wb-mode-spell-btn')).display"), 'none', '단어장 옆 "선택 게임" 버튼은 숨김');
-  assert.equal(await page.eval("document.getElementById('wb-mode-spell-btn').hidden"), true);
+  assert.equal(await page.eval("document.getElementById('wb-mode-spell-btn')"), null, '작업392: 단어장 옆 "선택 게임" 버튼은 없다(랜딩의 "선택"이 같은 선택 모드로 들어간다)');
   noErr(page); await page.close();
 });
 

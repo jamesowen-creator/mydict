@@ -1641,8 +1641,6 @@
         <div class="wb-side-group">
           <button class="wb-side-btn" id="wb-mode-listen-btn" onclick="setWordbookMode('listen')"><span class="wb-side-icon">🎙</span><span>선택 듣기</span></button>
           <button class="wb-side-btn" id="wb-mode-quiz-btn" onclick="setWordbookMode('quiz')"><span class="wb-side-icon">🎯</span><span>선택 퀴즈</span></button>
-          <!-- 작업374: 새 "게임" 탭의 "선택"이 같은 선택 모드(setWordbookMode('spell'))로 들어오므로 이 버튼은 숨긴다(삭제하지 않음: 시험과 선택 모드 코드가 그대로 쓴다) -->
-          <button class="wb-side-btn" id="wb-mode-spell-btn" hidden onclick="setWordbookMode('spell')"><span>선택 게임</span></button>
         </div>
 
         <div class="wb-side-group wb-side-gap-before">
@@ -3305,11 +3303,9 @@ function setWordbookMode(mode) {
 function updateModeButtons() {
   const listenBtn = document.getElementById('wb-mode-listen-btn');
   const quizBtn = document.getElementById('wb-mode-quiz-btn');
-  const spellBtn = document.getElementById('wb-mode-spell-btn');
   const deleteBtn = document.getElementById('wb-mode-delete-btn');
   if (listenBtn) listenBtn.classList.toggle('active', wordbookMode === 'listen');
   if (quizBtn) quizBtn.classList.toggle('active', wordbookMode === 'quiz');
-  if (spellBtn) spellBtn.classList.toggle('active', wordbookMode === 'spell');
   if (deleteBtn) deleteBtn.classList.toggle('active', wordbookMode === 'delete');
 }
 

@@ -145,8 +145,7 @@ test('1) 사전 단어장에서 영어 3개를 골라 "게임 시작"을 누르�
   assert.match(await page.text('#toast'), /영어 단어장에서만/);
   await page.eval("switchWordbookTab('en')");
   // 이모지·인라인 style 없는 새 버튼
-  assert.equal(await page.text('#wb-mode-spell-btn'), '선택 게임');
-  assert.equal(await page.eval("document.getElementById('wb-mode-spell-btn').hidden"), true, '작업374: 단어장 옆 "선택 게임" 버튼은 숨겨졌다');
+  assert.equal(await page.eval("document.getElementById('wb-mode-spell-btn')"), null, '작업392: 단어장 옆 "선택 게임" 버튼은 없다');
   // 작업374: 새 "게임" 탭의 "선택"으로 들어간다 → 단어장 화면의 같은 선택 모드
   await page.eval("showPage('game')");
   await page.click('.game-src[data-src="select"]');
