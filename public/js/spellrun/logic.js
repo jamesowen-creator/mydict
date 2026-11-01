@@ -131,6 +131,7 @@ function buildConfig(v) {
   SURV_HIGH_MAX: 0.5,     // 높은 칸 확률 상한
   SURV_BOSS_HEAL: 1,      // 생존 모드에서 보스 시작 때 회복하는 체력(기본 모드 BOSS_HEAL 과 따로 둔다)
   SURV_BOSS_HEAL_UNTIL: 20, // 단어 순번이 이 값 이하인 보스에서만 회복한다(그 뒤에는 회복 없음: 잘하는 사람이 끝없이 가는 것을 막는다)
+  RUN_LEN_SCALE: 1,       // 작업390: 달리기 걸음 주기 배율(주소 옵션 runlen 0.4~1.5, 기본 1). runFrameLength 가 기준값과 하한·상한에 곱한다
   STREAM_EDGE: false,     // 작업354: 타일 진입 방식. false = 'classic'(지금 세로 동작), true = 'edge'(오른쪽 화면 밖에서 흘러 들어온다). 주소 옵션 stream=edge
   WARN_SEC: T(0.78)       // 예고 표시가 보이는 최소 시간(최고 속도 기준, 거리로 계산). 기본 pace 1.3 에서 0.6초이고 pace 에 반비례(다른 시간 값과 같은 방식)
   };
@@ -157,6 +158,7 @@ function buildConfig(v) {
   if (v.continue !== undefined) cfg.CONT_ENABLED = !!v.continue;
   if (v.boostsec) cfg.BOOST_SEC = v.boostsec;
   if (v.stream !== undefined) cfg.STREAM_EDGE = !!v.stream;
+  if (v.runlen !== undefined) cfg.RUN_LEN_SCALE = v.runlen;   // 작업390
   // 빠른 pace 에서는 같은 px 폭이 더 짧은 시간에 지나가 점프 창도 같은 비율로 짧아지므로, 최저 속도에서도 여유 창이 남도록 폭을 줄인다(기본 pace 1.3 에서는 줄지 않는다)
   const fitW = (base, H) => Math.max(8, Math.min(base, Math.floor(cfg.SPEED_MIN * (airWindow(cfg, H).len - cfg.OBST_MIN_WINDOW - 0.01) - 2 * cfg.OBST_FOOT)));
   cfg.OBST_W = fitW(cfg.OBST_W, cfg.OBST_H);
@@ -178,6 +180,7 @@ const OPTION_RULES = {
   rescue: { min: 0, max: 1, int: true, def: 1 }, itemhp: { min: 0, max: 1, def: 0.6 }, rescueevery: { min: 1, max: 10, int: true, def: 2 }, rescuehigh: { min: 1, max: 10, int: true, def: 5 },
   continue: { min: 0, max: 1, int: true, def: 1 },
   stream: { min: 0, max: 1, int: true, def: 0 },   // 작업354: stream=edge(=1) / classic(=0)
+  runlen: { min: 0.4, max: 1.5, def: 1, clamp: true },   // 작업390: 달리기 걸음 주기 배율(프레임 길이의 기준값과 하한·상한에 같이 곱함). 범위 밖은 가까운 값, 세로·가로·세 캐릭터 모두
   grabdx: { min: 0, max: 40, def: LAND_GRAB_DX, clamp: true }   // 작업372: 가로 풍선을 그리는 오른쪽 이동(px). 범위 밖은 가까운 값으로 맞춘다(clamp). 세로에는 적용하지 않는다
 };
 // 반환 { values: 유효한 값(기본값과 같아도 포함), applied: 기본값과 다른 옵션 이름 }
@@ -764,8 +767,9 @@ const PENGUIN = { URL: '/img/spellrun/spellrun_penguin_sheet.png', SHEET_W: 1728
 // 작업364: P = 캐릭터(CHARS 항목, 기본 펭귄). 달리기가 8동작인 캐릭터는 한 바퀴 시간이 같도록 길이와 제한값이 4/8(0.055, 0.03~0.07)
 function runFrameLength(speed, cfg, P) {
   cfg = cfg || CONFIG; P = P || PENGUIN;
-  const len = P.RUN_LEN * cfg.SPEED_MIN / Math.max(1, speed);
-  return Math.max(P.RUN_LEN_MIN, Math.min(P.RUN_LEN_MAX, len));
+  const k = cfg.RUN_LEN_SCALE || 1;   // 작업390: 주소 옵션 runlen(기본 1 = 이전과 완전히 같다)
+  const len = P.RUN_LEN * k * cfg.SPEED_MIN / Math.max(1, speed);
+  return Math.max(P.RUN_LEN_MIN * k, Math.min(P.RUN_LEN_MAX * k, len));
 }
 // 달리기 위상(0~RUN_FRAMES 미만). 프레임 번호 = floor(위상). 속도가 바뀌어도 위상이 이어져 번호가 튀지 않는다
 function advanceRunPhase(phase, dt, speed, cfg, P) {
