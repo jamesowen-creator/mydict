@@ -219,6 +219,23 @@
       </div>
     </div>
 
+    <!-- 작업395: Speak Loop 원문 음성(관리자만 생성, 사용자는 재생만) -->
+    <div class="section" id="sl-section">
+      <div class="section-header">
+        <span class="section-title">Speak Loop 음성</span>
+        <button class="btn-save" id="sl-refresh" type="button">현황 새로고침</button>
+      </div>
+      <div class="section-body">
+        <div id="sl-status" style="font-size:13px;line-height:1.6;color:var(--text2)">현황을 불러오는 중…</div>
+        <div id="sl-confirm" style="display:none;font-size:13px;line-height:1.6;margin-top:12px"></div>
+        <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+          <button class="btn-save" id="sl-generate" type="button">부족분 생성</button>
+          <button class="btn-back" id="sl-cancel" type="button" style="display:none">취소</button>
+        </div>
+        <div id="sl-result" style="font-size:13px;line-height:1.6;margin-top:12px"></div>
+      </div>
+    </div>
+
     <!-- Users -->
     <div class="section">
       <div class="section-header">
@@ -241,6 +258,7 @@
               <th>개념 지도</th>
               <th>문장 학습</th>
               <th>대결</th>
+              <th>Speak Loop</th>
               <th style="text-align:right">검색 횟수</th>
               <th style="text-align:right">TTS 횟수</th>
               <th style="text-align:right">단어장</th>
@@ -377,6 +395,7 @@ function renderUserRow(u) {
     ${permToggleStrict(u, 'perm_concept_map', '개념 지도')}
     ${permToggleStrict(u, 'perm_jgrammar', '문장 학습')}
     ${permToggleStrict(u, 'perm_versus', '대결')}
+    ${permToggleStrict(u, 'perm_speakloop', 'Speak Loop')}
     <td style="text-align:right;font-weight:600">${fmt(u.search_count)}</td>
     <td style="text-align:right;font-weight:600">${fmt(u.tts_count)}</td>
     <td style="text-align:right">${fmt(u.wordbook_count)}</td>
@@ -486,6 +505,51 @@ async function loadData() {
   }
 }
 
+// ── Speak Loop 음성 (작업395) ─────────────────────────────────────────────
+let slBatch = null;   // 확인 문구를 보여준 뒤 두 번째 누름에서 실행할 개수
+const slEl = id => document.getElementById(id);
+function slConfirmOff() { slBatch = null; slEl('sl-confirm').style.display = 'none'; slEl('sl-cancel').style.display = 'none'; slEl('sl-generate').textContent = '부족분 생성'; }
+async function slLoad() {
+  const box = slEl('sl-status');
+  try {
+    const r = await fetch('/api/admin/speakloop/audio/status', { headers: authHeaders() });
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const k = d.by_kind;
+    const mb = (d.bytes / 1048576).toFixed(1);
+    box.textContent = '전체 ' + fmt(d.total) + ' · 있음 ' + fmt(d.have) + ' · 부족 ' + fmt(d.missing) + ' · 오래됨 ' + fmt(d.stale)
+      + ' · 저장 ' + mb + 'MB · 생성할 글자 ' + fmt(d.chars_to_generate) + '자 · 추정 비용 약 $' + Number(d.est_cost_usd).toFixed(2) + '(추정)'
+      + ' · 모델 ' + d.model + ' · 음성 ' + d.voice
+      + ' / 종류별(있음/전체) 이디엄 ' + k.idiom.have + '/' + k.idiom.total + ', 문장 ' + k.sentence.have + '/' + k.sentence.total + ', 구 ' + k.chunk.have + '/' + k.chunk.total;
+    return d;
+  } catch (e) { box.textContent = '현황을 불러오지 못했습니다.'; return null; }
+}
+async function slGenerate() {
+  const res = slEl('sl-result'), btn = slEl('sl-generate');
+  if (slBatch === null) {   // 첫 번째 누름: 확인 문구만 보여준다(OpenAI 호출 없음)
+    const d = await slLoad();
+    if (!d) return;
+    if (!d.batch.count) { res.textContent = '생성할 음성이 없습니다.'; return; }
+    slBatch = d.batch.count;
+    const c = slEl('sl-confirm');
+    c.textContent = d.batch.count + '개 생성, 추정 비용 약 $' + Number(d.batch.est_cost_usd).toFixed(2) + '(추정). OpenAI 호출 비용이 발생합니다. 실행하려면 [생성 실행]을 한 번 더 누르세요.';
+    c.style.display = 'block'; slEl('sl-cancel').style.display = 'inline-flex'; btn.textContent = '생성 실행'; res.textContent = '';
+    return;
+  }
+  const n = slBatch;
+  slConfirmOff(); btn.disabled = true; res.textContent = '생성 중입니다…';
+  try {
+    const r = await fetch('/api/admin/speakloop/audio/generate', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ max: n }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) res.textContent = d.error || ('실패했습니다(' + r.status + ').');
+    else res.textContent = '생성 ' + fmt(d.generated) + '개 · 남은 ' + fmt(d.remaining) + '개 · ' + (d.stopped_reason ? '멈춘 이유: ' + d.stopped_reason : '끝까지 진행');
+  } catch (e) { res.textContent = '요청에 실패했습니다.'; }
+  btn.disabled = false; slLoad();
+}
+slEl('sl-refresh').addEventListener('click', () => { slConfirmOff(); slEl('sl-result').textContent = ''; slLoad(); });
+slEl('sl-generate').addEventListener('click', slGenerate);
+slEl('sl-cancel').addEventListener('click', () => { slConfirmOff(); slEl('sl-result').textContent = ''; });
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 MetisAppHeader.renderAuthWidget(document.getElementById('metis-header-auth'));
 
@@ -506,6 +570,7 @@ MetisAppHeader.renderAuthWidget(document.getElementById('metis-header-auth'));
 
   document.getElementById('content').style.display = 'block';
   await loadData();
+  slLoad();   // 작업395
 })();
 </script>
 </body>

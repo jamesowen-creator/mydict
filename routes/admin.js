@@ -10,7 +10,7 @@ router.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
-        u.id, u.email, u.name, u.role, u.is_blocked, u.is_approved, u.perm_versus,
+        u.id, u.email, u.name, u.role, u.is_blocked, u.is_approved, u.perm_versus, u.perm_speakloop,
         u.can_search, u.can_wordbook, u.can_quiz, u.can_tts, u.can_podcast,
         u.perm_literature_compass, u.perm_digest_reading, u.perm_science_reading, u.perm_voice_study, u.perm_concept_map, u.perm_jgrammar,
         u.created_at,
@@ -34,7 +34,7 @@ router.patch('/api/admin/users/:id', requireAdmin, async (req, res) => {
   const targetId = parseInt(req.params.id);
   if (isNaN(targetId)) return res.status(400).json({ error: '잘못된 ID입니다.' });
 
-  const allowed = ['role', 'is_blocked', 'is_approved', 'can_search', 'can_wordbook', 'can_quiz', 'can_tts', 'can_podcast', 'perm_literature_compass', 'perm_digest_reading', 'perm_science_reading', 'perm_voice_study', 'perm_concept_map', 'perm_jgrammar', 'perm_versus'];
+  const allowed = ['role', 'is_blocked', 'is_approved', 'can_search', 'can_wordbook', 'can_quiz', 'can_tts', 'can_podcast', 'perm_literature_compass', 'perm_digest_reading', 'perm_science_reading', 'perm_voice_study', 'perm_concept_map', 'perm_jgrammar', 'perm_versus', 'perm_speakloop'];
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};   // 작업338: 본문이 배열·문자열이어도 예외 없이 400
   const updates = Object.entries(body).filter(([k]) => allowed.includes(k));
   if (!updates.length) return res.status(400).json({ error: '변경할 항목이 없습니다.' });
@@ -53,7 +53,7 @@ router.patch('/api/admin/users/:id', requireAdmin, async (req, res) => {
     const setClauses = updates.map(([k], i) => `${k} = $${i + 2}`).join(', ');
     const values = [targetId, ...updates.map(([, v]) => v)];
     const { rows } = await pool.query(
-      `UPDATE users SET ${setClauses} WHERE id = $1 RETURNING id, email, name, role, is_blocked, is_approved, perm_versus, can_search, can_wordbook, can_quiz, can_tts, can_podcast, perm_literature_compass, perm_digest_reading, perm_science_reading, perm_voice_study, perm_concept_map, perm_jgrammar`,
+      `UPDATE users SET ${setClauses} WHERE id = $1 RETURNING id, email, name, role, is_blocked, is_approved, perm_versus, perm_speakloop, can_search, can_wordbook, can_quiz, can_tts, can_podcast, perm_literature_compass, perm_digest_reading, perm_science_reading, perm_voice_study, perm_concept_map, perm_jgrammar`,
       values
     );
     if (!rows.length) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
@@ -118,6 +118,10 @@ router.get('/api/admin/stats', requireAdmin, async (req, res) => {
         if (r.event_type === 'image') openai += Number(r.count) * (Number(process.env.VOICE_IMAGE_COST_USD) || 0);   // 장당 단가는 환경변수(미설정이면 0)
         if (r.event_type === 'tts') {
           openai += (Number(r.char_count) / 1000) * 0.030;
+        }
+        if (r.event_type === 'speakloop_tts') {   // 작업395: Speak Loop 원문 음성(관리자 생성). 단가는 환경변수가 있으면 그 값, 없으면 임시 0.030(추정)
+          const per1k = parseFloat(process.env.SPEAKLOOP_TTS_COST_PER_1K_CHARS);
+          openai += (Number(r.char_count) / 1000) * (Number.isFinite(per1k) && per1k >= 0 ? per1k : 0.030);
         }
         if (r.event_type === 'stt' || r.event_type === 'concept_stt' || r.event_type === 'cmap_stt') {   // 개념학습 음성 입력(작업206)도 같은 오디오 초 × 분당 단가
           openai += (Number(r.char_count) / 60) * sttPerMin;

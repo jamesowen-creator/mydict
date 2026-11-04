@@ -36,7 +36,7 @@ test('사용자 현황 섹션과 #stats-grid 가 없고, API 비용 추정·사�
   const page = await openAdmin([userRow(7, '관리자', { role: 'admin' }), userRow(8, '학생')]);
   assert.equal(await page.eval("!!document.getElementById('stats-grid') || !!document.getElementById('stats-updated')"), false);
   const titles = await page.eval("[...document.querySelectorAll('.section-title')].map(e => e.textContent.trim())");
-  assert.deepEqual(titles, ['API 비용 추정', '사용자 관리']);
+  assert.deepEqual(titles, ['API 비용 추정', 'Speak Loop 음성', '사용자 관리']);   // 작업395: Speak Loop 음성 구역
   assert.equal(await page.eval("document.querySelectorAll('#cost-grid .cost-card').length"), 2, '비용 카드(전체 누적·이번달)가 그려짐');
   assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
   await page.close();
@@ -44,7 +44,7 @@ test('사용자 현황 섹션과 #stats-grid 가 없고, API 비용 추정·사�
 
 for (const width of [1280, 390]) {
   test(`폭 ${width}px: 헤더·본문이 680px 이하로 가운데에 놓이고, 페이지는 가로로 스크롤되지 않으며 표만 스크롤된다`, { skip: SKIP }, async () => {
-    const page = await openAdmin([userRow(7, '관리자', { role: 'admin' }), userRow(8, '학생')], { width });
+    const page = await openAdmin([userRow(7, '관리자', { role: 'admin' }), userRow(8, '학생')], { width, height: 1400 });   // 작업395: Speak Loop 음성 구역이 늘어 800px 에서는 세로 스크롤바가 생겨 가운데 측정이 7.5px 어긋난다
     const m = await page.eval(`(() => {
       const r = e => { const b = document.querySelector(e).getBoundingClientRect(); return { left: b.left, right: b.right, width: b.width }; };
       const wrap = document.querySelector('.table-wrap');
@@ -69,7 +69,7 @@ for (const width of [1280, 390]) {
 test('표 머리글 순서: 사용자·역할·승인·차단·과목 5열(작업CL-1: 개념학습 열 삭제)+개념 지도(작업270-1)·일본어 문법(작업JG-2)·사용 횟수 3열·저장', { skip: SKIP }, async () => {
   const page = await openAdmin([userRow(7, '관리자', { role: 'admin' }), userRow(8, '학생')]);
   const heads = await page.eval("[...document.querySelectorAll('thead th')].map(t => t.innerText.trim())");
-  assert.deepEqual(heads, ['사용자', '역할', '승인', '차단', '언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '개념 지도', '문장 학습', '대결', '검색 횟수', 'TTS 횟수', '단어장', '저장']);
+  assert.deepEqual(heads, ['사용자', '역할', '승인', '차단', '언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '개념 지도', '문장 학습', '대결', 'Speak Loop', '검색 횟수', 'TTS 횟수', '단어장', '저장']);
   assert.equal(await page.eval("document.querySelectorAll('#row-8 > td').length"), heads.length, '열 수가 머리글과 같음');
   await page.close();
 });
