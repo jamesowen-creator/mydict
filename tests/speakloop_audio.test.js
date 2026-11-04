@@ -32,17 +32,17 @@ async function rawGet(app, p, user, headers = {}) {
 }
 
 // ───── 관리자 현황 ─────
-test('status: 아무것도 없으면 전체 330 · 부족 330 · 생성할 글자 8,479 · 추정 비용(임시 단가 0.030) · OpenAI 호출 없음, audio 열은 읽지 않음', async t => {
+test('status: 아무것도 없으면 전체 318 · 부족 318 · 생성할 글자 8,323 · 추정 비용(임시 단가 0.030) · OpenAI 호출 없음, audio 열은 읽지 않음', async t => {
   const { status, db, ai } = await setup(t);
   const r = await status();
   assert.equal(r.status, 200);
-  assert.deepEqual([r.body.total, r.body.have, r.body.missing, r.body.stale], [330, 0, 330, 0]);
-  assert.equal(r.body.chars_to_generate, 8479);
-  assert.equal(r.body.est_cost_usd, +(8479 / 1000 * 0.03).toFixed(4));
+  assert.deepEqual([r.body.total, r.body.have, r.body.missing, r.body.stale], [318, 0, 318, 0]);
+  assert.equal(r.body.chars_to_generate, 8323);
+  assert.equal(r.body.est_cost_usd, +(8323 / 1000 * 0.03).toFixed(4));
   assert.equal(r.body.cost_estimated, true);
   assert.equal(r.body.model, 'gpt-4o-mini-tts');
   assert.equal(r.body.voice, 'alloy');
-  assert.deepEqual(Object.fromEntries(Object.entries(r.body.by_kind).map(([k, v]) => [k, v.total])), { idiom: 20, sentence: 70, chunk: 240 });
+  assert.deepEqual(Object.fromEntries(Object.entries(r.body.by_kind).map(([k, v]) => [k, v.total])), { idiom: 20, sentence: 70, chunk: 228 });
   assert.equal(r.body.bytes, 0);
   assert.equal(ai.calls.length, 0);
   assert.deepEqual(db.queries.filter(q => /speakloop_audio/.test(q)), ['SELECT clip_key, kind, content_hash, bytes FROM speakloop_audio'], 'audio 열을 읽는 문장이 없다');
@@ -53,7 +53,7 @@ test('단가 환경변수가 있으면 추정이 아닌 그 단가로 계산한�
   process.env.SPEAKLOOP_TTS_COST_PER_1K_CHARS = '0.015';
   const r = await status();
   assert.equal(r.body.cost_estimated, false);
-  assert.equal(r.body.est_cost_usd, +(8479 / 1000 * 0.015).toFixed(4));
+  assert.equal(r.body.est_cost_usd, +(8323 / 1000 * 0.015).toFixed(4));
 });
 
 test('관리자만: 권한 있는 일반 사용자(perm_speakloop true)와 권한 없는 사용자는 403 이고 OpenAI 를 부르지 않는다', async t => {
@@ -71,7 +71,7 @@ test('generate: max 만큼만 만들고 행·사용량(speakloop_tts, 글자 수
   const { gen, db, ai } = await setup(t);
   const r = await gen({ max: 3 });
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body, { ok: true, generated: 3, remaining: 327, stopped_reason: null });
+  assert.deepEqual(r.body, { ok: true, generated: 3, remaining: 315, stopped_reason: null });
   assert.equal(ai.calls.length, 3);
   assert.deepEqual([...db.audio.keys()], ['hang-out.say', 'hang-out.ex', 'hang-out.ex.c0']);
   assert.deepEqual(db.usage.map(u => [u.user_id, u.event_type, u.model, u.char_count]), [[4, 'speakloop_tts', 'gpt-4o-mini-tts', 8], [4, 'speakloop_tts', 'gpt-4o-mini-tts', 34], [4, 'speakloop_tts', 'gpt-4o-mini-tts', 10]]);
@@ -92,7 +92,7 @@ test('generate: max 는 SPEAKLOOP_GEN_MAX_PER_RUN(기본 40)을 넘지 못하고
   process.env.SPEAKLOOP_GEN_MAX_PER_RUN = '5';
   const b = await gen({});
   assert.equal(b.body.generated, 5);
-  assert.equal(b.body.remaining, 330 - 40 - 5);
+  assert.equal(b.body.remaining, 318 - 40 - 5);
 });
 
 test('generate: 입력 검증(max 는 1 이상 정수, kind 는 idiom/sentence/chunk) · 키가 없으면 503', async t => {
@@ -129,7 +129,7 @@ test('모델·음성·instructions 가 바뀌면 "오래됨"으로 잡히고 다
     const s = await status();
     assert.equal(s.body.stale, 2, name + ' → 오래됨');
     assert.equal(s.body.have, 0);
-    assert.equal(s.body.missing, 328);
+    assert.equal(s.body.missing, 316);
     if (before === undefined) delete process.env[name]; else process.env[name] = before;
     assert.equal((await status()).body.have, 2, '원래대로 돌리면 다시 최신');
   }
@@ -175,7 +175,7 @@ test('오류(401·403·429·500)·네트워크·타임아웃이면 즉시 멈추
       const origError = console.error; console.error = () => {};
       sub.after(() => { console.error = origError; });
       const r = await gen({ max: 10 });
-      assert.deepEqual(r.body, { ok: true, generated: 2, remaining: 328, stopped_reason: reason });
+      assert.deepEqual(r.body, { ok: true, generated: 2, remaining: 316, stopped_reason: reason });
       assert.equal(ai.calls.length, 3, '실패한 호출 뒤로는 부르지 않는다');
       assert.equal(db.audio.size, 2);
       assert.equal(db.usage.length, 2, '실패한 호출은 사용량에 기록하지 않는다');

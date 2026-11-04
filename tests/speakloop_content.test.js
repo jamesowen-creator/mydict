@@ -15,13 +15,13 @@ test('실제 콘텐츠: 검증 통과, 이디엄 20 · 독백 10(각 5문장)', 
   for (const m of content.monologues) assert.equal(m.lines.length, 5, m.id);
 });
 
-test('클립 330개 = 이디엄 20 + 문장 70 + 구 240, 키는 모두 고유, 글자 합계 8,479', () => {
+test('클립 318개 = 이디엄 20 + 문장 70 + 구 228, 키는 모두 고유, 글자 합계 8,323', () => {
   const clips = C.listClips();
-  assert.equal(clips.length, 330);
-  assert.equal(new Set(clips.map(c => c.key)).size, 330);
+  assert.equal(clips.length, 318);
+  assert.equal(new Set(clips.map(c => c.key)).size, 318);
   const by = k => clips.filter(c => c.kind === k).length;
-  assert.deepEqual([by('idiom'), by('sentence'), by('chunk')], [20, 70, 240]);
-  assert.equal(clips.reduce((a, c) => a + c.text.length, 0), 8479);
+  assert.deepEqual([by('idiom'), by('sentence'), by('chunk')], [20, 70, 228]);
+  assert.equal(clips.reduce((a, c) => a + c.text.length, 0), 8323);
   for (const c of clips) assert.ok(c.text.trim() && C.KINDS.includes(c.kind), c.key);
 });
 
@@ -31,8 +31,8 @@ test('키 규칙: <id>.say / <id>.ex / <id>.ex.c<i> / <독백id>.l<i> / <독백i
   assert.deepEqual(byKey.get('hang-out.ex'), { key: 'hang-out.ex', kind: 'sentence', text: 'We used to hang out every weekend.' });
   assert.deepEqual(byKey.get('hang-out.ex.c1'), { key: 'hang-out.ex.c1', kind: 'chunk', text: 'hang out' });
   assert.equal(byKey.get('m-delay.l0').kind, 'sentence');
-  assert.equal(byKey.get('m-delay.l0').text, 'Long story short, the launch got pushed back two weeks.');
-  assert.deepEqual(byKey.get('m-delay.l0.c1'), { key: 'm-delay.l0.c1', kind: 'chunk', text: 'the launch' });
+  assert.equal(byKey.get('m-delay.l0').text, 'So, the launch got pushed back about two weeks.');
+  assert.deepEqual(byKey.get('m-delay.l0.c1'), { key: 'm-delay.l0.c1', kind: 'chunk', text: 'the launch got pushed back' });
   assert.ok(C.hasClipKey('m-move.l4.c2') && !C.hasClipKey('hang-out.ex.c9') && !C.hasClipKey('../x') && !C.hasClipKey(''));
 });
 
