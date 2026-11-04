@@ -24,8 +24,8 @@ test('390-2) 기본값이면 applied 에 안 나오고 다른 값이면 나온�
 });
 
 test('390-3) runlen 1.0(또는 없음)이면 프레임 길이·위상이 이전과 완전히 같다', () => {
-  const base = L.buildConfig({}), one = cfgWith('?runlen=1');
-  assert.equal(base.RUN_LEN_SCALE, 1); assert.equal(one.RUN_LEN_SCALE, 1);
+  const base = cfgWith('?runlen=1'), one = cfgWith('?runlen=1');   // 작업393: 주소 없음은 캐릭터별 기본 배율이라 이전 식과의 동일성은 runlen=1 로 확인
+  assert.equal(L.buildConfig({}).RUN_LEN_SCALE, null); assert.equal(one.RUN_LEN_SCALE, 1);
   for (const P of [penguin, girl, L.CHARS.boy]) for (let v = 20; v <= 500; v += 7) {
     const old = Math.max(P.RUN_LEN_MIN, Math.min(P.RUN_LEN_MAX, P.RUN_LEN * base.SPEED_MIN / Math.max(1, v)));   // 390 이전 식
     assert.equal(L.runFrameLength(v, base, P), old, P.key + ' ' + v);
@@ -36,7 +36,7 @@ test('390-3) runlen 1.0(또는 없음)이면 프레임 길이·위상이 이전�
 });
 
 test('390-4) runlen 0.5: 프레임 길이와 한 바퀴 땅 거리가 절반(하한·상한도 같이 절반이라 모든 속도에서)', () => {
-  const base = L.buildConfig({}), half = cfgWith('?runlen=0.5');
+  const base = cfgWith('?runlen=1'), half = cfgWith('?runlen=0.5');   // 작업393: 기준은 runlen=1
   for (const P of [penguin, girl, L.CHARS.boy]) for (const v of [101, 169, 267, 364]) {
     const a = L.runFrameLength(v, base, P), b = L.runFrameLength(v, half, P);
     assert.ok(Math.abs(b - a / 2) < 1e-12, P.key + ' ' + v + ' ' + a + ' ' + b);

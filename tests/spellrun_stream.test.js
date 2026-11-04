@@ -265,15 +265,15 @@ test('작업363 반응 상태·맞는/틀린 글자 값: 길이 happy 0.4·hurt 
 
 // 작업364: 여학생·남학생 달리기 8동작·표정 프레임(순수 로직)
 test('작업364 프레임 길이: 8동작 캐릭터는 한 바퀴 시간이 펭귄(4칸 x 0.11)과 같다(길이 4/8, 제한값 0.03~0.07), 위상은 8 에서 돌아가고 속도가 바뀌어도 이어진다', () => {
-  const P = L.CHARS.penguin, G8 = L.CHARS.girl, B8 = L.CHARS.boy;
+  const P = L.CHARS.penguin, G8 = L.CHARS.girl, B8 = L.CHARS.boy, C1 = L.buildConfig({ runlen: 1 });   // 작업393: 한 바퀴 시간 비교는 배율 1(기본은 사람 캐릭터가 더 짧다)
   assert.equal(P.RUN_LEN, 0.11); assert.equal(P.RUN_FRAMES, 4);
   for (const C8 of [G8, B8]) { assert.equal(C8.RUN_FRAMES, 8); assert.equal(C8.RUN_LEN, 0.055); assert.equal(C8.RUN_LEN_MIN, 0.03); assert.equal(C8.RUN_LEN_MAX, 0.07); }
   for (const v of [C.SPEED_MIN, 80, 100, 130, C.SPEED_MAX, 400]) {
-    const lp = L.runFrameLength(v, C, P) * P.RUN_FRAMES, lg = L.runFrameLength(v, C, G8) * G8.RUN_FRAMES, lb = L.runFrameLength(v, C, B8) * B8.RUN_FRAMES;
+    const lp = L.runFrameLength(v, C1, P) * P.RUN_FRAMES, lg = L.runFrameLength(v, C1, G8) * G8.RUN_FRAMES, lb = L.runFrameLength(v, C1, B8) * B8.RUN_FRAMES;
     assert.ok(Math.abs(lp - lg) < 1e-9 && Math.abs(lp - lb) < 1e-9, `속도 ${v}: 한 바퀴 ${lp} / ${lg} / ${lb}`);
   }
   assert.equal(L.runFrameLength(C.SPEED_MIN, C), 0.11, '기본(펭귄)은 그대로');
-  assert.ok(Math.abs(L.runFrameLength(C.SPEED_MIN, C, G8) - 0.055) < 1e-12);
+  assert.ok(Math.abs(L.runFrameLength(C.SPEED_MIN, C1, G8) - 0.055) < 1e-12);
   let ph = 0, seen = new Set(); for (let i = 0; i < 400; i++) { const nxt = L.advanceRunPhase(ph, 0.01, C.SPEED_MIN + (i % 50), C, G8); assert.ok(nxt >= 0 && nxt < 8); assert.ok(((nxt - ph + 8) % 8) < 1, '한 걸음에 한 칸을 넘지 않는다(위상 이어짐)'); seen.add(Math.floor(nxt)); ph = nxt; }
   assert.equal(seen.size, 8, '8칸 모두 나온다');
   assert.equal(L.advanceRunPhase(7.99, 0.02, C.SPEED_MIN, C, G8) < 1, true, '8 에서 0 으로 돌아간다');

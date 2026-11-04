@@ -131,7 +131,7 @@ function buildConfig(v) {
   SURV_HIGH_MAX: 0.5,     // 높은 칸 확률 상한
   SURV_BOSS_HEAL: 1,      // 생존 모드에서 보스 시작 때 회복하는 체력(기본 모드 BOSS_HEAL 과 따로 둔다)
   SURV_BOSS_HEAL_UNTIL: 20, // 단어 순번이 이 값 이하인 보스에서만 회복한다(그 뒤에는 회복 없음: 잘하는 사람이 끝없이 가는 것을 막는다)
-  RUN_LEN_SCALE: 1,       // 작업390: 달리기 걸음 주기 배율(주소 옵션 runlen 0.4~1.5, 기본 1). runFrameLength 가 기준값과 하한·상한에 곱한다
+  RUN_LEN_SCALE: null,    // 작업390: 달리기 걸음 주기 배율(주소 옵션 runlen 0.4~1.5). 작업393: null = 주소·저장값 없음 → 캐릭터·방향별 기본 배율(RUN_LEN_DEF), 숫자면 모든 캐릭터·방향에 그 값. runFrameLength 가 기준값과 하한·상한에 곱한다
   STREAM_EDGE: false,     // 작업354: 타일 진입 방식. false = 'classic'(지금 세로 동작), true = 'edge'(오른쪽 화면 밖에서 흘러 들어온다). 주소 옵션 stream=edge
   WARN_SEC: T(0.78)       // 예고 표시가 보이는 최소 시간(최고 속도 기준, 거리로 계산). 기본 pace 1.3 에서 0.6초이고 pace 에 반비례(다른 시간 값과 같은 방식)
   };
@@ -765,16 +765,23 @@ const PENGUIN = { URL: '/img/spellrun/spellrun_penguin_sheet.png', SHEET_W: 1728
   RUN_FRAMES: 4, JUMP_UP: 4, JUMP_DOWN: 5, IDLE: 1, JOY: 4, RUN_LEN: 0.11, RUN_LEN_MIN: 0.06, RUN_LEN_MAX: 0.14 };
 // 달리기 한 프레임의 길이(초): 기본 0.11초를 속도에 반비례해 줄이고(빠를수록 빨리 바뀜) 0.06~0.14초로 제한한다. 기준 속도는 최저 속도(SPEED_MIN)
 // 작업364: P = 캐릭터(CHARS 항목, 기본 펭귄). 달리기가 8동작인 캐릭터는 한 바퀴 시간이 같도록 길이와 제한값이 4/8(0.055, 0.03~0.07)
-function runFrameLength(speed, cfg, P) {
+// 작업393: runlen 을 주지 않았을 때의 기본 배율(land: 가로 화면이면 true). 사람 캐릭터는 세로 0.65·가로 0.8, 펭귄은 1(이전과 같다)
+const RUN_LEN_DEF = { penguin: { port: 1, land: 1 }, girl: { port: 0.65, land: 0.8 }, boy: { port: 0.65, land: 0.8 } };
+function runLenScale(cfg, P, land) {
+  if (cfg.RUN_LEN_SCALE) return cfg.RUN_LEN_SCALE;   // 작업390: 주소·저장 runlen 은 모든 캐릭터·방향에 그대로
+  const d = RUN_LEN_DEF[P.key];
+  return d ? (land ? d.land : d.port) : 1;
+}
+function runFrameLength(speed, cfg, P, land) {
   cfg = cfg || CONFIG; P = P || PENGUIN;
-  const k = cfg.RUN_LEN_SCALE || 1;   // 작업390: 주소 옵션 runlen(기본 1 = 이전과 완전히 같다)
+  const k = runLenScale(cfg, P, land);
   const len = P.RUN_LEN * k * cfg.SPEED_MIN / Math.max(1, speed);
   return Math.max(P.RUN_LEN_MIN * k, Math.min(P.RUN_LEN_MAX * k, len));
 }
 // 달리기 위상(0~RUN_FRAMES 미만). 프레임 번호 = floor(위상). 속도가 바뀌어도 위상이 이어져 번호가 튀지 않는다
-function advanceRunPhase(phase, dt, speed, cfg, P) {
+function advanceRunPhase(phase, dt, speed, cfg, P, land) {
   P = P || PENGUIN;
-  const p = (phase + dt / runFrameLength(speed, cfg, P)) % P.RUN_FRAMES;
+  const p = (phase + dt / runFrameLength(speed, cfg, P, land)) % P.RUN_FRAMES;
   return p < 0 ? p + P.RUN_FRAMES : p;
 }
 // 그릴 프레임 번호(0부터). o: { state, cleared, air, rising, runPhase, P?(캐릭터, 기본 펭귄), react?(표정 종류: 'happy'|'hurt'|'surprise'|'') }
@@ -1328,7 +1335,7 @@ return {
   speedLevel: speedLevel, speedMult: speedMult, gapSec: gapSec, leadSec: leadSec, speedAfterHit: speedAfterHit, speedAfterFail: speedAfterFail,
   targetSpeed: targetSpeed, planHearts: planHearts, pickHeartSlot: pickHeartSlot, jumpHeight: jumpHeight, judge: judge, buildRound: buildRound,
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
-  ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT, LAYOUT_LAND: LAYOUT_LAND, layoutFor: layoutFor, LAND_RUNNER_X: LAND_RUNNER_X, LAND_GRAB_DX: LAND_GRAB_DX, AIR_GAP_MARGIN: AIR_GAP_MARGIN, airSeconds: airSeconds, doubleAirSeconds: doubleAirSeconds, airGapSeconds: airGapSeconds,
+  ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, RUN_LEN_DEF: RUN_LEN_DEF, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT, LAYOUT_LAND: LAYOUT_LAND, layoutFor: layoutFor, LAND_RUNNER_X: LAND_RUNNER_X, LAND_GRAB_DX: LAND_GRAB_DX, AIR_GAP_MARGIN: AIR_GAP_MARGIN, airSeconds: airSeconds, doubleAirSeconds: doubleAirSeconds, airGapSeconds: airGapSeconds,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
   survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, balloonRise: balloonRise, balloonRiseY: balloonRiseY, SOUND: SOUND, PENTA: PENTA, comboNote: comboNote, tempoCoef: tempoCoef, tempoStep: tempoStep, slotSec: slotSec, resumePos: resumePos, duckLevel: duckLevel, rampValue: rampValue, noiseSamples: noiseSamples, noteMidi: noteMidi, midiFreq: midiFreq, SONGS: SONGS, songEvents: songEvents, eventVoices: eventVoices, sfxPlan: sfxPlan, buildSoundGraph: buildSoundGraph, makeNoiseBuffer: makeNoiseBuffer, playVoices: playVoices, CHAR_FX: CHAR_FX, charSquash: charSquash, runBob: runBob, charShadow: charShadow, wrongFx: wrongFx, rightHop: rightHop, starFx: starFx, reactNext: reactNext, reactKind: reactKind, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamOffscreen: streamOffscreen,

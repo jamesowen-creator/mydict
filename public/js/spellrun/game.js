@@ -1272,7 +1272,7 @@ function step(dt) {
   }
   if (fxOn() && G.state === 'run' && G.jumpT < 0 && curH() <= 1) { G.dustT += dt; if (G.dustT >= CHAR_FX.DUST_RUN_SEC) { G.dustT -= CHAR_FX.DUST_RUN_SEC; spawnDust('run'); } }   // 달리는 동안 0.2초마다 아주 작은 먼지 1개
   if (G.jumpBuf > 0) G.jumpBuf -= dt;
-  { const nh = curH(); if (nh !== G.prevH) G.rising = nh > G.prevH; G.prevH = nh; if (nh <= 1) G.runPhase = advanceRunPhase(G.runPhase, dt, G.speed, undefined, CHARS[activeChar() || 'penguin']); }   // 작업321: 게임 시간 기준(일시정지 중 정지)
+  { const nh = curH(); if (nh !== G.prevH) G.rising = nh > G.prevH; G.prevH = nh; if (nh <= 1) G.runPhase = advanceRunPhase(G.runPhase, dt, G.speed, undefined, CHARS[activeChar() || 'penguin'], viewMode === 'land'); }   // 작업321: 게임 시간 기준(일시정지 중 정지)
   G.hurt = Math.max(0, G.hurt - dt);
   G.eat = Math.max(0, G.eat - dt);
   G.shake = Math.max(0, G.shake - dt);
