@@ -82,6 +82,49 @@ router.get('/api/admin/speakloop/audio/status', requireAdmin, needDb, async (req
   }
 });
 
+// 작업397: 한 항목(이디엄 id 또는 독백 id)의 클립 목록과 상태. prefix 는 콘텐츠의 id 와 정확히 같아야 한다
+const knownId = id => typeof id === 'string' && C.listClips().some(c => TTS.clipId(c.key) === id);
+router.get('/api/admin/speakloop/audio/list', requireAdmin, needDb, async (req, res) => {
+  try {
+    const prefix = req.query.prefix;
+    if (!knownId(prefix)) return res.status(400).json({ ok: false, error: 'prefix 는 콘텐츠의 이디엄 id 또는 독백 id 여야 합니다.' });
+    const st = TTS.settings();
+    const state = await TTS.currentState(pool, C.listClips(), st);
+    res.json({ ok: true, ...TTS.listFor(state, prefix, st) });
+  } catch (err) {
+    console.error('speakloop list error:', err && err.message);
+    res.status(500).json({ ok: false, error: '목록을 불러오지 못했습니다.' });
+  }
+});
+
+// 작업397: 미리듣기. 글은 서버 콘텐츠에서만 가져오고, 결과는 DB 에 저장하지 않고 mp3 본문으로 돌려준다
+router.post('/api/admin/speakloop/audio/preview', requireAdmin, async (req, res) => {
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  try {
+    const clip = typeof body.key === 'string' ? C.listClips().find(c => c.key === body.key) : null;
+    if (!clip) return res.status(404).json({ ok: false, error: '없는 클립입니다.' });
+    if (body.model !== undefined && !TTS.ALLOWED_MODELS.includes(body.model)) return res.status(400).json({ ok: false, error: 'model 은 ' + TTS.ALLOWED_MODELS.join(', ') + ' 중 하나여야 합니다.' });
+    if (body.voice !== undefined && !TTS.ALLOWED_VOICES.includes(body.voice)) return res.status(400).json({ ok: false, error: 'voice 는 ' + TTS.ALLOWED_VOICES.join(', ') + ' 중 하나여야 합니다.' });
+    if (!process.env.OPENAI_API_KEY) return res.status(503).json({ ok: false, error: '음성 생성 기능을 사용할 수 없습니다.' });
+    if (!TTS.previewAllowed(req.user.id)) return res.status(429).json({ ok: false, error: '미리듣기는 10분에 ' + TTS.PREVIEW_LIMIT + '회까지입니다. 잠시 후 다시 시도해 주세요.' });
+    const st = { ...TTS.settings(), ...(body.model !== undefined ? { model: body.model } : {}), ...(body.voice !== undefined ? { voice: body.voice } : {}) };
+    let audio;
+    try { audio = await TTS.synthesize(clip, st); } catch (e) {
+      const reason = e && e.reason ? e.reason : 'error';
+      console.error('speakloop preview failed:', reason);
+      const timeout = reason === 'timeout';
+      return res.status(timeout ? 504 : 502).json({ ok: false, reason, error: timeout ? 'OpenAI 응답이 30초 안에 오지 않았습니다.' : 'OpenAI 오류(' + (e && e.status ? e.status : reason) + ')' + (e && e.detail ? ': ' + e.detail : '') });
+    }
+    trackUsage(req.user.id, TTS.USAGE_EVENT, st.model, 0, 0, clip.text.length);
+    res.set('Content-Type', 'audio/mpeg');
+    res.set('Cache-Control', 'no-store');
+    res.send(audio);
+  } catch (err) {
+    console.error('speakloop preview error:', err && err.message);
+    if (!res.headersSent) res.status(500).json({ ok: false, error: '미리듣기에 실패했습니다.' });
+  }
+});
+
 router.post('/api/admin/speakloop/audio/generate', requireAdmin, needDb, async (req, res) => {
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
   let max;
@@ -89,11 +132,12 @@ router.post('/api/admin/speakloop/audio/generate', requireAdmin, needDb, async (
     if (!Number.isInteger(body.max) || body.max < 1) return res.status(400).json({ ok: false, error: 'max 는 1 이상의 정수여야 합니다.' });
     max = body.max;
   }
+  if (body.prefix !== undefined && !knownId(body.prefix)) return res.status(400).json({ ok: false, error: 'prefix 는 콘텐츠의 이디엄 id 또는 독백 id 여야 합니다.' });
   if (body.kind !== undefined && !C.KINDS.includes(body.kind)) return res.status(400).json({ ok: false, error: 'kind 는 idiom, sentence, chunk 중 하나여야 합니다.' });
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ ok: false, error: '음성 생성 기능을 사용할 수 없습니다.' });
   try {
     const clips = C.listClips();
-    const r = await TTS.runLocked(() => TTS.generate({ pool, trackUsage, userId: req.user.id, clips, max, kind: body.kind }));
+    const r = await TTS.runLocked(() => TTS.generate({ pool, trackUsage, userId: req.user.id, clips, max, kind: body.kind, prefix: body.prefix }));
     if (r.busy) return res.status(409).json({ ok: false, error: '이미 생성 중입니다. 끝난 뒤 다시 시도해 주세요.' });
     res.json({ ok: true, ...r.value });
   } catch (err) {
