@@ -149,19 +149,19 @@ test('preview: model·voice 를 고르면 그대로 쓰고, tts-1 이면 instruc
 
 test('preview: 구(chunk)에만 조각 문장이 덧붙는다', async t => {
   const { preview, ai } = await setup(t);
-  const { CHUNK_NOTE } = require('../lib/speakloop_tts');
+  const { CHUNK_INSTRUCTION } = require('../lib/speakloop_tts');
   await preview({ key: 'hang-out.say' });
   await preview({ key: 'hang-out.ex' });
   await preview({ key: 'hang-out.ex.c0' });
   const [idiom, sentence, chunk] = ai.calls.map(c => c.body);
-  assert.ok(!idiom.instructions.includes(CHUNK_NOTE) && !sentence.instructions.includes(CHUNK_NOTE));
-  assert.ok(chunk.instructions.endsWith(CHUNK_NOTE));
+  assert.ok(!idiom.instructions.includes(CHUNK_INSTRUCTION) && !sentence.instructions.includes(CHUNK_INSTRUCTION));
+  assert.ok(chunk.instructions.endsWith(CHUNK_INSTRUCTION));
   assert.equal(chunk.input, 'We used to');
 });
 
-test('preview: 사용자가 보낸 글자(text·input·instructions 등)는 요청 본문에 들어가지 않는다 — 글은 서버 콘텐츠에서만', async t => {
+test('preview: 사용자가 보낸 읽을 글(text·input·prompt 등)은 요청 본문에 들어가지 않는다 — 글은 서버 콘텐츠에서만(instructions 직접 입력은 작업398 에서 허용)', async t => {
   const { preview, ai } = await setup(t);
-  await preview({ key: 'hang-out.say', text: 'EVIL-TEXT', input: 'EVIL-INPUT', instructions: 'EVIL-INS', prompt: 'EVIL-PROMPT' });
+  await preview({ key: 'hang-out.say', text: 'EVIL-TEXT', input: 'EVIL-INPUT', prompt: 'EVIL-PROMPT' });
   assert.equal(ai.calls[0].body.input, 'hang out');
   assert.ok(!JSON.stringify(ai.calls[0].body).includes('EVIL'));
 });

@@ -144,14 +144,14 @@ test('모델·음성·instructions 가 바뀌면 "오래됨"으로 잡히고 다
 
 test('instructions: 구(chunk)에만 조각 문장이 덧붙고, tts-1 계열 모델이면 instructions 가 요청에서 빠진다', async t => {
   const { gen, ai } = await setup(t);
-  const { CHUNK_NOTE, DEFAULT_INSTRUCTIONS } = require('../lib/speakloop_tts');
+  const { CHUNK_INSTRUCTION, DEFAULT_INSTRUCTIONS } = require('../lib/speakloop_tts');
   await gen({ max: 1, kind: 'idiom' });
   await gen({ max: 1, kind: 'sentence' });
   await gen({ max: 1, kind: 'chunk' });
   const [idiom, sentence, chunk] = ai.calls.map(c => c.body);
   assert.equal(idiom.instructions, DEFAULT_INSTRUCTIONS);
   assert.equal(sentence.instructions, DEFAULT_INSTRUCTIONS);
-  assert.equal(chunk.instructions, DEFAULT_INSTRUCTIONS + ' ' + CHUNK_NOTE);
+  assert.equal(chunk.instructions, DEFAULT_INSTRUCTIONS + ' ' + CHUNK_INSTRUCTION);
   assert.equal(chunk.input, 'We used to');
   assert.ok(!idiom.instructions.includes('fragment') && !sentence.instructions.includes('fragment'));
   process.env.SPEAKLOOP_TTS_MODEL = 'tts-1';

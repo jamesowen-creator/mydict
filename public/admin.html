@@ -249,6 +249,11 @@
               <select id="slt-voice" style="font-size:14px;min-height:44px;padding:0 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface,#fff);color:var(--text)"></select>
             </label>
           </div>
+          <div style="margin-top:12px">
+            <label for="slt-ins" style="font-size:13px;color:var(--text2)">instructions 직접 입력(선택)</label>
+            <textarea id="slt-ins" rows="4" maxlength="600" style="display:block;width:100%;box-sizing:border-box;margin-top:4px;font-size:16px;line-height:1.5;padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface,#fff);color:var(--text);font-family:inherit"></textarea>
+            <div style="font-size:12px;line-height:1.6;color:var(--text2);margin-top:4px">비워 두면 서버 기본값을 씁니다. 채우면 이후 [미리듣기]에 이 문구가 그대로 적용됩니다(저장되지 않음, 최대 600자, gpt-4o-mini-tts에서만 적용).</div>
+          </div>
           <div id="slt-note" style="font-size:12px;line-height:1.6;color:var(--text2);margin-top:12px">미리듣기 1회마다 OpenAI 호출 비용이 발생합니다(추정 비용 표시).</div>
           <div style="margin-top:12px;overflow-x:auto">
             <table>
@@ -636,6 +641,7 @@ async function sltLoad() {
     sltPrefix = d.prefix; sltPer1k = d.cost_per_1k; sltEstimated = d.cost_estimated;
     sltEl('slt-model').options[0].textContent = '현재 설정(' + d.model + ')';
     sltEl('slt-voice').options[0].textContent = '현재 설정(' + d.voice + ')';
+    sltEl('slt-ins').placeholder = d.default_instructions && d.default_instructions.chunk ? d.default_instructions.chunk : '';   // 작업398: 현재 구 클립 기본 문구
     sltEl('slt-note').textContent = '미리듣기 1회마다 OpenAI 호출 비용이 발생합니다(추정 비용: 1,000자당 약 $' + Number(d.cost_per_1k).toFixed(3) + (d.cost_estimated ? ', 임시 단가' : '') + '). 각 미리듣기 버튼에 그 클립의 추정 비용이 표시됩니다.';
     const body = sltEl('slt-tbody');
     body.textContent = '';
@@ -675,6 +681,8 @@ async function sltPreview(key, btn) {
   const model = sltEl('slt-model').value, voice = sltEl('slt-voice').value;
   if (model) body.model = model;
   if (voice) body.voice = voice;
+  const ins = sltEl('slt-ins').value.trim();
+  if (ins) body.instructions = ins;   // 작업398: 비어 있으면 서버 기본값
   try {
     const r = await fetch('/api/admin/speakloop/audio/preview', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
     if (!r.ok) { sltMsg(await sltError(r)); return; }

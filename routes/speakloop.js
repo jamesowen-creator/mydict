@@ -105,9 +105,15 @@ router.post('/api/admin/speakloop/audio/preview', requireAdmin, async (req, res)
     if (!clip) return res.status(404).json({ ok: false, error: '없는 클립입니다.' });
     if (body.model !== undefined && !TTS.ALLOWED_MODELS.includes(body.model)) return res.status(400).json({ ok: false, error: 'model 은 ' + TTS.ALLOWED_MODELS.join(', ') + ' 중 하나여야 합니다.' });
     if (body.voice !== undefined && !TTS.ALLOWED_VOICES.includes(body.voice)) return res.status(400).json({ ok: false, error: 'voice 는 ' + TTS.ALLOWED_VOICES.join(', ') + ' 중 하나여야 합니다.' });
+    let override = '';
+    if (body.instructions !== undefined) {   // 작업398: 직접 입력한 instructions(최대 600자). 비어 있으면 서버 기본값
+      if (typeof body.instructions !== 'string' || Array.from(body.instructions).length > TTS.INSTRUCTIONS_MAX) return res.status(400).json({ ok: false, error: 'instructions 는 ' + TTS.INSTRUCTIONS_MAX + '자 이하의 글이어야 합니다.' });
+      override = body.instructions.trim();
+    }
     if (!process.env.OPENAI_API_KEY) return res.status(503).json({ ok: false, error: '음성 생성 기능을 사용할 수 없습니다.' });
     if (!TTS.previewAllowed(req.user.id)) return res.status(429).json({ ok: false, error: '미리듣기는 10분에 ' + TTS.PREVIEW_LIMIT + '회까지입니다. 잠시 후 다시 시도해 주세요.' });
-    const st = { ...TTS.settings(), ...(body.model !== undefined ? { model: body.model } : {}), ...(body.voice !== undefined ? { voice: body.voice } : {}) };
+    const st = { ...TTS.settings(), ...(body.model !== undefined ? { model: body.model } : {}), ...(body.voice !== undefined ? { voice: body.voice } : {}), ...(override ? { instructionsOverride: override } : {}) };
+    if (override) console.log('speakloop preview instructions length: ' + Array.from(override).length);   // 로그에는 길이만 남긴다
     let audio;
     try { audio = await TTS.synthesize(clip, st); } catch (e) {
       const reason = e && e.reason ? e.reason : 'error';
