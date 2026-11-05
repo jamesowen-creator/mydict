@@ -63,7 +63,7 @@ test('권한 확인 중 오류가 나면 403(fail-closed), DB 가 없어도 403'
 test('모르는 id 404, 잘못된 rating 400 (기록은 생기지 않음)', async t => {
   const { db, app } = await setup();
   t.after(() => app.close());
-  for (const id of ['nope', '', 5, null, undefined, 'm-delay.l0', 'hang-out']) assert.equal((await post(app, { item_id: id, rating: 'good' })).status, 404, String(id));
+  for (const id of ['nope', '', 5, null, undefined, 'm-delay.l0', 'hang-out.say']) assert.equal((await post(app, { item_id: id, rating: 'good' })).status, 404, String(id));
   for (const r of ['great', '', 'GOOD', 1, null, undefined, ['good']]) assert.equal((await post(app, { item_id: 'm-delay', rating: r })).status, 400, String(r));
   assert.equal((await app.call('POST', '/api/speakloop/progress', undefined, { user: 1 })).status, 404);
   assert.equal(db.progress.size, 0);
@@ -107,4 +107,18 @@ test('저장 실패는 500, 로그에는 상태 코드만 남고 오류 내용·
   const logs = [], orig = console.error; console.error = (...a) => logs.push(a.join(' '));
   try { assert.equal((await post(app, { item_id: 'm-delay', rating: 'good' })).status, 500); } finally { console.error = orig; }
   assert.deepEqual(logs, ['speakloop progress save failed: 500']);
+});
+
+test('작업401: 이디엄 id 도 기록할 수 있다(some·good·hard), 독백 id 는 기존대로, 모르는 id 404, 권한·본인 행 규칙 유지', async t => {
+  const { app } = await setup();
+  t.after(() => app.close());
+  for (const [id, rating] of [['hang-out', 'some'], ['hang-out', 'hard'], ['touch-base', 'good']]) assert.equal((await post(app, { item_id: id, rating })).status, 200, id + rating);
+  assert.equal((await post(app, { item_id: 'm-delay', rating: 'good' })).status, 200, '독백 id 는 그대로');
+  for (const id of ['hang-out.say', 'hang-out.ex', 'not-an-idiom']) assert.equal((await post(app, { item_id: id, rating: 'good' })).status, 404, id);
+  assert.equal((await post(app, { item_id: 'hang-out', rating: 'great' })).status, 400, 'rating 허용값은 그대로');
+  assert.equal((await post(app, { item_id: 'hang-out', rating: 'good' }, 3)).status, 403);
+  assert.equal((await post(app, { item_id: 'hang-out', rating: 'good' }, null)).status, 401);
+  const mine = await app.call('GET', '/api/speakloop/progress', undefined, { user: 1 });
+  assert.deepEqual(mine.body.items.map(i => [i.item_id, i.count, i.last_rating]).sort(), [['hang-out', 2, 'hard'], ['m-delay', 1, 'good'], ['touch-base', 1, 'good']]);
+  assert.deepEqual((await app.call('GET', '/api/speakloop/progress', undefined, { user: 4 })).body.items, [], '다른 사용자의 기록은 보이지 않는다');
 });

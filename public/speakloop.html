@@ -36,7 +36,26 @@
   .btn.text.tab { text-decoration: none; border-bottom: 2px solid transparent; border-radius: 0; }
   .btn.text.tab[aria-pressed="true"] { color: var(--color-text); font-weight: 700; border-bottom-color: var(--color-accent-ink); }
   .btn.text.tab:disabled { opacity: 1; color: var(--color-text-sub); font-weight: 400; }
-  .soon { font-size: var(--fs-12); color: var(--color-text-sub); }
+
+  /* 작업401: 이디엄 세션 */
+  .stat { display: flex; align-items: baseline; justify-content: space-between; padding: var(--sp-8) var(--sp-0); border-top: 1px solid var(--color-line); font-size: var(--fs-15); }
+  .stats { margin-top: var(--sp-8); }
+  .steps { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8); margin-top: var(--sp-8); font-size: var(--fs-14); color: var(--color-text-sub); }
+  .step[aria-current="step"] { font-weight: 700; color: var(--color-text); border-bottom: 2px solid var(--color-accent-ink); }
+  .progress { margin-top: var(--sp-8); font-size: var(--fs-13); color: var(--color-text-sub); }
+  .field { margin-top: var(--sp-16); }
+  .field-label { display: block; font-size: var(--fs-12); font-weight: 700; color: var(--color-text-sub); padding-bottom: var(--sp-4); }
+  .field input { display: block; width: 100%; min-height: var(--ctl-min-h); padding: var(--sp-8) var(--sp-12); font: inherit; font-size: var(--fs-16); color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-line-strong); border-radius: var(--input-radius); outline: none; }
+  .field input:focus { box-shadow: var(--ring-focus); }
+  .answer { margin-top: var(--sp-16); font-size: var(--fs-18); }
+  .miss { font-weight: 700; text-decoration: underline; color: var(--color-danger-ink); }
+  .mean { margin-top: var(--sp-4); font-size: var(--fs-14); color: var(--color-text-sub); }
+  .verdict { font-size: var(--fs-13); color: var(--color-text-sub); }
+  .idiom-head { margin-top: var(--sp-12); font-size: var(--fs-18); font-weight: 700; }
+  .body-text { margin-top: var(--sp-4); font-size: var(--fs-14); line-height: 1.6; }
+  .note-lead { margin-top: var(--sp-12); font-size: var(--fs-14); }
+  .countdown { margin-top: var(--sp-16); font-size: var(--fs-22); font-weight: 700; }
+  .speak-en { margin-top: var(--sp-4); font-size: var(--fs-16); }
   .top-tabs { margin-top: var(--sp-0); border-bottom: 1px solid var(--color-line); }
 
   .list { margin-top: var(--sp-8); }
@@ -118,9 +137,8 @@
   </div>
   <div id="main" hidden>
     <div class="tabs top-tabs" role="group" aria-label="학습 종류">
-      <button type="button" class="btn text tab" aria-pressed="true">독백 연습</button>
-      <button type="button" class="btn text tab" aria-pressed="false" disabled>이디엄 세션</button>
-      <span class="soon">준비 중</span>
+      <button type="button" class="btn text tab" data-tab="mono" aria-pressed="true">독백 연습</button>
+      <button type="button" class="btn text tab" data-tab="idiom" aria-pressed="false">이디엄 세션</button>
     </div>
     <div class="status-row">
       <p class="msg" id="status" role="status" aria-live="polite"></p>
@@ -130,8 +148,9 @@
   </div>
 </main>
 
-<script src="/js/speakloop/core.js?v=100"></script>
-<script src="/js/speakloop/player.js?v=100"></script>
-<script src="/js/speakloop/app.js?v=100"></script>
+<script src="/js/speakloop/core.js?v=101"></script>
+<script src="/js/speakloop/player.js?v=101"></script>
+<script src="/js/speakloop/app.js?v=101"></script>
+<script src="/js/speakloop/idiom.js?v=101"></script>
 </body>
 </html>

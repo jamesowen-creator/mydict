@@ -15,6 +15,7 @@ const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/ja
 const CONTENT = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'speakloop', 'content.json'), 'utf8'));
 const ALL_KEYS = [];
 for (const m of CONTENT.monologues) m.lines.forEach((l, i) => { ALL_KEYS.push(m.id + '.l' + i); l.chunks.forEach((c, j) => ALL_KEYS.push(m.id + '.l' + i + '.c' + j)); });
+for (const i of CONTENT.idioms) { ALL_KEYS.push(i.id + '.say', i.id + '.ex'); i.example.chunks.forEach((c, j) => ALL_KEYS.push(i.id + '.ex.c' + j)); }
 const MISSING = 'm-delay.l0.c1';   // 음성이 아직 없는 구
 
 let srv, base, browser;
@@ -104,7 +105,7 @@ async function enter(page, title) {
 const clickText = (page, label) => page.eval(`(() => { const b = [...document.querySelectorAll('#view button')].find(x => x.textContent.trim() === ${JSON.stringify(label)}); if (!b) return false; b.click(); return true; })()`);
 const plays = page => page.eval('window.__plays.map(p => p.key)');
 
-test('목록: 독백 10개, 카테고리 필터, 연습 기록(없으면 "아직 안 함"), 탭 2개(이디엄 세션은 비활성·준비 중)', { skip: SKIP }, async () => {
+test('목록: 독백 10개, 카테고리 필터, 연습 기록(없으면 "아직 안 함"), 탭 2개(둘 다 활성, 독백 연습이 선택됨)', { skip: SKIP }, async () => {
   state.progress = [{ item_id: 'm-delay', count: 2, last_rating: 'some', last_at: '2026-11-01T00:00:00Z' }];
   const page = await open();
   await ready(page);
@@ -113,8 +114,8 @@ test('목록: 독백 10개, 카테고리 필터, 연습 기록(없으면 "아직
   assert.equal(metas[0], '연습 2회 · 최근 몇 군데 막힘');
   assert.equal(metas.filter(t => t === '아직 안 함').length, 9);
   const tops = await page.eval("[...document.querySelectorAll('.top-tabs .tab')].map(b => [b.textContent, b.getAttribute('aria-pressed'), b.disabled])");
-  assert.deepEqual(tops, [['독백 연습', 'true', false], ['이디엄 세션', 'false', true]]);
-  assert.match(await page.text('.top-tabs'), /준비 중/);
+  assert.deepEqual(tops, [['독백 연습', 'true', false], ['이디엄 세션', 'false', false]]);
+  assert.doesNotMatch(await page.text('.top-tabs'), /준비 중/);
   const cats = CONTENT.monologues.reduce((o, m) => (o[m.cat] = (o[m.cat] || 0) + 1, o), {});
   await clickText(page, '비즈니스');
   assert.equal(await page.count('.item'), cats['비즈니스']);
@@ -417,6 +418,207 @@ test('작업400: 390px·1280px 소리 표기 블록 — 가로 스크롤 없음,
       }
       await clickText(page, '목록으로');
     }
+    await page.close();
+  }
+});
+
+// ───── 작업401: 이디엄 세션 ─────
+const IDI = CONTENT.idioms;
+const row = (i, rating) => ({ item_id: i.id, count: 1, last_rating: rating, last_at: '2026-11-01T00:00:00Z' });
+const goIdiom = async page => { await page.eval("document.querySelector('.top-tabs [data-tab=idiom]').click()"); await page.waitFor("!!document.querySelector('.stats')", 4000); };
+const text = (page, sel) => page.text(sel);
+const view = page => page.eval("document.getElementById('view').innerText");
+// 복습 1(IDI[0] hard) · 신규 1(IDI[1]) · 나머지는 배운 상태
+function seedOneEach() { state.progress = IDI.map((i, n) => n === 0 ? row(i, 'hard') : n === 1 ? null : row(i, 'some')).filter(Boolean); }
+
+test('이디엄 탭: 활성화되어 세션 안내(복습 대상·오늘 신규·이미 배운 수)와 [세션 시작]·[표현 목록]이 나온다', { skip: SKIP }, async () => {
+  state.progress = [row(IDI[0], 'hard'), row(IDI[1], 'good')];
+  const page = await open();
+  await ready(page);
+  await goIdiom(page);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('.top-tabs .tab')].map(b => b.getAttribute('aria-pressed'))"), ['false', 'true']);
+  assert.equal(await page.count('.item'), 0, '독백 목록은 사라진다');
+  const stats = await page.eval("[...document.querySelectorAll('.stat')].map(r => r.textContent)");
+  assert.deepEqual(stats, ['복습 대상1개', '오늘 신규5개', '이미 배운 표현2개']);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#view .toolbar button')].map(b => b.textContent + ':' + b.className)"), ['세션 시작:btn', '표현 목록:btn text']);
+  await page.close();
+});
+
+test('모두 배웠으면 안내 글과 [인출 연습만 하기](배운 것 중 최대 10개)', { skip: SKIP }, async () => {
+  state.progress = IDI.map(i => row(i, 'good'));
+  const page = await open();
+  await ready(page);
+  await goIdiom(page);
+  assert.match(await view(page), /모든 표현을 한 번씩 배웠습니다/);
+  assert.equal(await clickText(page, '세션 시작'), false);
+  await clickText(page, '인출 연습만 하기');
+  await page.waitFor("!!document.querySelector('.retrieval')", 3000);
+  assert.match(await text(page, '.progress'), /^인출 1\/10$/);
+  assert.equal(await page.eval("document.querySelector('.step[aria-current]').textContent"), '3 인출');
+  await page.close();
+});
+
+test('세션 전체 흐름: 복습 → 신규(A 받아쓰기 → B → C) → 인출 → 요약, 기록은 some/hard/good 으로 POST', { skip: SKIP }, async () => {
+  seedOneEach();
+  const [rev, fresh] = [IDI[0], IDI[1]];
+  const page = await open();
+  await ready(page);
+  await goIdiom(page);
+  await clickText(page, '세션 시작');
+  // 1 복습
+  await page.waitFor("!!document.querySelector('.retrieval')", 3000);
+  assert.equal(await page.eval("[...document.querySelectorAll('.step')].map(s => s.textContent + (s.hasAttribute('aria-current') ? '*' : '')).join('|')"), '1 복습*|2 신규|3 인출');
+  assert.equal(await page.eval("(() => { const c = getComputedStyle(document.querySelector('.step[aria-current]')); return c.fontWeight + ':' + c.borderBottomWidth; })()"), '700:2px');
+  assert.match(await text(page, '.progress'), /^복습 1\/1$/);
+  assert.ok((await view(page)).includes(rev.situ));
+  assert.match(await text(page, '#countdown'), /^[0-5]$/);
+  assert.equal(await page.count('[data-rating]'), 0, '공개 전에는 평가 버튼 없음');
+  await clickText(page, '정답 보기');
+  await page.waitFor("window.__plays.length === 1", 3000);
+  assert.deepEqual(await plays(page), [rev.id + '.ex']);
+  assert.ok((await view(page)).includes(rev.example.en));
+  await page.eval("(() => { const b = document.querySelector('[data-rating=hard]'); b.click(); b.click(); })()");
+  // 2 신규 - A
+  await page.waitFor("/신규 1\\/1/.test(document.querySelector('.progress').textContent)", 4000);
+  assert.deepEqual(state.posts, [{ item_id: rev.id, rating: 'hard' }], '연타해도 1회');
+  assert.match(await view(page), /A 받아쓰기/);
+  await clickText(page, '확인');
+  assert.equal(await text(page, '#dict-msg'), '들은 표현을 입력하세요');
+  assert.equal(await page.count('.answer'), 0);
+  await clickText(page, '듣기');
+  await page.waitFor("window.__plays.length === 2", 3000);
+  assert.equal((await plays(page))[1], fresh.id + '.say');
+  assert.equal(await page.eval("document.querySelector('label.field-label').htmlFor + ':' + document.getElementById('dict-in').type"), 'dict-in:text');
+  await page.setValue('#dict-in', fresh.idiom.split(' ')[0] + ' xxxx');
+  await clickText(page, '확인');
+  assert.equal(await page.count('.answer .miss'), fresh.idiom.split(' ').length - 1, '놓친 단어만 표시');
+  assert.equal(await page.eval("(() => { const c = getComputedStyle(document.querySelector('.answer .miss')); return c.fontWeight + ':' + c.textDecorationLine; })()"), '700:underline');
+  assert.ok((await view(page)).includes(fresh.mean));
+  await clickText(page, '다음');
+  // B
+  await page.waitFor("/B 소리·뉘앙스/.test(document.getElementById('view').innerText)", 3000);
+  const b = await view(page);
+  for (const t of [fresh.sound, fresh.note, fresh.nuance, fresh.situ]) assert.ok(b.includes(t), t.slice(0, 10));
+  await clickText(page, '다음');
+  // C
+  await page.waitFor("/C 예문 쉐도잉/.test(document.getElementById('view').innerText)", 3000);
+  const n = fresh.example.chunks.length;
+  assert.equal(await page.count('.sound .phrase'), n);
+  assert.equal(await page.count('.sound .slash'), n - 1);
+  await page.eval("document.querySelectorAll('.sound .phrase')[1].click()");
+  await page.waitFor("window.__plays.length === 3", 3000);
+  assert.equal((await plays(page))[2], fresh.id + '.ex.c1');
+  await page.eval("document.getElementById('say-counter').click(); document.getElementById('say-counter').click()");
+  assert.equal(await text(page, '#say-counter'), '통째로 말했어요 (2)');
+  await clickText(page, '이 표현 완료');
+  // 3 인출 (복습 1 + 신규 1)
+  await page.waitFor("/인출 1\\/2/.test(document.querySelector('.progress').textContent)", 4000);
+  assert.deepEqual(state.posts[1], { item_id: fresh.id, rating: 'some' });
+  for (let k = 0; k < 2; k++) {
+    await page.waitFor("!!document.querySelector('.retrieval') && !document.querySelector('[data-rating]')", 3000);
+    await clickText(page, '정답 보기');
+    await page.click('[data-rating=good]');
+    await page.waitFor(k === 0 ? "/인출 2\\/2/.test(document.querySelector('.progress').textContent)" : "/세션을 마쳤어요/.test(document.getElementById('view').innerText)", 4000);
+  }
+  const v = await view(page);
+  assert.match(v, /신규 1개 학습/);
+  assert.match(v, /인출 바로 말함 2 \/ 막힘 0/);
+  assert.equal(state.posts.length, 4);
+  assert.deepEqual(state.posts.slice(2).map(p => p.rating), ['good', 'good']);
+  assert.deepEqual(state.posts.slice(2).map(p => p.item_id).sort(), [rev.id, fresh.id].sort());
+  await clickText(page, '처음으로');
+  await page.waitFor("!!document.querySelector('.stats')", 3000);
+  assert.match(await view(page), /모든 표현을 한 번씩 배웠습니다/);
+  await page.close();
+});
+
+test('인출: 5초 카운트다운이 줄다가 0 이 되면 저절로 정답·예문 음성이 나온다. 저장이 실패해도 진행은 계속되고 글자로 알린다', { skip: SKIP }, async () => {
+  state.progress = IDI.map(i => row(i, 'good'));
+  const page = await open();
+  await ready(page);
+  await goIdiom(page);
+  state.progressFail = true;   // 기록 목록은 이미 불러온 뒤, 저장(POST)만 실패
+  await clickText(page, '인출 연습만 하기');
+  await page.waitFor("!!document.querySelector('#countdown')", 3000);
+  assert.equal(await text(page, '#countdown'), '5');
+  await page.waitFor("document.getElementById('countdown') && document.getElementById('countdown').textContent === '4'", 3000);
+  await page.waitFor("!document.getElementById('countdown') && !!document.querySelector('[data-rating]')", 6000);
+  await page.waitFor("window.__plays.length === 1 && /\\.ex$/.test(window.__plays[0].key)", 3000);
+  await page.click('[data-rating=hard]');
+  await page.waitFor("/인출 2\\/10/.test(document.querySelector('.progress').textContent)", 4000);
+  assert.match(await text(page, '#status'), /기록하지 못했습니다/, '다음 화면에서도 알림이 남는다');
+  await page.close();
+});
+
+test('표현 목록: 카테고리 필터, 상태(안 배움·학습·막힘), 상세는 B+C 를 한 화면에 보이고 기록·채점이 없다', { skip: SKIP }, async () => {
+  state.progress = [row(IDI[0], 'hard'), row(IDI[1], 'good'), row(IDI[2], 'some')];
+  const page = await open();
+  await ready(page);
+  await goIdiom(page);
+  await clickText(page, '표현 목록');
+  await page.waitFor("document.querySelectorAll('.item').length === 20", 3000);
+  const metas = await page.eval("[...document.querySelectorAll('.item-meta')].map(n => n.textContent)");
+  assert.deepEqual(metas.slice(0, 4), ['막힘', '학습', '학습', '안 배움']);
+  const cats = IDI.reduce((o, i) => (o[i.cat] = (o[i.cat] || 0) + 1, o), {});
+  await clickText(page, '비즈니스');
+  assert.equal(await page.count('.item'), cats['비즈니스']);
+  await clickText(page, '전체');
+  await page.eval("document.querySelectorAll('.item')[0].click()");
+  await page.waitFor("!!document.querySelector('.sound')", 3000);
+  const v = await view(page);
+  for (const t of [IDI[0].mean, IDI[0].sound, IDI[0].nuance, IDI[0].example.ko]) assert.ok(v.includes(t));
+  assert.equal(await clickText(page, '이 표현 완료'), false);
+  assert.equal(state.posts.length, 0);
+  await clickText(page, '목록으로');
+  await page.waitFor("document.querySelectorAll('.item').length === 20", 3000);
+  await page.close();
+});
+
+test('탭 전환: 쌓아가기 재생 중에 이디엄 탭으로 가면 즉시 멈춘다. 세션은 저장되지 않아 돌아오면 처음부터', { skip: SKIP }, async () => {
+  seedOneEach();
+  const page = await open();
+  await ready(page);
+  await enter(page, '프로젝트가 미뤄진 이유');
+  await clickText(page, '문장 훈련'); await clickText(page, '2'); await clickText(page, '쌓아가기');
+  await page.waitFor("window.__plays.length >= 1 && !document.getElementById('stop').hidden", 5000);
+  await goIdiom(page);
+  const n = (await plays(page)).length;
+  await sleep(800);
+  assert.equal((await plays(page)).length, n, '전환 뒤 재생 없음');
+  assert.equal(await page.eval("document.getElementById('stop').hidden"), true);
+  await clickText(page, '세션 시작');
+  await page.waitFor("!!document.querySelector('.retrieval')", 3000);
+  await page.eval("document.querySelector('.top-tabs [data-tab=mono]').click()");
+  await page.waitFor("document.querySelectorAll('.item').length === 10", 3000);
+  await goIdiom(page);
+  assert.equal(await page.count('.retrieval'), 0);
+  assert.equal(state.posts.length, 0, '평가 전에 나가면 기록 없음');
+  await page.close();
+});
+
+test('이디엄 화면 390px·1280px: 가로 스크롤 없음, 버튼 ≥44px, 허용 모서리만, 이모지 없음 (안내·복습·A·B·C·인출·목록·상세)', { skip: SKIP }, async () => {
+  for (const width of [390, 1280]) {
+    seedOneEach();
+    const page = await open({ width });
+    await ready(page);
+    await goIdiom(page);
+    const check = async label => {
+      const a = await page.eval(AUDIT);
+      assert.deepEqual(a.bad, [], width + ' ' + label + ' 버튼 높이');
+      assert.deepEqual(a.radii.filter(r => !ALLOWED_RADII.has(r)), [], width + ' ' + label + ' 모서리');
+      assert.equal(a.emoji, false, label); assert.equal(a.scroll, false, width + ' ' + label + ' 가로 스크롤');
+    };
+    await check('안내');
+    await clickText(page, '세션 시작'); await page.waitFor("!!document.querySelector('.retrieval')", 3000);
+    await check('복습'); await clickText(page, '정답 보기'); await check('복습-공개');
+    await page.click('[data-rating=good]');
+    await page.waitFor("/A 받아쓰기/.test(document.getElementById('view').innerText)", 4000);
+    await check('A'); await page.setValue('#dict-in', 'abc'); await clickText(page, '확인'); await check('A-결과');
+    await clickText(page, '다음'); await page.waitFor("/B 소리/.test(document.getElementById('view').innerText)", 3000); await check('B');
+    await clickText(page, '다음'); await page.waitFor("/C 예문/.test(document.getElementById('view').innerText)", 3000); await check('C');
+    await clickText(page, '이 표현 완료'); await page.waitFor("/인출 1\\//.test(document.querySelector('.progress').textContent)", 4000); await check('인출');
+    await page.eval("document.querySelector('.top-tabs [data-tab=mono]').click()"); await goIdiom(page); await clickText(page, '표현 목록'); await page.waitFor("document.querySelectorAll('.item').length === 20", 3000); await check('목록');
+    await page.eval("document.querySelectorAll('.item')[3].click()"); await page.waitFor("!!document.querySelector('.sound')", 3000); await check('상세');
     await page.close();
   }
 });

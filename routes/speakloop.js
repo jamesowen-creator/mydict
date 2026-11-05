@@ -84,9 +84,10 @@ router.get('/api/speakloop/progress', guard, needDb, async (req, res) => {
 
 router.post('/api/speakloop/progress', guard, needDb, async (req, res) => {
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
-  let monologues;
-  try { monologues = C.getContent().monologues; } catch (e) { return res.status(500).json(CONTENT_ERROR); }
-  if (typeof body.item_id !== 'string' || !monologues.some(m => m.id === body.item_id)) return res.status(404).json({ ok: false, error: '없는 독백입니다.' });
+  let content;
+  try { content = C.getContent(); } catch (e) { return res.status(500).json(CONTENT_ERROR); }
+  // 작업401: 독백 id 또는 이디엄 id(둘 다 서버 콘텐츠에 있어야 함). 이디엄은 'some' = 신규 학습 완료, 'good'·'hard' = 인출 결과
+  if (typeof body.item_id !== 'string' || !(content.monologues.some(m => m.id === body.item_id) || content.idioms.some(i => i.id === body.item_id))) return res.status(404).json({ ok: false, error: '없는 항목입니다.' });
   if (!RATINGS.includes(body.rating)) return res.status(400).json({ ok: false, error: 'rating 은 ' + RATINGS.join(', ') + ' 중 하나여야 합니다.' });
   try {
     const { rows } = await pool.query(

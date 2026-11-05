@@ -97,8 +97,48 @@
     return out;
   }
 
+  // ── 이디엄 세션 (작업401) ──
+  // 받아쓰기 비교용 단어 목록: 소문자, ’‘→', 하이픈은 공백, 문장부호 제거(단어 안의 아포스트로피는 유지)
+  function normWords(s) {
+    return String(s).toLowerCase().replace(/[‘’ʼ`]/g, "'").replace(/-/g, ' ')
+      .replace(/[^\p{L}\p{N}' ]+/gu, ' ').split(/\s+/).map(function (w) { return w.replace(/^'+|'+$/g, ''); }).filter(Boolean);
+  }
+  // 정답(answer)과 입력(input)을 단어 LCS 로 맞춘다. 정답을 공백으로 나눈 표시 단위마다 놓친 단어가 있으면 missed
+  function diffAnswer(answer, input) {
+    var tokens = String(answer).split(/\s+/).filter(Boolean), ans = [], owner = [];
+    tokens.forEach(function (t, ti) { normWords(t).forEach(function (w) { ans.push(w); owner.push(ti); }); });
+    var inp = normWords(input), n = ans.length, m = inp.length, i, j, dp = [];
+    for (i = 0; i <= n; i++) { dp.push(new Array(m + 1).fill(0)); }
+    for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--) dp[i][j] = ans[i] === inp[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    var hit = new Array(n).fill(false);
+    i = 0; j = 0;
+    while (i < n && j < m) {
+      if (ans[i] === inp[j]) { hit[i] = true; i++; j++; } else if (dp[i + 1][j] >= dp[i][j + 1]) i++; else j++;
+    }
+    var out = tokens.map(function (t) { return { text: t, missed: false }; });
+    hit.forEach(function (h, k) { if (!h) out[owner[k]].missed = true; });
+    return { tokens: out, missedCount: hit.filter(function (h) { return !h; }).length, extra: m - hit.filter(Boolean).length, allCorrect: n > 0 && hit.every(Boolean) && m === n };
+  }
+
+  function shuffle(list, rng) {
+    var a = list.slice(), r = rng || Math.random;
+    for (var i = a.length - 1; i > 0; i--) { var k = Math.floor(r() * (i + 1)), t = a[i]; a[i] = a[k]; a[k] = t; }
+    return a;
+  }
+  var NEW_MAX = 5, PRACTICE_MAX = 10;
+  // 이디엄 상태: 기록 없음 = 안 배움, 마지막 평가 hard = 막힘(복습 대상), 그 밖 = 학습
+  function idiomStatus(row) { return !row || !(row.count > 0) ? 'new' : row.last_rating === 'hard' ? 'hard' : 'learned'; }
+  // ids: 콘텐츠 순서의 이디엄 id. progress: { id: {count, last_rating} }
+  function sessionPlan(ids, progress, rng) {
+    var st = function (id) { return idiomStatus(progress && progress[id]); };
+    var review = ids.filter(function (id) { return st(id) === 'hard'; });
+    var fresh = ids.filter(function (id) { return st(id) === 'new'; }).slice(0, NEW_MAX);
+    var learned = ids.filter(function (id) { return st(id) !== 'new'; });
+    return { review: review, fresh: fresh, learned: learned.length, retrieval: shuffle(review.concat(fresh), rng), practice: shuffle(learned, rng).slice(0, PRACTICE_MAX) };
+  }
+
   var RATING_TEXT = { good: '막힘없음', some: '몇 군데 막힘', hard: '많이 막힘' };
 
   return { CHUNK_GAP: CHUNK_GAP, REST_FACTOR: REST_FACTOR, MAX_BLANKS: MAX_BLANKS, STAGES: STAGES, RATING_TEXT: RATING_TEXT,
-    arrowOf: arrowOf, maskWord: maskWord, maskChunk: maskChunk, hiddenFlags: hiddenFlags, buildupPlan: buildupPlan, shadowPlan: shadowPlan, stressWords: stressWords };
+    arrowOf: arrowOf, maskWord: maskWord, maskChunk: maskChunk, hiddenFlags: hiddenFlags, buildupPlan: buildupPlan, shadowPlan: shadowPlan, stressWords: stressWords, normWords: normWords, diffAnswer: diffAnswer, shuffle: shuffle, idiomStatus: idiomStatus, sessionPlan: sessionPlan, NEW_MAX: NEW_MAX, PRACTICE_MAX: PRACTICE_MAX };
 });

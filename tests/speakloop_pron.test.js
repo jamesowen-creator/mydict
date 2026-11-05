@@ -35,7 +35,9 @@ test('검증: p 가 없거나 비어 있으면 거절한다', () => {
 });
 
 test('p 를 지운 콘텐츠는 400 이전 파일과 1글자도 다르지 않다(직전 커밋 content.json 의 SHA-256)', () => {
-  const stripped = JSON.stringify(JSON.parse(raw), (k, v) => (k === 'p' ? undefined : v));
+  // 작업401: 강세(st) 두 곳만 고쳤으므로, 그 두 값을 옛 값으로 되돌리면 400 이전 파일과 같아야 한다
+  const stripped = JSON.stringify(JSON.parse(raw), (k, v) => (k === 'p' ? undefined : v))
+    .replace('"st":"for EVen a WEEK"', '"st":"for Even a WEEK"').replace('"st":"meant a DOZen EMails"', '"st":"meant a DOZen Emails"');
   assert.equal(sha(stripped), '32a6cbafb4b7417b72b0c89e4188198620503b04c3f320b232c17e5bfa7141a7');
 });
 
@@ -75,4 +77,15 @@ test('강세 점: 토큰이 모자라면 남은 단어는 강세 없음. 모든 
     assert.equal(w.map(x => x.text).join(' '), ch.en);
     w.forEach(x => x.ranges.forEach(r => assert.ok(r[0] >= 0 && r[1] <= x.text.length && r[0] < r[1], ch.en)));
   }
+});
+
+test('작업401: 강세 두 곳 — m-workout "for even a week" · m-app "meant a dozen emails" 의 st 가 바뀌고 점이 ev·em 에 찍힌다', () => {
+  const c = JSON.parse(raw);
+  const find = (id, en) => c.monologues.find(m => m.id === id).lines.flatMap(l => l.chunks).find(ch => ch.en === en);
+  const a = find('m-workout', 'for even a week'), b = find('m-app', 'meant a dozen emails');
+  assert.equal(a.st, 'for EVen a WEEK');
+  assert.equal(b.st, 'meant a DOZen EMails');
+  const picks = ch => Core.stressWords(ch.en, ch.st).map(w => w.ranges.map(r => w.text.slice(r[0], r[1])));
+  assert.deepEqual(picks(a), [[], ['ev'], [], ['week']]);
+  assert.deepEqual(picks(b), [[], [], ['doz'], ['em']]);
 });

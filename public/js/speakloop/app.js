@@ -31,7 +31,7 @@
   const S = {
     content: null, progress: {}, cat: '전체', mono: null, mode: 0, sent: 0, rate: 1,
     stage: 0, revealed: new Set(), say: 0, hints: 0, shown: false, done: new Set(), rated: false, saving: false, recorded: null, recordError: '',
-    busy: false, indexOk: true,
+    busy: false, indexOk: true, tab: 'mono',
   };
   const P = SLPlayer.create({ token });
 
@@ -69,10 +69,9 @@
     }
     if (P.alive(g)) { setBusy(false); setStatus(ok ? '' : '음성을 재생하지 못했습니다.', !ok); }
   }
-  function buildup(i) {
-    const keys = S.mono.lines[i].chunks.map((c, j) => ck(S.mono, i, j));
+  function buildup(i) { buildupKeys(S.mono.lines[i].chunks.map((c, j) => ck(S.mono, i, j)), ck(S.mono, i)); }
+  function buildupKeys(keys, sentKey) {
     if (!keys.every(P.has)) return;
-    const sentKey = ck(S.mono, i);
     setStatus('음성을 준비하는 중입니다…');
     P.preload(keys.concat([sentKey])).then(() => {
       if (!keys.every(P.ready) || !P.ready(sentKey)) { setStatus('음성을 불러오지 못했습니다.', true); return; }
@@ -170,11 +169,12 @@
     });
     return wrap;
   }
-  function soundBlock(m, i) {
-    const l = m.lines[i], box = el('div', 'sound');
-    l.chunks.forEach((c, j) => {
+  function soundBlock(m, i) { return soundBlockOf(m.lines[i].chunks, j => ck(m, i, j)); }
+  function soundBlockOf(chunks, keyOf) {
+    const box = el('div', 'sound');
+    chunks.forEach((c, j) => {
       if (j) { const sep = el('span', 'slash', '/'); sep.setAttribute('aria-hidden', 'true'); box.appendChild(sep); }
-      const key = ck(m, i, j);
+      const key = keyOf(j);
       const inner = [stressEn(c), el('span', 'pron', c.p)];
       if (!P.has(key)) {
         const cell = el('span', 'phrase off'); cell.dataset.key = key;
@@ -188,7 +188,7 @@
       b.addEventListener('click', () => playOne(key));
       box.appendChild(b);
     });
-    const a = Core.arrowOf(l.chunks[l.chunks.length - 1].en);
+    const a = Core.arrowOf(chunks[chunks.length - 1].en);
     if (a) { const ar = el('span', 'arrow end', a); ar.setAttribute('aria-hidden', 'true'); box.appendChild(ar); }
     return box;
   }
@@ -391,6 +391,18 @@
     if (notes.length) setStatus(notes.join(' '), true);
     renderList();
   }
+  // 작업401: 이디엄 세션 모듈(idiom.js)이 쓰는 공용 도구
+  window.SL = { S, P, el, btn, tabGroup, setStatus, setNow, stopAll, playOne, buildupKeys, soundBlockOf, authHeaders, RATES, NO_AUDIO, idiom: null };
+  // 학습 종류 탭: 바꾸면 재생 중인 음성·쌓아가기·타이머를 모두 멈추고, 세션 진행 상태는 버린다
+  function showTab(t) {
+    if (!S.content || S.tab === t) return;
+    stopAll(); P.clear();
+    if (window.SL.idiom) window.SL.idiom.leave();
+    S.tab = t; S.mono = null;
+    document.querySelectorAll('.top-tabs .tab').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tab === t)));
+    if (t === 'idiom' && window.SL.idiom) window.SL.idiom.show(); else { S.tab = 'mono'; renderList(); }
+  }
+  document.querySelectorAll('.top-tabs .tab').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
   $('stop').addEventListener('click', stopAll);
   window.addEventListener('pagehide', () => P.release());
   boot();
