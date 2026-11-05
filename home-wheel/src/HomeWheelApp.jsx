@@ -22,11 +22,15 @@ const CMAP_OPTION = { id: 'cmap', name: '개념 지도', description: '주제별
 // 위치는 언어 사전 바로 다음: 언어를 다루는 항목끼리 이웃하게 하고, 기존 항목의 순서는 그대로 둔 채 사이에만 끼운다. 라벨·설명은 다른 항목과 같은 방식이다.
 const JGRAMMAR_OPTION = { id: 'jgrammar', name: '문장 학습', description: '일본어·영어·중국어 문장 속 문법을 AI가 풀어주기', url: '/jgrammar.html' };
 
+// 작업399: Speak Loop(영어 말하기). perm_speakloop 이 true 인 계정과 관리자(role=admin)에게만 보이며, 맨 끝에 놓는다. 기존 항목의 순서는 그대로다.
+const SPEAKLOOP_OPTION = { id: 'speakloop', name: 'Speak Loop', description: '원어민 소리로 듣고 따라 하며 영어 말하기', url: '/speakloop.html' };
+
 // 로그인한 사용자 기준 휠 항목: 기본 6개 + (권한자) 일본어 문법(언어 사전 다음) + (권한자) 개념 지도(맨 끝). 로그인 전·권한 없음이면 기본 6개 그대로.
 function buildOptions(user) {
   const list = [...OPTIONS];
   if (user && (user.perm_jgrammar === true || user.role === 'admin')) list.splice(list.findIndex((o) => o.id === 'dictionary') + 1, 0, JGRAMMAR_OPTION);
   if (user && user.perm_concept_map === true) list.push(CMAP_OPTION);
+  if (user && (user.perm_speakloop === true || user.role === 'admin')) list.push(SPEAKLOOP_OPTION);
   return list;
 }
 

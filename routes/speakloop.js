@@ -70,6 +70,36 @@ router.get('/api/speakloop/audio/:clipKey', guard, needDb, async (req, res) => {
   }
 });
 
+// ───── 작업399: 연습 기록(본인 것만). 로그에는 개수·상태코드만, 녹음·글 입력은 받지 않는다 ─────
+const RATINGS = ['good', 'some', 'hard'];
+router.get('/api/speakloop/progress', guard, needDb, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT item_id, count, last_rating, last_at FROM speakloop_progress WHERE user_id = $1 ORDER BY item_id', [req.user.id]);
+    res.json({ ok: true, items: rows.map(r => ({ item_id: r.item_id, count: r.count, last_rating: r.last_rating, last_at: r.last_at })) });
+  } catch (err) {
+    console.error('speakloop progress list failed: 500');
+    res.status(500).json({ ok: false, error: '기록을 불러오지 못했습니다.' });
+  }
+});
+
+router.post('/api/speakloop/progress', guard, needDb, async (req, res) => {
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  let monologues;
+  try { monologues = C.getContent().monologues; } catch (e) { return res.status(500).json(CONTENT_ERROR); }
+  if (typeof body.item_id !== 'string' || !monologues.some(m => m.id === body.item_id)) return res.status(404).json({ ok: false, error: '없는 독백입니다.' });
+  if (!RATINGS.includes(body.rating)) return res.status(400).json({ ok: false, error: 'rating 은 ' + RATINGS.join(', ') + ' 중 하나여야 합니다.' });
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO speakloop_progress (user_id, item_id, count, last_rating, last_at) VALUES ($1, $2, 1, $3, now())
+       ON CONFLICT (user_id, item_id) DO UPDATE SET count = speakloop_progress.count + 1, last_rating = EXCLUDED.last_rating, last_at = now()
+       RETURNING item_id, count, last_rating, last_at`, [req.user.id, body.item_id, body.rating]);
+    res.json({ ok: true, item: rows[0] });
+  } catch (err) {
+    console.error('speakloop progress save failed: 500');
+    res.status(500).json({ ok: false, error: '기록하지 못했습니다.' });
+  }
+});
+
 // ───── 관리자: 음성 현황·생성 (권한 컬럼과 무관, 관리자만) ─────
 router.get('/api/admin/speakloop/audio/status', requireAdmin, needDb, async (req, res) => {
   try {

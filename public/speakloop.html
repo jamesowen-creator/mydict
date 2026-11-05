@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Speak Loop</title>
+<link rel="icon" type="image/png" href="/icons/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/common/appHeader.css">
+<link rel="stylesheet" href="/css/common/tokens.css">
+<link rel="stylesheet" href="/css/common/screenBar.css">
+<style>
+  /* 작업399: Speak Loop 독백 연습. docs/design/design-principles.md: 박스 없이 텍스트 중심, 구분은 가는 선으로만. 색·크기·간격·모서리는 tokens.css 변수만 쓴다. */
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  body { font-size: var(--body-font-size); font-family: var(--font-sans); background: var(--color-bg); color: var(--color-text); line-height: 1.5; }
+  .content { max-width: var(--content-max); margin: 0 auto; min-height: 100dvh; padding: var(--sp-16) var(--gutter) calc(var(--sp-24) + env(safe-area-inset-bottom)); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: var(--ctl-min-h); padding: var(--sp-12) var(--sp-20); font: inherit; font-size: var(--fs-14); font-weight: var(--btn-weight);
+    color: var(--color-surface); background: var(--btn-primary-bg); border: 0; border-radius: var(--btn-radius); cursor: pointer; text-decoration: none;
+  }
+  .btn:hover { background: var(--btn-primary-bg-hover); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  .btn.text { min-width: var(--ctl-min-h); padding: var(--sp-0) var(--sp-8); color: var(--color-text-sub); background: none; text-decoration: underline; font-weight: 500; }
+  .btn.text:hover { background: none; color: var(--color-text); }
+
+  .msg { margin-top: var(--sp-12); font-size: var(--fs-14); color: var(--color-text-sub); min-height: var(--sp-20); }
+  .msg.error { color: var(--color-danger); }
+
+  /* 탭(텍스트 컨트롤): 선택은 굵기 + 아래 선 두 가지 */
+  .tabs { display: flex; flex-wrap: wrap; align-items: center; margin-top: var(--sp-8); }
+  .btn.text.tab { text-decoration: none; border-bottom: 2px solid transparent; border-radius: 0; }
+  .btn.text.tab[aria-pressed="true"] { color: var(--color-text); font-weight: 700; border-bottom-color: var(--color-accent-ink); }
+  .btn.text.tab:disabled { opacity: 1; color: var(--color-text-sub); font-weight: 400; }
+  .soon { font-size: var(--fs-12); color: var(--color-text-sub); }
+  .top-tabs { margin-top: var(--sp-0); border-bottom: 1px solid var(--color-line); }
+
+  .list { margin-top: var(--sp-8); }
+  .item { display: block; width: 100%; min-height: var(--ctl-min-h); padding: var(--sp-12) var(--sp-0); text-align: left; font: inherit; color: var(--color-text); background: none; border: 0; border-top: 1px solid var(--color-line); cursor: pointer; }
+  .item:hover .item-title { text-decoration: underline; }
+  .item-title { display: block; font-size: var(--fs-16); font-weight: 600; }
+  .item-situ { display: block; font-size: var(--fs-13); color: var(--color-text-sub); }
+  .item-meta { display: block; margin-top: var(--sp-4); font-size: var(--fs-12); color: var(--color-text-sub); }
+
+  .back { margin-left: calc(var(--sp-8) * -1); margin-top: var(--sp-0); }
+  .mono-title { font-size: var(--fs-18); font-weight: 700; }
+  .mono-situ { font-size: var(--fs-13); color: var(--color-text-sub); }
+  .body { margin-top: var(--sp-8); }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8); margin-top: var(--sp-12); }
+  .noaudio { display: inline-flex; align-items: center; min-height: var(--ctl-min-h); padding: var(--sp-0) var(--sp-8); font-size: var(--fs-12); color: var(--color-text-sub); }
+
+  .line { padding: var(--sp-16) var(--sp-0); border-top: 1px solid var(--color-line); }
+  .line-head { display: flex; align-items: center; justify-content: space-between; }
+  .line-no, .sub-title { font-size: var(--fs-12); font-weight: 700; color: var(--color-text-sub); }
+  .sub-title { margin-top: var(--sp-16); }
+  .line-ko { margin-top: var(--sp-8); font-size: var(--fs-14); color: var(--color-text-sub); }
+  .idiom { margin-top: var(--sp-4); font-size: var(--fs-13); }
+  .chunk { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); padding: var(--sp-8) var(--sp-0); }
+  .chunk-text { flex: 1; min-width: 0; }
+  .en-wrap { font-size: var(--fs-16); overflow-wrap: anywhere; }
+  .en.k { font-weight: 600; color: var(--color-accent-ink); }
+  .arrow { margin-left: var(--sp-4); color: var(--color-text-sub); }
+  .chunk .ko { font-size: var(--fs-13); color: var(--color-text-sub); }
+  .stress { font-size: var(--fs-12); color: var(--color-text-sub); }
+  .stress .st { font-size: var(--fs-13); color: var(--color-text); }
+  .note { margin-top: var(--sp-12); font-size: var(--fs-11); color: var(--color-text-sub); }
+  .memo { font-size: var(--fs-18); line-height: 2; overflow-wrap: anywhere; }
+  .btn.text.masked { text-decoration: none; font-size: var(--fs-16); font-weight: 400; color: var(--color-text); padding: var(--sp-0) var(--sp-4); }
+  .speak-ko { margin-top: var(--sp-8); font-size: var(--fs-18); font-weight: 600; }
+  .hint { margin-top: var(--sp-12); min-height: var(--sp-24); font-size: var(--fs-16); }
+  .rating { padding-top: var(--sp-16); border-top: 1px solid var(--color-line); }
+
+  /* 재생 중인 문장·구: 굵기 + 밑줄 */
+  .chunk.now .en, .en-wrap.now .en, .line.now > .line-head .line-no, .btn.text.masked.now { font-weight: 700; text-decoration: underline; }
+  .line.now > .line-head .line-no { color: var(--color-text); }
+
+  #stop { margin-left: auto; }
+  .status-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); }
+  .status-row .msg { flex: 1; margin-top: var(--sp-0); }
+</style>
+</head>
+<body>
+
+<script src="/js/common/appHeader.js"></script>
+<script>MetisAppHeader.inject();</script>
+
+<div class="screen-bar">
+  <a class="screen-bar-back" href="/" aria-label="홈으로">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <h1 class="screen-bar-title">Speak Loop</h1>
+</div>
+
+<main class="content">
+  <p class="msg" id="loading" role="status">불러오는 중입니다…</p>
+  <div id="denied" hidden>
+    <p class="msg">접근 권한이 없습니다. 관리자에게 문의하세요.</p>
+    <a class="btn text" href="/">홈으로</a>
+  </div>
+  <div id="main" hidden>
+    <div class="tabs top-tabs" role="group" aria-label="학습 종류">
+      <button type="button" class="btn text tab" aria-pressed="true">독백 연습</button>
+      <button type="button" class="btn text tab" aria-pressed="false" disabled>이디엄 세션</button>
+      <span class="soon">준비 중</span>
+    </div>
+    <div class="status-row">
+      <p class="msg" id="status" role="status" aria-live="polite"></p>
+      <button type="button" class="btn text" id="stop" hidden>중지</button>
+    </div>
+    <div id="view"></div>
+  </div>
+</main>
+
+<script src="/js/speakloop/core.js"></script>
+<script src="/js/speakloop/player.js"></script>
+<script src="/js/speakloop/app.js"></script>
+</body>
+</html>

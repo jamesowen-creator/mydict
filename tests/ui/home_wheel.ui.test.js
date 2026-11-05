@@ -63,7 +63,7 @@ test('홈 휠: perm_jgrammar=true 는 "일본어 문법"이 언어 사전 바로
 
 test('홈 휠: 관리자(role=admin)는 perm_jgrammar 값이 없어도 "일본어 문법"이 보인다', { skip: SKIP }, async () => {
   const page = await openHome({ role: 'admin' });
-  assert.deepEqual(await cycle(page), WITH_JG);
+  assert.deepEqual(await cycle(page), [...WITH_JG, 'Speak Loop']);   // 작업399: 관리자는 Speak Loop 도 맨 끝에 보인다
   await page.close();
 });
 
