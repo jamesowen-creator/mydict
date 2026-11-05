@@ -106,6 +106,12 @@
   .legend { margin-top: var(--sp-8); font-size: var(--fs-12); color: var(--color-text-sub); }
   .phrase.now .en-line, .phrase.now .pron { font-weight: 700; text-decoration: underline; }
 
+  /* 작업402: 녹음 영역(녹음 버튼은 의미상 박스가 필요한 예외라 채움 버튼) */
+  .rec { margin-top: var(--sp-12); }
+  .rec-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8); }
+  .rec-note { margin-top: var(--sp-8); font-size: var(--fs-11); color: var(--color-text-sub); }
+  .rec .playing { font-weight: 700; color: var(--color-text); text-decoration: underline; text-decoration-thickness: 2px; }
+  .rec .btn.playing { color: var(--color-surface); }
   /* 재생 중인 문장·구: 굵기 + 밑줄 */
   .chunk.now .en, .en-wrap.now .en, .line.now > .line-head .line-no, .btn.text.masked.now { font-weight: 700; text-decoration: underline; }
   .line.now > .line-head .line-no { color: var(--color-text); }
@@ -148,9 +154,10 @@
   </div>
 </main>
 
-<script src="/js/speakloop/core.js?v=101"></script>
-<script src="/js/speakloop/player.js?v=101"></script>
-<script src="/js/speakloop/app.js?v=101"></script>
-<script src="/js/speakloop/idiom.js?v=101"></script>
+<script src="/js/speakloop/core.js?v=102"></script>
+<script src="/js/speakloop/player.js?v=102"></script>
+<script src="/js/speakloop/rec.js?v=102"></script>
+<script src="/js/speakloop/app.js?v=102"></script>
+<script src="/js/speakloop/idiom.js?v=102"></script>
 </body>
 </html>

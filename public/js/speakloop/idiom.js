@@ -79,7 +79,7 @@
     else {
       if (p.review.length) stages.push({ name: '복습', ids: p.review });
       if (p.fresh.length) stages.push({ name: '신규', ids: p.fresh });
-      stages.push({ name: '인출', ids: p.retrieval });
+      if (p.retrieval.length) stages.push({ name: '인출', ids: p.retrieval });   // 작업402: 인출은 이번 세션의 신규만(복습은 1단계에서 한 번 평가)
     }
     state.sess = { stages, si: 0, qi: 0, sub: 'A', learned: 0, good: 0, hard: 0 };
     render();
@@ -106,6 +106,7 @@
     if (s.si >= s.stages.length) return summary();
     const stage = s.stages[s.si], idiom = byId(stage.ids[s.qi]);
     go(h => {
+      h.appendChild(toolbar(btn('세션 끝내기', 'btn text', home)));   // 작업402: 서버에 남은 평가는 유지, 확인 단계 없음
       h.appendChild(stepsRow(stage.name));
       h.appendChild(rateGroup());
       const label = stage.name + ' ' + (s.qi + 1) + '/' + stage.ids.length;
@@ -165,6 +166,7 @@
     h.appendChild(el('p', 'mean', ex.ko));
     h.appendChild(soundBlockOf(ex.chunks, j => chunkKey(idiom, j)));
     h.appendChild(el('p', 'legend', '점 = 강세 음절, / = 끊어 읽기(숨 쉬는 곳), - = 음절, ‿ = 이어서 소리 남, ( ) = 거의 안 들림'));
+    h.appendChild(SLRec.panel(SL, exKey(idiom)));   // 작업402: 인출 카드에는 붙이지 않는다
     const tools = el('div', 'toolbar');
     tools.appendChild(playBtn(exKey(idiom), '문장 재생', 'btn text'));
     const keys = ex.chunks.map((c, j) => chunkKey(idiom, j));

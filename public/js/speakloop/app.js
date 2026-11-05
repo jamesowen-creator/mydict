@@ -41,19 +41,21 @@
     document.querySelectorAll('[data-key]').forEach(n => n.classList.toggle('now', set.has(n.dataset.key)));
   }
   function setBusy(b) { S.busy = b; $('stop').hidden = !b; if (!b) setNow([]); }
-  function stopAll() { P.stop(); setBusy(false); setStatus(''); }
+  function stopAll() { SLRec.stop(); P.stop(); setBusy(false); setStatus(''); }
+  // 새 재생을 시작하기 전에 녹음 중이면 정지한다(녹음분은 보관)
+  const begin = () => { SLRec.stop(); return P.begin(); };
   const ck = (m, i, j) => m.id + '.l' + i + (j === undefined ? '' : '.c' + j);
 
   async function playOne(key) {
     if (!P.has(key)) return;
-    const g = P.begin();
+    const g = begin();
     setBusy(true); setNow([key]); setStatus('');
     const ok = await P.play(key, g);
     if (P.alive(g)) { setBusy(false); if (!ok) setStatus('음성을 재생하지 못했습니다.', true); }
   }
   // 단계 목록을 순서대로 실행한다. 새 재생·중지·화면 이동이면 즉시 끝난다
   async function runSteps(steps, getKeys) {
-    const g = P.begin();
+    const g = begin();
     setBusy(true);
     let ok = true;
     for (const st of steps) {
@@ -93,7 +95,7 @@
   async function listenAll() {
     const keys = S.mono.lines.map((l, i) => ck(S.mono, i)).filter(P.has);
     if (!keys.length) return;
-    const g = P.begin(); setBusy(true);
+    const g = begin(); setBusy(true);
     let ok = true;
     for (let n = 0; n < keys.length && ok; n++) {
       if (n > 0) { setNow([]); ok = await P.wait(1.0, g); }
@@ -199,6 +201,7 @@
     sec.appendChild(el('p', 'line-ko', l.ko));
     sec.appendChild(soundBlock(m, i));
     sec.appendChild(el('p', 'legend', '점 = 강세 음절, / = 끊어 읽기(숨 쉬는 곳), - = 음절, ‿ = 이어서 소리 남, ( ) = 거의 안 들림'));
+    sec.appendChild(SLRec.panel(window.SL, ck(m, i)));   // 작업402: 내 소리 녹음 · 원음과 번갈아 듣기
     l.chunks.forEach((c, j) => sec.appendChild(chunkRow(m, i, j)));
     const tools = el('div', 'toolbar');
     const allChunks = l.chunks.every((c, j) => P.has(ck(m, i, j))), hasSent = P.has(ck(m, i));
@@ -272,6 +275,7 @@
       renderDetail();
     }));
     sec.appendChild(tools);
+    sec.appendChild(SLRec.panel(window.SL, ck(m, i)));   // 작업402: (a)·(b) 모두, (b)는 [확인] 전에도
     sec.appendChild(el('p', 'note', '끝낸 문장 ' + S.done.size + ' / ' + m.lines.length));
     host.appendChild(sec);
     if (S.done.size === m.lines.length) host.appendChild(ratingArea());
@@ -392,7 +396,7 @@
     renderList();
   }
   // 작업401: 이디엄 세션 모듈(idiom.js)이 쓰는 공용 도구
-  window.SL = { S, P, el, btn, tabGroup, setStatus, setNow, stopAll, playOne, buildupKeys, soundBlockOf, authHeaders, RATES, NO_AUDIO, idiom: null };
+  window.SL = { S, P, begin, setBusy, el, btn, tabGroup, setStatus, setNow, stopAll, playOne, buildupKeys, soundBlockOf, authHeaders, RATES, NO_AUDIO, idiom: null };
   // 학습 종류 탭: 바꾸면 재생 중인 음성·쌓아가기·타이머를 모두 멈추고, 세션 진행 상태는 버린다
   function showTab(t) {
     if (!S.content || S.tab === t) return;

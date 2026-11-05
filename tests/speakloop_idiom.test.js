@@ -32,13 +32,14 @@ test('받아쓰기 비교: 놓친 단어는 정답의 표시 단위로 표시하
 
 const ids = Array.from({ length: 20 }, (_, i) => 'i' + i);
 const rows = o => Object.fromEntries(Object.entries(o).map(([id, r]) => [id, { count: 1, last_rating: r }]));
-test('세션 구성: 복습 = 마지막 평가 hard, 신규 = 기록 없음 중 콘텐츠 순서 최대 5, 인출 = 복습+신규(섞음)', () => {
+test('세션 구성: 복습 = 마지막 평가 hard, 신규 = 기록 없음 중 콘텐츠 순서 최대 5, 인출 = 이번 세션의 신규만(섞음, 복습은 제외)', () => {
   const p = C.sessionPlan(ids, rows({ i0: 'some', i1: 'hard', i2: 'good', i3: 'hard' }));
   assert.deepEqual(p.review, ['i1', 'i3']);
   assert.deepEqual(p.fresh, ['i4', 'i5', 'i6', 'i7', 'i8']);
   assert.equal(p.learned, 4);
-  assert.deepEqual([...p.retrieval].sort(), [...p.review, ...p.fresh].sort());
-  assert.equal(p.retrieval.length, 7);
+  assert.deepEqual([...p.retrieval].sort(), [...p.fresh].sort(), '작업402: 복습 대상은 인출에 넣지 않는다');
+  assert.ok(p.review.every(id => !p.retrieval.includes(id)));
+  assert.equal(p.retrieval.length, 5);
 });
 test('세션 구성: 섞는 순서는 주어진 난수에 따르고 항목은 바뀌지 않는다. 기록이 count 0 이면 신규', () => {
   const a = C.sessionPlan(ids, {}, () => 0), b = C.sessionPlan(ids, {}, () => 0.999);

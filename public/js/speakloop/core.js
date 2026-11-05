@@ -134,7 +134,7 @@
     var review = ids.filter(function (id) { return st(id) === 'hard'; });
     var fresh = ids.filter(function (id) { return st(id) === 'new'; }).slice(0, NEW_MAX);
     var learned = ids.filter(function (id) { return st(id) !== 'new'; });
-    return { review: review, fresh: fresh, learned: learned.length, retrieval: shuffle(review.concat(fresh), rng), practice: shuffle(learned, rng).slice(0, PRACTICE_MAX) };
+    return { review: review, fresh: fresh, learned: learned.length, retrieval: shuffle(fresh, rng), /* 작업402: 인출은 이번 세션의 신규만 */ practice: shuffle(learned, rng).slice(0, PRACTICE_MAX) };
   }
 
   var RATING_TEXT = { good: '막힘없음', some: '몇 군데 막힘', hard: '많이 막힘' };

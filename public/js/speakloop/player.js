@@ -92,19 +92,29 @@
       if (myGen !== gen) return Promise.resolve(false);
       return fetchClip(key).then(function (c) {
         if (!c || myGen !== gen) return false;
-        endCurrent();
-        return new Promise(function (resolve) {
-          var a = new window.Audio(c.url);
-          a.playbackRate = P.rate;
-          current = a;
-          wake = resolve;
-          var fin = function (ok) { if (current === a) { current = null; wake = null; } resolve(ok); };
-          a.addEventListener('ended', function () { fin(true); });
-          a.addEventListener('error', function () { fin(false); });
-          var pr = a.play();
-          if (pr && pr.catch) pr.catch(function () { fin(false); });
-        });
+        return playUrl(c.url, P.rate, myGen);
       }, function () { return false; });
+    };
+
+    // Blob URL(내 녹음 등)을 재생. rate 를 직접 정한다(내 소리는 1.0). 한 번에 하나만 재생하는 규칙은 같다
+    function playUrl(url, rate, myGen) {
+      endCurrent();
+      return new Promise(function (resolve) {
+        var a = new window.Audio(url);
+        a.playbackRate = rate;
+        current = a;
+        wake = resolve;
+        var fin = function (ok) { if (current === a) { current = null; wake = null; } resolve(ok); };
+        a.addEventListener('ended', function () { fin(true); });
+        a.addEventListener('error', function () { fin(false); });
+        var pr = a.play();
+        if (pr && pr.catch) pr.catch(function () { fin(false); });
+      });
+    }
+    P.playUrl = function (url, rate, myGen) {
+      if (myGen === undefined) { P.stop(); myGen = gen; }
+      if (myGen !== gen) return Promise.resolve(false);
+      return playUrl(url, rate || 1, myGen);
     };
 
     // 취소할 수 있는 대기(초)

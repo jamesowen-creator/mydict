@@ -77,8 +77,23 @@ const FAKE_AUDIO = `(() => {
     const blob = await r.blob(); blob.__key = decodeURIComponent(m[1]);
     return { ok: r.ok, status: r.status, blob: async () => blob };
   };
-  URL.createObjectURL = b => 'fake:' + b.__key;
-  URL.revokeObjectURL = () => {};
+  window.__rec = { gum: 0, stops: 0, mimes: [], recN: 0, revoked: [], sent: [], ls: [] };
+  URL.createObjectURL = b => b.__key ? 'fake:' + b.__key : 'fake:rec' + (++window.__rec.recN);
+  URL.revokeObjectURL = u => window.__rec.revoked.push(u);
+  // 녹음 데이터가 어디로도 나가지 않는지 지켜본다(Blob·FormData 본문 fetch, XHR, sendBeacon, 저장소 쓰기)
+  const f2 = window.fetch;
+  window.fetch = (u, o) => { if (o && o.body && typeof o.body !== 'string') window.__rec.sent.push('fetch'); return f2(u, o); };
+  XMLHttpRequest.prototype.send = function () { window.__rec.sent.push('xhr'); };
+  navigator.sendBeacon = () => { window.__rec.sent.push('beacon'); return true; };
+  const si = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { window.__rec.ls.push(k); return si.call(this, k, v); };
+  const st = window.setTimeout; window.setTimeout = (f, d, ...a) => st(f, d === 30000 ? 300 : d, ...a);   // 30초 자동 정지를 0.3초로 줄인 가짜 타이머
+  navigator.mediaDevices.getUserMedia = async () => { window.__rec.gum++; if (window.__deny) throw Object.assign(new Error('x'), { name: 'NotAllowedError' }); return { getTracks: () => [{ stop: () => window.__rec.stops++ }] }; };
+  window.MediaRecorder = class {
+    static isTypeSupported(m) { window.__rec.mimes.push(m); return m === 'audio/mp4'; }
+    constructor(stream, opt) { this.mimeType = (opt && opt.mimeType) || 'audio/webm'; }
+    start() {}
+    stop() { setTimeout(() => { this.ondataavailable && this.ondataavailable({ data: new Blob(['x'], { type: this.mimeType }) }); this.onstop && this.onstop(); }, 0); }
+  };
   window.Audio = class {
     constructor(src) { this.L = {}; this.playbackRate = 1; if (src) this.src = src; }
     set src(v) { this._src = v; setTimeout(() => this.emit('loadedmetadata'), 0); }
@@ -86,14 +101,14 @@ const FAKE_AUDIO = `(() => {
     get duration() { return /\\.c\\d+$/.test(this._src || '') ? 0.05 : 0.1; }
     addEventListener(n, f) { (this.L[n] = this.L[n] || []).push(f); }
     emit(n) { (this.L[n] || []).forEach(f => f()); }
-    play() { window.__plays.push({ key: this._src.slice(5), rate: this.playbackRate }); this.t = setTimeout(() => this.emit('ended'), this.duration * 1000); return Promise.resolve(); }
+    play() { window.__plays.push({ key: this._src.slice(5), rate: this.playbackRate, t: performance.now() }); this.t = setTimeout(() => this.emit('ended'), this.duration * 1000); return Promise.resolve(); }
     pause() { clearTimeout(this.t); }
   };
 })();`;
 
-async function open({ width = 390 } = {}) {
+async function open({ width = 390, init = '' } = {}) {
   const page = await browser.newPage({ width, height: 844 });
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: FAKE_AUDIO });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: FAKE_AUDIO + init });
   await page.goto(base + '/speakloop.html');
   return page;
 }
@@ -511,24 +526,23 @@ test('세션 전체 흐름: 복습 → 신규(A 받아쓰기 → B → C) → �
   await page.eval("document.getElementById('say-counter').click(); document.getElementById('say-counter').click()");
   assert.equal(await text(page, '#say-counter'), '통째로 말했어요 (2)');
   await clickText(page, '이 표현 완료');
-  // 3 인출 (복습 1 + 신규 1)
-  await page.waitFor("/인출 1\\/2/.test(document.querySelector('.progress').textContent)", 4000);
+  // 3 인출 (작업402: 이번 세션의 신규만 — 복습 이디엄은 1단계에서 한 번만 기록)
+  await page.waitFor("document.querySelector('.progress').textContent === '인출 1/1'", 4000);
   assert.deepEqual(state.posts[1], { item_id: fresh.id, rating: 'some' });
-  for (let k = 0; k < 2; k++) {
-    await page.waitFor("!!document.querySelector('.retrieval') && !document.querySelector('[data-rating]')", 3000);
-    await clickText(page, '정답 보기');
-    await page.click('[data-rating=good]');
-    await page.waitFor(k === 0 ? "/인출 2\\/2/.test(document.querySelector('.progress').textContent)" : "/세션을 마쳤어요/.test(document.getElementById('view').innerText)", 4000);
-  }
+  await page.waitFor("!!document.querySelector('.retrieval') && !document.querySelector('[data-rating]')", 3000);
+  assert.ok((await view(page)).includes(fresh.situ), '인출 카드는 신규 이디엄');
+  assert.equal(await page.count('.rec'), 0, '인출 카드에는 녹음 영역이 없다');
+  await clickText(page, '정답 보기');
+  assert.equal(await page.count('.rec'), 0);
+  await page.click('[data-rating=good]');
+  await page.waitFor("/세션을 마쳤어요/.test(document.getElementById('view').innerText)", 4000);
   const v = await view(page);
   assert.match(v, /신규 1개 학습/);
-  assert.match(v, /인출 바로 말함 2 \/ 막힘 0/);
-  assert.equal(state.posts.length, 4);
-  assert.deepEqual(state.posts.slice(2).map(p => p.rating), ['good', 'good']);
-  assert.deepEqual(state.posts.slice(2).map(p => p.item_id).sort(), [rev.id, fresh.id].sort());
+  assert.match(v, /인출 바로 말함 1 \/ 막힘 0/);
+  assert.deepEqual(state.posts, [{ item_id: rev.id, rating: 'hard' }, { item_id: fresh.id, rating: 'some' }, { item_id: fresh.id, rating: 'good' }], '복습 이디엄은 한 번만 기록');
   await clickText(page, '처음으로');
   await page.waitFor("!!document.querySelector('.stats')", 3000);
-  assert.match(await view(page), /모든 표현을 한 번씩 배웠습니다/);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('.stat')].map(r => r.textContent)"), ['복습 대상1개', '오늘 신규0개', '이미 배운 표현20개'], '복습(hard)은 다음 세션 대상으로 남는다');
   await page.close();
 });
 
@@ -621,4 +635,240 @@ test('이디엄 화면 390px·1280px: 가로 스크롤 없음, 버튼 ≥44px, �
     await page.eval("document.querySelectorAll('.item')[3].click()"); await page.waitFor("!!document.querySelector('.sound')", 3000); await check('상세');
     await page.close();
   }
+});
+
+// ───── 작업402: 녹음 · 원음과 번갈아 듣기 · 세션 끝내기 ─────
+const recInfo = page => page.eval('JSON.parse(JSON.stringify(window.__rec))');
+const recBtn = (page, act) => page.eval(`(() => { const b = document.querySelector('.rec [data-act=${act}]'); if (!b) return false; b.click(); return true; })()`);
+const recMsg = page => page.eval("document.querySelector('.rec .msg').textContent");
+async function toTrain(page, n = 2) {
+  await enter(page, '프로젝트가 미뤄진 이유');
+  await clickText(page, '문장 훈련');
+  await clickText(page, String(n));
+}
+
+test('녹음 영역: 문장 훈련에 있고(소리 표기 블록 아래), 녹음 → 정지 → 내 소리·원음·번갈아 듣기가 동작한다', { skip: SKIP }, async () => {
+  const page = await open();
+  await ready(page);
+  await toTrain(page, 2);   // 키 m-delay.l1
+  assert.equal(await page.count('.rec'), 1);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('.rec button')].map(b => b.textContent + ':' + b.className.split(' ')[0])"), ['녹음:btn', '내 소리:btn', '원음:btn', '번갈아 듣기:btn'], '버튼 순서');
+  assert.equal(await page.eval("(() => { const r = document.querySelector('.rec'); return !!(document.querySelector('.sound').compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING); })()"), true, '소리 표기 블록 아래');
+  assert.equal(await text(page, '.rec-note'), '녹음은 이 기기에서만 재생되며 저장되거나 전송되지 않습니다.');
+  assert.equal((await recInfo(page)).gum, 0, '불러오기만 해서는 마이크 요청 없음');
+  // 녹음이 없을 때
+  await recBtn(page, 'mine'); assert.equal(await recMsg(page), '먼저 녹음하세요');
+  await recBtn(page, 'alt'); assert.equal(await recMsg(page), '먼저 녹음하세요');
+  assert.equal((await plays(page)).length, 0);
+  // 녹음
+  await recBtn(page, 'record');
+  await page.waitFor("/^정지 0:0\\d$/.test(document.querySelector('.rec [data-act=record]').textContent)", 3000);
+  let r = await recInfo(page);
+  assert.equal(r.gum, 1);
+  assert.deepEqual(r.mimes, ['audio/webm;codecs=opus', 'audio/mp4'], '형식 선택 순서');
+  assert.equal(await page.eval("document.querySelector('.rec [data-act=record]').getAttribute('aria-pressed')"), 'true');
+  await recBtn(page, 'record');   // 정지
+  await page.waitFor("document.querySelector('.rec [data-act=record]').textContent === '녹음'", 3000);
+  r = await recInfo(page);
+  assert.equal(r.stops, 1, '트랙을 끈다');
+  // 내 소리: 원래 속도
+  await clickText(page, '느리게');
+  await page.waitFor("!!document.querySelector('.rec')", 2000);
+  await recBtn(page, 'record'); await sleep(100); await recBtn(page, 'record');   // 속도를 바꾸면 화면이 다시 그려지므로 녹음을 다시 만든다
+  await page.waitFor("window.__rec.recN === 2 && window.__rec.stops === 2", 3000);
+  await recBtn(page, 'mine');
+  await page.waitFor("window.__plays.length === 1", 3000);
+  assert.deepEqual(await page.eval('window.__plays.map(p => [p.key, p.rate])'), [['rec2', 1]], '내 소리는 항상 1.0');
+  // 원음: 선택한 속도(0.8)
+  await sleep(250);
+  await recBtn(page, 'orig');
+  await page.waitFor("window.__plays.length === 2", 3000);
+  assert.deepEqual(await page.eval('[window.__plays[1].key, window.__plays[1].rate]'), ['m-delay.l1', 0.8]);
+  // 번갈아 듣기: 원음 → 0.5초 → 내 소리
+  await sleep(300);
+  await page.eval('window.__plays.length = 0');
+  await recBtn(page, 'alt');
+  await page.waitFor("window.__plays.length === 2", 4000);
+  const alt = await page.eval('window.__plays.map(p => ({ k: p.key, r: p.rate, t: p.t }))');
+  assert.deepEqual([alt[0].k, alt[0].r, alt[1].k, alt[1].r], ['m-delay.l1', 0.8, 'rec2', 1]);
+  assert.ok(alt[1].t - alt[0].t >= 540, '원음이 끝난 뒤 0.5초 쉼: ' + (alt[1].t - alt[0].t));
+  await page.waitFor("!document.querySelector('.rec .playing')", 3000);
+  // 번갈아 듣기 중 굵기+밑줄 표시와 다시 누르면 즉시 중지
+  await recBtn(page, 'alt');
+  await page.waitFor("!!document.querySelector('.rec [data-act=alt].playing')", 2000);
+  assert.equal(await page.eval("(() => { const c = getComputedStyle(document.querySelector('.rec [data-act=alt]')); return c.fontWeight + ':' + c.textDecorationLine; })()"), '700:underline');
+  await recBtn(page, 'alt');
+  const n = (await plays(page)).length;
+  await sleep(800);
+  assert.equal((await plays(page)).length, n, '다시 누르면 중지');
+  assert.equal(await page.count('.rec .playing'), 0);
+  // 같은 키 재녹음: 이전 URL 해제
+  await recBtn(page, 'record'); await sleep(80); await recBtn(page, 'record');
+  await page.waitFor("window.__rec.recN === 3", 3000);
+  assert.deepEqual((await recInfo(page)).revoked, ['fake:rec1', 'fake:rec2'], '재녹음마다 이전 URL 해제');
+  // 전송·저장 없음
+  r = await recInfo(page);
+  assert.deepEqual(r.sent, []);
+  assert.deepEqual(r.ls.filter(k => k !== 'mydict_token'), []);
+  assert.equal(state.audioRequests.filter(k => !ALL_KEYS.includes(k)).length, 0);
+  await page.close();
+});
+
+test('녹음 시작은 재생·쌓아가기를 멈추고, 녹음 중 다른 재생·모드 전환은 녹음을 정지(녹음분 보관)한다. 30초 자동 정지(가짜 타이머 0.3초)', { skip: SKIP }, async () => {
+  const page = await open();
+  await ready(page);
+  await toTrain(page, 2);
+  await clickText(page, '쌓아가기');
+  await page.waitFor("window.__plays.length >= 1 && !document.getElementById('stop').hidden", 5000);
+  await recBtn(page, 'record');
+  await page.waitFor("/^정지/.test(document.querySelector('.rec [data-act=record]').textContent)", 3000);
+  const n = (await plays(page)).length;
+  assert.equal(await page.eval("document.getElementById('stop').hidden"), true, '녹음을 시작하면 쌓아가기가 멈춘다');
+  await sleep(600);
+  assert.equal((await plays(page)).length, n);
+  // 녹음 중 다른 재생을 누르면 녹음 정지, 녹음분은 남는다
+  await page.eval("document.querySelector('.chunk[data-key=\"m-delay.l1.c0\"] button').click()");
+  await page.waitFor("window.__rec.recN === 1", 3000);
+  assert.equal(await page.eval("document.querySelector('.rec [data-act=record]').textContent"), '녹음');
+  // 모드 전환도 정지
+  await recBtn(page, 'record');
+  await page.waitFor("/^정지/.test(document.querySelector('.rec [data-act=record]').textContent)", 3000);
+  await clickText(page, '외우기');
+  await page.waitFor("window.__rec.recN === 2", 3000);
+  // 자동 정지
+  await clickText(page, '통째로 말하기');
+  await recBtn(page, 'record');
+  await page.waitFor("/^정지/.test(document.querySelector('.rec [data-act=record]').textContent)", 3000);
+  await page.waitFor("window.__rec.recN === 3", 3000);
+  assert.equal(await page.eval("document.querySelector('.rec [data-act=record]').textContent"), '녹음');
+  await page.close();
+});
+
+test('녹음 영역은 통째로 말하기 (a)(b) 모두, 이디엄 C 예문과 표현 목록 상세에 있고 인출 카드·듣고 이해·외우기에는 없다', { skip: SKIP }, async () => {
+  seedOneEach();
+  const page = await open();
+  await ready(page);
+  await enter(page, '프로젝트가 미뤄진 이유');
+  await clickText(page, '듣고 이해'); assert.equal(await page.count('.rec'), 0);
+  await clickText(page, '외우기'); assert.equal(await page.count('.rec'), 0);
+  await clickText(page, '통째로 말하기');
+  assert.equal(await page.count('.rec'), 1, '(a) 듣고 따라 말하기');
+  await clickText(page, '먼저 말하기');
+  assert.equal(await page.count('.rec'), 1, '(b) 확인 전에도');
+  await recBtn(page, 'orig');
+  await page.waitFor("window.__plays.length === 1", 3000);
+  assert.equal((await plays(page))[0], 'm-delay.l0', '현재 문장의 원음(음성 있는 문장)');
+  await goIdiom(page);
+  await clickText(page, '세션 시작');   // 복습(인출 카드)
+  await page.waitFor("!!document.querySelector('.retrieval')", 3000);
+  assert.equal(await page.count('.rec'), 0, '인출 카드(공개 전)');
+  await clickText(page, '정답 보기');
+  assert.equal(await page.count('.rec'), 0, '인출 카드(공개 후)');
+  await page.click('[data-rating=good]');
+  await page.waitFor("/A 받아쓰기/.test(document.getElementById('view').innerText)", 4000);
+  assert.equal(await page.count('.rec'), 0, 'A');
+  await page.setValue('#dict-in', 'x'); await clickText(page, '확인'); await clickText(page, '다음');
+  await page.waitFor("/B 소리/.test(document.getElementById('view').innerText)", 3000);
+  assert.equal(await page.count('.rec'), 0, 'B');
+  await clickText(page, '다음');
+  await page.waitFor("/C 예문/.test(document.getElementById('view').innerText)", 3000);
+  assert.equal(await page.count('.rec'), 1, 'C');
+  await page.eval('window.__plays.length = 0');
+  await recBtn(page, 'orig');
+  await page.waitFor("window.__plays.length === 1", 3000);
+  assert.equal((await plays(page))[0], IDI[1].id + '.ex', '이디엄 예문 키');
+  await page.eval("document.querySelector('.top-tabs [data-tab=mono]').click()");
+  await goIdiom(page);
+  await clickText(page, '표현 목록');
+  await page.eval("document.querySelectorAll('.item')[2].click()");
+  await page.waitFor("!!document.querySelector('.sound')", 3000);
+  assert.equal(await page.count('.rec'), 1, '표현 목록 상세');
+  await page.close();
+});
+
+test('마이크 사용 불가(지원 안 됨·권한 거부): 안내 글자만 보이고 나머지 학습 기능은 그대로 동작한다', { skip: SKIP }, async () => {
+  const MSG = '마이크를 사용할 수 없습니다. 브라우저 설정에서 마이크 권한을 확인하세요.';
+  let page = await open({ init: 'delete window.MediaRecorder;' });
+  await ready(page);
+  await toTrain(page, 2);
+  await recBtn(page, 'record');
+  await page.waitFor("document.querySelector('.rec .msg').textContent.length > 0", 3000);
+  assert.equal(await recMsg(page), MSG);
+  assert.equal(await page.eval("document.querySelector('.rec [data-act=record]').textContent"), '녹음');
+  await recBtn(page, 'orig');
+  await page.waitFor("window.__plays.length === 1", 3000);   // 원음 재생은 그대로
+  await page.close();
+  page = await open({ init: 'window.__deny = true;' });
+  await ready(page);
+  await toTrain(page, 2);
+  await recBtn(page, 'record');
+  await page.waitFor("document.querySelector('.rec .msg').textContent.length > 0", 3000);
+  assert.equal(await recMsg(page), MSG);
+  assert.equal((await recInfo(page)).gum, 1);
+  await clickText(page, '쌓아가기');
+  await page.waitFor("window.__plays.length >= 11", 10000);
+  await page.close();
+});
+
+test('원음이 없는 문장은 녹음 영역에도 "원음: 음성 없음" 글자만 보이고 [번갈아 듣기]는 안내한다', { skip: SKIP }, async () => {
+  state.noIndex = true;
+  const page = await open();
+  await ready(page);
+  await toTrain(page, 1);
+  assert.equal(await page.eval("document.querySelector('.rec .noaudio').textContent"), '원음: 음성 없음');
+  assert.equal(await page.eval("!!document.querySelector('.rec [data-act=orig]') && document.querySelector('.rec [data-act=orig]').tagName"), 'SPAN');
+  await recBtn(page, 'record'); await sleep(80); await recBtn(page, 'record');
+  await page.waitFor("window.__rec.recN === 1", 3000);
+  await recBtn(page, 'alt');
+  assert.equal(await recMsg(page), '음성 없음');
+  assert.equal((await plays(page)).length, 0);
+  await page.close();
+});
+
+test('세션 끝내기: 복습·신규·인출 어디서든 재생·타이머를 멈추고 세션 안내로 돌아간다(이미 기록된 평가는 유지)', { skip: SKIP }, async () => {
+  seedOneEach();
+  const page = await open();
+  await ready(page);
+  await goIdiom(page);
+  await clickText(page, '세션 시작');
+  await page.waitFor("!!document.querySelector('#countdown')", 3000);
+  assert.equal(await page.eval("document.querySelector('#view .btn.text').textContent"), '세션 끝내기', '상단 텍스트 버튼');
+  await clickText(page, '세션 끝내기');
+  await page.waitFor("!!document.querySelector('.stats')", 3000);
+  assert.equal(await page.count('#countdown'), 0);
+  await sleep(1300);
+  assert.equal(await page.count('.retrieval'), 0, '타이머가 멈췄다(정답이 저절로 열리지 않는다)');
+  assert.equal(state.posts.length, 0);
+  // 복습 평가 후 신규 C 에서 쌓아가기 재생 중 끝내기
+  await clickText(page, '세션 시작');
+  await clickText(page, '정답 보기');
+  await page.click('[data-rating=hard]');
+  await page.waitFor("/A 받아쓰기/.test(document.getElementById('view').innerText)", 4000);
+  await page.setValue('#dict-in', 'x'); await clickText(page, '확인'); await clickText(page, '다음');
+  await page.waitFor("/B 소리/.test(document.getElementById('view').innerText)", 3000);
+  await clickText(page, '다음');
+  await page.waitFor("/C 예문/.test(document.getElementById('view').innerText)", 3000);
+  await page.eval('window.__plays.length = 0');
+  await clickText(page, '쌓아가기');
+  await page.waitFor("window.__plays.length >= 1 && !document.getElementById('stop').hidden", 5000);
+  await clickText(page, '세션 끝내기');
+  await page.waitFor("!!document.querySelector('.stats')", 3000);
+  const n = (await plays(page)).length;
+  await sleep(800);
+  assert.equal((await plays(page)).length, n, '재생이 멈췄다');
+  assert.equal(await page.eval("document.getElementById('stop').hidden"), true);
+  assert.deepEqual(state.posts, [{ item_id: IDI[0].id, rating: 'hard' }], '이미 기록된 평가는 그대로');
+  // 인출에서 끝내기
+  await clickText(page, '세션 시작');
+  await clickText(page, '정답 보기'); await page.click('[data-rating=hard]');
+  await page.waitFor("/A 받아쓰기/.test(document.getElementById('view').innerText)", 4000);
+  await page.setValue('#dict-in', 'x'); await clickText(page, '확인'); await clickText(page, '다음');
+  await clickText(page, '다음');
+  await page.waitFor("/C 예문/.test(document.getElementById('view').innerText)", 3000);
+  await clickText(page, '이 표현 완료');
+  await page.waitFor("document.querySelector('.progress').textContent === '인출 1/1'", 4000);
+  assert.equal(await page.eval("document.querySelector('.step[aria-current]').textContent"), '3 인출');
+  await clickText(page, '세션 끝내기');
+  await page.waitFor("!!document.querySelector('.stats')", 3000);
+  await page.close();
 });
