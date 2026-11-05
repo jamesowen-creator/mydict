@@ -74,6 +74,19 @@
   .hint { margin-top: var(--sp-12); min-height: var(--sp-24); font-size: var(--fs-16); }
   .rating { padding-top: var(--sp-16); border-top: 1px solid var(--color-line); }
 
+  /* 작업400: 소리 표기 블록(문장 훈련). 구마다 위 영어 18px · 아래 소리 표기 13px, 구 사이 "/", 강세 음절 위 작은 원형 점 */
+  .sound { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-4) var(--sp-8); margin-top: var(--sp-12); padding-top: var(--sp-8); }
+  .phrase { display: flex; flex-direction: column; align-items: flex-start; min-height: var(--ctl-min-h); max-width: 100%; padding: var(--sp-4) var(--sp-0); font: inherit; color: var(--color-text); background: none; border: 0; text-align: left; cursor: pointer; }
+  .phrase.off { cursor: default; }
+  .en-line { font-size: var(--fs-18); line-height: 1.6; overflow-wrap: anywhere; }
+  .stressed { position: relative; font-weight: 600; color: var(--color-accent-ink); }
+  .dot { position: absolute; top: 0; left: 50%; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--color-accent); }
+  .pron { font-size: var(--fs-13); color: var(--color-text-sub); overflow-wrap: anywhere; }
+  .slash { align-self: flex-start; padding-top: var(--sp-8); font-size: var(--fs-18); color: var(--color-text-sub); }
+  .arrow.end { align-self: flex-start; padding-top: var(--sp-8); font-size: var(--fs-18); }
+  .legend { margin-top: var(--sp-8); font-size: var(--fs-12); color: var(--color-text-sub); }
+  .phrase.now .en-line, .phrase.now .pron { font-weight: 700; text-decoration: underline; }
+
   /* 재생 중인 문장·구: 굵기 + 밑줄 */
   .chunk.now .en, .en-wrap.now .en, .line.now > .line-head .line-no, .btn.text.masked.now { font-weight: 700; text-decoration: underline; }
   .line.now > .line-head .line-no { color: var(--color-text); }
@@ -117,8 +130,8 @@
   </div>
 </main>
 
-<script src="/js/speakloop/core.js"></script>
-<script src="/js/speakloop/player.js"></script>
-<script src="/js/speakloop/app.js"></script>
+<script src="/js/speakloop/core.js?v=100"></script>
+<script src="/js/speakloop/player.js?v=100"></script>
+<script src="/js/speakloop/app.js?v=100"></script>
 </body>
 </html>

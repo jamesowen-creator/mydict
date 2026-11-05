@@ -150,23 +150,62 @@
     });
   }
 
+  // 작업400: 소리 표기 블록 — 구마다 위(영어+강세 점)·아래(소리 표기 p), 구 사이 "/", 끝에 억양 화살표. 구 전체가 재생 버튼
+  function stressEn(c) {
+    const wrap = el('span', 'en-line');
+    Core.stressWords(c.en, c.st).forEach((w, n) => {
+      if (n) wrap.appendChild(document.createTextNode(' '));
+      const word = el('span', 'w');
+      let at = 0;
+      w.ranges.forEach(r => {
+        if (r[0] > at) word.appendChild(document.createTextNode(w.text.slice(at, r[0])));
+        const seg = el('span', 'stressed', w.text.slice(r[0], r[1]));
+        const dot = el('span', 'dot'); dot.setAttribute('aria-hidden', 'true');
+        seg.appendChild(dot);
+        word.appendChild(seg);
+        at = r[1];
+      });
+      if (at < w.text.length) word.appendChild(document.createTextNode(w.text.slice(at)));
+      wrap.appendChild(word);
+    });
+    return wrap;
+  }
+  function soundBlock(m, i) {
+    const l = m.lines[i], box = el('div', 'sound');
+    l.chunks.forEach((c, j) => {
+      if (j) { const sep = el('span', 'slash', '/'); sep.setAttribute('aria-hidden', 'true'); box.appendChild(sep); }
+      const key = ck(m, i, j);
+      const inner = [stressEn(c), el('span', 'pron', c.p)];
+      if (!P.has(key)) {
+        const cell = el('span', 'phrase off'); cell.dataset.key = key;
+        inner.forEach(n => cell.appendChild(n));
+        cell.appendChild(el('span', 'noaudio', NO_AUDIO));
+        box.appendChild(cell);
+        return;
+      }
+      const b = el('button', 'phrase'); b.type = 'button'; b.dataset.key = key; b.setAttribute('aria-label', '구 재생: ' + c.en);
+      inner.forEach(n => b.appendChild(n));
+      b.addEventListener('click', () => playOne(key));
+      box.appendChild(b);
+    });
+    const a = Core.arrowOf(l.chunks[l.chunks.length - 1].en);
+    if (a) { const ar = el('span', 'arrow end', a); ar.setAttribute('aria-hidden', 'true'); box.appendChild(ar); }
+    return box;
+  }
+
   function viewTrain(host) {
     const m = S.mono, i = S.sent, l = m.lines[i];
     const sec = el('section', 'line');
     sec.appendChild(el('p', 'line-ko', l.ko));
-    l.chunks.forEach((c, j) => sec.appendChild(chunkRow(m, i, j, (txt, ch) => {
-      const st = el('div', 'stress'); st.appendChild(document.createTextNode('강세 ')); st.appendChild(el('span', 'st', ch.st)); txt.appendChild(st);
-    })));
+    sec.appendChild(soundBlock(m, i));
+    sec.appendChild(el('p', 'legend', '점 = 강세 음절, / = 끊어 읽기(숨 쉬는 곳), - = 음절, ‿ = 이어서 소리 남, ( ) = 거의 안 들림'));
+    l.chunks.forEach((c, j) => sec.appendChild(chunkRow(m, i, j)));
     const tools = el('div', 'toolbar');
     const allChunks = l.chunks.every((c, j) => P.has(ck(m, i, j))), hasSent = P.has(ck(m, i));
     tools.appendChild(hasSent ? btn('문장 재생', 'btn text', () => playOne(ck(m, i))) : el('span', 'noaudio', '문장 재생: ' + NO_AUDIO));
     tools.appendChild(allChunks && hasSent ? btn('쌓아가기', 'btn', () => buildup(i)) : el('span', 'noaudio', '쌓아가기: ' + NO_AUDIO));
     tools.appendChild(hasSent ? btn('문장 전체 3회 반복 쉐도잉', 'btn', () => shadow(i)) : el('span', 'noaudio', '쉐도잉: ' + NO_AUDIO));
     sec.appendChild(tools);
-    if ((l.links || []).length) {
-      sec.appendChild(el('h3', 'sub-title', '연음'));
-      l.links.forEach(p => { const d = el('p', 'idiom'); d.appendChild(el('strong', null, p[0])); d.appendChild(document.createTextNode(' → ' + p[1])); sec.appendChild(d); });
-    }
     sec.appendChild(el('p', 'note', '발음 표기·강세는 참고용입니다(검수 전)'));
     host.appendChild(sec);
   }

@@ -211,7 +211,8 @@ test('문장 훈련: 쌓아가기가 구1, 구1+2, … 순서로 재생되고 �
   await clickText(page, '문장 훈련');
   await clickText(page, '2');   // 2번 문장(구 4개, 모두 음성 있음)
   assert.match(await page.text('.note'), /발음 표기·강세는 참고용입니다\(검수 전\)/);
-  assert.ok((await page.count('.stress')) === 4 && (await page.count('.idiom')) >= 1, '강세와 연음 표시');
+  assert.equal(await page.count('.phrase'), 4, '작업400: 구별 소리 표기 블록');
+  assert.equal(await page.count('.stress') + await page.count('.idiom'), 0, '작업400: 옛 강세 글자·연음 목록은 없다');
   await clickText(page, '쌓아가기');
   await page.waitFor("window.__plays.length >= 11", 10000);
   const p = (await plays(page)).map(k => k.replace('m-delay.l1', ''));
@@ -359,4 +360,63 @@ test('오류 알림: 콘텐츠 실패·음성 목록 실패·기록 목록 실�
   assert.ok((await page.count('.noaudio')) >= 20, '음성 없음 표시');
   assert.equal(await page.count('.chunk button'), 0);
   await page.close();
+});
+
+test('작업400 소리 표기 블록: 구 수만큼 줄, "/"는 구 수-1개, 강세 점, 억양 화살표, 범례·참고 문구', { skip: SKIP }, async () => {
+  const page = await open();
+  await ready(page);
+  await enter(page, '프로젝트가 미뤄진 이유');
+  await clickText(page, '문장 훈련');
+  await clickText(page, '2');   // 구 4개: The thing is, / the client changed / a few requirements / late in the game.
+  const l = CONTENT.monologues[0].lines[1];
+  assert.equal(await page.count('.sound .phrase'), 4);
+  assert.equal(await page.count('.sound .slash'), 3);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('.sound .pron')].map(n => n.textContent)"), l.chunks.map(c => c.p));
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('.sound .en-line')].map(n => n.textContent)"), l.chunks.map(c => c.en));
+  assert.equal(await page.eval("document.querySelector('.sound .arrow.end').textContent"), '↘');
+  const d = await page.eval(`(() => { const dot = document.querySelector('.sound .dot'), s = getComputedStyle(dot), seg = getComputedStyle(dot.parentElement);
+    return { w: dot.getBoundingClientRect().width, h: dot.getBoundingClientRect().height, radius: s.borderTopLeftRadius, bg: s.backgroundColor, weight: seg.fontWeight, color: seg.color, n: document.querySelectorAll('.sound .dot').length }; })()`);
+  assert.deepEqual([d.w, d.h, d.radius, d.bg, d.weight, d.color], [6, 6, '50%', 'rgb(226, 88, 59)', '600', 'rgb(184, 68, 46)']);
+  assert.equal(d.n, 7, '이 문장의 강세 음절 수: THING 1 + CLIent·CHANGED 2 + FEW·reQUIREments 2 + LATE·GAME 2');
+  const legend = await page.text('.legend');
+  for (const t of ['점 = 강세 음절', '/ = 끊어 읽기', '- = 음절', '‿ = 이어서 소리 남', '( ) = 거의 안 들림']) assert.ok(legend.includes(t), t);
+  assert.match(await page.text('.note'), /발음 표기·강세는 참고용입니다\(검수 전\)/);
+  await page.eval("document.querySelectorAll('.sound .phrase')[2].click()");
+  await page.waitFor("window.__plays.length === 1", 3000);
+  assert.deepEqual(await plays(page), ['m-delay.l1.c2']);
+  assert.equal(await page.eval("(() => { const c = getComputedStyle(document.querySelectorAll('.sound .phrase')[2].querySelector('.en-line')); return c.fontWeight + ':' + c.textDecorationLine; })()"), '700:underline', '재생 중인 구: 굵기+밑줄');
+  await page.close();
+});
+
+test('작업400: 음성 없는 구는 소리 표기 블록에서도 버튼 없이 "음성 없음", 나머지 구는 버튼', { skip: SKIP }, async () => {
+  const page = await open();
+  await ready(page);
+  await enter(page, '프로젝트가 미뤄진 이유');
+  await clickText(page, '문장 훈련');
+  assert.equal(await page.count('.sound button.phrase'), 2);
+  assert.equal(await page.eval("document.querySelector('.sound .phrase.off .noaudio').textContent"), '음성 없음');
+  assert.equal(await page.eval("document.querySelectorAll('.sound .phrase')[1].tagName"), 'SPAN');
+  await page.close();
+});
+
+test('작업400: 390px·1280px 소리 표기 블록 — 가로 스크롤 없음, 구 버튼 ≥44px, 허용 모서리만, 이모지 없음 (독백 10개 × 문장 5개)', { skip: SKIP }, async () => {
+  for (const width of [390, 1280]) {
+    const page = await open({ width });
+    await ready(page);
+    for (const { title } of CONTENT.monologues) {
+      await enter(page, title);
+      await clickText(page, '문장 훈련');
+      for (let n = 1; n <= 5; n++) {
+        await clickText(page, String(n));
+        const a = await page.eval(AUDIT);
+        const h = await page.eval("[...document.querySelectorAll('.sound button.phrase')].map(b => b.getBoundingClientRect().height)");
+        assert.ok(h.every(x => x >= 43.5), width + ' 구 버튼 높이 ' + h);
+        assert.deepEqual(a.bad, [], width + ' 버튼 높이');
+        assert.deepEqual(a.radii.filter(r => !ALLOWED_RADII.has(r)), [], width + ' 모서리');
+        assert.equal(a.emoji, false); assert.equal(a.scroll, false, width + ' 가로 스크롤 ' + title + n);
+      }
+      await clickText(page, '목록으로');
+    }
+    await page.close();
+  }
 });

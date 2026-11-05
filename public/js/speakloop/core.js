@@ -59,8 +59,46 @@
   }
   function round(x) { return Math.round(x * 1000) / 1000; }
 
+
+  // ── 강세 점 ──
+  // chunk.st 의 토큰(대문자 연속 구간 = 강세 음절)을 구 영어 단어에 순서대로 대응한다. "gonna"/"wanna" 토큰은 영어 두 단어("going to"·"want to")를 차지한다.
+  // 돌려주는 값: 영어 단어마다 { text, ranges: [[시작, 끝), …] } (text 안의 글자 위치, 문장부호는 범위에 넣지 않음).
+  // 철자가 다르면 그 단어의 글자 전체를 한 범위로 본다. 모두 소문자이거나 대문자 한 글자짜리 토큰("I")이면 ranges 가 비어 있다.
+  function letterIdx(word) { var out = []; for (var i = 0; i < word.length; i++) if (/[A-Za-z0-9]/.test(word.charAt(i))) out.push(i); return out; }
+  function wholeRange(word) { var li = letterIdx(word); return li.length ? [[li[0], li[li.length - 1] + 1]] : []; }
+  function upperRuns(token) {   // 토큰 글자(영숫자) 기준 대문자 연속 구간 [시작, 끝) 목록
+    var li = letterIdx(token), runs = [], start = -1;
+    for (var k = 0; k <= li.length; k++) {
+      var up = k < li.length && /[A-Z]/.test(token.charAt(li[k]));
+      if (up && start < 0) start = k;
+      if (!up && start >= 0) { runs.push([start, k]); start = -1; }
+    }
+    // 맨 앞 대문자 한 글자("I", "I'm", "We", "The" 처럼 문장 첫머리 대문자)는 강세가 아니다. 한 글자짜리 토큰("I")도 여기에 든다
+    return runs.filter(function (r) { return !(r[0] === 0 && r[1] - r[0] === 1); });
+  }
+  function stressWords(en, st) {
+    var words = String(en).split(/\s+/).filter(Boolean), tokens = String(st).split(/\s+/).filter(Boolean), out = [], t = 0;
+    for (var w = 0; w < words.length; w++) {
+      var word = words[w], token = tokens[t], ranges = [];
+      if (token === undefined) { out.push({ text: word, ranges: [] }); continue; }
+      var pair = /^(gonna|wanna)\W*$/i.test(token) && w + 1 < words.length;
+      t++;
+      var runs = upperRuns(token);
+      if (runs.length) {
+        var li = letterIdx(word), tl = letterIdx(token);
+        var wl = li.map(function (i) { return word.charAt(i).toLowerCase(); }).join(''), tk = tl.map(function (i) { return token.charAt(i).toLowerCase(); }).join('');
+        if (wl === tk) ranges = runs.map(function (r) { return [li[r[0]], li[r[1] - 1] + 1]; });
+        else if (pair && wl.indexOf(tk.slice(0, runs[runs.length - 1][1])) === 0) ranges = runs.map(function (r) { return [li[r[0]], li[r[1] - 1] + 1]; });   // WANna ↔ want: 앞 글자가 같으면 그 자리
+        else ranges = wholeRange(word);
+      }
+      out.push({ text: word, ranges: ranges });
+      if (pair) { out.push({ text: words[w + 1], ranges: [] }); w++; }
+    }
+    return out;
+  }
+
   var RATING_TEXT = { good: '막힘없음', some: '몇 군데 막힘', hard: '많이 막힘' };
 
   return { CHUNK_GAP: CHUNK_GAP, REST_FACTOR: REST_FACTOR, MAX_BLANKS: MAX_BLANKS, STAGES: STAGES, RATING_TEXT: RATING_TEXT,
-    arrowOf: arrowOf, maskWord: maskWord, maskChunk: maskChunk, hiddenFlags: hiddenFlags, buildupPlan: buildupPlan, shadowPlan: shadowPlan };
+    arrowOf: arrowOf, maskWord: maskWord, maskChunk: maskChunk, hiddenFlags: hiddenFlags, buildupPlan: buildupPlan, shadowPlan: shadowPlan, stressWords: stressWords };
 });
