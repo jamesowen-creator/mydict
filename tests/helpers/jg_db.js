@@ -1,7 +1,8 @@
 // 작업313: 문장 학습 시험용 가짜 DB (tests/jgrammar.test.js 의 가짜 DB 와 같은 SQL 범위 + lang 열). 실제 PostgreSQL 이 아니다.
 // users: 1·2·6 번은 권한 있음, 3 번은 권한 없음, 4 번은 DB 관리자, 9 번은 권한 있지만 차단. 그 밖의 id 는 행 없음
-function createJgDb() {
-  const db = { cache: new Map(), usage: [], queries: [], saved: new Map(), clock: 0, nextId: 1,
+// 작업404-T: failAuth = requireAuth 조회 자체가 실패. authQueries / permQueries 는 인증 조회·기능 권한 조회 횟수(시험이 검사 코드 실행을 단언하는 데 쓴다).
+function createJgDb({ failAuth = false } = {}) {
+  const db = { failAuth, authQueries: 0, permQueries: 0, cache: new Map(), usage: [], queries: [], saved: new Map(), clock: 0, nextId: 1,
     users: new Map([[1, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: true }], [2, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: true }],
       [6, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: true }], [3, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: false }],
       [4, { role: 'admin', is_approved: true, is_blocked: false, perm_jgrammar: false }], [9, { role: 'user', is_approved: true, is_blocked: true, perm_jgrammar: true }]]) };
@@ -9,6 +10,13 @@ function createJgDb() {
     query: async (sql, params = []) => {
       const q = sql.replace(/\s+/g, ' ').trim();
       db.queries.push(q);
+      if (/^SELECT is_approved, is_blocked, role FROM users/.test(q)) {   // 작업404-T: requireAuth 조회 — 어떤 id 든 승인된 일반 사용자(role 만 users 표를 따름). 기능 권한 검사 조회와 구분한다
+        db.authQueries++;
+        if (db.failAuth) throw new Error('auth lookup down');
+        const u = db.users.get(params[0]);
+        return { rows: [{ is_approved: true, is_blocked: false, role: (u && u.role) || 'user' }] };
+      }
+      if (/FROM users/.test(q)) { db.permQueries++; }
       if (/FROM users/.test(q)) return db.users.has(params[0]) ? { rows: [db.users.get(params[0])] } : { rows: [] };
       if (/FROM jgrammar_cache/.test(q)) return db.cache.has(params[0]) ? { rows: [{ result: db.cache.get(params[0]).result }] } : { rows: [] };
       if (/^INSERT INTO jgrammar_cache/.test(q)) {

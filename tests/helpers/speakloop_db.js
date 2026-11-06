@@ -1,14 +1,23 @@
 // 작업395: Speak Loop 시험용 가짜 DB·가짜 OpenAI(fetch). 이 기능이 쓰는 SQL 몇 가지만 흉내 낸다.
 // users: 1 = 권한 있음, 3 = 권한 없음, 4 = DB 관리자, 5 = 이메일 관리자(행 없음, ADMIN_EMAILS=u5@example.com), 9 = 권한 있지만 차단. 그 밖은 행 없음.
-function createSlDb({ failUsers = false } = {}) {
-  const db = { queries: [], audio: new Map(), usage: [], failUsers,
+// 작업404-T: requireAuth 의 조회(SELECT is_approved, is_blocked, role)에는 어떤 id 든 승인된 일반 사용자 행을 돌려준다(role 만 users 표를 따른다).
+// 기능별 권한 검사(perm_speakloop)의 조회에서만 행 없음·차단·오류(failUsers)를 흉내 낸다. failAuth 는 requireAuth 조회 자체가 실패하는 경우.
+function createSlDb({ failUsers = false, failAuth = false } = {}) {
+  const db = { queries: [], audio: new Map(), usage: [], failUsers, failAuth, authQueries: 0, permQueries: 0,
     users: new Map([[1, { role: 'user', is_approved: true, is_blocked: false, perm_speakloop: true }], [3, { role: 'user', is_approved: true, is_blocked: false, perm_speakloop: false }],
       [4, { role: 'admin', is_approved: true, is_blocked: false, perm_speakloop: false }], [9, { role: 'user', is_approved: true, is_blocked: true, perm_speakloop: true }]]) };
   db.pool = {
     query: async (sql, params = []) => {
       const s = sql.replace(/\s+/g, ' ').trim();
       db.queries.push(s);
+      if (/^SELECT is_approved, is_blocked, role FROM users/.test(s)) {
+        db.authQueries++;
+        if (db.failAuth) throw new Error('auth lookup down');
+        const u = db.users.get(params[0]);
+        return { rows: [{ is_approved: true, is_blocked: false, role: (u && u.role) || 'user' }] };
+      }
       if (/FROM users/.test(s)) {
+        db.permQueries++;
         if (db.failUsers) throw new Error('users down');
         return db.users.has(params[0]) ? { rows: [db.users.get(params[0])] } : { rows: [] };
       }

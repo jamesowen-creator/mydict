@@ -10,7 +10,7 @@ const { startApp } = require('./helpers/app');
 
 const T0 = 1000000;
 function createDb() {
-  const db = { users: new Map(), failPerm: false, queries: 0, patches: [] };
+  const db = { users: new Map(), failPerm: false, failAuth: false, authQueries: 0, permQueries: 0, queries: 0, patches: [] };
   const mk = (name, extra) => Object.assign({ name, role: 'user', is_approved: true, is_blocked: false, perm_versus: true }, extra);
   db.users.set(1, mk('Alice')); db.users.set(2, mk('Bob')); db.users.set(3, mk('Carol', { perm_versus: false })); db.users.set(4, mk('Dana', { role: 'admin', perm_versus: false }));
   db.users.set(5, mk('Eve')); db.users.set(6, mk('Fay', { is_blocked: true })); db.users.set(9, mk('Root', { perm_versus: false })); db.users.set(7, mk('alice@example.com'));
@@ -18,8 +18,9 @@ function createDb() {
   db.pool = {
     query: async (sql, params = []) => {
       db.queries++;
-      if (/^SELECT is_approved, is_blocked, role FROM users/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ is_approved: u.is_approved, is_blocked: u.is_blocked, role: u.role }] : [] }; }
-      if (/^SELECT name, role, is_blocked, perm_versus FROM users/.test(sql)) { if (db.failPerm) throw new Error('perm boom'); const u = db.users.get(params[0]); return { rows: u ? [u] : [] }; }
+      // 작업404-T: requireAuth 조회에는 어떤 id 든 승인된 일반 사용자 행을 돌려준다(role 만 users 표를 따름). 기능 권한(perm_versus) 조회에서만 행 없음·오류를 흉내 낸다
+      if (/^SELECT is_approved, is_blocked, role FROM users/.test(sql)) { db.authQueries++; if (db.failAuth) throw new Error('auth boom'); const u = db.users.get(params[0]); return { rows: [{ is_approved: true, is_blocked: false, role: u ? u.role : 'user' }] }; }
+      if (/^SELECT name, role, is_blocked, perm_versus FROM users/.test(sql)) { db.permQueries++; if (db.failPerm) throw new Error('perm boom'); const u = db.users.get(params[0]); return { rows: u ? [u] : [] }; }
       if (/^UPDATE users SET/.test(sql)) { db.patches.push(sql); return { rows: [{ id: params[0] }] }; }
       throw new Error('모의 DB 가 모르는 SQL: ' + sql.slice(0, 60));
     },
@@ -54,7 +55,16 @@ test('343-1. 권한: 비로그인 401, perm_versus 없음 403, 차단 403, 관�
   assert.equal((await a.get(9, '/rooms')).status, 200, 'ADMIN_EMAILS 관리자(perm_versus false)');
   assert.equal((await a.get(777, '/rooms')).status, 403, '없는 사용자');
   a.db.failPerm = true; const e = await a.get(1, '/rooms'); assert.equal(e.status, 403); assert.ok(!JSON.stringify(e.body).includes('boom'));
+  assert.equal(a.db.permQueries, 8, '기능 권한 검사 조회가 모든 인증 요청에서 실제로 실행됐다(requireAuth 에 가려지지 않음)');
   assert.equal(a.store.size(), 0, '권한이 없으면 방이 만들어지지 않는다');
+});
+
+// 작업404-T: 인증 조회(requireAuth) 자체가 실패하면 기능 권한 검사까지 가지 않고 503
+test('343-1b. 작업404: 인증 조회가 실패하면 503 auth_unavailable — 기능 권한 검사·방 생성에 가지 않는다', async t => {
+  const a = await setup(); t.after(() => a.t.close());
+  a.db.failAuth = true;
+  const r = await a.post(1, '/rooms'); assert.equal(r.status, 503); assert.equal(r.body.code, 'auth_unavailable'); assert.ok(!JSON.stringify(r.body).includes('boom'));
+  assert.equal(a.db.permQueries, 0); assert.equal(a.store.size(), 0);
 });
 
 test('343-2. 방 흐름: 만들기 → 목록(표시 이름·경과·달리는 중·mine) → 참가 → 가득 참(목록에서 사라짐), 이미 방이 있으면 409, 자기 방 참가 400, 가득 찬 방 참가 409, 이메일 노출 없음', async t => {

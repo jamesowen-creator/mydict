@@ -15,6 +15,14 @@ test('/api/cmap/status: 미로그인 401, 권한 없음(false·값 없음·차�
   db.addUser(2, { perm_concept_map: false });
   db.addUser(3);                                          // 열 값이 없는 행(마이그레이션 직후 모사): 열려서는 안 된다
   db.addUser(4, { perm_concept_map: true, is_blocked: true });
+  // 작업404-T: requireAuth 조회에는 어떤 id 든 승인된 일반 사용자 행을 돌려주고, 개념 지도 권한 조회(perm_concept_map)에서만 행 없음·차단 값이 그대로 나온다
+  let permQueries = 0;
+  const base = db.pool.query;
+  db.pool.query = async (sql, p) => {
+    if (/^SELECT is_approved, is_blocked, role FROM users/.test(sql)) return { rows: [{ is_approved: true, is_blocked: false, role: 'user' }] };
+    if (/perm_concept_map/.test(sql)) permQueries++;
+    return base(sql, p);
+  };
   const t = await startApp(['routes/concept_map.js'], { db });
   ctx.after(() => t.close());   // 작업271-3: 단언이 실패해도 서버를 닫는다
   assert.equal((await t.call('GET', '/api/cmap/status', undefined, { user: null })).status, 401);
@@ -22,6 +30,17 @@ test('/api/cmap/status: 미로그인 401, 권한 없음(false·값 없음·차�
   assert.equal(r.status, 200);
   assert.deepEqual(r.body, { ok: true, perm: true, stage: 1 });
   for (const id of [2, 3, 4, 99]) assert.equal((await t.call('GET', '/api/cmap/status', undefined, { user: id })).status, 403, '사용자 ' + id);
+  assert.equal(permQueries, 5, '개념 지도 권한 조회가 인증 요청 5번 모두 실제로 실행됐다(requireAuth 에 가려지지 않음)');
+});
+
+// 작업404-T: 사용자 행이 아예 없으면 requireAuth 가 먼저 401 auth_invalid (옛 기대: 403)
+test('/api/cmap/status: 작업404 — users 행이 없는 토큰은 requireAuth 가 401 auth_invalid(개념 지도 권한 조회까지 가지 않음)', async ctx => {
+  const db = createMockDb();
+  db.addUser(1, { perm_concept_map: true });
+  const t = await startApp(['routes/concept_map.js'], { db });
+  ctx.after(() => t.close());
+  const r = await t.call('GET', '/api/cmap/status', undefined, { user: 99 });
+  assert.equal(r.status, 401); assert.equal(r.body.code, 'auth_invalid');
 });
 
 test('/api/cmap/status: 권한 조회가 실패하면 닫힘(403, 500 아님)', async ctx => {

@@ -19,8 +19,10 @@ const GOOD = {
 };
 
 // users: 기본으로 1·2번은 권한 있음, 3번은 권한 없음(false), 4번은 DB 관리자(권한 열 false), 9번은 권한 있지만 차단. 그 밖의 id 는 행 없음
-function createJgDb({ blocked = [], failCacheRead = false, failUsers = false } = {}) {
-  const db = { cache: new Map(), usage: [], queries: [], failUsers, saved: new Map(), failSaved: false, clock: 0, nextId: 1,
+// 작업404-T: requireAuth 조회(SELECT is_approved, is_blocked, role)에는 어떤 id 든 승인된 일반 사용자 행을 돌려주고(role 만 users 표를 따름),
+// 기능 권한(perm_jgrammar) 조회에서만 행 없음·차단·오류(failUsers)를 흉내 낸다. failAuth = requireAuth 조회 자체 실패. authQueries/permQueries 로 어느 검사가 실행됐는지 단언한다.
+function createJgDb({ blocked = [], failCacheRead = false, failUsers = false, failAuth = false } = {}) {
+  const db = { failAuth, authQueries: 0, permQueries: 0, cache: new Map(), usage: [], queries: [], failUsers, saved: new Map(), failSaved: false, clock: 0, nextId: 1,
     users: new Map([[1, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: true }], [2, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: true }],
       [3, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: false }], [4, { role: 'admin', is_approved: true, is_blocked: false, perm_jgrammar: false }],
       [9, { role: 'user', is_approved: true, is_blocked: true, perm_jgrammar: true }]]) };
@@ -28,7 +30,14 @@ function createJgDb({ blocked = [], failCacheRead = false, failUsers = false } =
   db.pool = {
     query: async (sql, params = []) => {
       db.queries.push(sql.replace(/\s+/g, ' ').trim());
+      if (/^SELECT is_approved, is_blocked, role FROM users/.test(sql)) {
+        db.authQueries++;
+        if (db.failAuth) throw new Error('auth lookup down');
+        const u = db.users.get(params[0]);
+        return { rows: [{ is_approved: true, is_blocked: false, role: (u && u.role) || 'user' }] };
+      }
       if (/FROM users/.test(sql)) {
+        db.permQueries++;
         if (db.failUsers) throw new Error('users down');
         return db.users.has(params[0]) ? { rows: [db.users.get(params[0])] } : { rows: [] };
       }
@@ -305,6 +314,7 @@ test('권한 없음(false)·사용자 행 없음은 403 이고, 캐시 조회·A
   assert.equal(anthropic.calls.length, 0);
   assert.equal(db.usage.length, 0);
   assert.deepEqual(db.queries.filter(q => /jgrammar_cache|api_usage/.test(q)), [], '캐시·사용량 테이블을 건드리지 않음');
+  assert.equal(db.permQueries, 2, '기능 권한 검사 조회가 두 요청 모두 실제로 실행됐다(requireAuth 에 가려지지 않음)');
   assert.equal((await post('猫が好き', 1)).body.cached, true, '권한이 있으면 같은 저장본이 열림');
 });
 
@@ -313,24 +323,38 @@ test('권한 조회 중 오류가 나면 차단(fail-closed) — 캐시·AI 도 
   t.after(() => app.close());
   const r = await post('猫が好き', 1);
   assert.equal(r.status, 403);
+  assert.equal(db.permQueries, 1, '권한 검사 조회가 실제로 실행되어 오류를 냈다(requireAuth 조회는 정상)');
   assert.equal(anthropic.calls.length, 0);
   assert.deepEqual(db.queries.filter(q => /jgrammar_cache|api_usage/.test(q)), []);
 });
 
-test('DATABASE_URL 이 없으면 차단(fail-closed), 단 ADMIN_EMAILS 관리자는 허용', async t => {
+// 작업404-T: 인증 조회(requireAuth) 자체가 실패하면 기능 권한 검사까지 가지 않고 503
+test('작업404: 인증 조회가 실패하면 503 auth_unavailable — 캐시·AI·권한 검사에 가지 않는다', async t => {
+  const { post, anthropic, db, t: app } = await setup({ failAuth: true });
+  t.after(() => app.close());
+  const r = await post('猫が好き', 1);
+  assert.equal(r.status, 503); assert.equal(r.body.code, 'auth_unavailable');
+  assert.equal(db.permQueries, 0);
+  assert.equal(anthropic.calls.length, 0);
+  assert.deepEqual(db.queries.filter(q => /jgrammar_cache|api_usage/.test(q)), []);
+});
+
+test('작업404: DATABASE_URL 이 없으면 requireAuth 가 503 auth_unavailable(fail-closed) — AI 를 부르지 않는다(옛 기대: 일반 사용자 403)', async t => {
   const saved = process.env.DATABASE_URL;
   const { post, anthropic, t: app } = await setup();
   t.after(() => { process.env.DATABASE_URL = saved; return app.close(); });
   delete process.env.DATABASE_URL;
-  assert.equal((await post('猫が好き', 1)).status, 403);
+  const r = await post('猫が好き', 1);
+  assert.equal(r.status, 503); assert.equal(r.body.code, 'auth_unavailable');
   assert.equal(anthropic.calls.length, 0);
 });
 
 test('관리자는 항상 허용: DB 의 role=admin 은 권한 열이 false 여도, ADMIN_EMAILS 이메일은 사용자 행이 없어도 통과', async t => {
-  const { post, anthropic, t: app } = await setup();
+  const { post, anthropic, db, t: app } = await setup();
   t.after(() => app.close());
   assert.equal((await post('猫が好き', 4)).status, 200, 'DB 관리자(perm false)');
-  assert.equal((await post('犬が好き', 5)).status, 200, '이메일 관리자(행 없음)');
+  assert.equal(db.permQueries, 1, 'DB 관리자는 기능 권한 조회에서 role=admin 으로 통과(검사 코드 실행됨)');
+  assert.equal((await post('犬が好き', 5)).status, 200, '이메일 관리자(기능 권한 조회에 행 없음)');
   assert.equal(anthropic.calls.length, 2);
 });
 
@@ -395,9 +419,11 @@ test('OCR 권한: 로그인 없으면 401, 권한 없음·행 없음·차단은 
   assert.equal(a.anthropic.calls.length, 0);
   assert.equal(a.db.usage.length, 0);
   assert.deepEqual(a.db.queries.filter(q => /api_usage|jgrammar_cache/.test(q)), []);
+  assert.equal(a.db.permQueries, 5, '기능 권한 검사 조회가 403 요청 5번 모두 실제로 실행됐다(requireAuth 에 가려지지 않음)');
   const f = await ocrSetup({ failUsers: true });
   t.after(() => f.t.close());
   assert.equal((await f.sendImage(JPEG)).status, 403, '권한 조회 오류는 차단');
+  assert.equal(f.db.permQueries, 1, '오류가 난 쪽도 기능 권한 조회가 실행됐다');
   assert.equal(f.anthropic.calls.length, 0);
 });
 
@@ -405,6 +431,7 @@ test('OCR 관리자(DB role·이메일)는 항상 허용', async t => {
   const a = await ocrSetup();
   t.after(() => a.t.close());
   assert.equal((await a.sendImage(JPEG, 'image/jpeg', 4)).status, 200);
+  assert.equal(a.db.permQueries, 1, 'DB 관리자는 기능 권한 조회에서 role=admin 으로 통과');
   assert.equal((await a.sendImage(JPEG, 'image/jpeg', 5)).status, 200);
 });
 
@@ -690,6 +717,7 @@ test('저장 API 권한: 비로그인 401, 권한 없음·행 없음·차단·�
   assert.equal((await f.t.call('GET', '/api/jgrammar/saved', undefined, { user: 1 })).status, 403, '권한 조회 오류는 차단');
   assert.equal((await f.t.call('DELETE', '/api/jgrammar/saved/1', undefined, { user: 1 })).status, 403);
   assert.deepEqual(savedQueries(a.db), []); assert.deepEqual(savedQueries(f.db), []);
+  assert.equal(a.db.permQueries, 6, '기능 권한 검사 조회가 6번 실제로 실행됐다'); assert.equal(f.db.permQueries, 2, '오류 쪽도 2번 실행됐다');
   assert.equal((await a.t.call('GET', '/api/jgrammar/saved', undefined, { user: 4 })).status, 200, 'DB 관리자');
   assert.equal((await a.t.call('GET', '/api/jgrammar/saved', undefined, { user: 5 })).status, 200, '이메일 관리자');
 });

@@ -25,6 +25,8 @@ test('권한 없음(false)·사용자 행 없음·차단 계정은 모든 사용
     assert.equal(r.body.ok, false);
   }
   assert.deepEqual(db.queries.filter(q => /speakloop_audio/.test(q)), []);
+  assert.equal(db.permQueries, 9, '기능 권한 검사(perm_speakloop 조회)가 요청마다 실제로 실행됐다(requireAuth 에 가려지지 않음)');
+  assert.equal(db.authQueries, 9, 'requireAuth 조회도 요청마다 1회');
 });
 
 test('권한 있음(true)은 콘텐츠 200, 로그인 없음은 401', async t => {
@@ -38,18 +40,34 @@ test('권한 있음(true)은 콘텐츠 200, 로그인 없음은 401', async t =>
 });
 
 test('권한 조회 중 오류가 나면 차단(fail-closed)', async t => {
-  const { app } = await setup({ failUsers: true });
+  const { db, app } = await setup({ failUsers: true });
   t.after(() => app.close());
   for (const p of PATHS) assert.equal((await app.call('GET', p, undefined, { user: 1 })).status, 403, p);
+  assert.equal(db.permQueries, PATHS.length, '권한 검사 조회가 실제로 실행되어 오류를 냈다(requireAuth 조회는 정상)');
 });
 
-test('DATABASE_URL 이 없으면 차단(fail-closed), 단 ADMIN_EMAILS 관리자는 콘텐츠를 볼 수 있다', async t => {
+// 작업404-T: 옛 "DB 오류면 403"은 requireAuth 앞단 도입 후 두 가지로 갈린다 — 인증 조회 자체가 실패하면 503(auth_unavailable)
+test('작업404: 인증 조회(requireAuth)가 실패하면 503 auth_unavailable — 기능 권한 검사까지 가지 않는다', async t => {
+  const { db, app } = await setup({ failAuth: true });
+  t.after(() => app.close());
+  for (const p of PATHS) {
+    const r = await app.call('GET', p, undefined, { user: 1 });
+    assert.equal(r.status, 503, p);
+    assert.equal(r.body.code, 'auth_unavailable');
+  }
+  assert.equal(db.permQueries, 0);
+});
+
+test('작업404: DATABASE_URL 이 없으면 requireAuth 가 503 auth_unavailable(fail-closed) — 이메일 관리자도 예외 없음(옛 기대: 일반 403, 이메일 관리자 200)', async t => {
   const saved = process.env.DATABASE_URL;
   const { app } = await setup();
   t.after(() => { process.env.DATABASE_URL = saved; return app.close(); });
   delete process.env.DATABASE_URL;
-  assert.equal((await app.call('GET', '/api/speakloop/content', undefined, { user: 1 })).status, 403);
-  assert.equal((await app.call('GET', '/api/speakloop/content', undefined, { user: 5 })).status, 200);
+  for (const user of [1, 5]) {
+    const r = await app.call('GET', '/api/speakloop/content', undefined, { user });
+    assert.equal(r.status, 503, 'user ' + user);
+    assert.equal(r.body.code, 'auth_unavailable');
+  }
 });
 
 test('관리자는 항상 허용: DB role=admin 은 권한 열이 false 여도, ADMIN_EMAILS 이메일은 사용자 행이 없어도 통과', async t => {

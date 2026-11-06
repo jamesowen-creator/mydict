@@ -333,6 +333,7 @@ test('권한 없음 403 과 비로그인 401 은 lang 검사보다 먼저(잘못
     assert.equal((await a.saved('ko', user)).status, 403, 'saved ' + user);
     assert.equal((await a.ocr(PNG, 'fr', { user })).status, 403, 'ocr ' + user);
   }
+  assert.equal(a.db.permQueries, 9, '기능 권한 검사 조회가 403 요청 9번 모두 실제로 실행됐다(requireAuth 에 가려지지 않음)');
   assert.equal((await a.post(EN_SENTENCE, 'fr', null)).status, 401);
   assert.equal((await a.saved('fr', null)).status, 401);
   assert.equal((await a.ocr(PNG, 'fr', { user: null })).status, 401);

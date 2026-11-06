@@ -48,16 +48,29 @@ test('비로그인 401, 권한 없음·차단·행 없음 403(기록 테이블�
     assert.equal((await post(app, { item_id: 'm-delay', rating: 'good' }, user)).status, 403, 'POST ' + user);
   }
   assert.deepEqual(db.queries.filter(q => /speakloop_progress/.test(q)), []);
+  assert.equal(db.permQueries, 6, '기능 권한 검사 조회가 6번 모두 실제로 실행됐다(requireAuth 에 가려지지 않음)');
 });
 
-test('권한 확인 중 오류가 나면 403(fail-closed), DB 가 없어도 403', async t => {
-  const { app } = await setup({ failUsers: true });
-  const saved = process.env.DATABASE_URL;
-  t.after(() => { process.env.DATABASE_URL = saved; return app.close(); });
+test('권한 확인 중 오류가 나면 403(fail-closed)', async t => {
+  const { db, app } = await setup({ failUsers: true });
+  t.after(() => app.close());
   assert.equal((await app.call('GET', '/api/speakloop/progress', undefined, { user: 1 })).status, 403);
   assert.equal((await post(app, { item_id: 'm-delay', rating: 'good' })).status, 403);
+  assert.equal(db.permQueries, 2, '권한 검사 조회가 실제로 실행되어 오류를 냈다(requireAuth 조회는 정상)');
+});
+
+// 작업404-T: 옛 기대는 "DB 가 없어도 403" → 이제 requireAuth 가 먼저 503 auth_unavailable
+test('작업404: 인증 조회 실패·DB 없음은 503 auth_unavailable(fail-closed, 기록 테이블을 건드리지 않음)', async t => {
+  const { db, app } = await setup({ failAuth: true });
+  const saved = process.env.DATABASE_URL;
+  t.after(() => { process.env.DATABASE_URL = saved; return app.close(); });
+  const r = await app.call('GET', '/api/speakloop/progress', undefined, { user: 1 });
+  assert.equal(r.status, 503); assert.equal(r.body.code, 'auth_unavailable');
   delete process.env.DATABASE_URL;
-  assert.equal((await post(app, { item_id: 'm-delay', rating: 'good' })).status, 403);
+  const p = await post(app, { item_id: 'm-delay', rating: 'good' });
+  assert.equal(p.status, 503); assert.equal(p.body.code, 'auth_unavailable');
+  assert.deepEqual(db.queries.filter(q => /speakloop_progress/.test(q)), []);
+  assert.equal(db.permQueries, 0);
 });
 
 test('모르는 id 404, 잘못된 rating 400 (기록은 생기지 않음)', async t => {

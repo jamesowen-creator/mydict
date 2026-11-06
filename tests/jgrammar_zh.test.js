@@ -318,6 +318,7 @@ test('모르는 lang 은 400(AI·캐시·저장·한도 계산 없음), zh-Hans�
     assert.equal((await a.post(ZH, 'zh', user)).status, 403); assert.equal((await a.saved('zh-CN', user)).status, 403); assert.equal((await a.ocr(PNG, 'zh', { user })).status, 403);
     assert.equal((await a.post(ZH, 'zh-Hans', user)).status, 403, '올바른 lang 이어도 권한 없으면 403');
   }
+  assert.ok(a.db.permQueries >= 12, '기능 권한 검사 조회가 403 요청 12번 모두 실제로 실행됐다(requireAuth 에 가려지지 않음)');
   assert.equal((await a.post(ZH, 'zh', null)).status, 401);
   assert.equal(a.anthropic.calls.length, 0);
 });
