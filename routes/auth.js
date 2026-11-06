@@ -80,6 +80,9 @@ router.get('/auth/google/callback', (req, res, next) => {
 }, (req, res) => {
     const target = safeNextPath(req.query.state);
     const sep = target.includes('?') ? '&' : '?';
+    if (req.user.is_blocked === true) {   // 작업404: 차단 사용자에게는 토큰을 주지 않는다
+      return res.redirect(`${target}${sep}approval=blocked`);
+    }
     if (req.user.is_approved === false) {
       return res.redirect(`${target}${sep}approval=pending`);
     }

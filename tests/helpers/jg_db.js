@@ -2,9 +2,9 @@
 // users: 1·2·6 번은 권한 있음, 3 번은 권한 없음, 4 번은 DB 관리자, 9 번은 권한 있지만 차단. 그 밖의 id 는 행 없음
 function createJgDb() {
   const db = { cache: new Map(), usage: [], queries: [], saved: new Map(), clock: 0, nextId: 1,
-    users: new Map([[1, { role: 'user', is_blocked: false, perm_jgrammar: true }], [2, { role: 'user', is_blocked: false, perm_jgrammar: true }],
-      [6, { role: 'user', is_blocked: false, perm_jgrammar: true }], [3, { role: 'user', is_blocked: false, perm_jgrammar: false }],
-      [4, { role: 'admin', is_blocked: false, perm_jgrammar: false }], [9, { role: 'user', is_blocked: true, perm_jgrammar: true }]]) };
+    users: new Map([[1, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: true }], [2, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: true }],
+      [6, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: true }], [3, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: false }],
+      [4, { role: 'admin', is_approved: true, is_blocked: false, perm_jgrammar: false }], [9, { role: 'user', is_approved: true, is_blocked: true, perm_jgrammar: true }]]) };
   db.pool = {
     query: async (sql, params = []) => {
       const q = sql.replace(/\s+/g, ' ').trim();

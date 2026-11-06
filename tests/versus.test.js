@@ -11,13 +11,14 @@ const { startApp } = require('./helpers/app');
 const T0 = 1000000;
 function createDb() {
   const db = { users: new Map(), failPerm: false, queries: 0, patches: [] };
-  const mk = (name, extra) => Object.assign({ name, role: 'user', is_blocked: false, perm_versus: true }, extra);
+  const mk = (name, extra) => Object.assign({ name, role: 'user', is_approved: true, is_blocked: false, perm_versus: true }, extra);
   db.users.set(1, mk('Alice')); db.users.set(2, mk('Bob')); db.users.set(3, mk('Carol', { perm_versus: false })); db.users.set(4, mk('Dana', { role: 'admin', perm_versus: false }));
   db.users.set(5, mk('Eve')); db.users.set(6, mk('Fay', { is_blocked: true })); db.users.set(9, mk('Root', { perm_versus: false })); db.users.set(7, mk('alice@example.com'));
   for (let i = 20; i < 90; i++) db.users.set(i, mk('P' + i));
   db.pool = {
     query: async (sql, params = []) => {
       db.queries++;
+      if (/^SELECT is_approved, is_blocked, role FROM users/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ is_approved: u.is_approved, is_blocked: u.is_blocked, role: u.role }] : [] }; }
       if (/^SELECT name, role, is_blocked, perm_versus FROM users/.test(sql)) { if (db.failPerm) throw new Error('perm boom'); const u = db.users.get(params[0]); return { rows: u ? [u] : [] }; }
       if (/^UPDATE users SET/.test(sql)) { db.patches.push(sql); return { rows: [{ id: params[0] }] }; }
       throw new Error('모의 DB 가 모르는 SQL: ' + sql.slice(0, 60));

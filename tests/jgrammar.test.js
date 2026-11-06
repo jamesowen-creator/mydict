@@ -21,10 +21,10 @@ const GOOD = {
 // users: 기본으로 1·2번은 권한 있음, 3번은 권한 없음(false), 4번은 DB 관리자(권한 열 false), 9번은 권한 있지만 차단. 그 밖의 id 는 행 없음
 function createJgDb({ blocked = [], failCacheRead = false, failUsers = false } = {}) {
   const db = { cache: new Map(), usage: [], queries: [], failUsers, saved: new Map(), failSaved: false, clock: 0, nextId: 1,
-    users: new Map([[1, { role: 'user', is_blocked: false, perm_jgrammar: true }], [2, { role: 'user', is_blocked: false, perm_jgrammar: true }],
-      [3, { role: 'user', is_blocked: false, perm_jgrammar: false }], [4, { role: 'admin', is_blocked: false, perm_jgrammar: false }],
-      [9, { role: 'user', is_blocked: true, perm_jgrammar: true }]]) };
-  for (const id of blocked) db.users.set(id, { role: 'user', is_blocked: true, perm_jgrammar: true });
+    users: new Map([[1, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: true }], [2, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: true }],
+      [3, { role: 'user', is_approved: true, is_blocked: false, perm_jgrammar: false }], [4, { role: 'admin', is_approved: true, is_blocked: false, perm_jgrammar: false }],
+      [9, { role: 'user', is_approved: true, is_blocked: true, perm_jgrammar: true }]]) };
+  for (const id of blocked) db.users.set(id, { role: 'user', is_approved: true, is_blocked: true, perm_jgrammar: true });
   db.pool = {
     query: async (sql, params = []) => {
       db.queries.push(sql.replace(/\s+/g, ' ').trim());

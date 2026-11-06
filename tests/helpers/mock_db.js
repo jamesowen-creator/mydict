@@ -8,7 +8,7 @@
 // 사용: const db = createMockDb(); db.pool.query(...) / db.client / db.tables / db.addUser(id)
 
 const TABLE_DEFAULTS = {
-  users: () => ({ is_blocked: false, perm_concept_study: true, perm_voice_study: true }),
+  users: () => ({ is_approved: true, is_blocked: false, perm_concept_study: true, perm_voice_study: true }),
   // 작업214-2: 음성 학습 자료·연결(자료 연결 지도 테스트용)
   voice_notes: () => ({ title: '', transcript: '', summary: null, subject: null, subject_detail: null, link_hash: null, keywords: null, merged_from: null, created_at: new Date(), updated_at: new Date() }),
   // 작업224-2: 퀴즈 요약 API 테스트용(저장된 퀴즈·시도 기록)

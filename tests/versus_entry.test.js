@@ -10,13 +10,14 @@ const { startApp } = require('./helpers/app');
 
 function createDb() {
   const db = { users: new Map(), sqls: [] };
-  db.users.set(1, { id: 1, email: 'a@example.com', name: 'A', role: 'user', is_blocked: false, perm_versus: true });
-  db.users.set(2, { id: 2, email: 'b@example.com', name: 'B', role: 'user', is_blocked: false, perm_versus: false });
-  db.users.set(3, { id: 3, email: 'c@example.com', name: 'C', role: 'admin', is_blocked: false, perm_versus: false });
-  db.users.set(4, { id: 4, email: 'd@example.com', name: 'D', role: 'user', is_blocked: false, perm_versus: null });
+  db.users.set(1, { id: 1, email: 'a@example.com', name: 'A', role: 'user', is_approved: true, is_blocked: false, perm_versus: true });
+  db.users.set(2, { id: 2, email: 'b@example.com', name: 'B', role: 'user', is_approved: true, is_blocked: false, perm_versus: false });
+  db.users.set(3, { id: 3, email: 'c@example.com', name: 'C', role: 'admin', is_approved: true, is_blocked: false, perm_versus: false });
+  db.users.set(4, { id: 4, email: 'd@example.com', name: 'D', role: 'user', is_approved: true, is_blocked: false, perm_versus: null });
   db.pool = {
     query: async (sql, params = []) => {
       db.sqls.push(sql);
+      if (/^SELECT is_approved, is_blocked, role FROM users/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ is_approved: u.is_approved, is_blocked: u.is_blocked, role: u.role }] : [] }; }
       if (/^\s*SELECT id, email, name, role, is_blocked, perm_versus,/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ ...u }] : [] }; }
       throw new Error('모의 DB 가 모르는 SQL: ' + sql.slice(0, 60));
     },

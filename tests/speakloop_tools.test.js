@@ -14,6 +14,7 @@ async function setup(t, handler = (b, n) => mp3(n)) {
   for (const k of ENV_KEYS) { saved[k] = process.env[k]; if (k !== 'OPENAI_API_KEY') delete process.env[k]; }
   process.env.OPENAI_API_KEY = 'sk-test-fake';
   const db = createSlDb();
+  db.users.set(5, { role: 'user', is_approved: true, is_blocked: false, perm_speakloop: false });   // 작업404: 이메일 관리자(u5)도 이제 users 행이 있어야 한다
   const app = await startApp(['routes/speakloop.js'], { db });
   const ai = installOpenAiFetch(handler);
   t.after(() => {

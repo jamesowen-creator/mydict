@@ -14,17 +14,18 @@ const { startApp } = require('./helpers/app');
 // 모의 DB: tts_cache·users 만 흉내 낸다
 function createDb() {
   const db = { cache: new Map(), users: new Map(), usage: [], queries: [], failCache: false, failUsage: false, failUsageCheck: false };
-  db.users.set(7, { is_blocked: false, can_tts: true, role: 'user' });
-  db.users.set(8, { is_blocked: false, can_tts: false, role: 'user' });
-  db.users.set(5, { is_blocked: true, can_tts: true, role: 'user' });
-  db.users.set(9, { is_blocked: false, can_tts: true, role: 'admin' });
+  db.users.set(7, { is_approved: true, is_blocked: false, can_tts: true, role: 'user' });
+  db.users.set(8, { is_approved: true, is_blocked: false, can_tts: false, role: 'user' });
+  db.users.set(5, { is_approved: true, is_blocked: true, can_tts: true, role: 'user' });
+  db.users.set(9, { is_approved: true, is_blocked: false, can_tts: true, role: 'admin' });
   db.pool = {
     query: async (sql, params = []) => {
       db.queries.push(sql);
       if (/^SELECT audio FROM tts_cache/.test(sql)) { const r = db.cache.get(params[1] + '|' + params[0]); return { rows: r ? [{ audio: r }] : [] }; }
       if (/^\s*INSERT INTO tts_cache/.test(sql)) { const k = params[1] + '|' + params[0]; if (!db.cache.has(k)) db.cache.set(k, params[2]); return { rowCount: 1, rows: [] }; }
       if (/^DELETE FROM tts_cache/.test(sql)) { if (db.failCache) throw new Error('boom: secret table detail'); const n = db.cache.size; db.cache.clear(); return { rowCount: n, rows: [] }; }
-      if (/^SELECT is_blocked, can_tts FROM users/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ is_blocked: u.is_blocked, can_tts: u.can_tts }] : [] }; }
+      if (/^SELECT is_approved, is_blocked, role FROM users/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ is_approved: u.is_approved, is_blocked: u.is_blocked, role: u.role }] : [] }; }
+      if (/^SELECT is_blocked, can_tts FROM users/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ is_approved: true, is_blocked: u.is_blocked, can_tts: u.can_tts }] : [] }; }
       if (/^SELECT role FROM users/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ role: u.role }] : [] }; }
       if (/FROM api_usage/.test(sql)) { if (db.failUsageCheck) throw new Error('usage check boom'); const mine = db.usage.filter(u => u.userId === params[0] && u.eventType === 'tts'); return { rows: [{ n: mine.length, chars: mine.reduce((a, u) => a + (u.chars || 0), 0) }] }; }
       throw new Error('모의 DB 가 모르는 SQL: ' + sql.slice(0, 60));
@@ -168,7 +169,7 @@ test('DELETE /api/tts/cache 는 관리자 전용: 비로그인 401, 일반 사�
   assert.equal(e.status, 500); assert.deepEqual(e.body, { error: '캐시 삭제에 실패했습니다.' }); assert.ok(!JSON.stringify(e.body).includes('boom') && !JSON.stringify(e.body).includes('secret'), 'e.message 비노출');
   assert.ok(logs.some(l => /boom/.test(l)), '상세는 서버 로그에만');
   // 관리자 판별은 admin.js 와 같은 requireAdmin: 이메일(ADMIN_EMAILS) 또는 DB role
-  a.db.users.set(11, { is_blocked: false, can_tts: true, role: 'admin' }); a.db.failCache = false;
+  a.db.users.set(11, { is_approved: true, is_blocked: false, can_tts: true, role: 'admin' }); a.db.failCache = false;
   assert.equal((await a.del(11)).status, 200, 'DB role 이 admin 이면 허용');
 });
 
@@ -198,9 +199,9 @@ test('337-1. 로그인 필수: 토큰 없음·잘못된 토큰 401(OpenAI·DB �
 test('337-2. can_tts: false 는 403, 관리자(이메일·DB role)는 can_tts 검사에서 제외, 차단 사용자는 403', async t => {
   const a = await setup(); t.after(() => a.t.close());
   assert.equal((await a.post({ text: 'x' }, 8)).status, 403);
-  a.db.users.set(10, { is_blocked: false, can_tts: false, role: 'admin' });   // DB role 관리자인데 can_tts 가 false
+  a.db.users.set(10, { is_approved: true, is_blocked: false, can_tts: false, role: 'admin' });   // DB role 관리자인데 can_tts 가 false
   assert.equal((await a.post({ text: 'admin-db' }, 10)).status, 200, 'DB role admin 은 can_tts 검사 제외');
-  a.db.users.set(9, { is_blocked: false, can_tts: false, role: 'user' });     // u9@example.com 은 ADMIN_EMAILS(이메일) 관리자
+  a.db.users.set(9, { is_approved: true, is_blocked: false, can_tts: false, role: 'user' });     // u9@example.com 은 ADMIN_EMAILS(이메일) 관리자
   assert.equal((await a.post({ text: 'admin-mail' }, 9)).status, 200, 'ADMIN_EMAILS 관리자는 can_tts 검사 제외');
   assert.equal((await a.post({ text: 'x' }, 5)).status, 403);
 });
@@ -213,7 +214,7 @@ test('337-3. 하루 호출 횟수 제한(기본 150): 캐시 미스만 센다 �
   const over = await a.post({ text: 'w-new' }); assert.equal(over.status, 429); assert.match(over.body.error, /오늘 서버 발음 사용량/); assert.equal(openai.calls.length, 150, '초과하면 OpenAI 를 부르지 않는다');
   const hit = await postRaw(a, { text: 'w0' }); assert.equal(hit.status, 200); assert.equal(hit.cache, 'HIT', '캐시 적중은 제한에 안 걸린다');
   assert.equal(a.db.usage.length, 150, '적중은 사용량에 안 들어간다');
-  a.db.users.set(12, { is_blocked: false, can_tts: true, role: 'user' });
+  a.db.users.set(12, { is_approved: true, is_blocked: false, can_tts: true, role: 'user' });
   assert.equal((await a.post({ text: 'w-other-user' }, 12)).status, 200, '사용량은 사용자별');
 });
 

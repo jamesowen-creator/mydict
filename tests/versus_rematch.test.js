@@ -9,9 +9,10 @@ const { startApp } = require('./helpers/app');
 const T0 = 1000000;
 function createDb() {
   const users = new Map();
-  for (const [id, name] of [[1, 'Alice'], [2, 'Bob'], [5, 'Eve'], [20, 'P20'], [21, 'P21'], [30, 'P30'], [31, 'P31'], [32, 'P32'], [33, 'P33']]) users.set(id, { name, role: 'user', is_blocked: false, perm_versus: true });
+  for (const [id, name] of [[1, 'Alice'], [2, 'Bob'], [5, 'Eve'], [20, 'P20'], [21, 'P21'], [30, 'P30'], [31, 'P31'], [32, 'P32'], [33, 'P33']]) users.set(id, { name, role: 'user', is_approved: true, is_blocked: false, perm_versus: true });
   return {
     pool: { query: async (sql, params = []) => {
+      if (/^SELECT is_approved, is_blocked, role FROM users/.test(sql)) { const u = users.get(params[0]); return { rows: u ? [{ is_approved: u.is_approved, is_blocked: u.is_blocked, role: u.role }] : [] }; }
       if (/^SELECT name, role, is_blocked, perm_versus FROM users/.test(sql)) { const u = users.get(params[0]); return { rows: u ? [u] : [] }; }
       throw new Error('모의 DB 가 모르는 SQL: ' + sql.slice(0, 60));
     } },

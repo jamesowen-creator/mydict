@@ -11,15 +11,16 @@ const { startApp, createAnthropicMock } = require('./helpers/app');
 
 function createDb() {
   const db = { users: new Map(), usage: [], queries: [], failUsageCheck: false, wordbookInserts: [], userUpdates: [] };
-  db.users.set(7, { is_blocked: false, can_search: true, can_wordbook: true, role: 'user' });
-  db.users.set(8, { is_blocked: false, can_search: false, can_wordbook: true, role: 'user' });
-  db.users.set(5, { is_blocked: true, can_search: true, can_wordbook: true, role: 'user' });
-  db.users.set(9, { is_blocked: false, can_search: true, can_wordbook: true, role: 'admin' });
+  db.users.set(7, { is_approved: true, is_blocked: false, can_search: true, can_wordbook: true, role: 'user' });
+  db.users.set(8, { is_approved: true, is_blocked: false, can_search: false, can_wordbook: true, role: 'user' });
+  db.users.set(5, { is_approved: true, is_blocked: true, can_search: true, can_wordbook: true, role: 'user' });
+  db.users.set(9, { is_approved: true, is_blocked: false, can_search: true, can_wordbook: true, role: 'admin' });
   db.pool = {
     query: async (sql, params = []) => {
       db.queries.push(sql);
       let m;
-      if ((m = /^SELECT is_blocked, (\w+) FROM users/.exec(sql))) { const u = db.users.get(params[0]); return { rows: u ? [{ is_blocked: u.is_blocked, [m[1]]: u[m[1]] }] : [] }; }
+      if (/^SELECT is_approved, is_blocked, role FROM users/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ is_approved: u.is_approved, is_blocked: u.is_blocked, role: u.role }] : [] }; }
+      if ((m = /^SELECT is_blocked, (\w+) FROM users/.exec(sql))) { const u = db.users.get(params[0]); return { rows: u ? [{ is_approved: true, is_blocked: u.is_blocked, [m[1]]: u[m[1]] }] : [] }; }
       if (/^SELECT role FROM users/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ role: u.role }] : [] }; }
       if (/FROM api_usage/.test(sql)) { if (db.failUsageCheck) throw new Error('usage check boom'); return { rows: [{ n: db.usage.filter(u => u.userId === params[0] && u.eventType === 'ai').length }] }; }
       if (/^INSERT INTO wordbook/.test(sql)) { db.wordbookInserts.push(params); return { rows: [{ id: 1, word: params[1] }] }; }
@@ -121,7 +122,7 @@ test('338-7. 단어장 입력 검증: 숫자·객체·배열 등 예상 밖 타�
 test('338-8. 관리자 사용자 수정 입력 검증: 본문이 배열·문자열이거나 값 타입이 틀리면 400, 정상 값은 통과', async t => {
   const a = await setup(['routes/admin.js']); t.after(() => a.t.close());
   const P = '/api/admin/users/7';
-  for (const body of [[1], 'text', undefined, { role: 'owner' }, { role: {} }, { role: true }, { can_tts: 'yes' }, { can_tts: 1 }, { is_blocked: null }, { perm_voice_study: {} }]) assert.equal((await a.patch(P, body)).status, 400, JSON.stringify(body));
+  for (const body of [[1], 'text', undefined, { role: 'owner' }, { role: {} }, { role: true }, { can_tts: 'yes' }, { can_tts: 1 }, { is_approved: true, is_blocked: null }, { perm_voice_study: {} }]) assert.equal((await a.patch(P, body)).status, 400, JSON.stringify(body));
   assert.equal(a.db.userUpdates.length, 0);
   assert.equal((await a.patch(P, { role: 'user', can_tts: false, perm_concept_map: true })).status, 200); assert.equal(a.db.userUpdates.length, 1);
 });

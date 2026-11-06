@@ -2,8 +2,8 @@
 // users: 1 = 권한 있음, 3 = 권한 없음, 4 = DB 관리자, 5 = 이메일 관리자(행 없음, ADMIN_EMAILS=u5@example.com), 9 = 권한 있지만 차단. 그 밖은 행 없음.
 function createSlDb({ failUsers = false } = {}) {
   const db = { queries: [], audio: new Map(), usage: [], failUsers,
-    users: new Map([[1, { role: 'user', is_blocked: false, perm_speakloop: true }], [3, { role: 'user', is_blocked: false, perm_speakloop: false }],
-      [4, { role: 'admin', is_blocked: false, perm_speakloop: false }], [9, { role: 'user', is_blocked: true, perm_speakloop: true }]]) };
+    users: new Map([[1, { role: 'user', is_approved: true, is_blocked: false, perm_speakloop: true }], [3, { role: 'user', is_approved: true, is_blocked: false, perm_speakloop: false }],
+      [4, { role: 'admin', is_approved: true, is_blocked: false, perm_speakloop: false }], [9, { role: 'user', is_approved: true, is_blocked: true, perm_speakloop: true }]]) };
   db.pool = {
     query: async (sql, params = []) => {
       const s = sql.replace(/\s+/g, ' ').trim();
