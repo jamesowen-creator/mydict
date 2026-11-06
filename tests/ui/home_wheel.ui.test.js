@@ -47,8 +47,8 @@ async function cycle(page) {
   return out;
 }
 
-test('홈 휠: 권한 없음·값 없음·false·문자열 "true"·로그인 전은 기본 6개(일본어 문법 없음)', { skip: SKIP }, async () => {
-  for (const [name, me, token] of [['로그인 전', null, null], ['값 없음', {}, userToken()], ['false', { perm_jgrammar: false }, userToken()], ['문자열 "true"', { perm_jgrammar: 'true' }, userToken()]]) {
+test('홈 휠: 권한 없음·값 없음·false·문자열 "true"는 기본 6개(로그인 전은 406에서 9개 표시 — home_loggedout 시험)(일본어 문법 없음)', { skip: SKIP }, async () => {
+  for (const [name, me, token] of [['값 없음', {}, userToken()], ['false', { perm_jgrammar: false }, userToken()], ['문자열 "true"', { perm_jgrammar: 'true' }, userToken()]]) {
     const page = await openHome(me, { token });
     assert.deepEqual(await cycle(page), BASE6, name);
     await page.close();

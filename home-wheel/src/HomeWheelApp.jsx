@@ -26,11 +26,12 @@ const JGRAMMAR_OPTION = { id: 'jgrammar', name: '문장 학습', description: '�
 const SPEAKLOOP_OPTION = { id: 'speakloop', name: 'Speak Loop', description: '원어민 소리로 듣고 따라 하며 영어 말하기', url: '/speakloop.html' };
 
 // 로그인한 사용자 기준 휠 항목: 기본 6개 + (권한자) 일본어 문법(언어 사전 다음) + (권한자) 개념 지도(맨 끝). 로그인 전·권한 없음이면 기본 6개 그대로.
-function buildOptions(user) {
+// 작업406: loggedOut(토큰도 사용자도 없는 로그인 전)이면 9개를 모두 보인다(순서는 로그인 후 목록과 같다). 항목을 누르면 이동 대신 로그인을 시작한다(goTo).
+function buildOptions(user, loggedOut) {
   const list = [...OPTIONS];
-  if (user && (user.perm_jgrammar === true || user.role === 'admin')) list.splice(list.findIndex((o) => o.id === 'dictionary') + 1, 0, JGRAMMAR_OPTION);
-  if (user && user.perm_concept_map === true) list.push(CMAP_OPTION);
-  if (user && (user.perm_speakloop === true || user.role === 'admin')) list.push(SPEAKLOOP_OPTION);
+  if (loggedOut || (user && (user.perm_jgrammar === true || user.role === 'admin'))) list.splice(list.findIndex((o) => o.id === 'dictionary') + 1, 0, JGRAMMAR_OPTION);
+  if (loggedOut || (user && user.perm_concept_map === true)) list.push(CMAP_OPTION);
+  if (loggedOut || (user && (user.perm_speakloop === true || user.role === 'admin'))) list.push(SPEAKLOOP_OPTION);
   return list;
 }
 
@@ -40,9 +41,10 @@ export default function HomeWheelApp() {
   const [authChecked, setAuthChecked] = useState(false);
   // 작업405: 안내 상태 — null | 'pending'(승인 대기) | 'blocked'(차단). hasToken 은 토큰이 있는 경우(승인 취소·차단된 기존 사용자)라 [다시 확인]·[로그아웃]을 보인다.
   const [notice, setNotice] = useState(null);
-  const [hasToken, setHasToken] = useState(false);
+  const [hasToken, setHasToken] = useState(() => !!getToken());
   const [checking, setChecking] = useState(false);
-  const options = useMemo(() => buildOptions(user), [user]);
+  const loggedOut = !user && !hasToken;
+  const options = useMemo(() => buildOptions(user, loggedOut), [user, loggedOut]);
 
   useEffect(() => {
     // 9-a: unapproved signups never get a JWT (see routes/auth.js's OAuth
@@ -79,7 +81,9 @@ export default function HomeWheelApp() {
 
   const goTo = (id) => {
     const target = options.find((o) => o.id === id);
-    if (target) window.location.href = target.url;
+    if (!target) return;
+    // 작업406: 로그인 전에는 화면 이동 대신 Google 로그인을 시작한다(405 게이트가 홈으로 되돌리므로). 돌아오는 경로는 보존하지 않는다.
+    window.location.href = loggedOut ? '/auth/google' : target.url;
   };
 
   const handleLogout = () => {

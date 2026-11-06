@@ -44,8 +44,8 @@ async function cycle(page) {
   return out;
 }
 
-test('홈 휠: 권한 없음·값 없음·false·문자열 "true"·로그인 전에는 Speak Loop 가 없다', { skip: SKIP }, async () => {
-  for (const [name, me, token] of [['로그인 전', null, null], ['값 없음', {}, userToken()], ['false', { perm_speakloop: false }, userToken()], ['문자열 "true"', { perm_speakloop: 'true' }, userToken()]]) {
+test('홈 휠: 권한 없음·값 없음·false·문자열 "true"·(로그인 전 제외 — 406: 로그인 전은 9개 모두 표시)에는 Speak Loop 가 없다', { skip: SKIP }, async () => {
+  for (const [name, me, token] of [['값 없음', {}, userToken()], ['false', { perm_speakloop: false }, userToken()], ['문자열 "true"', { perm_speakloop: 'true' }, userToken()]]) {
     const page = await openHome(me, { token });
     assert.deepEqual(await cycle(page), BASE6, name);
     await page.close();
