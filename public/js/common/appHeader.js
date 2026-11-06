@@ -19,12 +19,17 @@
     localStorage.removeItem(TOKEN_KEY);
   }
 
+  // 작업405: 마지막 /api/me 실패 상태(401 이 아니면 토큰을 지우면 안 된다 — 승인 대기·차단·서버 오류 때 공통 게이트의 [다시 확인]이 토큰을 써야 한다)
+  let lastMeStatus = 0;
+
   async function fetchMe(token) {
     try {
       const res = await fetch('/api/me', { headers: { Authorization: 'Bearer ' + token } });
+      lastMeStatus = res.status;
       if (!res.ok) return null;
       return await res.json();
     } catch {
+      lastMeStatus = 0;
       return null;
     }
   }
@@ -95,8 +100,8 @@
     const user = await fetchMe(token);
     if (seq !== container._metisRenderSeq) return;   // 더 새로운 호출이 있으면 그쪽이 그린다
     if (!user) {
-      // 토큰이 만료/무효화된 경우 - 조용히 정리하고 로그인 버튼으로 대체
-      clearToken();
+      // 토큰이 만료/무효화된 경우(401) - 조용히 정리하고 로그인 버튼으로 대체. 그 밖의 실패(승인 대기·차단 403, 서버 오류, 연결 오류)는 토큰을 남긴다(작업405)
+      if (lastMeStatus === 401) clearToken();
       showLoginLink();
       return;
     }

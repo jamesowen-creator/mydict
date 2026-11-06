@@ -59,6 +59,7 @@ test('공용 헤더: 관리자는 로고 아래 "관리자 · 이름 님", rende
 test('공용 헤더: 로그인 전에는 로그인 버튼만 있고 로고 아래 글줄은 숨겨짐', { skip: SKIP }, async () => {
   srv.reset();
   srv.state.authed = false;
+  srv.state.gateOff = true;   // 작업405: 게이트는 로그인 전 화면을 열지 않으므로, 공용 헤더 자체의 로그인 전 모양을 보는 이 시험은 게이트 없이 연다
   const page = await browser.newPage({ width: 390, height: 844, token: null });
   await page.goto(srv.url + '/literature_compass.html');
   await page.waitFor("!!document.querySelector('.metis-app-header .metis-app-header-btn.primary')", 8000);

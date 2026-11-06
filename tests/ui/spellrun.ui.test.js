@@ -28,7 +28,7 @@ const ROWS = [
 ];
 
 let srv, base, browser;
-const state = { me: null, rows: ROWS, tts: 200, ttsDelay: 0, ttsHeader: null, requests: [] };
+const state = { gateOff: false, me: null, rows: ROWS, tts: 200, ttsDelay: 0, ttsHeader: null, requests: [] };
 const resetState = () => { state.me = { id: 7, email: 'u@x', name: '테스터', role: 'user', can_wordbook: true, perm_jgrammar: false }; state.rows = ROWS; state.tts = 200; state.ttsDelay = 0; state.ttsHeader = null; state.requests.length = 0; };
 test.before(async () => {
   if (SKIP) return;
@@ -36,6 +36,7 @@ test.before(async () => {
   srv = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x'), u = url.pathname;
     const json = (c, b) => { res.writeHead(c, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(b)); };
+    if (state.gateOff && u === '/js/common/authGate.js') { res.writeHead(200, { 'Content-Type': 'application/javascript' }); return res.end('/* 작업405: 이 시험은 게이트 없이 화면 자체 동작을 본다(게이트는 auth_gate.ui.test.js) */'); }
     if (u.startsWith('/api/')) {
       const chunks = [];
       req.on('data', d => chunks.push(d));
@@ -85,6 +86,7 @@ const SPEECH = `(() => {
 // 게임 페이지를 직접 연다. ids 가 있으면 sessionStorage 에 넣고, token=false 면 로그인 토큰 없이 연다.
 async function openGame({ ids, token = true, width = 390, height = 844, speech = false, query = '', dodge = true, blockObst = false, seed } = {}) {   // 작업386: seed 가 있으면 Math.random 을 그 숫자로 고정한 난수로 바꾼다(358-6 과 같은 방식)
   state.requests.length = 0;
+  state.gateOff = !token;   // 작업405: 토큰 없는 상태의 화면 동작(안내만 보이고 게임 시작 안 함)을 보는 시험은 게이트 없이 연다(게이트는 auth_gate.ui.test.js)
   const page = await browser.newPage({ width, height, token: token ? jwt() : null });
   await withDodge(page, dodge);
   if (blockObst) { await page.send('Network.enable'); await page.send('Network.setBlockedURLs', { urls: ['*spellrun_obstacles_sheet*'] }); }

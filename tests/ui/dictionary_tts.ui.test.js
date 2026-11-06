@@ -18,12 +18,13 @@ const TOKEN = `${b64({ alg: 'none' })}.${b64({ id: 7, name: '테스터', exp: Ma
 const WAV = (() => { const n = 800, b = Buffer.alloc(44 + n, 128); b.write('RIFF', 0); b.writeUInt32LE(36 + n, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(8000, 24); b.writeUInt32LE(8000, 28); b.writeUInt16LE(1, 32); b.writeUInt16LE(8, 34); b.write('data', 36); b.writeUInt32LE(n, 40); return b; })();
 
 let srv, base, browser;
-const state = { reqs: [], plan: [] };   // plan: 호출마다 앞에서 하나씩 꺼내 쓴다 { status, delay, body }. 비면 200 오디오
+const state = { reqs: [], plan: [], gateOff: false };   // plan: 호출마다 앞에서 하나씩 꺼내 쓴다 { status, delay, body }. 비면 200 오디오
 test.before(async () => {
   if (SKIP) return;
   srv = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x'), u = url.pathname;
     const json = (c, b) => { res.writeHead(c, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(b)); };
+    if (state.gateOff && u === '/js/common/authGate.js') { res.writeHead(200, { 'Content-Type': 'application/javascript' }); return res.end('/* 작업405: 이 시험은 게이트 없이 화면 자체 동작을 본다(게이트는 auth_gate.ui.test.js) */'); }
     if (u.startsWith('/api/')) {
       const chunks = [];
       req.on('data', d => chunks.push(d));
@@ -63,6 +64,7 @@ const MOCKS = speech => `(() => {
 
 async function open({ token = true, speech = true } = {}) {
   state.reqs.length = 0; state.plan.length = 0;
+  state.gateOff = !token;   // 작업405: 토큰 없는 상태의 화면 동작을 보는 시험은 게이트 없이 연다(게이트는 auth_gate.ui.test.js)
   const page = await browser.newPage({ width: 390, height: 844, token: 'x' });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: MOCKS(speech) });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: token ? `try { localStorage.setItem('mydict_token', ${JSON.stringify(TOKEN)}); } catch (e) {}` : "try { localStorage.removeItem('mydict_token'); } catch (e) {}" });

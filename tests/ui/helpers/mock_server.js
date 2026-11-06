@@ -20,6 +20,7 @@ function freshState() {
   return {
     me: { id: 7, email: 'u7@example.com', name: '테스터', role: 'user', perm_concept_study: true },
     authed: true,
+    gateOff: false,     // 작업405: true 면 /js/common/authGate.js 를 빈 파일로 대신 내려, 토큰 없음·조회 실패 상태의 화면 자체 동작을 시험할 수 있다(게이트는 auth_gate.ui.test.js 가 시험)
     studies: [], items: [], links: [], nextId: 1,
     explorePlan: [], respondPlan: [], refreshPlan: [],
     log: [],            // { method, url, body }
@@ -360,6 +361,7 @@ async function startMockServer() {
         try { await handleApi(req, res, url, body); } catch (e) { res.writeHead(500); res.end(String(e && e.message)); }
         return;
       }
+      if (state.gateOff && url.pathname === '/js/common/authGate.js') { res.writeHead(200, { 'Content-Type': 'application/javascript' }); res.end('/* 작업405: 게이트 끔 */'); return; }
       const rel = url.pathname === '/' ? '/home/index.html' : url.pathname === '/admin' ? '/admin.html' : url.pathname;   // 서버의 '/'·'/admin' 라우트와 같게
       const file = path.join(PUBLIC, decodeURIComponent(rel));
       if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end('not found'); return; }

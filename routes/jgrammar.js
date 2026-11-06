@@ -95,3 +95,4 @@ router.delete('/api/jgrammar/saved/:id', requireAuth, requireJgrammarPerm, async
 });
 
 module.exports = router;
+module.exports.requireJgrammarPerm = requireJgrammarPerm;   // 작업405: 기능 권한 검사를 req/res/DB 모의로 직접 시험하려고 이름만 내보낸다(동작 변경 없음)

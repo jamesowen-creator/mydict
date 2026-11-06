@@ -15,8 +15,9 @@ const userToken = (role = 'user') => `${b64({ alg: 'none' })}.${b64({ id: 7, rol
 const BASE6 = ['언어 사전', '문학 나침반', '한입 독서', '과학', '음성 학습', '작가 노트'];   // 작업N: 현재 기본 휠(개념학습 삭제, 작가 노트 포함). 개념 지도는 그 뒤에 붙는다
 const labels = page => page.eval("[...document.querySelectorAll('[role=option]')].map(o => o.getAttribute('aria-label').split(' — ')[0])");
 
-async function openMap(me, { token = userToken() } = {}) {
+async function openMap(me, { token = userToken(), gateOff = false } = {}) {
   srv.reset();
+  srv.state.gateOff = gateOff;   // 작업405: 토큰 없음·조회 실패는 게이트가 화면 앞에서 막으므로, 화면 자체의 접근 거부 동작을 보는 시험은 게이트 없이 연다
   if (me === 'fail') srv.state.authed = false; else srv.state.me = { id: 7, email: 'u7@example.com', name: '테스터', role: 'user', ...me };
   const page = await browser.newPage({ width: 390, height: 844, token });
   await page.goto(srv.url + '/concept_map.html');
@@ -26,7 +27,7 @@ async function openMap(me, { token = userToken() } = {}) {
 const visible = (page, id) => page.eval(`!document.getElementById('${id}').hidden`);
 
 test('개념 지도 화면: 권한 없음·값 없음·조회 실패·토큰 없음은 접근 거부', { skip: SKIP }, async () => {
-  for (const [name, me, opts] of [['false', { perm_concept_map: false }, {}], ['값 없음', {}, {}], ['조회 실패(401)', 'fail', {}], ['토큰 없음', { perm_concept_map: true }, { token: null }]]) {
+  for (const [name, me, opts] of [['false', { perm_concept_map: false }, {}], ['값 없음', {}, {}], ['조회 실패(401)', 'fail', { gateOff: true }], ['토큰 없음', { perm_concept_map: true }, { token: null, gateOff: true }]]) {
     const page = await openMap(me, opts);
     assert.equal(await visible(page, 'access-denied'), true, name + ': 접근 거부 화면');
     assert.equal(await visible(page, 'app'), false, name + ': 본문 숨김');

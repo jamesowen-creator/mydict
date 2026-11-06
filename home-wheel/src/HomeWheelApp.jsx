@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ThreeDWheelPicker } from './ThreeDWheelPicker.jsx';
-import { getToken, clearToken, fetchMe } from './auth.js';
+import { getToken, clearToken, fetchMeResult } from './auth.js';
 
 // Array-based so adding a future menu item is just adding an entry here.
 // No `icon` field (작업10-a removed the per-item icons - text-only cards now;
@@ -38,26 +38,44 @@ export default function HomeWheelApp() {
   const [selected, setSelected] = useState(OPTIONS[0].id);
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [pendingApproval, setPendingApproval] = useState(false);
+  // 작업405: 안내 상태 — null | 'pending'(승인 대기) | 'blocked'(차단). hasToken 은 토큰이 있는 경우(승인 취소·차단된 기존 사용자)라 [다시 확인]·[로그아웃]을 보인다.
+  const [notice, setNotice] = useState(null);
+  const [hasToken, setHasToken] = useState(false);
+  const [checking, setChecking] = useState(false);
   const options = useMemo(() => buildOptions(user), [user]);
 
   useEffect(() => {
     // 9-a: unapproved signups never get a JWT (see routes/auth.js's OAuth
     // callback) - they're bounced back here with this query param instead of
     // `?token=...`, so there's no `/api/me` call to make for this case.
+    // 작업405: 콜백이 붙이는 ?approval=pending|blocked 도 같은 안내로 보이고, 보인 뒤 주소에서 지운다.
     const params = new URLSearchParams(window.location.search);
-    if (params.get('approval') === 'pending') {
-      setPendingApproval(true);
+    const approval = params.get('approval');
+    if (approval === 'pending' || approval === 'blocked') {
+      setNotice(approval);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     const token = getToken();
     if (!token) { setAuthChecked(true); return; }
-    fetchMe(token)
-      .then((me) => setUser(me))
-      .catch(() => {})
-      .finally(() => setAuthChecked(true));
+    setHasToken(true);
+    checkMe(token).finally(() => setAuthChecked(true));
   }, []);
+
+  // 토큰이 있으면 /api/me 로 상태를 본다: 200 사용자, 403 approval_pending·blocked 는 안내, 401 은 토큰 삭제(로그인 버튼). 그 밖(503·연결 오류)은 예전처럼 로그인 전 모양.
+  const checkMe = (token) => fetchMeResult(token).then((r) => {
+    if (r.status === 200) { setUser(r.body); setNotice(null); }
+    else if (r.status === 403 && r.code === 'approval_pending') setNotice('pending');
+    else if (r.status === 403 && r.code === 'blocked') setNotice('blocked');
+    else if (r.status === 401) { clearToken(); setHasToken(false); }
+  });
+
+  const recheck = () => {
+    const token = getToken();
+    if (!token || checking) return;
+    setChecking(true);
+    checkMe(token).finally(() => setChecking(false));
+  };
 
   const goTo = (id) => {
     const target = options.find((o) => o.id === id);
@@ -67,6 +85,8 @@ export default function HomeWheelApp() {
   const handleLogout = () => {
     clearToken();
     setUser(null);
+    setNotice(null);
+    setHasToken(false);
   };
 
   return (
@@ -102,14 +122,45 @@ export default function HomeWheelApp() {
           fill whatever space is left between the top edge and the fixed-size
           login row below, and centers the wheel within that space - the
           "위/중간/아래 자연스럽게 분배" 작업10-b asked for. */}
-      {pendingApproval ? (
+      {notice ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-          <div className="text-lg font-bold" style={{ color: 'rgba(30,41,59,.85)' }}>승인 대기중</div>
-          <div className="text-sm leading-relaxed" style={{ color: 'rgba(30,41,59,.6)' }}>
-            관리자 승인 후 이용 가능합니다.
-            <br />
-            승인이 완료되면 다시 로그인해 주세요.
+          <div className="text-lg font-bold" style={{ color: 'rgba(30,41,59,.85)' }}>
+            {notice === 'blocked' ? '이용할 수 없는 계정입니다' : hasToken ? '승인을 기다리고 있습니다' : '승인 대기중'}
           </div>
+          <div className="text-sm leading-relaxed" style={{ color: 'rgba(30,41,59,.6)' }}>
+            {notice === 'blocked' ? (
+              '관리자에게 문의해 주세요.'
+            ) : hasToken ? (
+              '관리자가 승인하면 사용할 수 있습니다. 승인 후 아래 [다시 확인]을 눌러 주세요.'
+            ) : (
+              <>
+                관리자 승인 후 이용 가능합니다.
+                <br />
+                승인이 완료되면 다시 로그인해 주세요.
+              </>
+            )}
+          </div>
+          {hasToken && (
+            <div className="mt-2 flex flex-col items-center gap-2">
+              {notice === 'pending' && (
+                <button
+                  onClick={recheck}
+                  disabled={checking}
+                  className="min-h-[44px] rounded-[10px] px-5 text-sm font-semibold text-white"
+                  style={{ background: '#b8442e' }}
+                >
+                  다시 확인
+                </button>
+              )}
+              <button
+                onClick={handleLogout}
+                className="min-h-[44px] rounded-[10px] px-5 text-sm font-semibold"
+                style={{ color: 'rgba(30,41,59,.6)' }}
+              >
+                로그아웃
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex flex-1 items-center justify-center">
@@ -132,7 +183,7 @@ export default function HomeWheelApp() {
         // env(safe-area-inset-bottom)와 비교해 더 큰 쪽을 여백으로 사용.
         style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
       >
-        {!pendingApproval && authChecked && (
+        {!notice && authChecked && (
           user ? (
             <div className="flex items-center gap-3">
               {user.role === 'admin' && (

@@ -25,6 +25,18 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+// 작업405: /api/me 의 상태를 그대로 돌려준다 — 승인 대기(403 approval_pending)·차단(403 blocked)·토큰 무효(401)를 홈이 구분하려고.
+export async function fetchMeResult(token) {
+  try {
+    const res = await fetch('/api/me', { headers: { Authorization: `Bearer ${token}` } });
+    let body = null;
+    try { body = await res.json(); } catch { /* 본문 없음 */ }
+    return { status: res.status, code: body && body.code, body };
+  } catch {
+    return { status: 0, code: null, body: null };
+  }
+}
+
 export async function fetchMe(token) {
   const res = await fetch('/api/me', { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) return null;
