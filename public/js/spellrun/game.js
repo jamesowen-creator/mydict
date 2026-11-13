@@ -1928,7 +1928,7 @@ function pickWords(rows, ids) {
     if (seen.has(key)) continue;
     seen.add(key);
     const hp = buildHint(r, key, meaning);   // 단어장에 저장된 값만 쓴다(AI 호출 없음). 힌트의 모든 문자열에서 정답 단어와 활용형은 ＿＿ 로 가린다
-    words.push({ id: r.id, word: key, meaning: meaning, hint: hp.hint, pop: hp.pop });
+    words.push({ id: r.id, word: key, meaning: meaning, hint: hp.hint, pop: hp.pop, pv: L.previewInfo(r, key, meaning) });   // 작업414: 미리 보기용 짧은 뜻·상세(저장된 값만)
   }
   return { words: words, excluded: excluded };
 }
@@ -1995,36 +1995,27 @@ function showGame(words, excluded) {
   setupHelpUI();
   requestAnimationFrame(frame);
 }
-// ---------- 작업345: 시작 전 단어 미리 보기 ----------
-// previewRun(words, onReady): words = [{ word, meaning }] 를 순서대로 하나씩 보여 주며 발음을 읽고, 끝나거나 건너뛰면 "시작" 단추가 있는 준비 상태에서 멈춘 뒤
-// 사용자가 시작을 누르면 onReady() 를 부른다(돌아가기는 onBack). 게임 상태(G)를 건드리지 않아 대결에서도 그대로 쓸 수 있다.
+// ---------- 작업345·414: 시작 전 단어 미리 보기 ----------
+// previewRun(words, onReady, onBack): words = [{ word, meaning, pv? }] 를 한 단어씩 보여 준다. 자동으로 넘기지 않는다 — 사용자가 [이전]·[다음] 아이콘(키보드 Space·Enter·→ / ←)으로 넘기고,
+// 마지막 단어에서는 [다음] 자리의 재생 아이콘이 게임 시작이다. [건너뛰기]도 바로 시작한다. 닫기 아이콘은 onBack. 단어가 보일 때마다 발음을 한 번 읽는다.
+// 게임 상태(G)를 건드리지 않아 대결에서도 그대로 쓸 수 있다.
 const PV_MAX = 10;
-const PV_T = { maxMs: 6000, gapMs: 800, silentMs: 2500 };   // 한 단어 최대 시간, 재생 뒤 쉬는 시간, 소리를 껐을 때 한 단어를 보여 주는 시간. 시험이 줄여 쓴다
-const PV = { active: false, mode: '', words: [], idx: 0, token: 0, timers: [], userPaused: false, hiddenPaused: false, onReady: null, onBack: null, lastNote: '', prefetching: 0, maxPrefetch: 0, noPrefetch: false, wordsShown: [] };
-function pvClear() { PV.timers.forEach(clearTimeout); PV.timers = []; }
-function pvLater(fn, ms, tk) { PV.timers.push(setTimeout(() => { if (tk === PV.token && PV.active) fn(); }, ms)); }
+const PV_T = {};   // 작업414: 자동 넘김 시간이 없어졌다. 예전처럼 시험이 Object.assign 해도 오류가 나지 않게 빈 객체로 둔다
+const PV = { active: false, mode: '', words: [], idx: 0, token: 0, hiddenPaused: false, onReady: null, onBack: null, lastNote: '', prefetching: 0, maxPrefetch: 0, noPrefetch: false, wordsShown: [] };
 // 같은 종류의 안내는 연달아 다시 띄우지 않는다
 function pvNote(kind, text) { if (PV.lastNote === kind) return; PV.lastNote = kind; $('pvNote').textContent = text; }
-const pvRunning = () => PV.active && PV.mode === 'show' && !PV.userPaused && !PV.hiddenPaused;
-// 한 단어 발음. 게임과 같은 경로(서버 TTS → 기기 음성)를 쓰고, 끝났을 때 done() 을 한 번 부른다. 서버 발음이 안 되면 기기 음성으로 대신한다
-function pvSpeak(word, tk, done) {
-  let fin = false;
-  const end = () => { if (!fin) { fin = true; if (tk === PV.token) done(); } };
+// 한 단어 발음. 게임과 같은 경로(서버 TTS → 기기 음성)를 쓴다. 단어가 바뀌면(token) 이전 단어의 늦은 응답은 재생하지 않아 소리가 겹치지 않는다. 서버 발음이 안 되면 기기 음성으로 대신한다
+function pvSpeak(word, tk) {
   const builtin = status => {
+    if (tk !== PV.token) return;
     if (status === 429) pvNote('429', '서버 발음 한도에 걸려 기기 음성으로 읽어요.');
     else if (status === 401 || status === 403) pvNote('auth', '서버 발음을 쓸 수 없어 기기 음성으로 읽어요. 다시 로그인해 보세요.');
     else if (status) pvNote('tts', '서버 발음을 쓸 수 없어 기기 음성으로 읽어요.');
-    speakBuiltin(word, undefined, false, ok => { if (!ok) end(); });
-    if (lastUtt) { lastUtt.onend = end; const prev = lastUtt.onerror; lastUtt.onerror = e => { if (prev) prev(e); end(); }; }
+    speakBuiltin(word, undefined, false, () => {});
   };
   if (serverTtsOff && !audioCache.has(word)) { builtin(serverTtsStatus); return; }
-  getServerAudio(word).then(url => playUrl(url, 1, false)).then(() => {
-    if (tk !== PV.token) return;
-    const onEnd = () => { player.removeEventListener('ended', onEnd); player.removeEventListener('error', onEnd); end(); };
-    player.addEventListener('ended', onEnd); player.addEventListener('error', onEnd);
-    if (player.ended) onEnd();
-  }, err => {
-    if (err && err.name === 'AbortError') { end(); return; }
+  getServerAudio(word).then(url => (tk !== PV.token ? null : playUrl(url, 1, false))).then(null, err => {   // 받기 실패와 재생 거부(자동 재생 제한 등) 모두 기기 음성으로 대신한다
+    if (err && err.name === 'AbortError') return;
     builtin(err && err.status);
   });
 }
@@ -2040,63 +2031,82 @@ function pvPrefetch(i, tk) {
   const cur = audioCache.get(PV.words[i].word);
   if (cur) cur.then(go, go); else go();
 }
+const pvInfo = w => (w.pv && Array.isArray(w.pv.shorts) && w.pv.shorts.length ? w.pv : { shorts: [w.meaning], detail: [], keys: [] });
 function pvRender() {
-  const w = PV.words[PV.idx];
+  const w = PV.words[PV.idx], info = pvInfo(w), last = PV.idx + 1 >= PV.words.length;
   $('pvProg').textContent = (PV.idx + 1) + '/' + PV.words.length;
-  $('pvWord').textContent = w.word; $('pvMean').textContent = w.meaning;
-  $('pvArea').disabled = false; $('pvArea').setAttribute('aria-label', '다음 단어로 (' + w.word + ' ' + w.meaning + ')');
-  $('pvPause').textContent = PV.userPaused ? '계속' : '일시정지'; $('pvPause').setAttribute('aria-pressed', String(PV.userPaused));
-  $('pvCtl').hidden = false; $('pvStart').hidden = true;
+  $('pvWord').textContent = w.word;
+  const mean = $('pvMean'); mean.textContent = '';
+  info.shorts.forEach(t => { const sp = document.createElement('span'); sp.className = 'pvm1'; sp.textContent = t; mean.appendChild(sp); });
+  // 상세: 정의 전체(짧은 뜻과 다를 때) · usage_note · 보조 키워드. 보여 줄 것이 없으면 펼치기를 숨긴다. 단어가 바뀌면 접힘으로 돌아간다
+  const det = $('pvDetail'); det.textContent = '';
+  const add = (cls, text) => { const p = document.createElement('p'); p.className = cls; p.textContent = text; det.appendChild(p); };
+  info.detail.forEach(b => { if (b.def) add('pvd', b.def); if (b.note) add('pvd soft', b.note); });
+  if (info.keys.length) add('pvd soft', info.keys.join(' · '));
+  const can = det.childNodes.length > 0, mb = $('pvMeanBtn');
+  det.hidden = true; mb.disabled = !can; $('pvMore').hidden = !can;
+  if (can) { mb.setAttribute('aria-expanded', 'false'); mb.setAttribute('aria-label', w.word + ' 뜻 자세히 보기'); } else { mb.removeAttribute('aria-expanded'); mb.removeAttribute('aria-label'); }
+  $('pvPrev').disabled = PV.idx === 0;
+  $('pvNext').setAttribute('aria-label', last ? '게임 시작' : '다음 단어');
+  $('pvIcNext').toggleAttribute('hidden', last); $('pvIcPlay').toggleAttribute('hidden', !last);   // SVG 요소에는 hidden 프로퍼티가 없어 속성으로 바꾼다
+}
+function pvToggleDetail() {
+  const mb = $('pvMeanBtn'), det = $('pvDetail');
+  if (!PV.active || mb.disabled) return;
+  const open = det.hidden;
+  det.hidden = !open; mb.setAttribute('aria-expanded', String(open));
 }
 function pvShow(i) {
-  pvClear(); stopVoices();
+  stopVoices();
   const tk = ++PV.token;
   PV.mode = 'show'; PV.idx = i; PV.wordsShown.push(PV.words[i].word);
   pvRender();
-  if (!pvRunning()) return;
-  const w = PV.words[i];
-  pvLater(() => pvAdvance(), PV_T.maxMs, tk);   // 재생이 끝나지 않아도 한 단어 최대 시간이 지나면 넘어간다
-  if (!SND.on) { pvLater(() => pvAdvance(), PV_T.silentMs, tk); return; }
-  pvSpeak(w.word, tk, () => pvLater(() => pvAdvance(), PV_T.gapMs, tk));
+  if (PV.hiddenPaused) return;
+  try { $('pvNext').focus({ preventScroll: true }); } catch (e) { /* 포커스 실패는 무시 */ }
+  if (!SND.on) return;
+  pvSpeak(PV.words[i].word, tk);
   pvPrefetch(i, tk);
 }
-function pvAdvance() {
+function pvGo(dir) {
   if (!PV.active || PV.mode !== 'show') return;
-  if (PV.idx + 1 < PV.words.length) pvShow(PV.idx + 1); else pvReady();
+  const st = L.previewStep(PV.idx, PV.words.length, dir);
+  if (st.start) { pvBegin(); return; }
+  if (st.idx !== PV.idx) pvShow(st.idx);
 }
-function pvReady() {
-  pvClear(); stopVoices(); PV.token++; PV.mode = 'ready'; PV.userPaused = false;
-  $('pvProg').textContent = PV.words.length + '개를 훑어봤어요';
-  $('pvWord').textContent = '준비됐나요?'; $('pvMean').textContent = '시작을 누르면 바로 달려요.';
-  $('pvArea').disabled = true; $('pvArea').setAttribute('aria-label', '준비됐나요?');
-  $('pvCtl').hidden = true; $('pvStart').hidden = false; $('pvStart').focus();
-}
-function pvPauseToggle() {
-  if (!PV.active || PV.mode !== 'show') return;
-  PV.userPaused = !PV.userPaused;
-  if (PV.userPaused) { pvClear(); stopVoices(); PV.token++; pvRender(); } else pvShow(PV.idx);   // 계속하면 지금 단어를 처음부터 다시 읽는다
-}
-function pvStop() { PV.active = false; PV.mode = ''; pvClear(); PV.token++; stopVoices(); $('pv').hidden = true; }
+function pvBegin() { tryFs(); const f = PV.onReady; pvStop(); if (f) f(); }
+function pvStop() { PV.active = false; PV.mode = ''; PV.token++; stopVoices(); $('pv').hidden = true; }
 function previewRun(words, onReady, onBack) {
   const list = (words || []).slice(0, PV_MAX);
   if (!list.length) { onReady(); return; }
-  Object.assign(PV, { active: true, words: list, idx: 0, userPaused: false, hiddenPaused: document.hidden, onReady: onReady, onBack: onBack, lastNote: '', prefetching: 0, maxPrefetch: 0, noPrefetch: false, wordsShown: [] });
+  Object.assign(PV, { active: true, words: list, idx: 0, hiddenPaused: document.hidden, onReady: onReady, onBack: onBack, lastNote: '', prefetching: 0, maxPrefetch: 0, noPrefetch: false, wordsShown: [] });
   $('pvNote').textContent = '';
   els.start.hidden = true; els.result.hidden = true; $('pv').hidden = false;
   pvShow(0);
 }
+// 판 풀의 단어에 미리 보기용 짧은 뜻·상세를 붙인다(판 풀 객체 자체는 바꾸지 않는다)
+function pvList(pool) { return pool.map(w => { const v = VALID_WORDS.find(x => x.word === w.word); return { word: w.word, meaning: w.meaning, pv: v ? v.pv : null }; }); }
 function setupPreviewUI() {
-  $('pvArea').addEventListener('click', () => { if (PV.active && PV.mode === 'show') pvAdvance(); });
-  $('pvPause').addEventListener('click', pvPauseToggle);
-  $('pvSkip').addEventListener('click', () => { if (PV.active && PV.mode === 'show') pvReady(); });
-  $('pvStart').addEventListener('click', () => { tryFs(); const f = PV.onReady; pvStop(); if (f) f(); });
+  $('pvNext').addEventListener('click', () => pvGo(1));
+  $('pvPrev').addEventListener('click', () => pvGo(-1));
+  $('pvMeanBtn').addEventListener('click', pvToggleDetail);
+  $('pvSkip').addEventListener('click', () => { if (PV.active && PV.mode === 'show') pvBegin(); });
   $('pvBack').addEventListener('click', () => { const f = PV.onBack; pvStop(); if (f) f(); });
-  $('pv').addEventListener('keydown', e => { if (e.key === 'Escape') $('pvBack').click(); });
+  // 키보드: Space·Enter·→ 다음, ← 이전, Esc 돌아가기. 버튼에 포커스가 있을 때 Space·Enter 는 브라우저가 click 을 보내므로 여기서 또 처리하지 않는다(두 번 넘어가지 않게)
+  document.addEventListener('keydown', e => {
+    if (!PV.active || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === 'Escape') { $('pvBack').click(); return; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); pvGo(1); return; }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); pvGo(-1); return; }
+    if (e.key === ' ' || e.key === 'Spacebar' || e.key === 'Enter') {
+      if (e.target && e.target.closest && e.target.closest('button')) return;
+      e.preventDefault(); pvGo(1);
+    }
+  });
   // 작업351: 숨겨질 때와 되돌아올 수 있는 보관(pagehide persisted=true)은 같은 "숨겨짐" 멈춤이고, 다시 보일 때와 보관에서 돌아올 때(pageshow persisted=true)는 같은 재개다.
-  // 사용자가 직접 멈춘 상태(userPaused)는 돌아와도 멈춘 채로 둔다. 둘이 함께 와도 재개는 한 번만(hiddenPaused 와 직전 0.5초 기록).
+  // 재개는 지금 단어를 처음부터 다시 읽는다(자동 넘김이 없어져 멈출 것은 발음뿐이다). 둘이 함께 와도 재개는 한 번만(hiddenPaused 와 직전 0.5초 기록).
   let pvResumedAt = 0;
-  const pvHide = () => { if (PV.active && PV.mode === 'show' && !PV.hiddenPaused) { PV.hiddenPaused = true; pvClear(); stopVoices(); PV.token++; } };
-  const pvResume = () => { if (PV.active && PV.mode === 'show' && PV.hiddenPaused) { PV.hiddenPaused = false; if (!PV.userPaused) pvShow(PV.idx); } };   // 지금 단어부터 이어 간다
+  const pvHide = () => { if (PV.active && PV.mode === 'show' && !PV.hiddenPaused) { PV.hiddenPaused = true; stopVoices(); PV.token++; } };
+  const pvResume = () => { if (PV.active && PV.mode === 'show' && PV.hiddenPaused) { PV.hiddenPaused = false; pvShow(PV.idx); } };   // 지금 단어부터 이어 간다
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) pvHide(); else { pvResumedAt = Date.now(); pvResume(); }
   });
@@ -2110,7 +2120,7 @@ function beginRound(reviewOnly) {
   if (!P.pool.length) return;
   primeAudio();   // 이 클릭으로 소리 재생 권한을 확보한다(미리 보기의 자동 재생)
   const back = () => { els.start.hidden = false; };
-  previewRun(P.pool.map(w => ({ word: w.word, meaning: w.meaning })), () => startRound(reviewOnly, P), back);
+  previewRun(pvList(P.pool), () => startRound(reviewOnly, P), back);
 }
 // ---------- 작업344: 대결 입구(방 목록·만들기·참가·대기·준비). 서버 API 는 작업343(/api/versus/rooms). 게임 연결은 다음 작업 ----------
 const VS_MIN_WORDS = 10;   // 서버 start 가 10 미만을 400 으로 막는다
@@ -2593,7 +2603,7 @@ async function vsGo() {
     vsgBegin(P, roomId, res.data);
   };
   $('vs').hidden = true; primeAudio();
-  if (previewOn) previewRun(P.pool.map(w => ({ word: w.word, meaning: w.meaning })), begin, backToRoom);
+  if (previewOn) previewRun(pvList(P.pool), begin, backToRoom);
   else begin();
 }
 // 작업350: 앱이 다시 보일 때(visibilitychange)와 페이지 보관에서 돌아올 때(pageshow persisted)의 재개는 같은 동작이다.

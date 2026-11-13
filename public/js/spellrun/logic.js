@@ -1329,6 +1329,51 @@ function planRound(words, missed, cfg, rng, reviewOnly) {
   return { list: list, bossIdx: shape.bossIdx, regular: shape.regular };
 }
 
+// 작업414: 미리 보기 화면용 뜻 목록·상세·이전/다음 계산(순수 함수). 단어장에 저장된 값만 읽는다(AI·네트워크 없음).
+// 뜻 데이터를 읽는 곳은 이 함수 하나다: main(대표 뜻 = 게임이 읽는 short_meaning), meanings[].definition(없으면 core_meaning), meanings[].usage_note(없으면 nuance), 옛 구조의 data.nuance.
+// shorts: 큰 글자로 보일 짧은 뜻 줄. 대표 뜻 → 둘째 이후 뜻에서 새로 나온 키워드 줄(최대 4줄). 쉼표로 나열된 정의가 길면 항목 단위로만 줄이고(keywords), 쉼표 없는 긴 문장은 그대로 둔다.
+// detail: 펼쳤을 때 [{ def, note }] — def 는 정의 전체(보인 짧은 뜻과 다를 때만), note 는 usage_note. keys: 위에 나오지 않은 보조 키워드(buildHint 규칙: 정답 단어는 가리고 최대 6개).
+const PV_MAX_LINES = 4;
+function previewInfo(row, word, main) {
+  const d = row && row.data && typeof row.data === 'object' ? row.data : {};
+  const meanings = Array.isArray(d.meanings) ? d.meanings.filter(function (m) { return m && typeof m === 'object'; }) : [];
+  const defOf = function (m) { return txt(m.definition) || txt(m.core_meaning); };
+  const seen = new Set(splitKeywords(main));
+  const shorts = main ? [main] : [];
+  const shown = [];
+  meanings.forEach(function (m, i) {
+    shown[i] = '';
+    if (i === 0) { shown[i] = main; return; }
+    if (shorts.length >= PV_MAX_LINES) return;
+    const fresh = splitKeywords(keywords(defOf(m), 40)).filter(function (k) { return !seen.has(k); });
+    if (!fresh.length) return;
+    fresh.forEach(function (k) { seen.add(k); });
+    shown[i] = fresh.join(', ');
+    shorts.push(shown[i]);
+  });
+  const detail = [];
+  meanings.forEach(function (m, i) {
+    const def = defOf(m), note = txt(m.usage_note) || txt(m.nuance);
+    const dshow = def && def !== shown[i] ? def : '';
+    if (dshow || note) detail.push({ def: dshow, note: note });
+  });
+  if (!meanings.length && txt(d.nuance)) detail.push({ def: '', note: txt(d.nuance) });
+  const keys = [];
+  meanings.forEach(function (m) {
+    splitKeywords(defOf(m)).forEach(function (k) {
+      if (keys.length >= 6 || seen.has(k)) return;
+      seen.add(k); keys.push(maskText(k, word));
+    });
+  });
+  return { shorts: shorts, detail: detail, keys: keys };
+}
+// 미리 보기 이전(-1)·다음(+1). 첫 단어에서 이전은 그대로, 마지막 단어에서 다음은 게임 시작(start: true)
+function previewStep(idx, len, dir) {
+  if (!(len > 0)) return { idx: 0, start: true };
+  if (dir > 0) return idx + 1 < len ? { idx: idx + 1, start: false } : { idx: len - 1, start: true };
+  return { idx: Math.max(0, Math.min(len - 1, idx - 1)), start: false };
+}
+
 return {
   CONFIG: CONFIG, ALPHABET: ALPHABET, CONFUSABLE: CONFUSABLE, isAlpha: isAlpha, shuffle: shuffle, heuristicCuts: heuristicCuts, getSyllables: getSyllables,
   chunkProbFor: chunkProbFor, planSlots: planSlots, mutateChunk: mutateChunk, makeCandidates: makeCandidates, comboMult: comboMult, slotPoints: slotPoints,
@@ -1339,6 +1384,6 @@ return {
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
   survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, balloonRise: balloonRise, balloonRiseY: balloonRiseY, SOUND: SOUND, PENTA: PENTA, comboNote: comboNote, tempoCoef: tempoCoef, tempoStep: tempoStep, slotSec: slotSec, resumePos: resumePos, duckLevel: duckLevel, rampValue: rampValue, noiseSamples: noiseSamples, noteMidi: noteMidi, midiFreq: midiFreq, SONGS: SONGS, songEvents: songEvents, eventVoices: eventVoices, sfxPlan: sfxPlan, buildSoundGraph: buildSoundGraph, makeNoiseBuffer: makeNoiseBuffer, playVoices: playVoices, CHAR_FX: CHAR_FX, charSquash: charSquash, runBob: runBob, charShadow: charShadow, wrongFx: wrongFx, rightHop: rightHop, starFx: starFx, reactNext: reactNext, reactKind: reactKind, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamOffscreen: streamOffscreen,
-  wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords
+  wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords, previewInfo: previewInfo, previewStep: previewStep
 };
 });

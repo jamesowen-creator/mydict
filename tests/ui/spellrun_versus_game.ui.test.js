@@ -146,10 +146,12 @@ test('시작 흐름(미리 보기 켬): 미리 보기가 끝나 게임이 실제
   await click(page, '#vsGo');
   await page.waitFor("!document.getElementById('pv').hidden");
   assert.equal(calls('POST', /\/start$/).length, 0, '미리 보기 중에는 시작 알림 없음');
-  await page.waitFor("!document.getElementById('pvStart').hidden", 10000);
-  await sleep(1200);   // 준비 상태에서 한참 머문다
-  assert.equal(calls('POST', /\/start$/).length, 0, '준비 상태에서도 아직 없음');
-  await click(page, '#pvStart');
+  // 작업414: 자동 넘김이 없어졌다 — 마지막 단어까지 [다음]으로 넘기면 [다음] 자리가 재생 아이콘(게임 시작)이 된다
+  await page.waitFor("document.getElementById('pvProg').textContent.indexOf('1/') === 0", 10000);
+  for (let i = 0; i < 20 && (await page.eval("document.getElementById('pvNext').getAttribute('aria-label')")) !== '게임 시작'; i++) await click(page, '#pvNext');
+  await sleep(1200);   // 마지막 단어에서 한참 머문다
+  assert.equal(calls('POST', /\/start$/).length, 0, '마지막 단어에서도 아직 없음');
+  await click(page, '#pvNext');   // 재생 아이콘 = 게임 시작
   await running(page);
   assert.equal(calls('POST', /\/start$/).length, 1);
   assert.ok(await page.eval('SpellRun.G.time - SpellRun.G.startTime') < 1, '시계는 시작 누른 뒤부터');

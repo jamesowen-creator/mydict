@@ -160,12 +160,30 @@
   background:transparent;border:calc(2 * var(--u)) solid var(--ink);border-radius:999px;padding:calc(5 * var(--u)) calc(14 * var(--u));
 }
 .sr-box .toggle[aria-pressed="true"]{background:var(--ink);color:#fff}
-.sr-box .pvarea{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(8 * var(--u));min-height:calc(120 * var(--u));width:100%;padding:calc(10 * var(--u));cursor:pointer;font-family:var(--f-body);color:var(--ink);background:#eef0f6;border:calc(2 * var(--u)) solid var(--ink);border-radius:calc(16 * var(--u));text-align:center}
-.sr-box .pvarea:disabled{cursor:default}
-.sr-box .pvarea:focus-visible{outline:calc(3 * var(--u)) solid var(--ink);outline-offset:calc(3 * var(--u))}
-.sr-box .pvw{font-family:var(--f-letter);font-weight:700;font-size:calc(34 * var(--u));line-height:1.1;overflow-wrap:anywhere;max-width:100%}
-.sr-box .pvm{font-weight:700;font-size:calc(24 * var(--u));line-height:1.25;overflow-wrap:anywhere;word-break:keep-all;max-width:100%}
-.sr-box #pv .toggle{align-self:center}
+/* 작업414: 단어 미리 보기(미니멀). 카드 안에 박스·테두리·구분 영역 없이 여백과 글자 위계로만 구성: 진행 표시 → 단어 → 짧은 뜻 → 아이콘. 카드 바깥 모양은 작업382 시작 카드와 같다 */
+.sr-box #pv .card{border-width:calc(2 * var(--u));box-shadow:0 calc(10 * var(--u)) calc(28 * var(--u)) rgba(20,32,74,.28);gap:calc(2 * var(--u));padding:calc(4 * var(--u)) calc(16 * var(--u)) calc(10 * var(--u));overflow:hidden}
+.sr-box .pvtop{display:flex;align-items:center;justify-content:space-between}
+.sr-box .pvprog{font-size:max(11px,calc(12 * var(--u)));font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.sr-box #pv svg{width:calc(24 * var(--u));height:calc(24 * var(--u));min-width:20px;min-height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.sr-box .pvx,.sr-box .pvic,.sr-box .pvgo{display:inline-flex;align-items:center;justify-content:center;flex:none;box-sizing:border-box;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:var(--ink);cursor:pointer;width:max(44px,calc(48 * var(--u)));height:max(44px,calc(48 * var(--u)))}
+.sr-box .pvgo{width:max(48px,calc(56 * var(--u)));height:max(48px,calc(56 * var(--u)));background:var(--coral);box-shadow:0 calc(6 * var(--u)) calc(16 * var(--u)) rgba(255,107,90,.35)}
+.sr-box .pvic:disabled{visibility:hidden}
+.sr-box .pvx:focus-visible,.sr-box .pvic:focus-visible,.sr-box .pvgo:focus-visible,.sr-box .pvmeanbtn:focus-visible,.sr-box .pvskip:focus-visible{outline:calc(3 * var(--u)) solid var(--ink);outline-offset:calc(3 * var(--u))}
+.sr-box .pvmain{flex:1 1 auto;min-height:calc(140 * var(--u));overflow:auto;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:calc(8 * var(--u));text-align:center}
+.sr-box .pvw{font-family:var(--f-letter);font-weight:700;font-size:calc(36 * var(--u));line-height:1.1;overflow-wrap:anywhere;max-width:100%}
+.sr-box .pvmeanbtn{display:flex;flex-direction:column;align-items:center;gap:calc(4 * var(--u));width:100%;min-height:44px;margin:0;padding:calc(4 * var(--u)) calc(8 * var(--u));border:0;background:transparent;font:inherit;color:inherit;cursor:pointer}
+.sr-box .pvmeanbtn:disabled{cursor:default}
+.sr-box .pvm{display:flex;flex-direction:column;align-items:center;gap:calc(2 * var(--u))}
+.sr-box .pvm1{font-weight:700;font-size:calc(22 * var(--u));line-height:1.3;overflow-wrap:anywhere;word-break:keep-all;max-width:100%}
+.sr-box .pvmore{display:inline-flex;align-items:center;gap:calc(2 * var(--u));font-size:max(11px,calc(12 * var(--u)));font-weight:700;color:var(--ink-soft)}
+.sr-box .pvmore svg{width:calc(14 * var(--u));height:calc(14 * var(--u));min-width:12px;min-height:12px;stroke-width:2.6}
+.sr-box .pvmeanbtn[aria-expanded="true"] .pvmore svg{transform:rotate(180deg)}
+.sr-box .pvdetail{width:100%;display:flex;flex-direction:column;gap:calc(8 * var(--u));text-align:left}
+.sr-box .pvd{font-size:max(11px,calc(14 * var(--u)));font-weight:500;line-height:1.5;word-break:keep-all;overflow-wrap:anywhere}
+.sr-box .pvd.soft{color:var(--ink-soft)}
+.sr-box .pvfoot{display:flex;flex-direction:column;align-items:center;gap:calc(2 * var(--u))}
+.sr-box .pvnav{display:flex;align-items:center;justify-content:center;gap:calc(20 * var(--u))}
+.sr-box .pvskip{min-height:44px;margin:0;padding:0 calc(14 * var(--u));border:0;background:transparent;font-family:var(--f-body);font-size:max(11px,calc(12 * var(--u)));font-weight:700;color:var(--ink-soft);text-decoration:underline;cursor:pointer}
 .sr-box #help .card{overflow:hidden}
 .sr-box .helphead{display:flex;align-items:center;justify-content:space-between;gap:calc(8 * var(--u))}
 .sr-box .helphead .title{text-align:left}
@@ -299,14 +317,11 @@ body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
 .sr-box.land #resInfo{grid-column:1;grid-row:1;display:flex;flex-direction:column;gap:calc(8 * var(--u));justify-content:center}
 .sr-box.land #resMain{grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:calc(8 * var(--u))}
 .sr-box.land #resTitle{font-size:calc(30 * var(--u))}
-.sr-box.land #pv .card{display:grid;grid-template-columns:1fr 1fr;column-gap:calc(16 * var(--u));row-gap:calc(6 * var(--u));align-content:center}
-.sr-box.land #pv .pvarea{grid-column:1;grid-row:1 / span 6;min-height:0;align-self:stretch}
-.sr-box.land #pvTitle{grid-column:2;grid-row:1;font-size:calc(26 * var(--u))}
-.sr-box.land #pvProg{grid-column:2;grid-row:2}
-.sr-box.land #pvNote{grid-column:2;grid-row:3}
-.sr-box.land #pvCtl{grid-column:2;grid-row:4}
-.sr-box.land #pvStart{grid-column:2;grid-row:5}
-.sr-box.land #pvBack{grid-column:2;grid-row:6}
+.sr-box.land #pv .card{display:grid;grid-template-columns:1fr auto;grid-template-rows:auto minmax(0,1fr) auto;column-gap:calc(20 * var(--u));row-gap:calc(2 * var(--u));align-content:center}
+.sr-box.land .pvtop{grid-column:1 / -1;grid-row:1}
+.sr-box.land .pvmain{grid-column:1;grid-row:2;min-height:0}
+.sr-box.land #pvNote{grid-column:1;grid-row:3}
+.sr-box.land .pvfoot{grid-column:2;grid-row:2 / span 2;align-self:center}
 /* 대결 화면: 목록·대기·결과를 2열로. 방 목록(내용이 많은 곳)만 영역 안 스크롤 */
 .sr-box.land #vs .title.small{font-size:calc(24 * var(--u))}
 .sr-box.land #vs .vlist{max-height:calc(190 * var(--u))}

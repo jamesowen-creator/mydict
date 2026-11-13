@@ -1,4 +1,4 @@
-// 작업345: 스펠링 런 시작 전 단어 미리 보기(자동 순차 재생). 헤드리스 Chrome 360×640(일부 390).
+// 작업345·414: 스펠링 런 시작 전 단어 미리 보기. 작업414에서 자동 순차 재생을 없애고 아이콘으로 직접 넘기는 방식(이전·다음·재생=시작·닫기·건너뛰기), 짧은 뜻 줄과 펼치기, 키보드, 미니멀 배치로 바뀌었다. 헤드리스 Chrome 여러 크기.
 // 자체 임시 서버에 모의 /api/me·/api/wordbook·/api/tts 만 둔다 — 실제 서버·운영 서버·실제 TTS 와 무관.
 // 실행: node --test tests/ui/spellrun_preview.ui.test.js   (Chrome이 없으면 건너뜀)
 const test = require('node:test');
@@ -75,36 +75,60 @@ async function openGame({ query = '', width = 360, height = 640, speech = true, 
   await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
   return page;
 }
-const fast = (page, t = {}) => page.eval(`Object.assign(SpellRun.preview.T, ${JSON.stringify(Object.assign({ maxMs: 1500, gapMs: 40, silentMs: 80 }, t))})`);
 const click = (page, sel) => page.eval(`document.querySelector(${JSON.stringify(sel)}).click()`);
 const waitFor = (page, cond, ms = 6000) => page.waitFor(cond, ms);
 const pvShown = page => page.eval('SpellRun.preview.state.wordsShown.slice()');
-const ready = page => waitFor(page, "!document.getElementById('pvStart').hidden");
 const noErrors = page => assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
+const idxOf = page => page.eval('SpellRun.preview.state.idx');
+const prog = page => page.eval("document.getElementById('pvProg').textContent");
+const isLast = page => page.eval("document.getElementById('pvNext').getAttribute('aria-label') === '게임 시작'");
+// 작업414: 한 단어 앞으로. 새 단어가 보일 때까지 기다린다
+const next = async page => { const i = await idxOf(page); await click(page, '#pvNext'); await waitFor(page, `SpellRun.preview.state.idx === ${i + 1}`); };
+// 마지막 단어까지 [다음]으로 넘긴다(자동 넘김이 없으므로 시험이 직접 넘긴다). 단어마다 발음 호출이 끝나길 기다리지는 않는다
+const walkToLast = async page => { while (!(await isLast(page))) await next(page); };
+// 시작 흐름: 시작 → 미리 보기 → 마지막까지 넘기고 재생 아이콘으로 게임 시작
+const startGame = async page => { await click(page, '#startBtn'); await waitFor(page, "!document.getElementById('pv').hidden"); };
+const playing = page => waitFor(page, "SpellRun.G.state === 'run' || SpellRun.G.state === 'intro'");
+// 가짜 오디오 재생: 몇 번 재생을 시작했는지만 센다(소리·네트워크 없음)
+const AUDIO = `(() => { window.__plays = 0; HTMLMediaElement.prototype.play = function () { window.__plays++; return Promise.resolve(); }; })();`;
+// 데이터에 짧은 뜻·여러 뜻·usage_note 가 있는 단어장(모든 행 같은 모양): short_meaning 은 단어마다 다르게
+const richRows = () => WORDS.slice(0, 12).map((w, i) => ({ id: i + 1, word: w, lang: 'en', created_at: new Date(2026, 9, 1, 0, 0, 100 - i).toISOString(),
+  data: { word: w, lang: 'en', short_meaning: w + ' 뜻', meanings: [{ pos: 'noun', definition: w + ' 뜻, 보조뜻', usage_note: '쓰임 설명입니다.' }, { pos: 'verb', definition: '동사뜻' }] } }));
+// 짧은 뜻·상세를 직접 넘겨 미리 보기를 연다(판 시작 없이 화면만)
+const openPv = async (page, list) => {
+  await page.eval(`window.__ready = 0; window.__back = 0; SpellRun.preview.run(${JSON.stringify(list)}, () => { window.__ready++; }, () => { window.__back++; })`);
+};
+const W = (word, shorts, detail, keys) => ({ word, meaning: shorts[0], pv: { shorts, detail: detail || [], keys: keys || [] } });
+const DETAIL_LONG = [{ def: '주위를 둘러싸고 있는 자연적·사회적 조건 전체를 뜻하는 말로 쓰이는 명사입니다', note: '사람이 살아가는 데 영향을 주는 주변의 모든 조건을 넓게 가리킬 때 자주 쓰고, 일터나 학교처럼 사회적 분위기를 말할 때도 쓰는 표현입니다. 글에서는 격식을 갖춘 느낌을 줍니다.' }, { def: '', note: '두 번째 뜻의 쓰임 설명도 이어서 길게 적혀 있는 경우를 가정한 문장입니다.' }];
 
-test('켜짐(기본): 시작 → 미리 보기가 이번 판 순서대로 나오고 발음을 한 번씩 부르며, 끝나면 자동 시작 없이 시작 단추에서 멈춘다. 시작하면 같은 순서로 판이 열린다', { skip: SKIP }, async () => {
+test('켜짐(기본): 시작 → 미리 보기는 저절로 넘어가지 않고, 사용자가 [다음]으로 넘기며 단어마다 발음을 한 번씩 부른다. 마지막의 재생 아이콘을 누르면 같은 순서로 판이 열린다', { skip: SKIP }, async () => {
   resetState();
-  const page = await openGame(); await fast(page);
+  const page = await openGame();
   assert.equal(await page.eval('SpellRun.preview.isOn()'), true);
   assert.equal(await page.eval("document.querySelector('#optRow button[data-mode=\"preview\"]').textContent"), '미리 보기 켬');
-  await click(page, '#startBtn');
-  await waitFor(page, "!document.getElementById('pv').hidden");
+  await startGame(page);
   assert.notEqual(await page.eval('SpellRun.G.state'), 'run', '미리 보기 동안 판은 시작되지 않음');
   assert.equal(await page.eval("document.getElementById('start').hidden"), true);
-  await waitFor(page, "parseInt(document.getElementById('pvProg').textContent, 10) >= 1");   // 작업388: '1/10' 정확 일치는 부하에서 지나쳐 시간 초과가 났다
+  assert.equal(await prog(page), '1/10');
   const first = await page.eval("({ w: document.getElementById('pvWord').textContent, m: document.getElementById('pvMean').textContent })");
   assert.equal(first.m, first.w + ' 뜻', '단어와 대표 뜻이 함께 나옴');
-  await ready(page);
+  await sleep(1500);   // 예전에는 이 사이에 저절로 넘어갔다
+  assert.equal(await prog(page), '1/10', '자동 넘김 없음');
+  assert.equal((await pvShown(page)).length, 1);
+  assert.equal(await page.eval("document.getElementById('pvPrev').disabled"), true, '첫 단어에서는 이전이 없다');
+  assert.equal(await page.eval("document.getElementById('pvNext').getAttribute('aria-label')"), '다음 단어');
+  await walkToLast(page);
+  assert.equal(await prog(page), '10/10');
   const shown = await pvShown(page);
-  assert.equal(shown.length, 10, '10단어');
-  assert.equal(new Set(shown).size, 10);
-  assert.equal(ttsCalls().length, 10, '발음 호출은 단어당 한 번');
-  assert.deepEqual(ttsCalls().map(r => JSON.parse(r.body).text), shown, '발음도 보여 준 순서');
+  assert.equal(shown.length, 10, '10단어'); assert.equal(new Set(shown).size, 10);
+  const deadline = Date.now() + 4000; while (ttsCalls().length < 10 && Date.now() < deadline) await sleep(30);
+  assert.deepEqual(ttsCalls().map(r => JSON.parse(r.body).text), shown, '발음 호출은 단어당 한 번, 보여 준 순서');
   await sleep(400);
   assert.notEqual(await page.eval('SpellRun.G.state'), 'run', '마지막에 자동으로 시작하지 않음');
-  assert.match(await page.eval("document.getElementById('pvProg').textContent"), /10개/);
-  await click(page, '#pvStart');
-  await waitFor(page, "SpellRun.G.state === 'run' || SpellRun.G.state === 'intro'");
+  assert.equal(await page.eval("document.getElementById('pvIcPlay').hasAttribute('hidden')"), false, '마지막은 재생 아이콘');
+  assert.equal(await page.eval("document.getElementById('pvIcNext').hasAttribute('hidden')"), true);
+  await click(page, '#pvNext');
+  await playing(page);
   assert.deepEqual(await page.eval('SpellRun.G.words.slice(0, 10).map(w => w.word)'), shown, '미리 본 순서 = 실제 출제 순서');
   assert.equal(await page.eval("document.getElementById('pv').hidden"), true);
   noErrors(page);
@@ -119,7 +143,7 @@ test('끄기: 스위치로 끄면 저장(spellrun_preview)되고 시작이 바�
   assert.equal(await page.eval("document.querySelector('#optRow button[data-mode=\"preview\"]').textContent"), '미리 보기 끔');
   assert.equal(await page.eval("document.querySelector('#optRow button[data-mode=\"preview\"]').getAttribute('aria-pressed')"), 'false');
   await click(page, '#startBtn');
-  await waitFor(page, "SpellRun.G.state === 'run' || SpellRun.G.state === 'intro'");
+  await playing(page);
   assert.equal(await page.eval("document.getElementById('pv').hidden"), true, '끄면 미리 보기 화면 없음');
   assert.equal(ttsCalls().length <= 1, true, '미리 보기용 발음 호출 없음(게임의 첫 단어 연출 발음만)');
   await page.close();
@@ -140,47 +164,43 @@ test('끄기: 스위치로 끄면 저장(spellrun_preview)되고 시작이 바�
   await page.close();
 });
 
-test('상한: 단어가 10개를 넘으면 처음 10개만(생존 모드 포함). 건너뛰기는 바로 준비 상태, 탭하면 다음 단어, 일시정지/계속', { skip: SKIP }, async () => {
+test('상한·이동: 단어가 10개를 넘으면 처음 10개만(생존 모드 포함). 다음·이전 아이콘으로 오가고, 건너뛰기는 바로 시작한다', { skip: SKIP }, async () => {
   resetState();
-  let page = await openGame({ query: '?survival=1' }); await fast(page);
-  await click(page, '#startBtn');
-  await ready(page);
+  let page = await openGame({ query: '?survival=1' });
+  await startGame(page); await walkToLast(page);
   const shown = await pvShown(page);
   assert.ok(shown.length <= 10 && shown.length >= 5, '생존 모드도 최대 10: ' + shown.length);
-  await click(page, '#pvStart');
-  await waitFor(page, "SpellRun.G.state === 'run' || SpellRun.G.state === 'intro'");
+  await click(page, '#pvNext');
+  await playing(page);
   assert.deepEqual(await page.eval('SpellRun.G.words.slice(0, ' + shown.length + ').map(w => w.word)'), shown, '생존 모드도 실제 출제 순서');
   await page.close();
 
-  page = await openGame(); await fast(page, { maxMs: 5000, gapMs: 3000 });   // 천천히 흘러가게 해 두고 조작한다
-  await page.eval("SpellRun.preview.run(" + JSON.stringify(Array.from({ length: 15 }, (_, i) => ({ word: 'w' + i, meaning: 'm' + i }))) + ", () => {}, () => {})");
+  page = await openGame();
+  await openPv(page, Array.from({ length: 15 }, (_, i) => ({ word: 'w' + i, meaning: 'm' + i })));   // pv 없이 {word, meaning} 만 와도 대표 뜻으로 보인다
   assert.equal(await page.eval('SpellRun.preview.state.words.length'), 10, '15개를 넘겨도 10개');
-  assert.equal(await page.eval("document.getElementById('pvProg').textContent"), '1/10');
-  await click(page, '#pvArea');
-  assert.equal(await page.eval("document.getElementById('pvProg').textContent"), '2/10', '탭하면 다음 단어');
+  assert.equal(await prog(page), '1/10');
+  assert.equal(await page.eval("document.getElementById('pvMean').textContent"), 'm0');
+  await click(page, '#pvNext'); await waitFor(page, "document.getElementById('pvProg').textContent === '2/10'");
   assert.equal(await page.eval("document.getElementById('pvWord').textContent"), 'w1');
-  await click(page, '#pvPause');
-  assert.equal(await page.eval("document.getElementById('pvPause').textContent"), '계속');
-  const n = ttsCalls().length; await sleep(500);
-  assert.equal(await page.eval("document.getElementById('pvProg').textContent"), '2/10');
-  assert.equal(ttsCalls().length, n, '일시정지 중에는 발음 호출도 없음');
-  await click(page, '#pvPause');
-  assert.equal(await page.eval("document.getElementById('pvPause').textContent"), '일시정지');
+  assert.equal(await page.eval("document.getElementById('pvPrev').disabled"), false);
+  await click(page, '#pvPrev'); await waitFor(page, "document.getElementById('pvProg').textContent === '1/10'");
+  assert.equal(await page.eval("document.getElementById('pvWord').textContent"), 'w0', '이전으로 되돌아감');
+  assert.equal(await page.eval("document.getElementById('pvPrev').disabled"), true);
+  await click(page, '#pvPrev'); await sleep(100);
+  assert.equal(await idxOf(page), 0, '첫 단어에서 이전을 눌러도 제자리');
   await click(page, '#pvSkip');
-  assert.equal(await page.eval("document.getElementById('pvStart').hidden"), false, '건너뛰기는 바로 시작 준비');
-  assert.equal(await page.eval("document.getElementById('pvCtl').hidden"), true);
-  assert.equal(await page.eval("document.activeElement && document.activeElement.id"), 'pvStart');
+  assert.equal(await page.eval('window.__ready'), 1, '건너뛰기는 바로 시작(onReady 1번)');
+  assert.equal(await page.eval("document.getElementById('pv').hidden"), true);
   await page.close();
 });
 
 test('미리 보기 시간은 생존 시간·시계에 들어가지 않는다(시작을 누른 순간부터 센다)', { skip: SKIP }, async () => {
   resetState();
-  const page = await openGame(); await fast(page, { maxMs: 3000, gapMs: 150 });
-  await click(page, '#startBtn');
-  await ready(page);
-  await sleep(1500);   // 준비 상태에서 한참 머문다
-  await click(page, '#pvStart');
-  await waitFor(page, "SpellRun.G.state === 'run' || SpellRun.G.state === 'intro'");
+  const page = await openGame();
+  await startGame(page); await walkToLast(page);
+  await sleep(1500);   // 마지막 단어에서 한참 머문다
+  await click(page, '#pvNext');
+  await playing(page);
   const t = await page.eval('SpellRun.G.time - SpellRun.G.startTime');
   assert.ok(t < 0.6, '시작 직후 경과 시간이 미리 보기 시간을 포함하지 않음: ' + t);
   await page.close();
@@ -188,14 +208,13 @@ test('미리 보기 시간은 생존 시간·시계에 들어가지 않는다(�
 
 test('다음 단어 발음은 현재 단어 요청이 끝난 뒤 하나만 미리 받는다(서버에 동시에 둘 이상 나가지 않는다)', { skip: SKIP }, async () => {
   resetState(); state.ttsDelay = 120;
-  const page = await openGame(); await fast(page, { maxMs: 3000, gapMs: 1500 });
-  await click(page, '#startBtn');
+  const page = await openGame();
+  await startGame(page);
   await waitFor(page, "document.getElementById('pvProg').textContent === '1/10'");
-  await waitFor(page, "SpellRun.preview.state.idx === 0", 2000);
   const deadline = Date.now() + 3000;
   while (ttsCalls().length < 2 && Date.now() < deadline) await sleep(30);
-  assert.equal(ttsCalls().length, 2, '첫 단어가 놀 때 다음 단어 하나를 미리 받음');
-  assert.equal(await page.eval('SpellRun.preview.state.idx'), 0, '아직 첫 단어에 머무는 중');
+  assert.equal(ttsCalls().length, 2, '첫 단어가 머무는 동안 다음 단어 하나를 미리 받음');
+  assert.equal(await idxOf(page), 0, '아직 첫 단어에 머무는 중');
   await sleep(300);
   assert.equal(ttsCalls().length, 2, '그 뒤로는 더 받지 않음');
   assert.equal(state.maxInflight, 1, '서버 동시 요청 최대 ' + state.maxInflight);
@@ -206,10 +225,13 @@ test('다음 단어 발음은 현재 단어 요청이 끝난 뒤 하나만 미�
 for (const status of [429, 503, 401, 403]) {
   test(`서버 발음 ${status}: 게임과 같은 방식으로 기기 음성으로 대신 읽고, 같은 종류의 안내는 연달아 다시 쓰지 않는다`, { skip: SKIP }, async () => {
     resetState(); state.tts = status;
-    const page = await openGame(); await fast(page);
+    const page = await openGame();
     await page.eval("window.__mut = 0; new MutationObserver(l => { window.__mut += l.length; }).observe(document.getElementById('pvNote'), { childList: true, characterData: true, subtree: true })");
-    await click(page, '#startBtn');
-    await ready(page);
+    await startGame(page);
+    for (let i = 0; i < 10; i++) {
+      await waitFor(page, `window.__speech.spoken.length === ${i + 1}`);   // 단어마다 기기 음성이 시작된 뒤에 넘긴다(바로 넘기면 이전 단어의 늦은 대체 음성은 일부러 읽지 않는다)
+      if (i < 9) await next(page);
+    }
     const spoken = await page.eval('window.__speech.spoken.slice()');
     assert.deepEqual(spoken, await pvShown(page), '기기 음성이 보여 준 순서대로 읽음');
     assert.match(await page.eval("document.getElementById('pvNote').textContent"), /기기 음성/);
@@ -221,39 +243,36 @@ for (const status of [429, 503, 401, 403]) {
   });
 }
 
-test('소리를 끄면 읽지 않고 정해진 시간만 보여 준다. 재생이 끝나지 않아도 한 단어 최대 시간이 지나면 넘어간다', { skip: SKIP }, async () => {
+test('소리를 끄면 읽지 않는다(발음 호출 0, 단어는 그대로 넘어감). 서버 실패+기기 음성 없음이어도 멈추지 않고 넘길 수 있다', { skip: SKIP }, async () => {
   resetState();
-  let page = await openGame(); await fast(page, { silentMs: 60 });
+  let page = await openGame();
   await click(page, '#sndStart');   // 소리 끔
-  await click(page, '#startBtn');
-  await ready(page);
+  await startGame(page); await walkToLast(page);
   assert.equal(ttsCalls().length, 0, '소리를 끄면 발음 호출 없음');
   assert.equal((await pvShown(page)).length, 10);
   await page.close();
 
-  page = await openGame({ speech: false }); await fast(page, { maxMs: 250, gapMs: 40 });
-  await page.eval("Object.defineProperty(window.SpellRun, 'x', { value: 1 })");
-  state.tts = 500;   // 서버 실패 + 기기 음성 없음 → 곧바로 끝난 것으로 보고 다음으로
-  await click(page, '#startBtn');
-  const t0 = Date.now();
-  await ready(page);
-  assert.ok(Date.now() - t0 < 10 * 400 + 2000, '단어당 상한을 넘기지 않음: ' + (Date.now() - t0));
+  page = await openGame({ speech: false });
+  state.tts = 500;   // 서버 실패 + 기기 음성 없음
+  await startGame(page); await walkToLast(page);
+  assert.equal((await pvShown(page)).length, 10, '소리가 안 나도 넘길 수 있다');
+  noErrors(page);
   await page.close();
 });
 
-test('탭이 숨겨지면 진행을 멈추고, 다시 보이면 이어 간다. 돌아가기는 재생을 멈추고 시작 화면으로 돌아간다', { skip: SKIP }, async () => {
+test('탭이 숨겨지면 발음을 멈추고 요청도 없다. 다시 보이면 지금 단어를 한 번 다시 읽는다. 돌아가기는 시작 화면으로 돌아간다', { skip: SKIP }, async () => {
   resetState();
-  const page = await openGame(); await fast(page, { maxMs: 3000, gapMs: 100 });
-  await click(page, '#startBtn');
-  await waitFor(page, "document.getElementById('pvProg').textContent === '1/10'");
+  const page = await openGame();
+  await startGame(page); await next(page);
   await page.eval("Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange'));");
   await sleep(200);
-  const idx = await page.eval('SpellRun.preview.state.idx'), n = state.requests.length;
-  await sleep(700);
-  assert.equal(await page.eval('SpellRun.preview.state.idx'), idx, '숨겨진 동안 단어가 넘어가지 않음');
+  const idx = await idxOf(page), n = state.requests.length, shownN = (await pvShown(page)).length;
+  await sleep(500);
+  assert.equal(await idxOf(page), idx, '숨겨진 동안 단어가 그대로');
   assert.equal(state.requests.length, n, '숨겨진 동안 요청 없음');
   await page.eval("Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange'));");
-  await waitFor(page, `SpellRun.preview.state.idx > ${idx}`, 4000);
+  await waitFor(page, `SpellRun.preview.state.wordsShown.length === ${shownN + 1}`, 4000);
+  assert.equal(await idxOf(page), idx, '같은 단어를 이어 간다');
   await click(page, '#pvBack');
   assert.equal(await page.eval("document.getElementById('pv').hidden"), true);
   assert.equal(await page.eval("document.getElementById('start').hidden"), false);
@@ -265,76 +284,44 @@ test('탭이 숨겨지면 진행을 멈추고, 다시 보이면 이어 간다. �
   await page.close();
 });
 
-test('360×640: 모드 줄에 미리 보기 스위치가 들어가도 시작 카드 스크롤 높이가 늘지 않고 시작 버튼 클릭이 막히지 않는다. 미리 보기 화면도 스크롤 없이 핵심이 보인다', { skip: SKIP }, async () => {
-  resetState();
-  const page = await openGame();
-  const g = await page.eval(`(() => {
-    const box = document.getElementById('box').getBoundingClientRect(), card = document.querySelector('#start .card'), b = document.getElementById('startBtn'), r = b.getBoundingClientRect();
-    const row = document.getElementById('modeRow').getBoundingClientRect(), cr = card.getBoundingClientRect();
-    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return { scroll: card.scrollHeight - card.clientHeight, btnInBox: r.top >= box.top && r.bottom <= box.bottom, hitOk: hit === b || b.contains(hit), rowW: row.width, rowH: row.height, btnH: document.querySelector('#modeRow button').getBoundingClientRect().height, rowScroll: document.getElementById('modeRow').scrollWidth - document.getElementById('modeRow').clientWidth, rowInCard: row.right <= cr.right + 0.5 && row.left >= cr.left - 0.5, docX: document.documentElement.scrollWidth - document.documentElement.clientWidth };
-  })()`);
-  console.log('[측정] 360×640 시작 카드: ' + JSON.stringify(g));
-  assert.ok(g.rowH <= g.btnH + 2, '모드 줄이 한 줄(스위치가 줄을 늘리지 않음): ' + JSON.stringify(g));
-  assert.ok(g.hitOk, '시작 버튼이 가려지지 않고 눌림: ' + JSON.stringify(g));
-  assert.ok(g.rowScroll <= 0 && g.rowInCard, '모드 줄이 카드 폭 안에 들어감: ' + JSON.stringify(g));
-  assert.ok(g.docX <= 0);
-  await fast(page, { maxMs: 4000, gapMs: 4000 });
-  await page.click('#startBtn');
-  await waitFor(page, "!document.getElementById('pv').hidden");
-  const p = await page.eval(`(() => {
-    const box = document.getElementById('box').getBoundingClientRect(), card = document.querySelector('#pv .card');
-    const inBox = id => { const r = document.getElementById(id).getBoundingClientRect(); return r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5 && r.left >= box.left - 0.5 && r.right <= box.right + 0.5; };
-    return { scroll: card.scrollHeight - card.clientHeight, area: inBox('pvArea'), pause: inBox('pvPause'), skip: inBox('pvSkip'), back: inBox('pvBack'), h: document.getElementById('pvPause').getBoundingClientRect().height };
-  })()`);
-  console.log('[측정] 360×640 미리 보기: ' + JSON.stringify(p));
-  assert.ok(p.area && p.pause && p.skip && p.back, JSON.stringify(p));
-  assert.ok(p.scroll <= 1, '카드 스크롤 없음: ' + JSON.stringify(p));
-  assert.ok(p.h >= 44, '터치 크기');
-  noErrors(page);
-  await page.close();
-});
-
-// 작업351: 페이지 보관(bfcache). pagehide persisted=true 는 미리 보기를 끝내지 않고 숨겨짐처럼 멈추며, 돌아오면(pageshow persisted=true) 지금 단어부터 한 번만 이어 간다.
+// 작업351: 페이지 보관(bfcache). pagehide persisted=true 는 미리 보기를 끝내지 않고 숨겨짐처럼 멈추며, 돌아오면(pageshow persisted=true) 지금 단어를 한 번만 다시 읽는다.
 const pagehide = (page, persisted) => page.eval(`window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: ${persisted} }))`);
 const pageshow = (page, persisted) => page.eval(`window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: ${persisted} }))`);
 const setHidden = (page, h) => page.eval(`Object.defineProperty(document, 'hidden', { configurable: true, get: () => ${h} }); document.dispatchEvent(new Event('visibilitychange'));`);
 
-test('보관(pagehide persisted=true) → 복귀(pageshow): 미리 보기가 끝나지 않고 멈췄다가 같은 단어부터 한 번만 이어지고, 끝나면 시작이 그대로 동작한다', { skip: SKIP }, async () => {
+test('보관(pagehide persisted=true) → 복귀(pageshow): 미리 보기가 끝나지 않고 멈췄다가 같은 단어를 한 번만 다시 읽고, 펼침은 접히며, 이전·다음·시작이 그대로 동작한다', { skip: SKIP }, async () => {
   for (const withVisibility of [true, false]) {   // 보관에 들어갈 때 visibilitychange 가 함께 오는 브라우저 / 오지 않는 브라우저
     resetState();
-    const page = await openGame(); await fast(page, { maxMs: 3000, gapMs: 2500 });
-    await click(page, '#startBtn');
-    await waitFor(page, "document.getElementById('pvProg').textContent === '1/10'");   // 단어가 저절로 넘어가지 않을 만큼 느리게(재개 횟수를 세기 위해)
-    await page.eval("document.getElementById('pvArea').click()");   // 탭하면 다음 단어
-    await waitFor(page, "document.getElementById('pvProg').textContent === '2/10'");
+    const page = await openGame();
+    await startGame(page); await next(page);
+    assert.equal(await prog(page), '2/10');
     if (withVisibility) await setHidden(page, true);
     await pagehide(page, true);
     await sleep(200);
     assert.equal(await page.eval('SpellRun.preview.state.active'), true, '끝나지 않는다');
     assert.equal(await page.eval("document.getElementById('pv').hidden"), false);
-    const idx = await page.eval('SpellRun.preview.state.idx'), shownN = (await pvShown(page)).length, n = state.requests.length;
-    await sleep(700);
-    assert.equal(await page.eval('SpellRun.preview.state.idx'), idx, '멈춘 동안 단어가 넘어가지 않음');
+    const idx = await idxOf(page), shownN = (await pvShown(page)).length, n = state.requests.length;
+    await sleep(500);
+    assert.equal(await idxOf(page), idx, '멈춘 동안 단어가 그대로');
     assert.equal(state.requests.length, n, '멈춘 동안 요청 없음');
     if (withVisibility) await setHidden(page, false);
     await pageshow(page, true);
     await waitFor(page, `SpellRun.preview.state.wordsShown.length === ${shownN + 1}`, 3000);
     const shown = await pvShown(page);
-    assert.equal(shown[shownN], shown[shownN - 1], '같은 단어부터 이어 간다');
+    assert.equal(shown[shownN], shown[shownN - 1], '같은 단어를 다시 읽는다');
     await sleep(300);
     assert.equal((await pvShown(page)).length, shownN + 1, '재개는 한 번만(visibilitychange 와 pageshow 가 함께 와도)');
-    await page.eval("document.getElementById('pvSkip').click()");
-    await ready(page);
-    await click(page, '#pvStart');
-    await waitFor(page, "SpellRun.G.state === 'run' || SpellRun.G.state === 'intro'");   // onReady 가 그대로 동작
+    await click(page, '#pvPrev'); await waitFor(page, `SpellRun.preview.state.idx === ${idx - 1}`);   // 복귀 뒤에도 이전이 동작
+    await walkToLast(page);
+    await click(page, '#pvNext');
+    await playing(page);   // onReady 가 그대로 동작
     noErrors(page);
     await page.close();
   }
   // 돌아가기(onBack)도 그대로
   resetState();
-  const p2 = await openGame(); await fast(p2, { maxMs: 3000, gapMs: 100 });
-  await click(p2, '#startBtn');
+  const p2 = await openGame();
+  await startGame(p2);
   await waitFor(p2, "document.getElementById('pvProg').textContent === '1/10'");
   await pagehide(p2, true); await pageshow(p2, true);
   await click(p2, '#pvBack');
@@ -343,30 +330,203 @@ test('보관(pagehide persisted=true) → 복귀(pageshow): 미리 보기가 끝
   await p2.close();
 });
 
-test('보관 복귀: 사용자가 직접 멈춘 미리 보기는 돌아와도 멈춘 채. 실제로 닫히는 pagehide(persisted=false)는 지금처럼 끝낸다', { skip: SKIP }, async () => {
+test('실제로 닫히는 pagehide(persisted=false)는 미리 보기를 끝낸다', { skip: SKIP }, async () => {
   resetState();
-  let page = await openGame(); await fast(page, { maxMs: 3000, gapMs: 100 });
-  await click(page, '#startBtn');
-  await waitFor(page, "parseInt(document.getElementById('pvProg').textContent, 10) >= 2");   // 작업386: '2/10' 정확 일치는 부하에서 지나쳐 시간 초과가 났다. 2번째 이상이면 통과
-  await click(page, '#pvPause');
-  await sleep(200);
-  const idx = await page.eval('SpellRun.preview.state.idx'), n = state.requests.length, shownN = (await pvShown(page)).length;
-  await pagehide(page, true); await pageshow(page, true);
-  await sleep(800);
-  assert.equal(await page.eval('SpellRun.preview.state.idx'), idx);
-  assert.equal(state.requests.length, n, '직접 멈춘 채로 둔다');
-  assert.equal((await pvShown(page)).length, shownN);
-  assert.equal(await page.eval("document.getElementById('pvPause').getAttribute('aria-pressed')"), 'true');
-  await click(page, '#pvPause');   // 직접 계속하면 이어 간다
-  await waitFor(page, `SpellRun.preview.state.wordsShown.length === ${shownN + 1}`, 3000);
-  await page.close();
-
-  resetState();
-  page = await openGame(); await fast(page, { maxMs: 3000, gapMs: 100 });
-  await click(page, '#startBtn');
+  const page = await openGame();
+  await startGame(page);
   await waitFor(page, "document.getElementById('pvProg').textContent === '1/10'");
   await pagehide(page, false);
   assert.equal(await page.eval('SpellRun.preview.state.active'), false, '닫히는 것이면 끝낸다');
   assert.equal(await page.eval("document.getElementById('pv').hidden"), true);
+  await page.close();
+});
+
+// ───────── 작업414: 아이콘·뜻 펼치기·키보드·디자인 ─────────
+test('414 아이콘: 이전·다음·닫기는 글자 없이 인라인 SVG(stroke) 아이콘이고 aria-label 이 있다. 마지막 단어에서 다음 자리는 재생 아이콘·"게임 시작". 글자 버튼은 [건너뛰기] 하나', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame();
+  await openPv(page, [W('apple', ['사과']), W('book', ['책'])]);
+  const g = () => page.eval(`(() => { const b = id => document.getElementById(id); const ic = id => { const e = b(id); return { label: e.getAttribute('aria-label'), text: e.textContent.trim(), svg: e.querySelectorAll('svg').length, stroke: getComputedStyle(e.querySelector('svg:not([hidden])') || e.querySelector('svg')).stroke, fill: getComputedStyle(e.querySelector('svg:not([hidden])') || e.querySelector('svg')).fill }; };
+    return { back: ic('pvBack'), prev: ic('pvPrev'), next: ic('pvNext'), nextIcon: { arrow: !b('pvIcNext').hasAttribute('hidden'), play: !b('pvIcPlay').hasAttribute('hidden') }, skip: b('pvSkip').textContent.trim(), textButtons: [...document.querySelectorAll('#pv button')].filter(e => e.id !== 'pvMeanBtn' && e.textContent.trim()).map(e => e.id), prevDisabled: b('pvPrev').disabled }; })()`);
+  let m = await g();
+  assert.deepEqual([m.back.label, m.prev.label, m.next.label], ['돌아가기', '이전 단어', '다음 단어']);
+  for (const k of ['back', 'prev', 'next']) { assert.equal(m[k].text, '', k + ' 은 글자 없음'); assert.ok(m[k].svg >= 1); assert.notEqual(m[k].stroke, 'none', k + ' 은 stroke 아이콘'); }
+  assert.deepEqual(m.nextIcon, { arrow: true, play: false }); assert.equal(m.prevDisabled, true);
+  assert.deepEqual(m.textButtons, ['pvSkip'], '글자 버튼은 [건너뛰기] 하나(뜻 영역 제외)');
+  assert.equal(m.skip, '건너뛰기');
+  await click(page, '#pvNext'); await waitFor(page, 'SpellRun.preview.state.idx === 1');
+  m = await g();
+  assert.equal(m.next.label, '게임 시작'); assert.deepEqual(m.nextIcon, { arrow: false, play: true }); assert.equal(m.prevDisabled, false);
+  assert.equal(await page.eval("document.getElementById('pvNext').querySelector('svg:not([hidden])').id"), 'pvIcPlay');
+  await click(page, '#pvPrev'); await waitFor(page, 'SpellRun.preview.state.idx === 0');
+  assert.equal((await g()).next.label, '다음 단어', '되돌아가면 다시 화살표');
+  await click(page, '#pvNext'); await waitFor(page, 'SpellRun.preview.state.idx === 1'); await click(page, '#pvNext');
+  assert.equal(await page.eval('window.__ready'), 1, '재생 아이콘이 게임 시작(onReady)');
+  await page.close();
+});
+
+test('414 뜻: 짧은 뜻이 여러 개면 줄마다 모두 보인다. 단어가 바뀌면 줄이 바뀐다', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame();
+  await openPv(page, [W('scrutinize', ['신중하게 검토하다', '자세히 살피다', '꼼꼼히 조사하다']), W('book', ['책'])]);
+  const lines = () => page.eval("[...document.querySelectorAll('#pvMean .pvm1')].map(e => e.textContent)");
+  assert.deepEqual(await lines(), ['신중하게 검토하다', '자세히 살피다', '꼼꼼히 조사하다']);
+  const tops = await page.eval("[...document.querySelectorAll('#pvMean .pvm1')].map(e => Math.round(e.getBoundingClientRect().top))");
+  assert.equal(new Set(tops).size, 3, '줄바꿈으로 구분(서로 다른 줄)');
+  await click(page, '#pvNext'); await waitFor(page, 'SpellRun.preview.state.idx === 1');
+  assert.deepEqual(await lines(), ['책']);
+  await page.close();
+});
+
+test('414 펼치기: 뜻 영역은 button, 눌러서 상세(정의·usage_note·보조 키워드 순)가 아래로 펼쳐지고 다시 누르면 접힌다. aria-expanded, "자세히"+화살표. 단어가 바뀌면 접힘. 상세가 없으면 펼치기 표시 없음', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame();
+  await openPv(page, [W('apple', ['사과'], [{ def: '사과, 사과나무', note: '둥근 과일을 가리킵니다.' }], ['과일']), W('book', ['책'])]);
+  const st = () => page.eval(`(() => ({ tag: document.getElementById('pvMeanBtn').tagName, exp: document.getElementById('pvMeanBtn').getAttribute('aria-expanded'), dis: document.getElementById('pvMeanBtn').disabled, more: !document.getElementById('pvMore').hidden && document.getElementById('pvMore').textContent.trim(), moreSvg: document.querySelectorAll('#pvMore svg').length, open: !document.getElementById('pvDetail').hidden, paras: [...document.querySelectorAll('#pvDetail p')].map(p => p.textContent), controls: document.getElementById('pvMeanBtn').getAttribute('aria-controls') }))()`);
+  let s = await st();
+  assert.deepEqual([s.tag, s.exp, s.dis, s.more, s.moreSvg, s.open, s.controls], ['BUTTON', 'false', false, '자세히', 1, false, 'pvDetail']);
+  await click(page, '#pvMeanBtn');
+  s = await st(); assert.equal(s.exp, 'true'); assert.equal(s.open, true);
+  assert.deepEqual(s.paras, ['사과, 사과나무', '둥근 과일을 가리킵니다.', '과일'], '정의 → 쓰임 설명 → 보조 키워드');
+  assert.equal(await page.eval("getComputedStyle(document.querySelector('#pvMore svg')).transform !== 'none'"), true, '펼치면 화살표가 돌아간다');
+  await click(page, '#pvMeanBtn');
+  s = await st(); assert.equal(s.exp, 'false'); assert.equal(s.open, false);
+  await click(page, '#pvMeanBtn'); assert.equal((await st()).open, true);
+  await click(page, '#pvNext'); await waitFor(page, 'SpellRun.preview.state.idx === 1');
+  s = await st();
+  assert.equal(s.open, false, '단어가 바뀌면 접힘'); assert.equal(s.dis, true, '상세가 없으면 누를 수 없다'); assert.equal(s.more, false, '"자세히" 표시 없음'); assert.equal(s.exp, null);
+  await click(page, '#pvPrev'); await waitFor(page, 'SpellRun.preview.state.idx === 0');
+  assert.equal((await st()).open, false, '돌아와도 접힌 채');
+  noErrors(page); await page.close();
+});
+
+test('414 키보드: 버튼에 포커스가 있을 때 Space·Enter 는 한 번만 넘어가고, 포커스가 없을 때도 Space·Enter·→ 는 다음, ← 는 이전, Esc 는 돌아가기', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame();
+  await openPv(page, Array.from({ length: 6 }, (_, i) => W('w' + i, ['뜻' + i])));
+  const key = async (k, code, text) => { await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code, text, windowsVirtualKeyCode: ({ ' ': 32, Enter: 13, ArrowRight: 39, ArrowLeft: 37, Escape: 27 })[k] }); await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: ({ ' ': 32, Enter: 13, ArrowRight: 39, ArrowLeft: 37, Escape: 27 })[k] }); await sleep(120); };
+  assert.equal(await page.eval("document.activeElement && document.activeElement.id"), 'pvNext', '첫 포커스는 [다음]');
+  await key(' ', 'Space', ' ');
+  assert.equal(await idxOf(page), 1, '버튼 포커스에서 Space 는 한 번만(두 번 처리되지 않음)');
+  await key('Enter', 'Enter', '\r');
+  assert.equal(await idxOf(page), 2, '버튼 포커스에서 Enter 는 한 번만');
+  await key('ArrowRight', 'ArrowRight'); assert.equal(await idxOf(page), 3);
+  await key('ArrowLeft', 'ArrowLeft'); assert.equal(await idxOf(page), 2);
+  await page.eval("document.activeElement.blur()");   // 포커스를 버튼 밖으로
+  assert.equal(await page.eval("document.activeElement === document.body"), true);
+  await key(' ', 'Space', ' '); assert.equal(await idxOf(page), 3, '포커스 없이 Space');
+  await key('Enter', 'Enter', '\r'); assert.equal(await idxOf(page), 4, '포커스 없이 Enter');
+  await key('ArrowRight', 'ArrowRight'); assert.equal(await idxOf(page), 5);
+  await key('ArrowRight', 'ArrowRight');
+  assert.equal(await page.eval('window.__ready'), 1, '마지막에서 →는 게임 시작');
+  await openPv(page, [W('a', ['가']), W('b', ['나'])]);
+  await key('ArrowLeft', 'ArrowLeft'); assert.equal(await idxOf(page), 0, '첫 단어에서 ←는 제자리');
+  await key('Escape', 'Escape');
+  assert.equal(await page.eval('window.__back'), 1, 'Esc 는 돌아가기'); assert.equal(await page.eval("document.getElementById('pv').hidden"), true);
+  await key(' ', 'Space', ' '); await key('ArrowRight', 'ArrowRight');
+  assert.equal(await page.eval('window.__ready'), 0, '미리 보기가 닫힌 뒤에는 키가 아무것도 하지 않는다(시작도 안 됨)');
+  noErrors(page); await page.close();
+});
+
+test('414 연타: 빨리 여러 번 넘겨도 이전 단어의 늦은 발음이 겹쳐 재생되지 않는다(마지막 단어만 재생)', { skip: SKIP }, async () => {
+  resetState(); state.ttsDelay = 150;
+  const page = await browser.newPage({ width: 360, height: 640, token: jwt() });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: AUDIO });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { if (!sessionStorage.getItem('__init')) { sessionStorage.setItem('__init', '1'); localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.removeItem('spellrun_preview'); } sessionStorage.setItem('spellrun_ids', JSON.stringify(${JSON.stringify(state.rows.map(r => r.id))})); } catch (e) {}` });
+  await page.goto(base + '/spelling_run.html');
+  await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
+  await startGame(page);
+  await waitFor(page, "window.__plays === 1", 4000);   // 첫 단어 재생
+  await page.eval("(() => { const b = document.getElementById('pvNext'); b.click(); b.click(); b.click(); b.click(); })()");
+  await waitFor(page, 'SpellRun.preview.state.idx === 4');
+  await sleep(1000);
+  assert.equal(await page.eval('window.__plays'), 2, '첫 단어 + 마지막 단어만 재생(그 사이 단어의 늦은 응답은 버려짐): ' + await page.eval('window.__plays'));
+  noErrors(page); await page.close();
+});
+
+test('414 새 호출 0: 미리 보기 중 서버로 나가는 요청은 발음(/api/tts)뿐이다(AI·단어장 저장 없음)', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame();
+  await startGame(page); await walkToLast(page); await sleep(300);
+  const mine = state.requests.filter(r => r.url !== '/api/tts');
+  assert.deepEqual(mine.map(r => r.method + ' ' + r.url).sort(), ['GET /api/me', 'GET /api/wordbook'], '발음 외에는 화면을 열 때의 조회 2건뿐(AI·저장·수정 요청 없음)');
+  await page.close();
+});
+
+test('414 데이터 연결: 단어장의 short_meaning·meanings·usage_note 가 미리 보기에 그대로 쓰인다(짧은 뜻 줄, 정의 전체, 쓰임 설명, 보조 키워드)', { skip: SKIP }, async () => {
+  resetState(); state.rows = richRows();
+  const page = await openGame();
+  await startGame(page);
+  const w = await page.eval("document.getElementById('pvWord').textContent");
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#pvMean .pvm1')].map(e => e.textContent)"), [w + ' 뜻', '동사뜻']);
+  await click(page, '#pvMeanBtn');
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#pvDetail p')].map(p => p.textContent)"), [w + ' 뜻, 보조뜻', '쓰임 설명입니다.', '보조뜻'], '정의 전체 → usage_note → 위에 나오지 않은 키워드');
+  await page.close();
+});
+
+// ───────── 배치(세로·가로) ─────────
+const SIZES = [[360, 640], [390, 844], [800, 400], [640, 360], [844, 390]];
+for (const [w, h] of SIZES) {
+  test(`414 배치 ${w}x${h}: 카드가 넘치지 않고 가로 스크롤 없음, 버튼 44px 이상·겹침 0, 글자 11px 이상, 이모지 없음 (접힘·펼침·긴 상세·마지막 단어)`, { skip: SKIP }, async () => {
+    resetState();
+    const page = await openGame({ width: w, height: h, query: w > h ? '?mode=1' : '' });   // 가로 배치는 주소 mode=1(저장된 화면 모드)로 연다
+    const M = () => page.eval(`(() => {
+      const box = document.getElementById('box').getBoundingClientRect(), card = document.querySelector('#pv .card'), cr = card.getBoundingClientRect();
+      const ids = ['pvBack', 'pvMeanBtn', 'pvPrev', 'pvNext', 'pvSkip'];
+      const rs = ids.map(id => { const e = document.getElementById(id), r = e.getBoundingClientRect(); return { id, l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height, vis: getComputedStyle(e).visibility !== 'hidden' && r.width > 0 }; }).filter(x => x.vis);
+      const inCard = rs.every(x => x.l >= cr.left - 0.5 && x.r <= cr.right + 0.5 && x.t >= cr.top - 0.5 && x.b <= cr.bottom + 0.5);
+      let overlap = 0; for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) { const a = rs[i], b = rs[j]; if (a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5) overlap++; }
+      const texts = [...document.querySelectorAll('#pv *')].filter(e => e.children.length === 0 && e.textContent.trim() && e.getClientRects().length && !e.closest('.sr-only')).map(e => parseFloat(getComputedStyle(e).fontSize));
+      const clip = [...document.querySelectorAll('#pv .pvw, #pv .pvm1, #pv .pvd')].filter(e => e.getClientRects().length).some(e => e.scrollWidth > e.clientWidth + 1);
+      return { overflow: Math.round(card.scrollHeight - card.clientHeight), inBox: cr.left >= box.left - 0.5 && cr.right <= box.right + 0.5 && cr.top >= box.top - 0.5 && cr.bottom <= box.bottom + 0.5, docX: document.documentElement.scrollWidth - document.documentElement.clientWidth, cardX: card.scrollWidth - card.clientWidth,
+        minBtn: Math.min(...rs.map(x => Math.min(x.w, x.h))), inCard, overlap, minFont: Math.min(...texts), clip, nextInCard: rs.some(x => x.id === 'pvNext'), text: document.getElementById('pv').innerText, land: document.getElementById('box').classList.contains('land') };
+    })()`);
+    const check = async (label) => {
+      const m = await M();
+      assert.ok(m.inBox, `${label}: 카드가 판 안 ${JSON.stringify(m)}`);
+      assert.ok(m.overflow <= 1, `${label}: 카드 넘침 ${m.overflow}px`);
+      assert.ok(m.docX <= 0 && m.cardX <= 0, `${label}: 가로 스크롤 없음`);
+      assert.ok(m.inCard && m.nextInCard, `${label}: 모든 버튼이 카드 안에 보임`);
+      assert.equal(m.overlap, 0, `${label}: 버튼 겹침`);
+      assert.ok(m.minBtn >= 43.5, `${label}: 터치 영역 ${m.minBtn}px >= 44`);
+      assert.ok(m.minFont >= 11 - 0.01, `${label}: 글자 ${m.minFont}px >= 11`);
+      assert.ok(!m.clip, `${label}: 글자가 칸 밖으로 잘림`);
+      assert.ok(!/\p{Extended_Pictographic}/u.test(m.text), `${label}: 이모지 없음`);
+      return m;
+    };
+    const words = [W('environment', ['환경', '주변 상황, 둘러싼 조건', '자연환경'], DETAIL_LONG, ['둘러싼', '조건', '생활환경']), W('incomprehensibilities', ['이해할 수 없음'], [])];
+    await openPv(page, words);
+    const a = await check('접힘'); assert.equal(a.land, w > h, '가로/세로 판정');
+    await click(page, '#pvMeanBtn'); await check('펼침(긴 상세)');
+    await click(page, '#pvNext'); await waitFor(page, 'SpellRun.preview.state.idx === 1'); await check('마지막 단어(긴 단어·재생 아이콘)');
+    noErrors(page); await page.close();
+  });
+}
+
+test('414 디자인: 카드 안에 박스·테두리·구분선·그림자가 없고(주 버튼의 코랄 번짐 제외), 카드 바깥 모양은 382 시작 카드와 같다. 글자 위계 단어 > 짧은 뜻 > 보조, 주 버튼은 코랄 채움 원형', { skip: SKIP }, async () => {
+  resetState();
+  const page = await openGame();
+  await openPv(page, [W('apple', ['사과', '애플'], [{ def: '사과, 애플', note: '쓰임' }], ['과일']), W('book', ['책'])]);
+  await click(page, '#pvMeanBtn');
+  const d = await page.eval(`(() => {
+    const cs = e => getComputedStyle(e), card = document.querySelector('#pv .card'), cc = cs(card), start = cs(document.querySelector('#start .card'));
+    const inner = [...card.querySelectorAll('*')].filter(e => e.getClientRects().length && !e.closest('svg') && e.tagName !== 'svg');
+    const bad = inner.filter(e => { const c = cs(e); return parseFloat(c.borderTopWidth) + parseFloat(c.borderBottomWidth) + parseFloat(c.borderLeftWidth) + parseFloat(c.borderRightWidth) > 0 || (c.backgroundColor !== 'rgba(0, 0, 0, 0)' && !e.classList.contains('pvgo')) || (c.boxShadow !== 'none' && !e.classList.contains('pvgo')) || c.borderTopLeftRadius !== '0px' && !e.classList.contains('pvgo') && !e.classList.contains('pvx') && !e.classList.contains('pvic'); }).map(e => e.id || e.className);
+    const px = sel => parseFloat(cs(document.querySelector(sel)).fontSize);
+    const go = cs(document.getElementById('pvNext'));
+    const pos = (a, b) => document.querySelector(a).compareDocumentPosition(document.querySelector(b)) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : 0;
+    return { bad, card: { bw: cc.borderTopWidth, rad: cc.borderTopLeftRadius, shadow: cc.boxShadow, bg: cc.backgroundColor }, start: { bw: start.borderTopWidth, rad: start.borderTopLeftRadius, shadow: start.boxShadow, bg: start.backgroundColor },
+      sizes: { prog: px('#pvProg'), word: px('#pvWord'), mean: px('.pvm1'), more: px('#pvMore'), detail: px('.pvd'), note: px('#pvNote'), skip: px('#pvSkip') },
+      go: { bg: go.backgroundColor, rad: go.borderTopLeftRadius, bw: go.borderTopWidth }, order: [pos('#pvProg', '#pvWord'), pos('#pvWord', '#pvMean'), pos('#pvMean', '#pvDetail'), pos('#pvDetail', '#pvNext'), pos('#pvNext', '#pvSkip')],
+      ghost: ['pvBack', 'pvPrev'].map(id => { const c = cs(document.getElementById(id)); return [c.backgroundColor, c.borderTopWidth]; }), skipBorder: cs(document.getElementById('pvSkip')).borderTopWidth, vis: ['pvBack', 'pvPrev'].map(id => cs(document.getElementById(id)).visibility) };
+  })()`);
+  console.log('[414 측정] ' + JSON.stringify(d.sizes) + ' 카드 ' + JSON.stringify(d.card));
+  assert.deepEqual(d.bad, [], '카드 안의 박스·테두리·배경·그림자: ' + d.bad);
+  assert.equal(d.card.bw, d.start.bw, '카드 테두리 = 시작 카드(2px)'); assert.equal(d.card.bw, '2px'); assert.equal(d.card.rad, d.start.rad); assert.equal(d.card.rad, '22px'); assert.equal(d.card.shadow, d.start.shadow); assert.equal(d.card.bg, 'rgb(255, 255, 255)');
+  assert.ok(d.sizes.word > d.sizes.mean && d.sizes.mean > d.sizes.detail && d.sizes.detail >= d.sizes.more - 0.01 && d.sizes.more >= d.sizes.note - 0.01, '글자 위계 단어 > 짧은 뜻 > 상세 >= 보조 ' + JSON.stringify(d.sizes));
+  assert.deepEqual(d.go, { bg: 'rgb(255, 107, 90)', rad: '50%', bw: '0px' }, '주 버튼: 코랄 #ff6b5a 채움, 모서리 50%, 테두리 없음');
+  assert.deepEqual(d.order, [1, 1, 1, 1, 1], '위→아래 순서: 진행 → 단어 → 뜻 → 상세 → 아이콘 → 건너뛰기');
+  assert.deepEqual(d.ghost, [['rgba(0, 0, 0, 0)', '0px'], ['rgba(0, 0, 0, 0)', '0px']], '이전·닫기는 테두리 없는 아이콘'); assert.equal(d.skipBorder, '0px');
   await page.close();
 });

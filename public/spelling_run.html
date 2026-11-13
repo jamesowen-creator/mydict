@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<script src="/js/common/authGate.js?v=104"></script>
+<script src="/js/common/authGate.js?v=105"></script>
 <link rel="manifest" href="/manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -185,19 +185,27 @@
 
         <section class="screen" id="pv" hidden role="dialog" aria-modal="true" aria-labelledby="pvTitle">
           <div class="card">
-            <h2 class="title small" id="pvTitle">단어 미리 보기</h2>
-            <p class="note" id="pvProg" aria-live="polite"></p>
-            <button class="pvarea" id="pvArea" type="button" aria-label="다음 단어로">
-              <span class="pvw" id="pvWord"></span>
-              <span class="pvm" id="pvMean"></span>
-            </button>
-            <p class="note" id="pvNote" role="status" aria-live="polite"></p>
-            <div class="trow" id="pvCtl">
-              <button class="toggle vsbtn" id="pvPause" type="button" aria-pressed="false">일시정지</button>
-              <button class="toggle vsbtn" id="pvSkip" type="button">건너뛰기</button>
+            <h2 class="sr-only" id="pvTitle">단어 미리 보기</h2>
+            <div class="pvtop">
+              <p class="pvprog" id="pvProg" aria-live="polite"></p>
+              <button class="pvx" id="pvBack" type="button" aria-label="돌아가기"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
             </div>
-            <button class="btn" id="pvStart" type="button" hidden>시작</button>
-            <button class="toggle vsbtn" id="pvBack" type="button">돌아가기</button>
+            <div class="pvmain">
+              <p class="pvw" id="pvWord"></p>
+              <button class="pvmeanbtn" id="pvMeanBtn" type="button" aria-controls="pvDetail">
+                <span class="pvm" id="pvMean"></span>
+                <span class="pvmore" id="pvMore" hidden>자세히<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg></span>
+              </button>
+              <div class="pvdetail" id="pvDetail" hidden></div>
+            </div>
+            <p class="note" id="pvNote" role="status" aria-live="polite"></p>
+            <div class="pvfoot">
+              <div class="pvnav">
+                <button class="pvic" id="pvPrev" type="button" aria-label="이전 단어"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"/></svg></button>
+                <button class="pvgo" id="pvNext" type="button" aria-label="다음 단어"><svg id="pvIcNext" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7"/></svg><svg id="pvIcPlay" viewBox="0 0 24 24" aria-hidden="true" focusable="false" hidden><path d="M8 5v14l11-7z"/></svg></button>
+              </div>
+              <button class="pvskip" id="pvSkip" type="button">건너뛰기</button>
+            </div>
           </div>
         </section>
 
@@ -287,8 +295,8 @@
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=104"></script>
-<script src="/js/spellrun/stage_style.js?v=104"></script>
-<script src="/js/spellrun/game.js?v=104"></script>
+<script src="/js/spellrun/logic.js?v=105"></script>
+<script src="/js/spellrun/stage_style.js?v=105"></script>
+<script src="/js/spellrun/game.js?v=105"></script>
 </body>
 </html>
