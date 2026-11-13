@@ -582,7 +582,8 @@
     font-family: 'Noto Sans KR', sans-serif;
   }
   .wb-side-icon { font-size: 17px; line-height: 1; }
-  .wb-side-btn.active-en, .wb-side-btn.active { border-color: var(--accent); color: var(--color-accent-ink, #b8442e); background: rgba(226,88,59,0.06); }
+  .wb-side-btn.wb-it-btn { min-height: var(--ctl-min-h, 44px); }   /* 작업411: 아이콘 없는 [IT] 버튼도 터치 44px */
+  .wb-side-btn.active-en, .wb-side-btn.active-it, .wb-side-btn.active { border-color: var(--accent); color: var(--color-accent-ink, #b8442e); background: rgba(226,88,59,0.06); }
   .wb-side-btn.active-ko { border-color: var(--accent-ko); color: var(--accent-ko); background: rgba(230,126,34,0.06); }
   .wb-side-btn.active-ja { border-color: var(--accent-ja); color: var(--accent-ja); background: rgba(179,38,30,0.06); }
   .wb-side-btn.active-zh { border-color: var(--accent-zh); color: var(--accent-zh); background: rgba(192,57,43,0.06); }
@@ -1640,6 +1641,7 @@
           <button class="wb-side-btn" id="wb-tab-ko" onclick="switchWordbookTab('ko')"><span class="wb-side-icon">🇰🇷</span><span>한국어</span></button>
           <button class="wb-side-btn" id="wb-tab-ja" onclick="switchWordbookTab('ja')"><span class="wb-side-icon">🇯🇵</span><span>일본어</span></button>
           <button class="wb-side-btn" id="wb-tab-zh" onclick="switchWordbookTab('zh')"><span class="wb-side-icon">🇨🇳</span><span>중국어</span></button>
+          <button class="wb-side-btn wb-it-btn" id="wb-tab-it" onclick="switchWordbookTab('it')"><span>IT</span></button>
         </div>
 
         <div class="wb-side-group">
@@ -3056,14 +3058,30 @@ let currentUserName = '';
 let wordbookMode = 'none';
 let _currentPage = 'search';
 
+// 작업411: 단어장 구분의 정의는 여기 한 곳. 'it' 은 저장된 행이 아니라 필터(영어·한국어 행 중 IT 설명이 있고 is_it===true). 같은 단어가 영어·한국어 행에 모두 있어도 행마다 따로 나온다.
+// 선택 키는 행의 실제 언어 기준(단어|lang)이라 IT 구분에서도 충돌하지 않는다. 일반 구분에서는 단어|탭 과 같다.
+// WB-TAB-START
+function isItRow(w) {
+  var l = (w && w.lang) || 'en';
+  if (l !== 'en' && l !== 'ko') return false;
+  var it = w && w.it ? validateItTerm(w.it) : null;
+  return !!(it && it.is_it === true);
+}
+function wbTabRows(tab, list) {
+  var src = list || wordbook;
+  return tab === 'it' ? src.filter(isItRow) : src.filter(function (w) { return (w.lang || 'en') === tab; });
+}
+function wbKey(w) { return w.word + '|' + (w.lang || 'en'); }
+// WB-TAB-END
+
 function switchWordbookTab(tab) {
   currentWordbookTab = tab;
   resetWordbookSort();
   selectedWords.clear();
   wordbookMode = 'none';
-  ['en','ko','ja','zh'].forEach(function(l) {
+  ['en','ko','ja','zh','it'].forEach(function(l) {
     var el = document.getElementById('wb-tab-' + l);
-    if (el) el.className = 'wb-side-btn' + (tab === l ? ' active-' + l : '');
+    if (el) el.className = 'wb-side-btn' + (l === 'it' ? ' wb-it-btn' : '') + (tab === l ? ' active-' + l : '');
   });
   updateModeButtons();
   updateSelectRow();
@@ -3086,10 +3104,12 @@ function getChosung(char) {
 function renderWordbook() {
   var el = document.getElementById('wordbook-list');
   var tab = currentWordbookTab;
-  var filtered = wordbook.filter(function(w) { return (w.lang || 'en') === tab; });
+  var filtered = wbTabRows(tab);
 
   if (filtered.length === 0) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">아직 저장된 단어가 없어요.<br>검색하면 자동으로 저장됩니다.</div></div>';
+    el.innerHTML = tab === 'it'
+      ? '<div class="empty-state"><div class="empty-state-text">IT 용어로 저장된 단어가 없습니다.<br>검색 결과에서 [IT 용어]를 눌러 보세요.</div></div>'
+      : '<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">아직 저장된 단어가 없어요.<br>검색하면 자동으로 저장됩니다.</div></div>';
     updateSelectedBtn();
     return;
   }
@@ -3099,19 +3119,26 @@ function renderWordbook() {
   var headerClass = tab !== 'en' ? tab : '';
 
   function makeChip(w) {
-    var key = w.word + '|' + tab;
-    var isSelected = selectedWords.has(key);
+    var rowLang = w.lang || 'en';   // 일반 구분에서는 tab 과 같고, IT 구분에서는 행의 실제 언어(영어·한국어)
+    var isSelected = selectedWords.has(wbKey(w));
     var safeWord = w.word.split("'").join("\\'");
     var inSelectMode = wordbookMode !== 'none';
     var clickAction = inSelectMode
-      ? 'toggleWordSelect(\'' + safeWord + '\',\'' + tab + '\')'
-      : 'searchFromWordbook(\'' + safeWord + '\', \'' + tab + '\')';
-    return '<div class="word-chip ' + chipClass + (isSelected ? ' selected' : '') + '" onclick="' + clickAction + '">' +
-      '<span style="display:flex;align-items:center;gap:8px">' +
+      ? 'toggleWordSelect(\'' + safeWord + '\',\'' + rowLang + '\')'
+      : 'searchFromWordbook(\'' + safeWord + '\', \'' + rowLang + '\'' + (tab === 'it' ? ', true' : '') + ')';
+    var delAction = tab === 'it'
+      ? 'deleteItFromChip(\'' + safeWord + '\', \'' + rowLang + '\')'   // IT 구분의 ×는 IT 설명만 지운다(단어는 남는다)
+      : 'deleteWord(\'' + safeWord + '\', \'' + tab + '\')';
+    var itLine = tab === 'it' ? validateItTerm(w.it) : null;
+    var label = itLine
+      ? '<span style="display:flex;flex-direction:column;min-width:0"><span class="word-chip-text">' + w.word + '</span><span class="similar-core">' + escHtml(itLine.one_line) + '</span></span>'
+      : '<span class="word-chip-text">' + w.word + '</span>';
+    return '<div class="word-chip ' + (tab === 'it' ? (rowLang !== 'en' ? rowLang : '') : chipClass) + (isSelected ? ' selected' : '') + '" onclick="' + clickAction + '">' +
+      '<span style="display:flex;align-items:center;gap:8px;min-width:0">' +
       (inSelectMode ? '<span class="word-chip-check">✓</span>' : '') +
-      '<span class="word-chip-text">' + w.word + '</span>' +
+      label +
       '</span>' +
-      '<span class="word-chip-del" onclick="event.stopPropagation();deleteWord(\'' + safeWord + '\', \'' + tab + '\')">×</span>' +
+      '<span class="word-chip-del" onclick="event.stopPropagation();' + delAction + '">×</span>' +
       '</div>';
   }
 
@@ -3123,12 +3150,12 @@ function renderWordbook() {
     var sorted = filtered.slice().sort(function(a, b) { return a.word.localeCompare(b.word, locale); });
     var groups = {};
     sorted.forEach(function(w) {
-      var letter = tab === 'ko' ? getChosung(w.word[0]) : w.word[0].toUpperCase();
+      var letter = (w.lang || 'en') === 'ko' ? getChosung(w.word[0]) : w.word[0].toUpperCase();
       if (!groups[letter]) groups[letter] = [];
       groups[letter].push(w);
     });
     var sortedKeys;
-    if (tab === 'ko') {
+    if (tab === 'ko' || tab === 'it') {
       sortedKeys = Object.keys(groups).sort(function(a, b) {
         var ai = KO_ORDER.indexOf(a), bi = KO_ORDER.indexOf(b);
         if (ai === -1 && bi === -1) return a.localeCompare(b, 'ko');
@@ -3173,17 +3200,17 @@ function toggleWordSelect(word, lang) {
 
 function toggleSelectAll() {
   const tab = currentWordbookTab;
-  const tabWords = wordbook.filter(w => (w.lang || 'en') === tab);
-  const allSelected = tabWords.length > 0 && tabWords.every(w => selectedWords.has(w.word + '|' + tab));
-  if (allSelected) tabWords.forEach(w => selectedWords.delete(w.word + '|' + tab));
-  else tabWords.forEach(w => selectedWords.add(w.word + '|' + tab));
+  const tabWords = wbTabRows(tab);
+  const allSelected = tabWords.length > 0 && tabWords.every(w => selectedWords.has(wbKey(w)));
+  if (allSelected) tabWords.forEach(w => selectedWords.delete(wbKey(w)));
+  else tabWords.forEach(w => selectedWords.add(wbKey(w)));
   renderWordbook();
 }
 
 function updateSelectedBtn() {
   const tab = currentWordbookTab;
-  const tabWords = wordbook.filter(w => (w.lang || 'en') === tab);
-  const count = tabWords.filter(w => selectedWords.has(w.word + '|' + tab)).length;
+  const tabWords = wbTabRows(tab);
+  const count = tabWords.filter(w => selectedWords.has(wbKey(w))).length;
   const btn = document.getElementById('wb-selected-action-btn');
   if (btn) {
     const label = wordbookMode === 'delete' ? '🗑 선택 삭제'
@@ -3196,14 +3223,14 @@ function updateSelectedBtn() {
   }
   const selectAllBtn = document.getElementById('wb-select-all-btn');
   if (selectAllBtn) {
-    const allSelected = tabWords.length > 0 && tabWords.every(w => selectedWords.has(w.word + '|' + tab));
+    const allSelected = tabWords.length > 0 && tabWords.every(w => selectedWords.has(wbKey(w)));
     selectAllBtn.textContent = allSelected ? '전체해제' : '전체선택';
   }
 }
 
 function podcastStartSelected() {
   const tab = currentWordbookTab;
-  const words = wordbook.filter(w => (w.lang || 'en') === tab && selectedWords.has(w.word + '|' + tab));
+  const words = wbTabRows(tab).filter(w => selectedWords.has(wbKey(w)));
   if (words.length === 0) { showToast('선택된 단어가 없습니다.'); return; }
   // Exit select mode before starting playback
   setWordbookMode('none');
@@ -3228,7 +3255,7 @@ function startSelectedWordsQuiz() {
     showToast('선택 퀴즈는 영어 단어장에서만 가능합니다.');
     return;
   }
-  const words = wordbook.filter(w => (w.lang || 'en') === tab && selectedWords.has(w.word + '|' + tab));
+  const words = wbTabRows(tab).filter(w => selectedWords.has(wbKey(w)));
   if (words.length === 0) { showToast('선택된 단어가 없습니다.'); return; }
   setWordbookMode('none'); // 선택 모드 종료 (words는 이미 위에서 확보해뒀으니 clear돼도 무방)
   isWrongQuiz = false;
@@ -3247,7 +3274,7 @@ const SPELLRUN_MIN_WORDS = 3;
 function startSpellRunSelected() {
   const tab = currentWordbookTab;
   if (tab !== 'en') { showToast('선택 게임은 영어 단어장에서만 가능합니다.'); return; }
-  const words = wordbook.filter(w => (w.lang || 'en') === tab && selectedWords.has(w.word + '|' + tab));
+  const words = wbTabRows(tab).filter(w => selectedWords.has(wbKey(w)));
   const ids = words.map(w => w.id).filter(id => id != null);
   if (ids.length < SPELLRUN_MIN_WORDS) { showToast('게임은 단어를 ' + SPELLRUN_MIN_WORDS + '개 이상 선택해야 시작할 수 있습니다.'); return; }
   try { sessionStorage.setItem('spellrun_ids', JSON.stringify(ids)); }
@@ -3385,8 +3412,9 @@ function startGame(key) {
 
 async function confirmDeleteSelectedWords() {
   const tab = currentWordbookTab;
-  const words = wordbook.filter(w => (w.lang || 'en') === tab && selectedWords.has(w.word + '|' + tab));
+  const words = wbTabRows(tab).filter(w => selectedWords.has(wbKey(w)));
   if (words.length === 0) { showToast('선택된 단어가 없습니다.'); return; }
+  if (tab === 'it') { await deleteItExplanations(words); setWordbookMode('none'); return; }   // 작업411: IT 구분은 IT 설명만 지운다
   if (!(await metisConfirm(`선택한 ${words.length}개 단어를 삭제하시겠습니까?`, { danger: true }))) return;
   await Promise.all(words.filter(w => w.id).map(w => deleteWordFromDB(w.id)));
   const keys = new Set(words.map(w => w.word + '|' + tab));
@@ -3449,7 +3477,7 @@ function updateSelectRow() {
   }
 }
 
-function searchFromWordbook(word, lang) {
+function searchFromWordbook(word, lang, showIt) {
   clearOcrQueue();
   document.getElementById('search-input').value = word;
   _langOverride = lang;
@@ -3457,6 +3485,32 @@ function searchFromWordbook(word, lang) {
   showPage('search');
   window.scrollTo({ top: 0, behavior: 'smooth' });
   doSearch();
+  // 작업411: IT 구분에서 연 경우, 저장된 단어는 doSearch 가 바로 그리므로 저장된 IT 설명을 이어서 펼친다(AI 호출 0회). 다른 구분에서 연 경우는 기존 동작.
+  if (showIt) {
+    var b = document.querySelector('#search-result .extra-trans-btn.it');
+    if (b) { loadITTerm(b); var r = document.getElementById('extra-trans-result'); if (r && r.scrollIntoView) r.scrollIntoView({ block: 'start' }); }
+  }
+}
+
+// 작업411: IT 설명 삭제(서버 행·단어는 그대로, data.it 만 제거). 확인 문구는 구분의 언어에 맞춘다.
+async function deleteItExplanations(rows) {
+  var langs = new Set(rows.map(function (w) { return w.lang || 'en'; }));
+  var where = langs.size === 1 && langs.has('ko') ? '한국어' : langs.size === 1 ? '영어' : '영어·한국어';
+  if (!(await metisConfirm('IT 설명을 삭제할까요? 단어는 ' + where + ' 단어장에 남습니다.', { danger: true }))) return;
+  var failed = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var w = rows[i];
+    try {
+      var res = w.id != null ? await fetch('/api/wordbook/' + encodeURIComponent(w.id) + '/it', { method: 'DELETE', headers: authHeaders() }) : { ok: false };
+      if (res.ok) delete w.it; else failed++;
+    } catch (e) { failed++; }
+  }
+  renderWordbook();
+  showToast(failed ? 'IT 설명 ' + failed + '개를 삭제하지 못했습니다.' : 'IT 설명을 삭제했습니다.');
+}
+async function deleteItFromChip(word, lang) {
+  var w = wordbook.find(function (x) { return x.word === word && (x.lang || 'en') === lang; });
+  if (w) await deleteItExplanations([w]);
 }
 
 async function deleteWord(word, lang) {
