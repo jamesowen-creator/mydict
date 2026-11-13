@@ -2031,13 +2031,20 @@ function pvPrefetch(i, tk) {
   const cur = audioCache.get(PV.words[i].word);
   if (cur) cur.then(go, go); else go();
 }
-const pvInfo = w => (w.pv && Array.isArray(w.pv.shorts) && w.pv.shorts.length ? w.pv : { shorts: [w.meaning], detail: [], keys: [] });
+const pvInfo = w => (w.pv && Array.isArray(w.pv.groups) && w.pv.groups.length ? w.pv : { groups: [{ pos: '', lines: [w.meaning] }], detail: [], keys: [] });
 function pvRender() {
   const w = PV.words[PV.idx], info = pvInfo(w), last = PV.idx + 1 >= PV.words.length;
   $('pvProg').textContent = (PV.idx + 1) + '/' + PV.words.length;
   $('pvWord').textContent = w.word;
+  // 품사별 번호 목록(품사 이름 줄 + 번호 열·뜻 열). 번호는 품사 안에서 1부터. 품사 필드가 없으면 품사 줄 없이 번호만
   const mean = $('pvMean'); mean.textContent = '';
-  info.shorts.forEach(t => { const sp = document.createElement('span'); sp.className = 'pvm1'; sp.textContent = t; mean.appendChild(sp); });
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  info.groups.forEach(g => {
+    const grp = mk('span', 'pvgrp');
+    if (g.pos) grp.appendChild(mk('span', 'pvpos', g.pos));
+    g.lines.forEach((t, i) => { const row = mk('span', 'pvrow'); const n = mk('span', 'pvn', (i + 1) + '.'); n.setAttribute('aria-hidden', 'true'); row.appendChild(n); row.appendChild(mk('span', 'pvt', t)); grp.appendChild(row); });
+    mean.appendChild(grp);
+  });
   // 상세: 정의 전체(짧은 뜻과 다를 때) · usage_note · 보조 키워드. 보여 줄 것이 없으면 펼치기를 숨긴다. 단어가 바뀌면 접힘으로 돌아간다
   const det = $('pvDetail'); det.textContent = '';
   const add = (cls, text) => { const p = document.createElement('p'); p.className = cls; p.textContent = text; det.appendChild(p); };
@@ -2045,7 +2052,7 @@ function pvRender() {
   if (info.keys.length) add('pvd soft', info.keys.join(' · '));
   const can = det.childNodes.length > 0, mb = $('pvMeanBtn');
   det.hidden = true; mb.disabled = !can; $('pvMore').hidden = !can;
-  if (can) { mb.setAttribute('aria-expanded', 'false'); mb.setAttribute('aria-label', w.word + ' 뜻 자세히 보기'); } else { mb.removeAttribute('aria-expanded'); mb.removeAttribute('aria-label'); }
+  if (can) mb.setAttribute('aria-expanded', 'false'); else mb.removeAttribute('aria-expanded');   // 이름은 안의 글(품사·뜻 목록·자세히)을 그대로 읽는다
   $('pvPrev').disabled = PV.idx === 0;
   $('pvNext').setAttribute('aria-label', last ? '게임 시작' : '다음 단어');
   $('pvIcNext').toggleAttribute('hidden', last); $('pvIcPlay').toggleAttribute('hidden', !last);   // SVG 요소에는 hidden 프로퍼티가 없어 속성으로 바꾼다

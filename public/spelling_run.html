@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<script src="/js/common/authGate.js?v=105"></script>
+<script src="/js/common/authGate.js?v=106"></script>
 <link rel="manifest" href="/manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -191,12 +191,14 @@
               <button class="pvx" id="pvBack" type="button" aria-label="돌아가기"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
             </div>
             <div class="pvmain">
-              <p class="pvw" id="pvWord"></p>
-              <button class="pvmeanbtn" id="pvMeanBtn" type="button" aria-controls="pvDetail">
-                <span class="pvm" id="pvMean"></span>
-                <span class="pvmore" id="pvMore" hidden>자세히<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg></span>
-              </button>
-              <div class="pvdetail" id="pvDetail" hidden></div>
+              <div class="pvcol">
+                <p class="pvw" id="pvWord"></p>
+                <button class="pvmeanbtn" id="pvMeanBtn" type="button" aria-controls="pvDetail">
+                  <span class="pvm" id="pvMean"></span>
+                  <span class="pvmore" id="pvMore" hidden>자세히<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg></span>
+                </button>
+                <div class="pvdetail" id="pvDetail" hidden></div>
+              </div>
             </div>
             <p class="note" id="pvNote" role="status" aria-live="polite"></p>
             <div class="pvfoot">
@@ -295,8 +297,8 @@
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=105"></script>
-<script src="/js/spellrun/stage_style.js?v=105"></script>
-<script src="/js/spellrun/game.js?v=105"></script>
+<script src="/js/spellrun/logic.js?v=106"></script>
+<script src="/js/spellrun/stage_style.js?v=106"></script>
+<script src="/js/spellrun/game.js?v=106"></script>
 </body>
 </html>

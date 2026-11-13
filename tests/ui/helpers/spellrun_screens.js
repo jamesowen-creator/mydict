@@ -2,7 +2,7 @@
 // 각 화면: { name, setup(JS 문자열), card(카드 선택자), buttons(주 버튼 id 목록) }
 // 작업414: 미리 보기 화면을 같은 DOM 으로 채운다(짧은 뜻 두 줄 + 자세히). expanded 면 긴 상세를 펼친 상태, last 면 [다음] 자리가 재생 아이콘
 const PV_SETUP = (prog, last, expanded) => `document.querySelectorAll('.sr-box .screen').forEach(e => { e.hidden = e.id !== 'pv'; }); pvProg.textContent = ${JSON.stringify(prog)}; pvWord.textContent = 'environment';
-  pvMean.innerHTML = '<span class="pvm1">환경</span><span class="pvm1">주변 상황, 둘러싼 조건</span>'; pvMore.hidden = false; pvNote.textContent = '소리가 나지 않으면 기기 음량을 확인하세요';
+  pvMean.innerHTML = '<span class="pvgrp"><span class="pvpos">명사</span><span class="pvrow"><span class="pvn">1.</span><span class="pvt">환경, 주변</span></span><span class="pvrow"><span class="pvn">2.</span><span class="pvt">둘러싼 조건, 상황</span></span></span><span class="pvgrp"><span class="pvpos">동사</span><span class="pvrow"><span class="pvn">1.</span><span class="pvt">영향을 주다</span></span></span>'; pvMore.hidden = false; pvNote.textContent = '소리가 나지 않으면 기기 음량을 확인하세요';
   pvDetail.innerHTML = ${JSON.stringify(expanded)} ? ['주위를 둘러싸고 있는 자연적·사회적 조건 전체를 뜻하는 말로 쓰이는 명사', '사람이 살아가는 데 영향을 주는 주변의 모든 조건을 넓게 가리킬 때 자주 쓰고, 일터나 학교처럼 사회적 분위기를 말할 때도 쓴다.', '둘러싼 · 조건 · 자연환경 · 생활환경'].map((t, i) => '<p class="pvd' + (i ? ' soft' : '') + '">' + t + '</p>').join('') : '';
   pvDetail.hidden = !${JSON.stringify(expanded)}; pvMeanBtn.setAttribute('aria-expanded', String(${JSON.stringify(expanded)}));
   pvPrev.disabled = false; pvIcNext.toggleAttribute('hidden', ${JSON.stringify(last)}); pvIcPlay.toggleAttribute('hidden', !${JSON.stringify(last)});`;
@@ -10,9 +10,9 @@ const SCREENS = [
   { name: '시작', setup: `document.querySelectorAll('.sr-box .screen').forEach(e => { e.hidden = e.id !== 'start'; });`, buttons: ['startBtn', 'helpBtn'], primary: ['startBtn'] },
   { name: '결과', setup: `document.querySelectorAll('.sr-box .screen').forEach(e => { e.hidden = e.id !== 'result'; });`, buttons: ['revBtn', 'againBtn'], primary: ['againBtn'], needsResult: true },
   { name: '게임방법', setup: `document.querySelectorAll('.sr-box .screen').forEach(e => { e.hidden = e.id !== 'help'; });`, buttons: ['helpClose'], primary: ['helpClose'] },
-  { name: '미리보기-진행', setup: PV_SETUP('3/8', false, false), buttons: ['pvBack', 'pvMeanBtn', 'pvPrev', 'pvNext', 'pvSkip'], primary: ['pvNext'] },   // 작업414: 자동 넘김이 없어지고 아이콘으로 넘긴다
-  { name: '미리보기-끝', setup: PV_SETUP('8/8', true, false), buttons: ['pvBack', 'pvMeanBtn', 'pvPrev', 'pvNext', 'pvSkip'], primary: ['pvNext'] },
-  { name: '미리보기-펼침', setup: PV_SETUP('3/8', false, true), buttons: ['pvBack', 'pvMeanBtn', 'pvPrev', 'pvNext', 'pvSkip'], primary: ['pvNext'] },
+  { name: '미리보기-진행', setup: PV_SETUP('3/8', false, false), buttons: ['pvBack', 'pvPrev', 'pvNext', 'pvSkip'], primary: ['pvNext'] },   // 작업414: 자동 넘김이 없어지고 아이콘으로 넘긴다
+  { name: '미리보기-끝', setup: PV_SETUP('8/8', true, false), buttons: ['pvBack', 'pvPrev', 'pvNext', 'pvSkip'], primary: ['pvNext'] },
+  { name: '미리보기-펼침', setup: PV_SETUP('3/8', false, true), buttons: ['pvBack', 'pvPrev', 'pvNext', 'pvSkip'], primary: ['pvNext'] },
   { name: '이어하기', setup: `document.querySelectorAll('.sr-box .screen').forEach(e => { e.hidden = e.id !== 'cont'; });`, buttons: ['contBtn', 'endBtn'], primary: ['contBtn'] },
   { name: '대결-목록', setup: `document.querySelectorAll('.sr-box .screen').forEach(e => { e.hidden = e.id !== 'vs'; }); document.querySelectorAll('#vs .vsview').forEach(e => { e.hidden = e.id !== 'vsListView'; }); vsMsg.textContent = ''; vsList.innerHTML = [1, 2, 3, 4].map(i => '<li><span class="vn">방 주인 ' + i + '</span><span class="vm">1 / 2 · 단어 10개</span><button class="toggle vsbtn" type="button">참가</button></li>').join('');`, buttons: ['vsCreate', 'vsRefresh', 'vsClose'], primary: ['vsCreate'] },
   { name: '대결-대기', setup: `document.querySelectorAll('.sr-box .screen').forEach(e => { e.hidden = e.id !== 'vs'; }); document.querySelectorAll('#vs .vsview').forEach(e => { e.hidden = e.id !== 'vsRoomView'; }); vsMsg.textContent = '방을 만들었어요'; vsRoomText.textContent = '두 사람이 모였어요. 시작하면 같은 단어로 겨뤄요.'; vsPlayers.innerHTML = '<li><span class="vn">나</span><span class="vm">준비</span></li><li><span class="vn">상대 이름</span><span class="vm">준비</span></li>'; vsGo.textContent = '시작';`, buttons: ['vsGo', 'vsLeave'], primary: ['vsGo'] },

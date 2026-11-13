@@ -1329,43 +1329,52 @@ function planRound(words, missed, cfg, rng, reviewOnly) {
   return { list: list, bossIdx: shape.bossIdx, regular: shape.regular };
 }
 
-// 작업414: 미리 보기 화면용 뜻 목록·상세·이전/다음 계산(순수 함수). 단어장에 저장된 값만 읽는다(AI·네트워크 없음).
-// 뜻 데이터를 읽는 곳은 이 함수 하나다: main(대표 뜻 = 게임이 읽는 short_meaning), meanings[].definition(없으면 core_meaning), meanings[].usage_note(없으면 nuance), 옛 구조의 data.nuance.
-// shorts: 큰 글자로 보일 짧은 뜻 줄. 대표 뜻 → 둘째 이후 뜻에서 새로 나온 키워드 줄(최대 4줄). 쉼표로 나열된 정의가 길면 항목 단위로만 줄이고(keywords), 쉼표 없는 긴 문장은 그대로 둔다.
-// detail: 펼쳤을 때 [{ def, note }] — def 는 정의 전체(보인 짧은 뜻과 다를 때만), note 는 usage_note. keys: 위에 나오지 않은 보조 키워드(buildHint 규칙: 정답 단어는 가리고 최대 6개).
-const PV_MAX_LINES = 4;
+// 작업414·419: 미리 보기 화면용 뜻 목록·상세·이전/다음 계산(순수 함수). 단어장에 저장된 값만 읽는다(AI·네트워크 없음).
+// 뜻 데이터를 읽는 곳은 이 함수 하나다: main(대표 뜻 = 게임이 읽는 short_meaning), meanings[].pos(영문 품사, 없을 수 있음)·definition(없으면 core_meaning)·usage_note(없으면 nuance), 옛 구조의 data.nuance.
+// groups: 품사별로 묶은 번호 목록 [{ pos: '명사'|'', lines: ['특징, 특성', ...] }]. 같은 품사의 뜻은 기존 순서(중요도순)를 지키고 품사 블록은 처음 나온 순서. 품사 필드가 없으면 pos '' (품사 줄 없이 번호만, 추정하지 않는다).
+//   각 줄은 그 뜻의 definition 에서 유효한 대응어(20자 이하·마침표 등 없음) 앞 3개를 ", " 로 잇는다. 유효한 항목이 없는 옛 문장형 정의는 줄바꿈만 처리하고 그대로 쓴다(변환은 417). 뜻이 하나도 없으면 대표 뜻 한 줄.
+// detail: 펼쳤을 때 [{ def, note }] — def 는 정의 전체(위 목록에 보인 줄과 다를 때만, 같으면 뺀다), note 는 usage_note. keys: 위 목록에 나오지 않은 보조 키워드(buildHint 규칙: 정답 단어는 가리고 최대 6개).
+const PV_POS = { noun: '명사', verb: '동사', adjective: '형용사', adverb: '부사', preposition: '전치사', conjunction: '접속사', pronoun: '대명사', interjection: '감탄사', phrase: '구', idiom: '관용어' };
+const posLabel = function (p) { const t = txt(p); return t ? (PV_POS[t.toLowerCase()] || t) : ''; };
+const pvItemOk = function (it) { return Array.from(it).length <= 20 && !/[.!?。！？]/.test(it); };
 function previewInfo(row, word, main) {
   const d = row && row.data && typeof row.data === 'object' ? row.data : {};
   const meanings = Array.isArray(d.meanings) ? d.meanings.filter(function (m) { return m && typeof m === 'object'; }) : [];
   const defOf = function (m) { return txt(m.definition) || txt(m.core_meaning); };
-  const seen = new Set(splitKeywords(main));
-  const shorts = main ? [main] : [];
-  const shown = [];
-  meanings.forEach(function (m, i) {
-    shown[i] = '';
-    if (i === 0) { shown[i] = main; return; }
-    if (shorts.length >= PV_MAX_LINES) return;
-    const fresh = splitKeywords(keywords(defOf(m), 40)).filter(function (k) { return !seen.has(k); });
-    if (!fresh.length) return;
-    fresh.forEach(function (k) { seen.add(k); });
-    shown[i] = fresh.join(', ');
-    shorts.push(shown[i]);
+  const seen = new Set();
+  const rows = [];
+  meanings.forEach(function (m) {
+    const def = defOf(m);
+    if (!def) return;
+    const good = splitKeywords(def).filter(pvItemOk).slice(0, 3);
+    const text = good.length ? good.join(', ') : def;
+    splitKeywords(text).forEach(function (k) { seen.add(k); });
+    rows.push({ pos: posLabel(m.pos), text: text, def: def });
   });
+  const groups = [];
+  rows.forEach(function (r) {
+    let g = groups.find(function (x) { return x.pos === r.pos; });
+    if (!g) { g = { pos: r.pos, lines: [] }; groups.push(g); }
+    g.lines.push(r.text);
+  });
+  if (!groups.length && main) { groups.push({ pos: '', lines: [main] }); splitKeywords(main).forEach(function (k) { seen.add(k); }); }
   const detail = [];
-  meanings.forEach(function (m, i) {
+  let ri = 0;
+  meanings.forEach(function (m) {
     const def = defOf(m), note = txt(m.usage_note) || txt(m.nuance);
-    const dshow = def && def !== shown[i] ? def : '';
+    const r = def ? rows[ri++] : null;
+    const dshow = r && splitKeywords(r.def).join(', ') !== r.text && r.def !== r.text ? r.def : '';
     if (dshow || note) detail.push({ def: dshow, note: note });
   });
   if (!meanings.length && txt(d.nuance)) detail.push({ def: '', note: txt(d.nuance) });
   const keys = [];
   meanings.forEach(function (m) {
     splitKeywords(defOf(m)).forEach(function (k) {
-      if (keys.length >= 6 || seen.has(k)) return;
+      if (keys.length >= 6 || seen.has(k) || !pvItemOk(k)) return;   // 문장형 항목은 보조 키워드로 쓰지 않는다
       seen.add(k); keys.push(maskText(k, word));
     });
   });
-  return { shorts: shorts, detail: detail, keys: keys };
+  return { groups: groups, detail: detail, keys: keys };
 }
 // 미리 보기 이전(-1)·다음(+1). 첫 단어에서 이전은 그대로, 마지막 단어에서 다음은 게임 시작(start: true)
 function previewStep(idx, len, dir) {

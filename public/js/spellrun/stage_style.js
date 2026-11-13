@@ -160,30 +160,38 @@
   background:transparent;border:calc(2 * var(--u)) solid var(--ink);border-radius:999px;padding:calc(5 * var(--u)) calc(14 * var(--u));
 }
 .sr-box .toggle[aria-pressed="true"]{background:var(--ink);color:#fff}
-/* 작업414: 단어 미리 보기(미니멀). 카드 안에 박스·테두리·구분 영역 없이 여백과 글자 위계로만 구성: 진행 표시 → 단어 → 짧은 뜻 → 아이콘. 카드 바깥 모양은 작업382 시작 카드와 같다 */
-.sr-box #pv .card{border-width:calc(2 * var(--u));box-shadow:0 calc(10 * var(--u)) calc(28 * var(--u)) rgba(20,32,74,.28);gap:calc(2 * var(--u));padding:calc(4 * var(--u)) calc(16 * var(--u)) calc(10 * var(--u));overflow:hidden}
-.sr-box .pvtop{display:flex;align-items:center;justify-content:space-between}
+/* 작업414·419: 단어 미리 보기(미니멀). 카드 안에 박스·테두리·구분선 없이 여백과 글자 크기·굵기·색 대비로만 위계를 만든다. 카드 바깥 모양은 작업382 시작 카드와 같다.
+   작업419: 이 화면은 몰입형 예외로 읽기 칼럼(최대 560u, 카드 가운데) 안의 글을 모두 왼쪽 정렬한다(앱 일반 규칙의 가운데 정렬과 다름). 새 색은 없다: 단어 --ink, 뜻·상세 --ink-soft, 번호는 --ink-soft 에 투명도.
+   겹침 수정: 칼럼 안 요소는 줄어들지 않고(flex:none) 안쪽 영역(.pvmain)만 세로로 스크롤한다. */
+.sr-box #pv .card{border-width:calc(2 * var(--u));box-shadow:0 calc(10 * var(--u)) calc(28 * var(--u)) rgba(20,32,74,.28);padding:calc(4 * var(--u)) calc(16 * var(--u)) calc(10 * var(--u));overflow:hidden;display:grid;grid-template-columns:1fr auto 1fr;grid-template-rows:auto minmax(0,1fr) auto auto;row-gap:calc(2 * var(--u));column-gap:calc(8 * var(--u))}
+.sr-box .pvtop{grid-column:1 / -1;grid-row:1;display:flex;align-items:center;justify-content:space-between}
 .sr-box .pvprog{font-size:max(11px,calc(12 * var(--u)));font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums}
 .sr-box #pv svg{width:calc(24 * var(--u));height:calc(24 * var(--u));min-width:20px;min-height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 .sr-box .pvx,.sr-box .pvic,.sr-box .pvgo{display:inline-flex;align-items:center;justify-content:center;flex:none;box-sizing:border-box;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:var(--ink);cursor:pointer;width:max(44px,calc(48 * var(--u)));height:max(44px,calc(48 * var(--u)))}
 .sr-box .pvgo{width:max(48px,calc(56 * var(--u)));height:max(48px,calc(56 * var(--u)));background:var(--coral);box-shadow:0 calc(6 * var(--u)) calc(16 * var(--u)) rgba(255,107,90,.35)}
 .sr-box .pvic:disabled{visibility:hidden}
 .sr-box .pvx:focus-visible,.sr-box .pvic:focus-visible,.sr-box .pvgo:focus-visible,.sr-box .pvmeanbtn:focus-visible,.sr-box .pvskip:focus-visible{outline:calc(3 * var(--u)) solid var(--ink);outline-offset:calc(3 * var(--u))}
-.sr-box .pvmain{flex:1 1 auto;min-height:calc(140 * var(--u));overflow:auto;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:calc(8 * var(--u));text-align:center}
-.sr-box .pvw{font-family:var(--f-letter);font-weight:700;font-size:calc(36 * var(--u));line-height:1.1;overflow-wrap:anywhere;max-width:100%}
-.sr-box .pvmeanbtn{display:flex;flex-direction:column;align-items:center;gap:calc(4 * var(--u));width:100%;min-height:44px;margin:0;padding:calc(4 * var(--u)) calc(8 * var(--u));border:0;background:transparent;font:inherit;color:inherit;cursor:pointer}
+.sr-box .pvmain{grid-column:1 / -1;grid-row:2;min-height:calc(120 * var(--u));overflow:auto;display:flex}
+.sr-box .pvcol{margin:auto;width:100%;max-width:min(100%,calc(560 * var(--u)));display:flex;flex-direction:column;align-items:stretch;gap:calc(8 * var(--u));text-align:left;padding:calc(4 * var(--u)) 0}
+.sr-box .pvcol > *{flex:none}
+.sr-box .pvw{margin:0;font-family:var(--f-letter);font-weight:700;color:var(--ink);font-size:max(26px,calc(40 * var(--u)));line-height:1.1;overflow-wrap:anywhere}
+.sr-box .pvmeanbtn{display:flex;flex-direction:column;align-items:flex-start;gap:calc(6 * var(--u));width:100%;min-height:44px;margin:0;padding:calc(2 * var(--u)) 0;border:0;background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer}
 .sr-box .pvmeanbtn:disabled{cursor:default}
-.sr-box .pvm{display:flex;flex-direction:column;align-items:center;gap:calc(2 * var(--u))}
-.sr-box .pvm1{font-weight:700;font-size:calc(22 * var(--u));line-height:1.3;overflow-wrap:anywhere;word-break:keep-all;max-width:100%}
-.sr-box .pvmore{display:inline-flex;align-items:center;gap:calc(2 * var(--u));font-size:max(11px,calc(12 * var(--u)));font-weight:700;color:var(--ink-soft)}
+.sr-box .pvm{display:flex;flex-direction:column;align-items:stretch;gap:calc(12 * var(--u));width:100%}
+.sr-box .pvgrp{display:flex;flex-direction:column;gap:calc(3 * var(--u))}
+.sr-box .pvpos{font-size:max(11px,calc(12 * var(--u)));font-weight:700;letter-spacing:.04em;color:var(--ink-soft)}
+.sr-box .pvrow{display:grid;grid-template-columns:calc(24 * var(--u)) minmax(0,1fr);align-items:baseline}
+.sr-box .pvn{font-size:calc(16 * var(--u));font-weight:500;color:var(--ink-soft);opacity:.6;font-variant-numeric:tabular-nums}
+.sr-box .pvt{font-size:calc(18 * var(--u));font-weight:500;line-height:1.45;color:var(--ink-soft);overflow-wrap:anywhere;word-break:keep-all}
+.sr-box .pvmore{display:inline-flex;align-items:center;gap:calc(2 * var(--u));min-height:max(24px,calc(24 * var(--u)));font-size:max(11px,calc(12 * var(--u)));font-weight:700;color:var(--ink-soft)}
 .sr-box .pvmore svg{width:calc(14 * var(--u));height:calc(14 * var(--u));min-width:12px;min-height:12px;stroke-width:2.6}
 .sr-box .pvmeanbtn[aria-expanded="true"] .pvmore svg{transform:rotate(180deg)}
-.sr-box .pvdetail{width:100%;display:flex;flex-direction:column;gap:calc(8 * var(--u));text-align:left}
-.sr-box .pvd{font-size:max(11px,calc(14 * var(--u)));font-weight:500;line-height:1.5;word-break:keep-all;overflow-wrap:anywhere}
-.sr-box .pvd.soft{color:var(--ink-soft)}
-.sr-box .pvfoot{display:flex;flex-direction:column;align-items:center;gap:calc(2 * var(--u))}
-.sr-box .pvnav{display:flex;align-items:center;justify-content:center;gap:calc(20 * var(--u))}
-.sr-box .pvskip{min-height:44px;margin:0;padding:0 calc(14 * var(--u));border:0;background:transparent;font-family:var(--f-body);font-size:max(11px,calc(12 * var(--u)));font-weight:700;color:var(--ink-soft);text-decoration:underline;cursor:pointer}
+.sr-box .pvdetail{display:flex;flex-direction:column;gap:calc(8 * var(--u));text-align:left}
+.sr-box .pvd{margin:0;font-size:max(11px,calc(14 * var(--u)));font-weight:400;line-height:1.6;color:var(--ink-soft);word-break:keep-all;overflow-wrap:anywhere}
+.sr-box #pvNote{grid-column:1 / -1;grid-row:3;text-align:left}
+.sr-box .pvfoot{display:contents}
+.sr-box .pvnav{grid-column:2;grid-row:4;display:flex;align-items:center;justify-content:center;gap:calc(20 * var(--u))}
+.sr-box .pvskip{grid-column:1;grid-row:4;justify-self:start;align-self:center;min-width:44px;min-height:44px;margin:0;padding:0;text-align:left;border:0;background:transparent;font-family:var(--f-body);font-size:max(11px,calc(12 * var(--u)));font-weight:700;color:var(--ink-soft);text-decoration:underline;cursor:pointer}
 .sr-box #help .card{overflow:hidden}
 .sr-box .helphead{display:flex;align-items:center;justify-content:space-between;gap:calc(8 * var(--u))}
 .sr-box .helphead .title{text-align:left}
@@ -317,11 +325,22 @@ body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
 .sr-box.land #resInfo{grid-column:1;grid-row:1;display:flex;flex-direction:column;gap:calc(8 * var(--u));justify-content:center}
 .sr-box.land #resMain{grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:calc(8 * var(--u))}
 .sr-box.land #resTitle{font-size:calc(30 * var(--u))}
-.sr-box.land #pv .card{display:grid;grid-template-columns:1fr auto;grid-template-rows:auto minmax(0,1fr) auto;column-gap:calc(20 * var(--u));row-gap:calc(2 * var(--u));align-content:center}
+/* 작업419: 가로는 [넘김]이 카드 오른쪽 가운데, [건너뛰기]는 왼쪽 아래 가장자리. 읽기 칼럼은 그 왼쪽 영역 가운데 */
+.sr-box.land #pv .card{grid-template-columns:auto 1fr auto;grid-template-rows:auto minmax(0,1fr) auto;column-gap:calc(16 * var(--u));row-gap:calc(2 * var(--u));align-content:center}
 .sr-box.land .pvtop{grid-column:1 / -1;grid-row:1}
-.sr-box.land .pvmain{grid-column:1;grid-row:2;min-height:0}
-.sr-box.land #pvNote{grid-column:1;grid-row:3}
-.sr-box.land .pvfoot{grid-column:2;grid-row:2 / span 2;align-self:center}
+.sr-box.land .pvmain{grid-column:1 / 3;grid-row:2}
+.sr-box.land .pvnav{grid-column:3;grid-row:2;align-self:center}
+.sr-box.land .pvskip{grid-column:1;grid-row:3}
+.sr-box.land #pvNote{grid-column:2;grid-row:3;align-self:center}
+/* 낮은 가로 화면에서도 [자세히]가 영역 안에 보이도록 단어·목록을 조금 줄인다(위계 단어 > 뜻 > 상세는 그대로) */
+.sr-box.land .pvw{font-size:max(24px,calc(34 * var(--u)))}
+.sr-box.land .pvcol{gap:calc(4 * var(--u));padding:0}
+.sr-box.land .pvm{gap:calc(8 * var(--u))}
+.sr-box.land .pvgrp{gap:calc(1 * var(--u))}
+.sr-box.land .pvmeanbtn{gap:calc(2 * var(--u));padding:0}
+.sr-box.land .pvt{font-size:calc(16 * var(--u));line-height:1.3}
+.sr-box.land .pvn{font-size:calc(14 * var(--u))}
+.sr-box.land .pvmore{min-height:max(20px,calc(20 * var(--u)))}
 /* 대결 화면: 목록·대기·결과를 2열로. 방 목록(내용이 많은 곳)만 영역 안 스크롤 */
 .sr-box.land #vs .title.small{font-size:calc(24 * var(--u))}
 .sr-box.land #vs .vlist{max-height:calc(190 * var(--u))}
