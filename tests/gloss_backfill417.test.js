@@ -210,7 +210,7 @@ test('sample: DB 쓰기 0·호출 1회·12단어 이하·응답 형식, 긴 정�
   assert.equal(ai.calls.length, 1); assert.equal(r.items.length, 12);
   assert.equal(JSON.stringify(db.rows), snap); assert.equal(db.writes, 0); assert.equal(db.backup.length, 0);
   const it = r.items[0];
-  assert.deepEqual(Object.keys(it).sort(), ['after', 'before', 'id', 'ok', 'short_meaning_after', 'word']);
+  assert.deepEqual(Object.keys(it).sort(), ['after', 'before', 'fail_items', 'id', 'ok', 'reason', 'short_meaning_after', 'word']);
   assert.equal(it.ok, true); assert.ok(Array.isArray(it.before) && Array.isArray(it.after));
   assert.ok(r.items.some(x => x.id > 24), '긴 정의 단어 포함');
   assert.ok(r.items.some(x => x.id <= 24), '무작위 단어 포함');

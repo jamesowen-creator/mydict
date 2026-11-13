@@ -60,3 +60,32 @@ test('샘플 전에는 [전체 적용] 비활성 → 샘플 후 활성 → 화�
   assert.deepEqual(runs.map(l => l.body), [{ cursor: 0 }, { cursor: 100, run_id: 'gtest1' }]);
   await page.close();
 });
+
+// 작업420: 단어 지정 입력칸 — 비우면 무작위(본문 {}), 채우면 words 배열을 보내고, 실패 칸에 이유와 실패 항목이 작은 글씨로 보인다
+test('단어 지정 입력칸: 비우면 무작위({}), 채우면 words 전송, 실패 이유·대상 없음 표시', { skip: SKIP }, async () => {
+  srv.reset();
+  srv.state.me = { id: 7, email: 'u7@example.com', name: '관리자', role: 'admin' };
+  srv.state.adminUsers = [{ id: 7, email: 'u7@example.com', name: '관리자', role: 'admin', is_blocked: false, is_approved: true, wordbook_count: 0, search_count: 0, tts_count: 0 }];
+  srv.state.adminApi = (u, m, body, J) => {
+    if (u.endsWith('/status')) return J(200, { ok: true, targets: 5, users: 1, legacy: 0, converted: 0, est_calls: 1, est_cost_usd: 0.001, cost_estimated: true, model: 'm' });
+    if (u.endsWith('/sample')) return J(200, { ok: true, items: body.words
+      ? [{ id: 1, word: 'Metis', before: ['설명'], after: [], short_meaning_after: '', ok: false, reason: '20자 초과', fail_items: [{ meaning: 1, text: '가'.repeat(60) + '…', reason: '20자 초과' }] }, { id: null, word: 'zzz', before: [], after: [], short_meaning_after: '', ok: false, reason: '대상 없음', fail_items: [] }]
+      : [{ id: 2, word: 'run', before: ['가'], after: ['달리다'], short_meaning_after: '달리다', ok: true, reason: '', fail_items: [] }] });
+    return J(404, { ok: false });
+  };
+  const page = await browser.newPage({ width: 1280, height: 1800, token: adminToken() });
+  await page.goto(srv.url + '/admin');
+  await page.waitFor("document.getElementById('gl-words') && /대상 5/.test(document.getElementById('gl-status').textContent)", 8000);
+  assert.ok(await page.eval("document.getElementById('gl-words').getBoundingClientRect().height >= 44"), '입력칸 터치 44px');
+  await page.eval("document.getElementById('gl-sample').click(); true");
+  await page.waitFor("document.querySelectorAll('#gl-tbody tr').length === 1", 5000);
+  await page.eval("document.getElementById('gl-words').value = ' metis, ZZZ ,'; document.getElementById('gl-sample').click(); true");
+  await page.waitFor("document.querySelectorAll('#gl-tbody tr').length === 2", 5000);
+  const posts = srv.state.log.filter(l => l.url === '/api/admin/gloss/sample').map(l => l.body);
+  assert.deepEqual(posts, [{}, { words: ['metis', 'ZZZ'] }]);
+  const cell = await page.eval("document.querySelectorAll('#gl-tbody tr')[0].children[2].textContent");
+  assert.match(cell, /^\(변환 실패\)20자 초과 — 1번 뜻: 가{60}… \(20자 초과\)$/);
+  assert.equal(await page.eval("document.querySelectorAll('#gl-tbody tr')[1].children[2].textContent"), '(대상 없음)');
+  assert.equal(await page.eval("document.getElementById('gl-run').disabled"), false, '실패 샘플도 본 것으로 본다(대상 없음만 있으면 켜지지 않음)');
+  await page.close();
+});

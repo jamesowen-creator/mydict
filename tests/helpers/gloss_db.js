@@ -31,6 +31,10 @@ function createGlossDb() {
       if (s === SQLN.countDone) return { rows: [{ n: db.rows.filter(r => r.lang === 'en' && r.data && 'gloss_v' in r.data).length }] };
       if (s === SQLN.sampleLong) return { rows: db.rows.filter(isTarget).sort((a, b) => maxDef(b) - maxDef(a)).slice(0, p[0]).map(clone) };
       if (s === SQLN.sampleRandom) return { rows: db.rows.filter(r => isTarget(r) && !p[1].includes(r.id)).slice(0, p[0]).map(clone) };
+      if (s === SQLN.sampleWords) {
+        const seen = new Set();
+        return { rows: db.rows.filter(r => isTarget(r) && p[0].includes(r.word.toLowerCase())).sort((a, b) => a.id - b.id).filter(r => { const k = r.word.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; }).map(clone) };
+      }
       if (s === SQLN.apply) {
         const row = db.get(p[0]);
         if (db.beforeApply) db.beforeApply(row);   // 읽은 뒤·쓰기 전에 사용자가 고치는 상황을 흉내 낸다

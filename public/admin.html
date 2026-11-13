@@ -280,6 +280,10 @@
       </div>
       <div class="section-body">
         <div id="gl-status" style="font-size:13px;line-height:1.6;color:var(--text2)">현황을 불러오는 중…</div>
+        <div style="margin-top:12px">
+          <label for="gl-words" style="font-size:13px;color:var(--text2)">단어 지정, 쉼표로 구분, 비우면 무작위(최대 5개)</label>
+          <input id="gl-words" type="text" maxlength="200" autocomplete="off" spellcheck="false" style="display:block;width:100%;box-sizing:border-box;margin-top:4px;font-size:16px;min-height:44px;padding:0 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface,#fff);color:var(--text)">
+        </div>
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">
           <button class="btn-save" id="gl-sample" type="button">샘플 보기</button>
           <button class="btn-save" id="gl-run" type="button" disabled>전체 적용</button>
@@ -777,21 +781,28 @@ async function glLoad() {
   glSync();
   return glStatus;
 }
+function glWords() { return glEl('gl-words').value.split(',').map(x => x.trim()).filter(Boolean); }
 async function glSample() {
   glConfirmOff(); glMsg('샘플을 만드는 중입니다…'); glBusy = true; glSync();
   try {
-    const r = await fetch('/api/admin/gloss/sample', { method: 'POST', headers: authHeaders(), body: '{}' });
+    const r = await fetch('/api/admin/gloss/sample', { method: 'POST', headers: authHeaders(), body: JSON.stringify(glWords().length ? { words: glWords() } : {}) });
     if (!r.ok) { glMsg(await glErr(r)); }
     else {
       const d = await r.json();
       const tb = glEl('gl-tbody'); tb.textContent = '';
       d.items.forEach(it => {
         const tr = document.createElement('tr');
-        [it.word, it.before.join(' / '), it.ok ? it.after.join(' / ') : '(변환 실패)'].forEach(t => { const td = document.createElement('td'); td.textContent = t; tr.appendChild(td); });
+        [it.word, it.before.join(' / '), it.ok ? it.after.join(' / ') : (it.reason === '대상 없음' ? '(대상 없음)' : '(변환 실패)')].forEach(t => { const td = document.createElement('td'); td.textContent = t; tr.appendChild(td); });
+        if (!it.ok && it.reason && it.reason !== '대상 없음') {   // 작업420: 실패 이유(라벨)와 실패 항목(최대 3개)을 작은 글씨로
+          const why = document.createElement('div');
+          why.style.cssText = 'font-size:11px;line-height:1.5;color:var(--text3)';
+          why.textContent = it.reason + (it.fail_items && it.fail_items.length ? ' — ' + it.fail_items.map(f => f.meaning + '번 뜻: ' + (f.text || '(빈 값)') + ' (' + f.reason + ')').join(' / ') : '');
+          tr.lastChild.appendChild(why);
+        }
         tb.appendChild(tr);
       });
       glEl('gl-sample-box').style.display = 'block';
-      glSampled = d.items.length > 0;
+      glSampled = d.items.some(it => it.reason !== '대상 없음');
       glMsg(d.items.length ? '샘플 ' + d.items.length + '단어입니다. 문제가 없으면 [전체 적용]을 누르세요. 아직 아무것도 저장되지 않았습니다.' : '변환할 단어가 없습니다.');
     }
   } catch (e) { glMsg('요청에 실패했습니다.'); }

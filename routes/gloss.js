@@ -17,9 +17,27 @@ router.get('/api/admin/gloss/status', requireAdmin, needDb, async (req, res) => 
   catch (err) { console.error('gloss status error:', err && err.message); res.status(500).json({ ok: false, error: '현황을 불러오지 못했습니다.' }); }
 });
 
+// words: 문자열 배열(또는 쉼표로 구분한 문자열). 소문자로 바꾸고 중복을 없애 최대 5개. 형식이 틀리면 null
+function parseWords(v) {
+  if (v === undefined || v === null) return [];
+  const a = typeof v === 'string' ? v.split(',') : v;
+  if (!Array.isArray(a) || a.length > 100) return null;
+  const out = [];
+  for (const x of a) {
+    if (typeof x !== 'string') return null;
+    const t = x.trim().toLowerCase();
+    if (!t) continue;
+    if (Array.from(t).length > 60) return null;
+    if (!out.includes(t)) out.push(t);
+  }
+  return out.slice(0, B.SAMPLE_WORDS_MAX);
+}
+
 router.post('/api/admin/gloss/sample', requireAdmin, needDb, needAi, async (req, res) => {
+  const words = parseWords(bodyOf(req).words);
+  if (words === null) return res.status(400).json({ ok: false, error: 'words 는 철자 문자열의 목록이어야 합니다.' });
   try {
-    const r = await B.sample(req.user.id, B.defaultDeps());
+    const r = await B.sample(req.user.id, B.defaultDeps(), { words });
     res.json({ ok: true, items: r.items });
   } catch (err) { console.error('gloss sample error:', err && err.message); res.status(500).json({ ok: false, error: '샘플을 만들지 못했습니다.' }); }
 });

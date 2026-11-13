@@ -2276,6 +2276,8 @@ Respond ONLY in valid JSON with this exact structure:
 Rules:
 - meanings: 2-4 entries, ordered by REAL-WORLD USAGE FREQUENCY (most common sense first). If the word has senses across different parts of speech, include them all in this SAME array (still frequency-ordered overall) - each entry's "pos" marks which part of speech it belongs to.
 - 뜻 표현 원칙: 한국어 뜻은 문장이 아니라, 학습자가 바로 떠올릴 수 있는 직관적인 한국어 단어나 짧은 구로 쓴다. '~하는 것', '무언가를 ~' 같은 사전식 문장체, 마침표, 설명 덧붙이기를 쓰지 않는다. 뜻이 여럿이면 중요한 순서대로 모두 쓴다. meanings[].definition에는 그 뜻의 대응어를 2~3개 쉼표로 나열한다. 쓰임·뉘앙스·상황 설명은 2차 usage_note가 맡으므로 definition에 넣지 않는다. 예(형식 참고용, 해당 단어에만 해당): scrutinize → 신중하게 검토하다, 정밀 조사하다 / ambiguous → 애매한, 모호한 / run → (뜻1) 달리다, 뛰다 (뜻2) 운영하다, 경영하다 (뜻3) 흐르다.
+- 뜻 표현 원칙(보완): 대응하는 한국어 단어가 없는 고유명사·브랜드·전문용어·신화·인물·지명은 '무엇인지'를 20자 이내의 짧은 명사구로 쓴다(마침표·서술어 문장 금지). 설명이 길면 핵심 명사만 남기고 세부는 쓰지 않는다(세부는 usage_note가 맡는다). 예(형식 참고용, 해당 단어에만 해당): Metis → 그리스 신화의 지혜의 여신, 캐나다의 혼혈 원주민 집단 / wordmark → 글자로만 만든 로고.
+- '~하는', '~인', '~것'으로 끝나는 설명형 풀이는 쓰지 말고 대응 단어로 쓴다(예: 성실하고 꼼꼼한, 열심인).
 - derivatives: up to 5 related word forms.
 - domain: one of 일반, 비즈니스, 의학, 법률, 기술, 구어체, 문학, 격식체, 비격식.
 - Do NOT include etymology or word-origin information anywhere in the response.
