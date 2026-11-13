@@ -288,9 +288,9 @@
           <button class="btn-save" id="gl-sample" type="button">샘플 보기</button>
           <button class="btn-save" id="gl-run" type="button" disabled>전체 적용</button>
           <button class="btn-back" id="gl-cancel" type="button" style="display:none">취소</button>
-          <button class="btn-back" id="gl-stop" type="button" style="display:none">중지</button>
+          <button class="btn-back" id="gl-stop" type="button" style="display:none">중단</button>
         </div>
-        <div id="gl-note" style="font-size:12px;line-height:1.6;color:var(--text2);margin-top:12px">[전체 적용]은 [샘플 보기]로 12단어의 전/후를 한 번 본 뒤에 켜집니다. 샘플 1회마다 Haiku 호출 비용이 발생합니다.</div>
+        <div id="gl-note" style="font-size:12px;line-height:1.6;color:var(--text2);margin-top:12px">[전체 적용]은 [샘플 보기]로 12단어의 전/후를 한 번 본 뒤에 켜집니다(이미 변환된 단어가 있으면 바로 켜집니다). 샘플 1회마다 Haiku 호출 비용이 발생합니다.</div>
         <div id="gl-confirm" style="display:none;font-size:13px;line-height:1.6;margin-top:12px"></div>
         <div id="gl-sample-box" style="display:none;margin-top:12px;overflow-x:auto">
           <table>
@@ -299,7 +299,7 @@
           </table>
         </div>
         <div id="gl-progress" style="font-size:13px;line-height:1.6;margin-top:12px"></div>
-        <div id="gl-failed" style="font-size:12px;line-height:1.6;color:var(--text2);margin-top:4px;word-break:break-word"></div>
+        <div id="gl-failed" style="font-size:12px;line-height:1.6;color:var(--text2);margin-top:4px;word-break:break-word;white-space:pre-line"></div>
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">
           <label for="gl-runid" style="font-size:13px;color:var(--text2)">실행 번호</label>
           <input id="gl-runid" type="text" maxlength="40" autocomplete="off" style="font-size:16px;min-height:44px;padding:0 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface,#fff);color:var(--text);max-width:100%">
@@ -761,11 +761,14 @@ sltEl('slt-item').addEventListener('change', () => { sltConfirmOff(); });
 
 // ── 단어 뜻 일괄 변환 (작업417) ─────────────────────────────────────────────
 const glEl = id => document.getElementById(id);
-let glSampled = false, glStatus = null, glStep = null, glStopFlag = false, glBusy = false;   // glStep: null | 'run' | 'restore' (확인 문구를 보인 뒤 두 번째 누름에서 실행)
+let glSampled = false, glStatus = null, glStep = null, glStopFlag = false, glBusy = false, glResume = false;   // glResume: 앞선 실행이 실패·중단돼 [이어서 적용]으로 다시 돌릴 수 있음(작업421)   // glStep: null | 'run' | 'restore' (확인 문구를 보인 뒤 두 번째 누름에서 실행)
 const GL_RUN_ID = /^[A-Za-z0-9_-]{1,40}$/;
 function glMsg(t) { glEl('gl-msg').textContent = t || ''; }
-function glSync() { glEl('gl-run').disabled = glBusy || !glSampled || !glStatus || !glStatus.targets; glEl('gl-sample').disabled = glBusy; glEl('gl-restore').disabled = glBusy; glEl('gl-backup').disabled = glBusy; }
-function glConfirmOff() { glStep = null; glEl('gl-confirm').style.display = 'none'; glEl('gl-cancel').style.display = 'none'; glEl('gl-run').textContent = '전체 적용'; glEl('gl-restore').textContent = '되돌리기'; glSync(); }
+// 작업421: 변환된 단어가 이미 1개 이상이면 샘플을 다시 보지 않아도 켜진다. 현황을 못 읽었어도(요청 실패 직후 등) 샘플을 봤다면 잠그지 않는다
+function glCanRun() { return glSampled || !!(glStatus && glStatus.converted >= 1); }
+function glRunLabel() { return glResume ? '이어서 적용' : '전체 적용'; }
+function glSync() { glEl('gl-run').disabled = glBusy || !glCanRun() || (!!glStatus && !glStatus.targets); glEl('gl-sample').disabled = glBusy; glEl('gl-restore').disabled = glBusy; glEl('gl-backup').disabled = glBusy; }
+function glConfirmOff() { glStep = null; glEl('gl-confirm').style.display = 'none'; glEl('gl-cancel').style.display = 'none'; glEl('gl-run').textContent = glRunLabel(); glEl('gl-restore').textContent = '되돌리기'; glSync(); }
 function glSaveRun(id) { glEl('gl-runid').value = id || ''; try { localStorage.setItem('gl_last_run', id || ''); } catch (e) { /* 저장 못 해도 입력칸에 남는다 */ } }
 async function glErr(r) { const d = await r.json().catch(() => ({})); return d.error || ('실패했습니다(' + r.status + ').'); }
 async function glLoad() {
@@ -810,33 +813,63 @@ async function glSample() {
 }
 function glPrompt(kind) {
   const c = glEl('gl-confirm');
-  if (kind === 'run') c.textContent = '대상 ' + fmt(glStatus.targets) + '단어, 예상 비용 약 $' + Number(glStatus.est_cost_usd).toFixed(2) + '(추정). 모든 사용자 단어가 바뀝니다. 실행하려면 [적용 실행]을 한 번 더 누르세요.';
+  if (kind === 'run') c.textContent = '대상 ' + fmt(glStatus.targets) + '단어, 예상 비용 약 $' + Number(glStatus.est_cost_usd).toFixed(2) + '(추정). 모든 사용자 단어가 바뀝니다. 실행하려면 [적용 실행]을 한 번 더 누르세요.' + (glResume ? ' (앞선 실행의 남은 단어를 이어서 처리합니다. 이미 변환된 단어는 다시 처리하지 않습니다.)' : '');
   else c.textContent = '실행 번호 ' + glEl('gl-runid').value.trim() + '의 변환을 되돌립니다. 그 뒤 사용자가 고친 단어는 건너뜁니다. 실행하려면 [되돌리기 실행]을 한 번 더 누르세요.';
   c.style.display = 'block'; glEl('gl-cancel').style.display = 'inline-flex';
   glEl(kind === 'run' ? 'gl-run' : 'gl-restore').textContent = kind === 'run' ? '적용 실행' : '되돌리기 실행';
   glStep = kind;
 }
+const GL_FETCH_MS = 200000;   // 요청 하나를 기다리는 한도(서버 시간 예산 45초 + 배치 최악 120초보다 길게)
+async function glPost(url, body) {   // { r, d } 를 돌려주거나, 연결 문제면 { kind: 'network' | 'timeout' } 를 던진다
+  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), GL_FETCH_MS);
+  try {
+    const r = await fetch(url, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body), signal: ac.signal });
+    return { r, d: await r.json().catch(() => ({})) };
+  } catch (e) { throw { kind: e && e.name === 'AbortError' ? 'timeout' : 'network' }; }
+  finally { clearTimeout(tm); }
+}
+// 요청이 실패한 이유를 사람이 읽는 말로(네트워크 끊김 / 서버 시간 초과 / AI 응답 오류 / 서버 오류 / 이미 실행 중)
+function glFailText(e, r, d) {
+  if (e) return e.kind === 'timeout' ? '서버 시간 초과: 서버가 제때 응답하지 않았습니다.' : '네트워크 끊김: 서버에 연결하지 못했습니다.';
+  if ([502, 504, 524].includes(r.status)) return '서버 시간 초과: 서버가 제때 응답하지 않았습니다(' + r.status + ').';
+  if (r.status === 409) return d.error || '이미 실행 중입니다.';
+  if (r.status === 503) return 'AI 응답 오류(키·한도·사용 불가): ' + (d.error || r.status);
+  return '서버 오류: ' + (d.error || r.status);
+}
 async function glRun() {
-  if (glStep !== 'run') { if (!(await glLoad()) || !glStatus.targets) { glMsg('변환할 단어가 없습니다.'); return; } glPrompt('run'); glMsg(''); return; }
+  if (glStep !== 'run') { if (!(await glLoad()) || !glStatus.targets) { glMsg(glStatus ? '변환할 단어가 없습니다.' : '현황을 읽지 못했습니다. 잠시 후 다시 눌러 주세요.'); return; } glPrompt('run'); glMsg(''); return; }
   glConfirmOff(); glBusy = true; glStopFlag = false; glSync(); glEl('gl-stop').style.display = 'inline-flex';
-  const tot = { done: 0, failed: 0, skipped_changed: 0 }, failedWords = [];
-  let cursor = 0, runId = null, remaining = glStatus.targets, text = '';
+  const tot = { done: 0, failed: 0, skipped_changed: 0 }, kinds = { ai: 0, rule: 0, structure: 0 }, failedWords = [];
+  let cursor = 0, runId = glResume && glEl('gl-runid').value.trim() ? glEl('gl-runid').value.trim() : null, remaining = glStatus.targets, text = '', failedReq = false, partials = 0;
   glEl('gl-failed').textContent = ''; glMsg('');
   try {
     for (;;) {
-      const r = await fetch('/api/admin/gloss/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify(runId ? { cursor, run_id: runId } : { cursor }) });
-      if (!r.ok) { text = await glErr(r); break; }
-      const d = await r.json();
+      let res;
+      try { res = await glPost('/api/admin/gloss/run', runId ? { cursor, run_id: runId } : { cursor }); }
+      catch (e) { text = glFailText(e); failedReq = true; break; }
+      const { r, d } = res;
+      if (!r.ok) { text = glFailText(null, r, d); failedReq = true; break; }
       runId = d.run_id; cursor = d.next_cursor; remaining = d.remaining; glSaveRun(runId);
       tot.done += d.done; tot.failed += d.failed; tot.skipped_changed += d.skipped_changed;
+      if (d.partial) partials++;
+      if (d.fail_kinds) for (const k of ['ai', 'rule', 'structure']) kinds[k] += d.fail_kinds[k] || 0;
       d.failed_words.forEach(w => { if (failedWords.length < 200) failedWords.push(w); });
-      glEl('gl-progress').textContent = '완료 ' + fmt(tot.done) + ' · 실패 ' + fmt(tot.failed) + ' · 건너뜀(그사이 수정) ' + fmt(tot.skipped_changed) + ' · 남음 ' + fmt(remaining);
-      glEl('gl-failed').textContent = failedWords.length ? '실패한 단어: ' + failedWords.join(', ') : '';
-      if (d.finished) { text = '끝났습니다. 실패·건너뜀 단어는 표지가 없어 다시 실행하면 다시 대상이 됩니다.'; break; }
-      if (glStopFlag) { text = '중지했습니다. [전체 적용]을 다시 누르면 남은 단어부터 이어서 처리합니다.'; break; }
+      glEl('gl-progress').textContent = '완료 ' + fmt(tot.done) + ' · 실패 ' + fmt(tot.failed) + ' · 건너뜀(그사이 수정) ' + fmt(tot.skipped_changed) + ' · 남음 ' + fmt(remaining) + (d.partial ? ' · 시간 예산에 도달해 여기까지 처리하고 이어서 요청합니다' : '');
+      glEl('gl-failed').textContent = (tot.failed ? '실패 종류: AI 응답 오류 ' + fmt(kinds.ai) + '단어 · 규칙 불통과 ' + fmt(kinds.rule) + '단어 · 단어 구조 이상으로 건너뜀 ' + fmt(kinds.structure) + '단어\n' : '') + (failedWords.length ? '실패한 단어: ' + failedWords.join(', ') : '');
+      if (d.finished) { text = '끝났습니다. 실패·건너뜀 단어는 표지가 없어 다시 실행하면 다시 대상이 됩니다.'; glResume = false; break; }
+      if (glStopFlag) { text = '중단했습니다. [이어서 적용]을 누르면 남은 단어부터 이어서 처리합니다.'; glResume = true; break; }
     }
-  } catch (e) { text = '요청에 실패했습니다. 다시 실행하면 이어서 처리합니다.'; }
-  glEl('gl-stop').style.display = 'none'; glBusy = false; glMsg(text); await glLoad();
+  } catch (e) { text = '화면 처리 중 오류가 났습니다. [이어서 적용]으로 다시 돌릴 수 있습니다.'; failedReq = true; }
+  if (failedReq) glResume = true;   // 요청이 실패해도 [전체 적용]이 잠기지 않고 [이어서 적용]으로 바뀐다. 서버가 뒤에서 계속 처리했을 수 있어 남은 수를 다시 읽는다
+  glEl('gl-stop').style.display = 'none'; glBusy = false; glConfirmOff();
+  glMsg(text);
+  if (failedReq) {
+    glMsg(text + ' 남은 수를 다시 읽는 중…');
+    let st = null;
+    for (let i = 0; i < 3 && !st; i++) { st = await glLoad(); if (!st) await new Promise(r => setTimeout(r, 2000)); }
+    glMsg(text + (st ? ' 남은 ' + fmt(st.targets) + '단어. [이어서 적용]으로 다시 돌릴 수 있습니다(이미 변환된 단어는 다시 처리하지 않습니다). 서버가 앞선 요청을 아직 처리 중이면 잠시 뒤 다시 누르세요.' : ' 남은 수를 읽지 못했습니다. [이어서 적용]으로 다시 시도할 수 있습니다.'));
+  } else { await glLoad(); }
+  glConfirmOff();
 }
 async function glRestore() {
   const id = glEl('gl-runid').value.trim();

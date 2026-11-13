@@ -19,7 +19,7 @@ test('샘플 전에는 [전체 적용] 비활성 → 샘플 후 활성 → 화�
   srv.state.adminUsers = [{ id: 7, email: 'u7@example.com', name: '관리자', role: 'admin', is_blocked: false, is_approved: true, wordbook_count: 0, search_count: 0, tts_count: 0 }];
   let runCalls = 0;
   srv.state.adminApi = (u, m, body, J) => {
-    if (u.endsWith('/status')) return J(200, { ok: true, targets: 120, users: 3, legacy: 4, converted: 10, est_calls: 6, est_cost_usd: 0.0512, cost_estimated: true, model: 'claude-haiku-4-5-20251001' });
+    if (u.endsWith('/status')) return J(200, { ok: true, targets: 120, users: 3, legacy: 4, converted: 0, est_calls: 6, est_cost_usd: 0.0512, cost_estimated: true, model: 'claude-haiku-4-5-20251001' });
     if (u.endsWith('/sample')) return J(200, { ok: true, items: [{ id: 1, word: 'run', before: ['무언가를 하는 것'], after: ['달리다, 뛰다'], short_meaning_after: '달리다', ok: true }, { id: 2, word: 'bad', before: ['설명'], after: [], short_meaning_after: '', ok: false }] });
     if (u.endsWith('/run')) {
       runCalls++;
