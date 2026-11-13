@@ -181,7 +181,8 @@
 .sr-box .pvgrp{display:flex;flex-direction:column;gap:calc(3 * var(--u))}
 .sr-box .pvpos{font-size:max(11px,calc(12 * var(--u)));font-weight:700;letter-spacing:.04em;color:var(--ink-soft)}
 .sr-box .pvrow{display:grid;grid-template-columns:calc(24 * var(--u)) minmax(0,1fr);align-items:baseline}
-.sr-box .pvn{font-size:calc(16 * var(--u));font-weight:500;color:var(--ink-soft);opacity:.6;font-variant-numeric:tabular-nums}
+/* 작업422: 번호 대신 CSS 로 그린 작은 원(지름 4~5px, 장식). 같은 보조 글자색에 연하게. 뜻 첫 줄의 가운데에 맞춘다 */
+.sr-box .pvn{display:block;box-sizing:border-box;align-self:start;justify-self:start;width:clamp(4px,calc(5 * var(--u)),5px);height:clamp(4px,calc(5 * var(--u)),5px);margin-top:calc(13 * var(--u) - 2.5px);border-radius:50%;background:currentColor;color:var(--ink-soft);opacity:.6}
 .sr-box .pvt{font-size:calc(18 * var(--u));font-weight:500;line-height:1.45;color:var(--ink-soft);overflow-wrap:anywhere;word-break:keep-all}
 .sr-box .pvmore{display:inline-flex;align-items:center;gap:calc(2 * var(--u));min-height:max(24px,calc(24 * var(--u)));font-size:max(11px,calc(12 * var(--u)));font-weight:700;color:var(--ink-soft)}
 .sr-box .pvmore svg{width:calc(14 * var(--u));height:calc(14 * var(--u));min-width:12px;min-height:12px;stroke-width:2.6}
@@ -339,7 +340,7 @@ body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
 .sr-box.land .pvgrp{gap:calc(1 * var(--u))}
 .sr-box.land .pvmeanbtn{gap:calc(2 * var(--u));padding:0}
 .sr-box.land .pvt{font-size:calc(16 * var(--u));line-height:1.3}
-.sr-box.land .pvn{font-size:calc(14 * var(--u))}
+.sr-box.land .pvn{margin-top:calc(10.4 * var(--u) - 2.5px)}
 .sr-box.land .pvmore{min-height:max(20px,calc(20 * var(--u)))}
 /* 대결 화면: 목록·대기·결과를 2열로. 방 목록(내용이 많은 곳)만 영역 안 스크롤 */
 .sr-box.land #vs .title.small{font-size:calc(24 * var(--u))}

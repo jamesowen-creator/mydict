@@ -374,7 +374,7 @@ test('414·419 뜻: 뜻이 여러 개면 번호 줄마다 모두 보인다(서�
   await openPv(page, [W('scrutinize', ['신중하게 검토하다', '자세히 살피다', '꼼꼼히 조사하다']), W('book', ['책'])]);
   const lines = () => page.eval("[...document.querySelectorAll('#pvMean .pvt')].map(e => e.textContent)");
   assert.deepEqual(await lines(), ['신중하게 검토하다', '자세히 살피다', '꼼꼼히 조사하다']);
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('#pvMean .pvn')].map(e => e.textContent)"), ['1.', '2.', '3.']);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#pvMean .pvn')].map(e => e.textContent)"), ['', '', ''], '작업422: 번호 글자 없음(불릿은 CSS 원)');
   const tops = await page.eval("[...document.querySelectorAll('#pvMean .pvt')].map(e => Math.round(e.getBoundingClientRect().top))");
   assert.equal(new Set(tops).size, 3, '줄바꿈으로 구분(서로 다른 줄)');
   await click(page, '#pvNext'); await waitFor(page, 'SpellRun.preview.state.idx === 1');
@@ -517,7 +517,7 @@ test('414 디자인: 카드 안에 박스·테두리·구분선·그림자가 �
   const d = await page.eval(`(() => {
     const cs = e => getComputedStyle(e), card = document.querySelector('#pv .card'), cc = cs(card), start = cs(document.querySelector('#start .card'));
     const inner = [...card.querySelectorAll('*')].filter(e => e.getClientRects().length && !e.closest('svg') && e.tagName !== 'svg');
-    const bad = inner.filter(e => { const c = cs(e); return parseFloat(c.borderTopWidth) + parseFloat(c.borderBottomWidth) + parseFloat(c.borderLeftWidth) + parseFloat(c.borderRightWidth) > 0 || (c.backgroundColor !== 'rgba(0, 0, 0, 0)' && !e.classList.contains('pvgo')) || (c.boxShadow !== 'none' && !e.classList.contains('pvgo')) || c.borderTopLeftRadius !== '0px' && !e.classList.contains('pvgo') && !e.classList.contains('pvx') && !e.classList.contains('pvic'); }).map(e => e.id || e.className);
+    const bad = inner.filter(e => { const c = cs(e); return parseFloat(c.borderTopWidth) + parseFloat(c.borderBottomWidth) + parseFloat(c.borderLeftWidth) + parseFloat(c.borderRightWidth) > 0 || (c.backgroundColor !== 'rgba(0, 0, 0, 0)' && !e.classList.contains('pvgo') && !e.classList.contains('pvn')) || (c.boxShadow !== 'none' && !e.classList.contains('pvgo')) || c.borderTopLeftRadius !== '0px' && !e.classList.contains('pvgo') && !e.classList.contains('pvx') && !e.classList.contains('pvic') && !e.classList.contains('pvn'); }).map(e => e.id || e.className);
     const px = sel => parseFloat(cs(document.querySelector(sel)).fontSize);
     const go = cs(document.getElementById('pvNext'));
     const pos = (a, b) => document.querySelector(a).compareDocumentPosition(document.querySelector(b)) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : 0;
@@ -588,20 +588,20 @@ for (const [w, h, q] of [[960, 460, '?mode=1'], [390, 844, ''], [844, 390, '?mod
   });
 }
 
-test('419 품사별 번호 목록: feature 형태는 품사 줄 2개(명사·동사)와 품사별로 1부터 번호, 문구 일치. 품사 없는 데이터는 번호만. 짧은 뜻만 있는 옛 단어는 번호 한 줄. 긴 문장 정의도 깨지지 않는다', { skip: SKIP }, async () => {
+test('419 품사별 번호 목록: feature 형태는 품사 줄 2개(명사·동사)와 품사별 불릿(번호 없음), 문구 일치. 품사 없는 데이터는 번호만. 짧은 뜻만 있는 옛 단어는 번호 한 줄. 긴 문장 정의도 깨지지 않는다', { skip: SKIP }, async () => {
   resetState();
   const page = await openGame({ width: 390, height: 844 });
   const LONG = '무언가를 매우 자세하고 신중하게 살펴보거나 검토하다 또한 철저히 조사하는 일을 가리키며 문서나 계약 조건 같은 것을 꼼꼼히 확인할 때에도 널리 쓰이는 표현';
   await openPv(page, [FEATURE_PV, W('scrutinize', ['신중하게 검토하다', '정밀 조사하다']), W('old', ['사과']), G('long', [{ pos: '동사', lines: [LONG] }])]);
-  const dump = () => page.eval(`(() => ({ pos: [...document.querySelectorAll('#pvMean .pvpos')].map(e => e.textContent), groups: [...document.querySelectorAll('#pvMean .pvgrp')].map(g => [...g.querySelectorAll('.pvrow')].map(r => r.querySelector('.pvn').textContent + ' ' + r.querySelector('.pvt').textContent)), clip: [...document.querySelectorAll('#pv .pvt, #pv .pvw')].some(e => e.scrollWidth > e.clientWidth + 1), docX: document.documentElement.scrollWidth - document.documentElement.clientWidth }))()`);
+  const dump = () => page.eval(`(() => ({ pos: [...document.querySelectorAll('#pvMean .pvpos')].map(e => e.textContent), groups: [...document.querySelectorAll('#pvMean .pvgrp')].map(g => [...g.querySelectorAll('.pvrow')].map(r => (r.querySelector('.pvn') ? '•' : '-') + ' ' + r.querySelector('.pvt').textContent)), clip: [...document.querySelectorAll('#pv .pvt, #pv .pvw')].some(e => e.scrollWidth > e.clientWidth + 1), docX: document.documentElement.scrollWidth - document.documentElement.clientWidth }))()`);
   let d = await dump();
   assert.deepEqual(d.pos, ['명사', '동사']);
-  assert.deepEqual(d.groups, [['1. 특징, 특성', '2. 얼굴 부위, 눈/코/입 등', '3. 기획기사, 특집'], ['1. 주요 역할을 하다']], '품사별 번호는 각각 1부터');
+  assert.deepEqual(d.groups, [['• 특징, 특성', '• 얼굴 부위, 눈/코/입 등', '• 기획기사, 특집'], ['• 주요 역할을 하다']], '품사별 번호는 각각 1부터');
   await next(page); d = await dump();
-  assert.deepEqual(d.pos, [], '품사 없는 데이터에는 품사 줄이 없다'); assert.deepEqual(d.groups, [['1. 신중하게 검토하다', '2. 정밀 조사하다']]);
-  await next(page); d = await dump(); assert.deepEqual(d.groups, [['1. 사과']], '짧은 뜻만 있는 옛 단어는 번호 한 줄');
+  assert.deepEqual(d.pos, [], '품사 없는 데이터에는 품사 줄이 없다'); assert.deepEqual(d.groups, [['• 신중하게 검토하다', '• 정밀 조사하다']]);
+  await next(page); d = await dump(); assert.deepEqual(d.groups, [['• 사과']], '짧은 뜻만 있는 옛 단어는 번호 한 줄');
   await next(page); d = await dump();
-  assert.deepEqual(d.pos, ['동사']); assert.deepEqual(d.groups, [['1. ' + LONG]], '긴 문장은 그대로 줄바꿈'); assert.equal(d.clip, false, '글자가 칸 밖으로 잘리지 않음'); assert.ok(d.docX <= 0);
+  assert.deepEqual(d.pos, ['동사']); assert.deepEqual(d.groups, [['• ' + LONG]], '긴 문장은 그대로 줄바꿈'); assert.equal(d.clip, false, '글자가 칸 밖으로 잘리지 않음'); assert.ok(d.docX <= 0);
   const lines = await page.eval("Math.round(document.querySelector('#pvMean .pvt').getBoundingClientRect().height / parseFloat(getComputedStyle(document.querySelector('#pvMean .pvt')).lineHeight))");
   assert.ok(lines >= 2, '긴 문장은 여러 줄로 감긴다: ' + lines);
   const hang = await page.eval("(() => { const n = document.querySelector('#pvMean .pvn').getBoundingClientRect(), t = document.querySelector('#pvMean .pvt').getBoundingClientRect(); return { numRight: n.right, textLeft: t.left }; })()");
@@ -627,7 +627,7 @@ test('419 글자 위계: 단어가 가장 크고 굵고 진하다 > 뜻(500·연
   await click(page, '#pvMeanBtn');
   const s = await page.eval(`(() => { const c = sel => getComputedStyle(document.querySelector(sel)), lum = col => { const m = col.match(/[\\d.]+/g).map(Number); return 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]; };
     const w = c('#pvWord'), t = c('#pvMean .pvt'), p = c('#pvMean .pvpos'), n = c('#pvMean .pvn'), d = c('#pvDetail .pvd'), more = c('#pvMore');
-    const bad = [...document.querySelectorAll('#pv .pvcol *')].filter(e => e.getClientRects().length && !e.closest('svg') && e.tagName !== 'svg').filter(e => { const k = getComputedStyle(e); return parseFloat(k.borderTopWidth) + parseFloat(k.borderBottomWidth) + parseFloat(k.borderLeftWidth) + parseFloat(k.borderRightWidth) > 0 || k.boxShadow !== 'none' || k.backgroundColor !== 'rgba(0, 0, 0, 0)'; }).map(e => String(e.className));
+    const bad = [...document.querySelectorAll('#pv .pvcol *')].filter(e => e.getClientRects().length && !e.closest('svg') && e.tagName !== 'svg').filter(e => { const k = getComputedStyle(e); return parseFloat(k.borderTopWidth) + parseFloat(k.borderBottomWidth) + parseFloat(k.borderLeftWidth) + parseFloat(k.borderRightWidth) > 0 || k.boxShadow !== 'none' || (k.backgroundColor !== 'rgba(0, 0, 0, 0)' && !e.classList.contains('pvn')); }).map(e => String(e.className));   // 작업422: 불릿(.pvn) 제외
     return { word: { px: parseFloat(w.fontSize), wt: Number(w.fontWeight), col: w.color, lum: lum(w.color) }, mean: { px: parseFloat(t.fontSize), wt: Number(t.fontWeight), col: t.color, lum: lum(t.color) }, pos: { px: parseFloat(p.fontSize), col: p.color }, num: { op: parseFloat(n.opacity), col: n.color, px: parseFloat(n.fontSize) }, detail: { px: parseFloat(d.fontSize), wt: Number(d.fontWeight), col: d.color }, more: parseFloat(more.fontSize), bad }; })()`);
   console.log('[419 위계 측정] ' + JSON.stringify({ word: s.word, mean: s.mean, pos: s.pos, num: s.num, detail: s.detail }));
   assert.ok(s.word.px > s.mean.px && s.mean.px > s.detail.px, '크기 단어 > 뜻 > 상세'); assert.ok(s.word.wt >= 700, '단어 굵기 700 이상'); assert.equal(s.mean.wt, 500); assert.ok(s.detail.wt < s.mean.wt, '상세는 더 가늘게');
@@ -635,3 +635,30 @@ test('419 글자 위계: 단어가 가장 크고 굵고 진하다 > 뜻(500·연
   assert.ok(s.num.op < 1 && s.num.px <= s.mean.px, '번호는 뜻보다 연하게(투명도)'); assert.deepEqual(s.bad, [], '읽기 칼럼 안에 구분선·박스·그림자 없음: ' + s.bad);
   await page.close();
 });
+
+// ───────── 작업422: 뜻 목록 번호 → 불릿(CSS 로 그린 작은 원) ─────────
+for (const [w, h] of [[390, 844], [960, 460]]) {
+  test(`422 불릿 ${w}x${h}: 번호 글자 없음·불릿 수 = 뜻 수(품사 있음·없음·뜻 하나·옛 단어), 장식(aria-hidden), 지름 4~5px 원, 뜻보다 연한 색, 뜻 시작점 일정(줄바꿈 포함), 겹침·가로 스크롤 없음`, { skip: SKIP }, async () => {
+    resetState();
+    const page = await openGame({ width: w, height: h });
+    const LONG = '무언가를 매우 자세하고 신중하게 살펴보거나 검토하다 또한 철저히 조사하는 일을 가리키며 문서나 계약 조건 같은 것을 꼼꼼히 확인할 때에도 널리 쓰이는 표현';
+    await openPv(page, [FEATURE_PV, W('scrutinize', ['신중하게 검토하다', '정밀 조사하다']), W('old', ['사과']), G('long', [{ pos: '동사', lines: [LONG, '짧은 뜻'] }])]);
+    const expectCounts = [4, 2, 1, 2];
+    for (let i = 0; i < expectCounts.length; i++) {
+      const m = await page.eval(`(() => { const rows = [...document.querySelectorAll('#pvMean .pvrow')], hid = [...document.querySelectorAll('#pvMean .pvn')].every(e => e.getAttribute('aria-hidden') === 'true'),
+        text = document.getElementById('pvMean').textContent, bs = rows.map(r => { const b = r.querySelector('.pvn'), k = getComputedStyle(b), t = r.querySelector('.pvt'), tb = t.getBoundingClientRect(), bb = b.getBoundingClientRect(); return { w: bb.width, h: bb.height, rad: k.borderRadius, op: parseFloat(k.opacity), bg: k.backgroundColor, tl: Math.round(tb.left * 10) / 10, br: bb.right, bl: Math.round(bb.left * 10) / 10, bc: (bb.top + bb.bottom) / 2, tt: tb.top, tfs: parseFloat(getComputedStyle(t).lineHeight) }; });
+        return { n: rows.length, hid, numText: /\d\./.test(text), bs, docX: document.documentElement.scrollWidth - document.documentElement.clientWidth, tc: getComputedStyle(document.querySelector('#pvMean .pvt')).color }; })()`);
+      assert.equal(m.n, expectCounts[i], `불릿 수 = 뜻 수 (${i})`); assert.ok(m.hid, '불릿은 장식(aria-hidden)'); assert.equal(m.numText, false, '번호 텍스트(1. 2.) 없음');
+      for (const b of m.bs) {
+        assert.ok(b.w >= 3.9 && b.w <= 5.1 && Math.abs(b.w - b.h) < 0.2, `지름 4~5px ${b.w}x${b.h}`); assert.equal(b.rad, '50%'); assert.ok(b.op < 1, '뜻보다 연함');
+        assert.ok(b.br <= b.tl + 0.5, '불릿은 뜻 시작점 왼쪽'); assert.ok(Math.abs(b.bc - (b.tt + b.tfs / 2)) <= 4, `불릿이 뜻 첫 줄 가운데: ${b.bc} vs ${b.tt + b.tfs / 2}`);
+      }
+      assert.ok(m.bs.every(b => Math.abs(b.tl - m.bs[0].tl) <= 0.5) && m.bs.every(b => Math.abs(b.bl - m.bs[0].bl) <= 0.5), '불릿 열·뜻 시작점이 일정');
+      assert.ok(m.docX <= 0, '가로 스크롤 없음');
+      if (i < expectCounts.length - 1) await next(page);
+    }
+    const wrap = await page.eval("(() => { const t = document.querySelector('#pvMean .pvt'), h = t.getBoundingClientRect().height, lh = parseFloat(getComputedStyle(t).lineHeight); return { lines: Math.round(h / lh) }; })()");
+    assert.ok(wrap.lines >= 2 || w > 390, '390 폭에서 긴 뜻은 여러 줄로 감긴다(시작점은 위에서 확인): ' + wrap.lines);
+    noErrors(page); await page.close();
+  });
+}

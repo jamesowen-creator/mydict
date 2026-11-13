@@ -2036,13 +2036,13 @@ function pvRender() {
   const w = PV.words[PV.idx], info = pvInfo(w), last = PV.idx + 1 >= PV.words.length;
   $('pvProg').textContent = (PV.idx + 1) + '/' + PV.words.length;
   $('pvWord').textContent = w.word;
-  // 품사별 번호 목록(품사 이름 줄 + 번호 열·뜻 열). 번호는 품사 안에서 1부터. 품사 필드가 없으면 품사 줄 없이 번호만
+  // 품사별 불릿 목록(품사 이름 줄 + 불릿 열·뜻 열). 불릿은 CSS 로 그린 장식 원(작업422, 번호 대신). 품사 필드가 없으면 품사 줄 없이 불릿만
   const mean = $('pvMean'); mean.textContent = '';
   const mk = (tag, cls, text) => { const e = document.createElement(tag); e.className = cls; if (text !== undefined) e.textContent = text; return e; };
   info.groups.forEach(g => {
     const grp = mk('span', 'pvgrp');
     if (g.pos) grp.appendChild(mk('span', 'pvpos', g.pos));
-    g.lines.forEach((t, i) => { const row = mk('span', 'pvrow'); const n = mk('span', 'pvn', (i + 1) + '.'); n.setAttribute('aria-hidden', 'true'); row.appendChild(n); row.appendChild(mk('span', 'pvt', t)); grp.appendChild(row); });
+    g.lines.forEach(t => { const row = mk('span', 'pvrow'); const n = mk('span', 'pvn'); n.setAttribute('aria-hidden', 'true'); row.appendChild(n); row.appendChild(mk('span', 'pvt', t)); grp.appendChild(row); });
     mean.appendChild(grp);
   });
   // 상세: 정의 전체(짧은 뜻과 다를 때) · usage_note · 보조 키워드. 보여 줄 것이 없으면 펼치기를 숨긴다. 단어가 바뀌면 접힘으로 돌아간다
