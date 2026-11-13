@@ -80,6 +80,29 @@ router.patch('/api/wordbook/:id/example', requireAuth, async (req, res) => {
   }
 });
 
+// 작업408: 단어 한 건의 data.it(IT 용어 설명)만 병합 저장한다. 본인 행만, 단어장 권한은 기존 POST 와 같은 규칙, 다른 data 필드는 건드리지 않는다.
+const IT_MAX_BYTES = 4000;
+router.patch('/api/wordbook/:id/it', requireAuth, async (req, res) => {
+  const allowed = await checkPermission(req.user.id, 'can_wordbook');
+  if (!allowed) return res.status(403).json({ error: '단어장 권한이 없습니다.' });
+  if (!isId(req.params.id)) return res.status(400).json({ error: '항목이 올바르지 않습니다.' });
+  const { it } = bodyOf(req);
+  if (!it || typeof it !== 'object' || Array.isArray(it) || typeof it.is_it !== 'boolean') return res.status(400).json({ error: 'IT 설명이 올바르지 않습니다.' });
+  const json = JSON.stringify(it);
+  if (Buffer.byteLength(json, 'utf8') > IT_MAX_BYTES) return res.status(400).json({ error: 'IT 설명이 너무 깁니다.' });
+  try {
+    const { rowCount } = await pool.query(
+      "UPDATE wordbook SET data = COALESCE(data, '{}'::jsonb) || jsonb_build_object('it', $1::jsonb) WHERE id = $2 AND user_id = $3",
+      [json, req.params.id, req.user.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: '항목을 찾을 수 없습니다.' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[it patch] DB error:', err.message);
+    res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+  }
+});
+
 // ─── SM-2 Spaced Repetition ───────────────────────────────────────────────────
 
 function applySM2({ score, repetitions, ease_factor, interval_days }) {
