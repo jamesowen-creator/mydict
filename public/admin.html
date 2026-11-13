@@ -272,6 +272,40 @@
       </div>
     </div>
 
+    <!-- 작업417: 저장된 영어 단어 뜻 일괄 변환(샘플 검토 → 승인 → 적용 → 되돌리기) -->
+    <div class="section" id="gl-section">
+      <div class="section-header">
+        <span class="section-title">단어 뜻 일괄 변환</span>
+        <button class="btn-save" id="gl-refresh" type="button">현황 새로고침</button>
+      </div>
+      <div class="section-body">
+        <div id="gl-status" style="font-size:13px;line-height:1.6;color:var(--text2)">현황을 불러오는 중…</div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">
+          <button class="btn-save" id="gl-sample" type="button">샘플 보기</button>
+          <button class="btn-save" id="gl-run" type="button" disabled>전체 적용</button>
+          <button class="btn-back" id="gl-cancel" type="button" style="display:none">취소</button>
+          <button class="btn-back" id="gl-stop" type="button" style="display:none">중지</button>
+        </div>
+        <div id="gl-note" style="font-size:12px;line-height:1.6;color:var(--text2);margin-top:12px">[전체 적용]은 [샘플 보기]로 12단어의 전/후를 한 번 본 뒤에 켜집니다. 샘플 1회마다 Haiku 호출 비용이 발생합니다.</div>
+        <div id="gl-confirm" style="display:none;font-size:13px;line-height:1.6;margin-top:12px"></div>
+        <div id="gl-sample-box" style="display:none;margin-top:12px;overflow-x:auto">
+          <table>
+            <tbody><tr style="font-size:11px;font-weight:600;color:var(--text3)"><td>단어</td><td>기존 뜻</td><td>새 뜻</td></tr></tbody>
+            <tbody id="gl-tbody"></tbody>
+          </table>
+        </div>
+        <div id="gl-progress" style="font-size:13px;line-height:1.6;margin-top:12px"></div>
+        <div id="gl-failed" style="font-size:12px;line-height:1.6;color:var(--text2);margin-top:4px;word-break:break-word"></div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">
+          <label for="gl-runid" style="font-size:13px;color:var(--text2)">실행 번호</label>
+          <input id="gl-runid" type="text" maxlength="40" autocomplete="off" style="font-size:16px;min-height:44px;padding:0 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface,#fff);color:var(--text);max-width:100%">
+          <button class="btn-save" id="gl-backup" type="button">백업 JSON 내려받기</button>
+          <button class="btn-save" id="gl-restore" type="button">되돌리기</button>
+        </div>
+        <div id="gl-msg" style="font-size:13px;line-height:1.6;margin-top:12px"></div>
+      </div>
+    </div>
+
     <!-- Users -->
     <div class="section">
       <div class="section-header">
@@ -721,6 +755,118 @@ sltEl('slt-gen').addEventListener('click', sltGenerate);
 sltEl('slt-cancel').addEventListener('click', () => { sltConfirmOff(); sltMsg(''); });
 sltEl('slt-item').addEventListener('change', () => { sltConfirmOff(); });
 
+// ── 단어 뜻 일괄 변환 (작업417) ─────────────────────────────────────────────
+const glEl = id => document.getElementById(id);
+let glSampled = false, glStatus = null, glStep = null, glStopFlag = false, glBusy = false;   // glStep: null | 'run' | 'restore' (확인 문구를 보인 뒤 두 번째 누름에서 실행)
+const GL_RUN_ID = /^[A-Za-z0-9_-]{1,40}$/;
+function glMsg(t) { glEl('gl-msg').textContent = t || ''; }
+function glSync() { glEl('gl-run').disabled = glBusy || !glSampled || !glStatus || !glStatus.targets; glEl('gl-sample').disabled = glBusy; glEl('gl-restore').disabled = glBusy; glEl('gl-backup').disabled = glBusy; }
+function glConfirmOff() { glStep = null; glEl('gl-confirm').style.display = 'none'; glEl('gl-cancel').style.display = 'none'; glEl('gl-run').textContent = '전체 적용'; glEl('gl-restore').textContent = '되돌리기'; glSync(); }
+function glSaveRun(id) { glEl('gl-runid').value = id || ''; try { localStorage.setItem('gl_last_run', id || ''); } catch (e) { /* 저장 못 해도 입력칸에 남는다 */ } }
+async function glErr(r) { const d = await r.json().catch(() => ({})); return d.error || ('실패했습니다(' + r.status + ').'); }
+async function glLoad() {
+  const box = glEl('gl-status');
+  try {
+    const r = await fetch('/api/admin/gloss/status', { headers: authHeaders() });
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    glStatus = d;
+    box.textContent = '대상 ' + fmt(d.targets) + '단어(' + fmt(d.users) + '명) · 이미 변환 ' + fmt(d.converted) + ' · 옛 구조(대상 아님) ' + fmt(d.legacy)
+      + ' · 예상 호출 ' + fmt(d.est_calls) + '회 · 예상 비용 약 $' + Number(d.est_cost_usd).toFixed(2) + '(추정) · 모델 ' + d.model;
+  } catch (e) { glStatus = null; box.textContent = '현황을 불러오지 못했습니다.'; }
+  glSync();
+  return glStatus;
+}
+async function glSample() {
+  glConfirmOff(); glMsg('샘플을 만드는 중입니다…'); glBusy = true; glSync();
+  try {
+    const r = await fetch('/api/admin/gloss/sample', { method: 'POST', headers: authHeaders(), body: '{}' });
+    if (!r.ok) { glMsg(await glErr(r)); }
+    else {
+      const d = await r.json();
+      const tb = glEl('gl-tbody'); tb.textContent = '';
+      d.items.forEach(it => {
+        const tr = document.createElement('tr');
+        [it.word, it.before.join(' / '), it.ok ? it.after.join(' / ') : '(변환 실패)'].forEach(t => { const td = document.createElement('td'); td.textContent = t; tr.appendChild(td); });
+        tb.appendChild(tr);
+      });
+      glEl('gl-sample-box').style.display = 'block';
+      glSampled = d.items.length > 0;
+      glMsg(d.items.length ? '샘플 ' + d.items.length + '단어입니다. 문제가 없으면 [전체 적용]을 누르세요. 아직 아무것도 저장되지 않았습니다.' : '변환할 단어가 없습니다.');
+    }
+  } catch (e) { glMsg('요청에 실패했습니다.'); }
+  glBusy = false; glSync();
+}
+function glPrompt(kind) {
+  const c = glEl('gl-confirm');
+  if (kind === 'run') c.textContent = '대상 ' + fmt(glStatus.targets) + '단어, 예상 비용 약 $' + Number(glStatus.est_cost_usd).toFixed(2) + '(추정). 모든 사용자 단어가 바뀝니다. 실행하려면 [적용 실행]을 한 번 더 누르세요.';
+  else c.textContent = '실행 번호 ' + glEl('gl-runid').value.trim() + '의 변환을 되돌립니다. 그 뒤 사용자가 고친 단어는 건너뜁니다. 실행하려면 [되돌리기 실행]을 한 번 더 누르세요.';
+  c.style.display = 'block'; glEl('gl-cancel').style.display = 'inline-flex';
+  glEl(kind === 'run' ? 'gl-run' : 'gl-restore').textContent = kind === 'run' ? '적용 실행' : '되돌리기 실행';
+  glStep = kind;
+}
+async function glRun() {
+  if (glStep !== 'run') { if (!(await glLoad()) || !glStatus.targets) { glMsg('변환할 단어가 없습니다.'); return; } glPrompt('run'); glMsg(''); return; }
+  glConfirmOff(); glBusy = true; glStopFlag = false; glSync(); glEl('gl-stop').style.display = 'inline-flex';
+  const tot = { done: 0, failed: 0, skipped_changed: 0 }, failedWords = [];
+  let cursor = 0, runId = null, remaining = glStatus.targets, text = '';
+  glEl('gl-failed').textContent = ''; glMsg('');
+  try {
+    for (;;) {
+      const r = await fetch('/api/admin/gloss/run', { method: 'POST', headers: authHeaders(), body: JSON.stringify(runId ? { cursor, run_id: runId } : { cursor }) });
+      if (!r.ok) { text = await glErr(r); break; }
+      const d = await r.json();
+      runId = d.run_id; cursor = d.next_cursor; remaining = d.remaining; glSaveRun(runId);
+      tot.done += d.done; tot.failed += d.failed; tot.skipped_changed += d.skipped_changed;
+      d.failed_words.forEach(w => { if (failedWords.length < 200) failedWords.push(w); });
+      glEl('gl-progress').textContent = '완료 ' + fmt(tot.done) + ' · 실패 ' + fmt(tot.failed) + ' · 건너뜀(그사이 수정) ' + fmt(tot.skipped_changed) + ' · 남음 ' + fmt(remaining);
+      glEl('gl-failed').textContent = failedWords.length ? '실패한 단어: ' + failedWords.join(', ') : '';
+      if (d.finished) { text = '끝났습니다. 실패·건너뜀 단어는 표지가 없어 다시 실행하면 다시 대상이 됩니다.'; break; }
+      if (glStopFlag) { text = '중지했습니다. [전체 적용]을 다시 누르면 남은 단어부터 이어서 처리합니다.'; break; }
+    }
+  } catch (e) { text = '요청에 실패했습니다. 다시 실행하면 이어서 처리합니다.'; }
+  glEl('gl-stop').style.display = 'none'; glBusy = false; glMsg(text); await glLoad();
+}
+async function glRestore() {
+  const id = glEl('gl-runid').value.trim();
+  if (glStep !== 'restore') { if (!GL_RUN_ID.test(id)) { glMsg('되돌릴 실행 번호를 입력하세요.'); return; } glPrompt('restore'); glMsg(''); return; }
+  glConfirmOff(); glBusy = true; glSync(); glMsg('되돌리는 중입니다…');
+  let restored = 0, skipped = 0, cursor, text = '';
+  try {
+    for (;;) {
+      const r = await fetch('/api/admin/gloss/restore', { method: 'POST', headers: authHeaders(), body: JSON.stringify(cursor ? { run_id: id, cursor } : { run_id: id }) });
+      if (!r.ok) { text = await glErr(r); break; }
+      const d = await r.json();
+      restored += d.restored; skipped += d.skipped; cursor = d.next_cursor;
+      text = '복원 ' + fmt(restored) + ' · 건너뜀(그사이 수정·이미 복원) ' + fmt(skipped);
+      glMsg(text);
+      if (d.finished) break;
+    }
+  } catch (e) { text = '요청에 실패했습니다.'; }
+  glBusy = false; glMsg(text); await glLoad();
+}
+async function glBackup() {
+  const id = glEl('gl-runid').value.trim();
+  if (!GL_RUN_ID.test(id)) { glMsg('내려받을 실행 번호를 입력하세요.'); return; }
+  try {
+    const r = await fetch('/api/admin/gloss/backup?run_id=' + encodeURIComponent(id), { headers: authHeaders() });
+    if (!r.ok) { glMsg(await glErr(r)); return; }
+    const d = await r.json();
+    const url = URL.createObjectURL(new Blob([JSON.stringify(d, null, 1)], { type: 'application/json' }));
+    const a = document.createElement('a'); a.href = url; a.download = 'gloss-backup-' + id + '.json'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    glMsg(fmt(d.rows.length) + '건의 변환 전/후 기록을 내려받았습니다.');
+  } catch (e) { glMsg('요청에 실패했습니다.'); }
+}
+glEl('gl-refresh').addEventListener('click', () => { glConfirmOff(); glLoad(); });
+glEl('gl-sample').addEventListener('click', glSample);
+glEl('gl-run').addEventListener('click', glRun);
+glEl('gl-restore').addEventListener('click', glRestore);
+glEl('gl-backup').addEventListener('click', glBackup);
+glEl('gl-cancel').addEventListener('click', () => { glConfirmOff(); glMsg(''); });
+glEl('gl-stop').addEventListener('click', () => { glStopFlag = true; glEl('gl-stop').style.display = 'none'; });
+try { glEl('gl-runid').value = localStorage.getItem('gl_last_run') || ''; } catch (e) { /* 저장값을 못 읽어도 직접 입력 */ }
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 MetisAppHeader.renderAuthWidget(document.getElementById('metis-header-auth'));
 
@@ -743,6 +889,7 @@ MetisAppHeader.renderAuthWidget(document.getElementById('metis-header-auth'));
   await loadData();
   slLoad();   // 작업395
   sltInit();  // 작업397
+  glLoad();   // 작업417
 })();
 </script>
 </body>

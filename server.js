@@ -76,6 +76,7 @@ app.use(require('./routes/voice_study'));
 app.use(require('./routes/concept_map'));   // 작업270-1: 새 메뉴 개념 지도
 app.use(require('./routes/jgrammar'));      // 작업JG-1: 일본어 문법 해설
 app.use(require('./routes/speakloop'));     // 작업395: Speak Loop(영어 말하기) 권한·콘텐츠·음성
+app.use(require('./routes/gloss'));         // 작업417: 저장된 영어 단어 뜻 일괄 변환(관리자 전용)
 app.use(require('./routes/versus'));        // 작업343: 2인 대결(방은 서버 메모리, 인스턴스 1개 전제)
 
 app.use(errorHandler);   // 작업352: 라우터 등록 뒤. 잘못된 JSON 400, 그 밖의 처리되지 않은 오류 500(내부 내용 없음)

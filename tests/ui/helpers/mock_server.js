@@ -91,6 +91,7 @@ async function startMockServer() {
       Object.assign(user, body);
       return J(200, user);
     }
+    if (state.adminApi && u.startsWith('/api/admin/gloss/')) return state.adminApi(u, m, body, J);   // 작업417: 단어 뜻 일괄 변환 관리자 화면 시험용(시험이 응답 함수를 꽂는다)
     if (u === '/api/me') return state.authed ? J(200, state.me) : J(401, { error: 'no' });
     if (!state.authed) return J(401, { error: '로그인이 필요합니다.' });
     if (u === '/api/voice-notes/quiz-summary' && m === 'GET') return J(200, state.voiceQuizSummary);   // 작업224-2
