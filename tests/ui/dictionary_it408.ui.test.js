@@ -15,7 +15,7 @@ const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/ja
 const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
 const TOKEN = `${b64({ alg: 'none' })}.${b64({ id: 7, name: '테스터', exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`;
 
-const GOOD = { is_it: true, one_line: '자주 쓰는 데이터를 가까이 두는 저장소', situations: ['웹사이트가 느릴 때 같은 그림을 매번 새로 받지 않도록 둔다', '개발자가 화면을 빨리 열려고 쓴다'], origin: { text: '프랑스어로 숨긴다는 말에서 왔다는 설명이 흔하다', sure: true }, compare: { term: 'buffer', diff: '버퍼는 잠깐 쌓아 두는 곳' } };
+const GOOD = { is_it: true, one_line: '자주 쓰는 데이터를 가까이 두는 저장소', situations: ['웹사이트가 느릴 때 같은 그림을 매번 새로 받지 않도록 둔다', '개발자가 화면을 빨리 열려고 쓴다'], origin: { text: '프랑스어로 숨긴다는 말에서 왔다는 설명이 흔하다', sure: true }, related: [{ term: 'buffer', diff: '버퍼는 잠깐 쌓아 두는 곳' }, { term: 'register', diff: 'CPU 안의 작고 빠른 저장 칸' }] };
 let srv, base, browser;
 const state = { ai: [], patches: [], aiPlan: [], patchStatus: 200, rows: [] };
 test.before(async () => {
@@ -97,7 +97,7 @@ test('B 영어: 클릭 1회 = AI 1회(단어 포함·로그인 헤더) + 저장 
   assert.equal(state.ai.length, 1); assert.match(state.ai[0].prompt, /"cache"/); assert.equal(state.ai[0].auth, 'Bearer ' + TOKEN);
   assert.equal(state.patches.length, 1); assert.equal(state.patches[0].id, 11); assert.deepEqual(state.patches[0].body, { it: GOOD }); assert.equal(state.patches[0].auth, 'Bearer ' + TOKEN);
   const t = await resultText(page);
-  const order = [GOOD.one_line, '용도', GOOD.situations[0], GOOD.situations[1], '유래', GOOD.origin.text, '관련어', 'buffer'].map(s => t.indexOf(s));
+  const order = [GOOD.one_line, '용도', GOOD.situations[0], GOOD.situations[1], '유래', GOOD.origin.text, '관련어', 'buffer', 'register'].map(s => t.indexOf(s));
   assert.ok(order.every(i => i >= 0), '모두 표시 ' + order); assert.deepEqual(order, order.slice().sort((a, b) => a - b), '순서');
   assert.ok(!/\p{Extended_Pictographic}/u.test(t)); assert.ok(!/저장하지 못했습니다/.test(t)); for (const old of ['이럴 때 씁니다', '왜 이렇게 부를까', '헷갈리는 용어', '예문', 'Clear the cache']) assert.ok(!t.includes(old), '없어야 함: ' + old);
   const css = await page.eval(`(() => { const l = document.querySelector('#extra-trans-result .result-section-title'), b = document.querySelector('#extra-trans-result .meaning-nuance'); const cl = getComputedStyle(l), cb = getComputedStyle(b); return { fs: cl.fontSize, fw: cl.fontWeight, ls: cl.letterSpacing, color: cl.color, bfs: cb.fontSize, bg: cb.backgroundColor, shadow: cb.boxShadow, rad: cb.borderRadius }; })()`);
@@ -194,7 +194,7 @@ test('C 예전에 저장된 data.it.example 은 표시하지 않고 AI 도 부�
 });
 
 test('C IT 결과의 글자 크기·간격·구분선이 위쪽 단어 결과와 같은 값(계산 스타일 비교)', { skip: SKIP }, async () => {
-  const data = { ...EN, meanings: [{ pos: 'noun', definition: '캐시', usage_note: '설명', example: 'a b', translation: '가' }, { pos: 'verb', definition: '저장하다' }], similar: [{ word: 'buffer', core_meaning: '버퍼', diff: '다름' }], collocations: [] };
+  const data = { ...EN, meanings: [{ pos: 'noun', definition: '캐시', usage_note: '설명', example: 'a b', translation: '가' }, { pos: 'verb', definition: '저장하다' }], similar: [{ word: 'buffer', core_meaning: '버퍼', diff: '다름' }, { word: 'register', core_meaning: '레지스터', diff: '다름2' }], collocations: [] };
   const page = await open({ rows: [row(11, data)] });
   await page.eval('renderResultEN(' + JSON.stringify(data) + ', true)');
   await click(page); await waitDone(page);
@@ -208,9 +208,91 @@ test('C IT 결과의 글자 크기·간격·구분선이 위쪽 단어 결과와
       body: cmp(T + '.result-section .meaning-nuance', '#extra-trans-result .meaning-nuance', ['fontSize', 'lineHeight', 'color']),
       item: cmp(T + '.result-section .meaning-set', '#extra-trans-result .meaning-set', ['paddingBottom', 'marginBottom', 'borderBottomWidth', 'borderBottomColor']),
       lead: cmp(T + '.result-section .meaning-core', '#extra-trans-result .meaning-core', ['fontSize', 'fontWeight', 'color']),
-      sim: cmp(T + '.result-section .similar-item', '#extra-trans-result .similar-item', ['paddingTop', 'paddingBottom', 'gap', 'display', 'borderBottomWidth']),
-      simw: cmp(T + '.result-section .similar-word', '#extra-trans-result .similar-word', ['fontSize', 'fontWeight', 'fontFamily', 'minWidth']),
+      sim: cmp(T + '.result-section .similar-item:first-child', '#extra-trans-result .similar-item:first-child', ['paddingTop', 'paddingBottom', 'gap', 'display', 'borderBottomWidth']),
+      simLast: cmp(T + '.result-section .similar-item:last-child', '#extra-trans-result .similar-item:last-child', ['paddingTop', 'paddingBottom', 'gap', 'display', 'borderBottomWidth']),
+      simList: cmp(T + '.result-section .similar-list', '#extra-trans-result .similar-list', ['display', 'flexDirection', 'gap']),
+      simw: cmp(T + '.result-section .similar-word', '#extra-trans-result .similar-word', ['fontSize', 'fontWeight', 'fontFamily', 'minWidth', 'cursor', 'color']),
       simd: cmp(T + '.result-section .similar-diff', '#extra-trans-result .similar-diff', ['fontSize', 'color', 'lineHeight']) }; })()`);
   for (const [k, v] of Object.entries(m)) { assert.ok(v.top && v.it, k + ' 요소 없음'); assert.equal(v.it, v.top, k + ': 위쪽 ' + v.top + ' / IT ' + v.it); }
   await page.close();
 });
+
+const BUF = { word: 'buffer', lang: 'en', short_meaning: '버퍼', meanings: [{ pos: 'noun', definition: '버퍼' }], derivatives: [] };
+const QUICK = { word: 'register', search_query: 'register', pronunciation: '/r/', short_gloss: '레지스터', meanings: [{ pos: 'noun', domain: '기술', definition: '레지스터' }], derivatives: [] };
+const relSel = "#extra-trans-result .similar-item .similar-word";
+
+test('F 관련어 복수 표시: 위쪽 유의어와 같은 클래스·같은 클릭 표시(cursor pointer), 항목마다 설명, 순서 유지', { skip: SKIP }, async () => {
+  const page = await open({ rows: [row(11, EN)] });
+  await click(page); await waitDone(page);
+  const r = await page.eval(`[...document.querySelectorAll('#extra-trans-result .similar-list > .similar-item')].map(i => ({ w: i.querySelector('.similar-word').textContent, d: i.querySelector('.similar-diff').textContent, cur: getComputedStyle(i.querySelector('.similar-word')).cursor, h: i.getBoundingClientRect().height }))`);
+  assert.deepEqual(r.map(x => x.w), ['buffer', 'register']); assert.deepEqual(r.map(x => x.d), ['버퍼는 잠깐 쌓아 두는 곳', 'CPU 안의 작고 빠른 저장 칸']);
+  assert.ok(r.every(x => x.cur === 'pointer'));
+  assert.equal(await page.eval("document.querySelector('#extra-trans-result .it-compare')"), null, '409 의 클릭 불가 보정 클래스 없음');
+  await page.close();
+});
+
+test('F 관련어 0개면 섹션 없음. 예전 저장분(compare 만)은 1개짜리 관련어로 표시되고 저장 데이터는 그대로', { skip: SKIP }, async () => {
+  const noRel = { ...GOOD, related: [] };
+  const p1 = await open({ rows: [row(11, { ...EN, it: noRel })] });
+  await click(p1); await sleep(300);
+  let t = await resultText(p1); assert.ok(t.includes(GOOD.one_line)); assert.ok(!t.includes('관련어'));
+  await p1.close();
+  const legacy = { is_it: true, one_line: '옛 저장분', situations: ['가', '나'], origin: { text: '유래', sure: true }, compare: { term: 'legacyterm', diff: '옛 차이' } };
+  const p2 = await open({ rows: [row(12, { ...EN, it: legacy })] });
+  await click(p2); await sleep(300);
+  t = await resultText(p2); assert.ok(t.includes('관련어') && t.includes('legacyterm') && t.includes('옛 차이'));
+  assert.deepEqual(await p2.eval("JSON.parse(JSON.stringify(wordbook.find(w => w.id === 12).it))"), legacy, '저장 데이터는 건드리지 않음');
+  assert.equal(state.ai.length, 0);
+  await p2.close();
+});
+
+test('F 영어 결과: 저장된 용어(buffer)를 누르면 AI 0회로 그 용어의 검색 결과, 미저장 용어(register)는 영어 검색과 같은 호출 2회(1차+2차)', { skip: SKIP }, async () => {
+  const page = await open({ rows: [row(11, { ...EN, it: GOOD }), row(13, BUF)] });   // cache 의 IT 설명은 저장돼 있어 눌러도 AI 0회
+  await click(page); await sleep(200);
+  await page.eval("[...document.querySelectorAll('" + relSel + "')].find(e => e.textContent === 'buffer').click()");
+  await page.waitFor("document.querySelector('#search-result .result-word') && document.querySelector('#search-result .result-word').textContent === 'buffer'", 6000);
+  assert.equal(state.ai.length, 0, '저장된 용어는 AI 호출 없이 표시 ' + JSON.stringify(state.ai.map(a => String(a.prompt).slice(0, 90))));
+  assert.equal(await page.eval("document.getElementById('search-input').value"), 'buffer');
+  // 다시 cache 로 돌아가 register 를 누른다
+  await page.eval('renderResultEN(' + JSON.stringify(EN) + ', true)');
+  await click(page); await sleep(200);
+  state.aiPlan.push({ text: JSON.stringify(QUICK) }, { text: JSON.stringify({ meanings: [{ usage_note: 'n', example: 'e', translation: 't' }], similar: [], collocations: [] }) });
+  await page.eval("[...document.querySelectorAll('" + relSel + "')].find(e => e.textContent === 'register').click()");
+  await page.waitFor("document.querySelector('#search-result .result-word') && document.querySelector('#search-result .result-word').textContent === 'register'", 8000);
+  await sleep(200);
+  assert.equal(state.ai.length, 2, '기존 영어 검색과 같은 2회');
+  assert.match(state.ai[0].prompt, /"register"/);
+  await page.close();
+});
+
+test('F 한국어 결과에서도 같은 동작(영어 용어 검색, 저장된 용어는 AI 0회)', { skip: SKIP }, async () => {
+  const page = await open({ kind: 'ko', rows: [row(21, { ...KO, it: GOOD }), row(13, BUF)] });
+  await click(page); await sleep(300);
+  await page.eval("[...document.querySelectorAll('" + relSel + "')].find(e => e.textContent === 'buffer').click()");
+  await page.waitFor("document.querySelector('#search-result .result-word') && document.querySelector('#search-result .result-word').textContent === 'buffer'", 6000);
+  assert.equal(state.ai.length, 0);
+  assert.equal(await page.eval("_langOverride"), 'en');
+  await page.close();
+});
+
+test('F 관련어에 따옴표·꺾쇠가 있어도 안전하게 표시·검색된다', { skip: SKIP }, async () => {
+  const odd = { ...GOOD, related: [{ term: "it's <b>x</b>", diff: "a \"q\" & b" }] };
+  const page = await open({ rows: [row(11, { ...EN, it: odd })] });
+  await click(page); await sleep(300);
+  assert.equal(await page.eval("document.querySelector('" + relSel + "').textContent"), "it's <b>x</b>"); assert.equal(await page.eval("document.querySelectorAll('#extra-trans-result b').length"), 0);
+  await page.eval("document.querySelector('" + relSel + "').click()"); await sleep(200);
+  assert.equal(await page.eval("document.getElementById('search-input').value"), "it's <b>x</b>");
+  await page.close();
+});
+
+for (const width of [320, 390, 1280]) {
+  test(`F ${width}px: 관련어 4개를 표시해도 가로 스크롤 없음, 이모지 없음, 클릭 영역 높이 기록`, { skip: SKIP }, async () => {
+    const four = { ...GOOD, related: Array.from({ length: 4 }, (_, i) => ({ term: 'term' + i, diff: '설명 ' + i + ' 입니다. 조금 긴 설명을 써서 줄이 바뀌는지 본다.' })) };
+    const page = await open({ width, rows: [row(11, { ...EN, it: four })] });
+    await click(page); await sleep(300);
+    const m = await page.eval("({ sw: document.documentElement.scrollWidth, vw: document.documentElement.clientWidth, n: document.querySelectorAll('#extra-trans-result .similar-item').length, hs: [...document.querySelectorAll('#extra-trans-result .similar-item')].map(e => Math.round(e.getBoundingClientRect().height)), top: Math.round(document.querySelector('#search-result .similar-item') ? document.querySelector('#search-result .similar-item').getBoundingClientRect().height : 0) })");
+    assert.equal(m.n, 4); assert.ok(m.sw <= m.vw, '가로 스크롤 없음'); assert.ok(!/\p{Extended_Pictographic}/u.test(await resultText(page)));
+    console.log('[412 측정] ' + width + 'px: 관련어 항목 높이 ' + m.hs.join('/') + 'px');
+    await page.close();
+  });
+}

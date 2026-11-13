@@ -181,3 +181,15 @@ test('E 변경 없음: IT 단어도 게임 풀·퀴즈 풀·영어 구분에 영
   await sleep(300); assert.deepEqual(state.deletes, [{ id: 3, it: false }], '행 삭제(기존 경로)');
   await page.close();
 });
+
+test('G 단어장 IT 구분에서 연 결과에서도 관련어 클릭이 같은 동작(저장된 용어는 AI 0회)', { skip: SKIP }, async () => {
+  const page = await open();
+  await page.eval("wordbook.find(w => w.id === 1).it = { is_it: true, one_line: '캐시 한 줄', situations: ['가', '나'], origin: { text: '유', sure: true }, related: [{ term: 'apple', diff: '관련 설명' }] }");
+  await page.eval("renderWordbook()");
+  await page.eval("[...document.querySelectorAll('#wordbook-list .word-chip')].find(c => c.querySelector('.word-chip-text').textContent === 'cache').click()");
+  await page.waitFor("document.getElementById('extra-trans-result') && document.getElementById('extra-trans-result').innerText.includes('관련 설명')", 6000);
+  await page.eval("document.querySelector('#extra-trans-result .similar-item .similar-word').click()");
+  await page.waitFor("document.querySelector('#search-result .result-word') && document.querySelector('#search-result .result-word').textContent === 'apple'", 6000);
+  assert.equal(state.ai.length, 0);
+  await page.close();
+});

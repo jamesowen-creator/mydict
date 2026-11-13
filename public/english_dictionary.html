@@ -1013,8 +1013,6 @@
   .extra-trans-result .result-section:last-child { margin-bottom: 0; }
   .extra-trans-result .meaning-nuance { margin-top: 0; margin-bottom: 0; }
   .meaning-nuance.it-unsure { color: var(--text3); }
-  .it-compare .similar-word { cursor: default; }
-  .it-compare .similar-word:hover { color: var(--text); }
   .it-note { font-size: 12px; color: var(--text3); margin-top: 12px; }
 
   /* ─── LOGIN OVERLAY ──────────────────────────────────────────── */
@@ -2957,7 +2955,7 @@ function validateItTerm(raw) {
   var len = function (v) { return Array.from(v).length; };
   var str = function (v, max) { if (typeof v !== 'string') return null; var t = v.trim(); return t && len(t) <= max ? t : null; };
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || typeof raw.is_it !== 'boolean') return null;
-  if (raw.is_it === false) return { is_it: false, one_line: '', situations: [], origin: null, compare: null };
+  if (raw.is_it === false) return { is_it: false, one_line: '', situations: [], origin: null, related: [] };
   var one = str(raw.one_line, 60);
   if (!one) return null;
   if (!Array.isArray(raw.situations) || raw.situations.length !== 2) return null;
@@ -2967,15 +2965,21 @@ function validateItTerm(raw) {
   if (!o || typeof o !== 'object' || typeof o.sure !== 'boolean') return null;
   var otext = o.sure ? str(o.text, 200) : IT_UNSURE_TEXT;   // 불확실하면 문구를 고정한다(모델이 쓴 추측은 버린다)
   if (!otext) return null;
-  var cmp = null;
-  if (raw.compare !== null && raw.compare !== undefined) {
-    if (typeof raw.compare !== 'object' || Array.isArray(raw.compare)) return null;
-    var term = str(raw.compare.term, 60), diff = str(raw.compare.diff, 100);
-    if (!term || !diff) return null;
-    cmp = { term: term, diff: diff };
+  // 작업412: 관련어는 related 배열(최대 4개). related 가 없고 예전 compare({term, diff})만 있으면 1개짜리 related 로 바꿔 본다(저장 데이터는 그대로 둔다).
+  // 형식이 맞지 않는 항목·글자 수를 넘긴 항목은 그 항목만 버리고 나머지는 살린다. related 자체가 배열이 아니면 형식 오류.
+  var relRaw;
+  if (raw.related === undefined || raw.related === null) relRaw = raw.compare && typeof raw.compare === 'object' && !Array.isArray(raw.compare) ? [raw.compare] : [];
+  else if (Array.isArray(raw.related)) relRaw = raw.related;
+  else return null;
+  var rel = [];
+  for (var i = 0; i < relRaw.length && rel.length < 4; i++) {
+    var r = relRaw[i];
+    if (!r || typeof r !== 'object' || Array.isArray(r)) continue;
+    var term = str(r.term, 60), diff = str(r.diff, 100);
+    if (term && diff) rel.push({ term: term, diff: diff });
   }
   // 작업409: example 은 더 이상 쓰지 않는다(예전에 저장된 data.it.example 이 있어도 통과하되 화면에는 내지 않는다)
-  return { is_it: true, one_line: one, situations: sit, origin: { text: otext, sure: o.sure }, compare: cmp };
+  return { is_it: true, one_line: one, situations: sit, origin: { text: otext, sure: o.sure }, related: rel };
 }
 // IT-VALIDATE-END
 
@@ -2990,7 +2994,7 @@ function buildItPrompt(word, lang, engTerms) {
     '"one_line": "한 줄 핵심 (60자 이내)", ' +
     '"situations": ["누가·언제·어떤 문제를 풀려고 이 말을 쓰는지 구체적 장면 (120자 이내)", "두 번째 장면 (120자 이내)"] (exactly 2), ' +
     '"origin": {"text": "왜 이런 이름·표현을 쓰게 되었는지 유래·비유 (200자 이내)", "sure": true or false (false if the origin is not certain; do not invent a plausible story)}, ' +
-    '"compare": {"term": "헷갈리기 쉬운 용어 1개", "diff": "차이 (100자 이내)"} or null}. ONLY JSON.';
+    '"related": [{"term": "관련되거나 헷갈리기 쉬운 IT 용어 (영어 표준 표기, 60자 이내, 검색할 수 있게; 한국어 단어여도 term 은 영어 용어로 쓰고 한국어 이름은 diff 안에 쓴다)", "diff": "그 용어와 어떻게 다른지·어떤 관계인지 (쉬운 한국어, 100자 이내)"}] (1 to 4 items; leave out any item you are not sure about, an empty array is allowed if there is really none)}. ONLY JSON.';
 }
 
 function escHtml(v) { return String(v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -3001,7 +3005,7 @@ function itViewHtml(it, note) {
   return '<div class="result-section"><div class="meaning-core">' + escHtml(it.one_line) + '</div></div>' +
     sec('용도', it.situations.map(function (x) { return '<div class="meaning-set"><div class="meaning-nuance">' + escHtml(x) + '</div></div>'; }).join('')) +
     sec('유래', '<div class="meaning-nuance' + (it.origin.sure ? '' : ' it-unsure') + '">' + escHtml(it.origin.text) + '</div>') +
-    (it.compare ? sec('관련어', '<div class="similar-list it-compare"><div class="similar-item"><div style="min-width:100px"><div class="similar-word">' + escHtml(it.compare.term) + '</div></div><div class="similar-diff">' + escHtml(it.compare.diff) + '</div></div></div>') : '') +
+    (it.related.length ? sec('관련어', '<div class="similar-list">' + it.related.map(function (r) { return '<div class="similar-item"><div style="min-width:100px"><div class="similar-word" data-it-term="' + escHtml(r.term) + '" onclick="searchWord(this.getAttribute(\'data-it-term\'), \'en\')">' + escHtml(r.term) + '</div></div><div class="similar-diff">' + escHtml(r.diff) + '</div></div>'; }).join('') + '</div>') : '') +
     (note ? '<div class="it-note">' + escHtml(note) + '</div>' : '');
 }
 
