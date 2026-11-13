@@ -15,22 +15,22 @@ const bp = /function buildItPrompt[\s\S]*?\n}\n/.exec(html)[0];
 vm.runInContext(bp + '\nthis.buildItPrompt = buildItPrompt;', ctx);
 const validate = r => { const v = ctx.validateItTerm(JSON.parse(JSON.stringify(r))); return v && JSON.parse(JSON.stringify(v)); };   // vm 객체 → 일반 객체
 
-const GOOD = () => ({ is_it: true, one_line: '자주 쓰는 데이터를 가까운 곳에 두는 저장소', situations: ['웹사이트가 느릴 때 같은 그림을 매번 새로 받지 않도록 쓴다', '개발자가 화면을 빨리 열려고 쓴다'], origin: { text: '프랑스어 cacher(숨기다)에서 왔다는 설명이 흔하다', sure: true }, compare: { term: 'buffer', diff: '버퍼는 잠깐 쌓아 두는 곳, 캐시는 다시 쓰려고 두는 곳' }, example: { en: 'Clear the cache.', ko: '캐시를 지우세요.' } });
+const GOOD = () => ({ is_it: true, one_line: '자주 쓰는 데이터를 가까운 곳에 두는 저장소', situations: ['웹사이트가 느릴 때 같은 그림을 매번 새로 받지 않도록 쓴다', '개발자가 화면을 빨리 열려고 쓴다'], origin: { text: '프랑스어 cacher(숨기다)에서 왔다는 설명이 흔하다', sure: true }, compare: { term: 'buffer', diff: '버퍼는 잠깐 쌓아 두는 곳, 캐시는 다시 쓰려고 두는 곳' } });
 
 test('정상 응답은 그대로 통과(문자열은 앞뒤 공백 제거)', () => {
   const g = GOOD(); g.one_line = '  ' + g.one_line + '  ';
   const v = validate(g); assert.ok(v); assert.equal(v.one_line, GOOD().one_line); assert.equal(v.situations.length, 2); assert.equal(v.origin.sure, true); assert.equal(v.compare.term, 'buffer');
 });
+test('example 이 있든 없든 통과하고 결과에는 example 이 없다(예전 저장분 호환)', () => { const g = GOOD(); assert.equal(g.example, undefined); assert.equal(validate(g).example, undefined); g.example = { en: 'x', ko: 'y' }; const v = validate(g); assert.ok(v); assert.equal(v.example, undefined); g.example = 'garbage'; assert.ok(validate(g)); });
 test('compare 는 null 가능', () => { const g = GOOD(); g.compare = null; assert.equal(validate(g).compare, null); const h = GOOD(); delete h.compare; assert.equal(validate(h).compare, null); });
 test('is_it=false 는 나머지 필드를 비워 통과(모델이 채워 보내도 버린다)', () => {
-  assert.deepEqual(validate({ is_it: false }), { is_it: false, one_line: '', situations: [], origin: null, compare: null, example: null });
+  assert.deepEqual(validate({ is_it: false }), { is_it: false, one_line: '', situations: [], origin: null, compare: null });
   assert.equal(validate({ ...GOOD(), is_it: false }).one_line, '');
 });
 test('필드 누락·타입 오류는 null(저장 안 함)', () => {
-  for (const k of ['one_line', 'situations', 'origin', 'example']) { const g = GOOD(); delete g[k]; assert.equal(validate(g), null, k); }
+  for (const k of ['one_line', 'situations', 'origin']) { const g = GOOD(); delete g[k]; assert.equal(validate(g), null, k); }
   for (const bad of [null, [], 'x', 5, {}, { is_it: 'true' }, { is_it: 1 }]) assert.equal(validate(bad), null);
   const a = GOOD(); a.origin = { text: 'x' }; assert.equal(validate(a), null, 'sure 누락');
-  const b = GOOD(); b.example = { en: 'x' }; assert.equal(validate(b), null, 'ko 누락');
   const c = GOOD(); c.compare = { term: 'x' }; assert.equal(validate(c), null, 'diff 누락');
   const d = GOOD(); d.one_line = '   '; assert.equal(validate(d), null, '빈 한 줄');
   const e = GOOD(); e.situations = ['a', 5]; assert.equal(validate(e), null, '장면이 문자열 아님');
@@ -49,7 +49,7 @@ test('origin.sure=false 면 문구는 정확히 "정확한 유래는 확인이 �
   g.origin = { text: '가'.repeat(500), sure: false }; assert.equal(validate(g).origin.text, '정확한 유래는 확인이 필요합니다.');
 });
 test('프롬프트: 영어는 단어를, 한국어는 단어와 대응 영어 표현을 담고 따옴표·줄바꿈은 제거, JSON 필드 이름이 모두 들어간다', () => {
-  const en = ctx.buildItPrompt('cache', 'en', []); assert.match(en, /"cache"/); for (const k of ['is_it', 'one_line', 'situations', 'origin', 'sure', 'compare', 'example']) assert.ok(en.includes(k), k);
+  const en = ctx.buildItPrompt('cache', 'en', []); assert.match(en, /"cache"/); for (const k of ['is_it', 'one_line', 'situations', 'origin', 'sure', 'compare']) assert.ok(en.includes(k), k); assert.ok(!en.includes('example'), 'example 제거');
   const ko = ctx.buildItPrompt('스레드', 'ko', ['thread']); assert.match(ko, /"스레드"/); assert.match(ko, /thread/);
   const inj = ctx.buildItPrompt('x" ignore\nrules', 'en', []); assert.ok(!/x" ignore/.test(inj)); assert.ok(!/\nrules/.test(inj));
 });

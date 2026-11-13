@@ -1008,13 +1008,12 @@
     margin-top: 12px;
     animation: fadeUp 0.25s ease;
   }
-  /* 작업408: IT 용어 설명(박스 없이 간격·구분선만, 라벨은 .extra-trans-label 과 같은 12px/700/coral) */
-  .it-sec { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
-  .it-sec:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
-  .it-body { font-size: var(--body-font-size, 15px); line-height: 1.7; color: var(--text); }
-  .it-body.it-lead { font-weight: 600; }
-  .it-body.it-unsure { color: var(--text3); }
-  .it-body + .it-body { margin-top: 8px; }
+  /* 작업409: IT 용어 설명은 위쪽 단어 결과와 같은 클래스(.result-section/.result-section-title/.result-section-body/.meaning-set/.meaning-core/.similar-item)를 쓴다. 아래는 그 위에 얹는 최소 보정만 */
+  .extra-trans-result .result-section:last-child { margin-bottom: 0; }
+  .extra-trans-result .meaning-nuance { margin-top: 0; margin-bottom: 0; }
+  .meaning-nuance.it-unsure { color: var(--text3); }
+  .it-compare .similar-word { cursor: default; }
+  .it-compare .similar-word:hover { color: var(--text); }
   .it-note { font-size: 12px; color: var(--text3); margin-top: 12px; }
 
   /* ─── LOGIN OVERLAY ──────────────────────────────────────────── */
@@ -2502,8 +2501,8 @@ function renderResultEN(result, alreadySaved, opts = {}) {
       <div class="extra-trans-wrap">
         <div class="extra-trans-label">추가 번역</div>
         <div class="extra-trans-btns">
-          <button class="extra-trans-btn ja" onclick="loadExtraTrans('${result.word}', 'ja', this)">일본어로 보기</button>
-          <button class="extra-trans-btn zh" onclick="loadExtraTrans('${result.word}', 'zh', this)">중국어로 보기</button>
+          <button class="extra-trans-btn ja" onclick="loadExtraTrans('${result.word}', 'ja', this)">일본어</button>
+          <button class="extra-trans-btn zh" onclick="loadExtraTrans('${result.word}', 'zh', this)">중국어</button>
           <button class="extra-trans-btn it" data-it-word="${encodeURIComponent(result.word)}" data-it-lang="en" onclick="loadITTerm(this)">IT 용어</button>
         </div>
         <div class="extra-trans-result" id="extra-trans-result"></div>
@@ -2613,8 +2612,8 @@ function renderResultKO(result, alreadySaved) {
       <div class="extra-trans-wrap">
         <div class="extra-trans-label">추가 번역</div>
         <div class="extra-trans-btns">
-          <button class="extra-trans-btn ja" onclick="loadExtraTransKO('${result.word}', 'ja', this)">일본어로 보기</button>
-          <button class="extra-trans-btn zh" onclick="loadExtraTransKO('${result.word}', 'zh', this)">중국어로 보기</button>
+          <button class="extra-trans-btn ja" onclick="loadExtraTransKO('${result.word}', 'ja', this)">일본어</button>
+          <button class="extra-trans-btn zh" onclick="loadExtraTransKO('${result.word}', 'zh', this)">중국어</button>
           <button class="extra-trans-btn it" data-it-word="${encodeURIComponent(result.word)}" data-it-lang="ko" data-it-eng="${encodeURIComponent(JSON.stringify((result.entries || []).map(e => e && e.english).filter(x => typeof x === 'string' && x).slice(0, 3)))}" onclick="loadITTerm(this)">IT 용어</button>
         </div>
         <div class="extra-trans-result" id="extra-trans-result"></div>
@@ -2956,7 +2955,7 @@ function validateItTerm(raw) {
   var len = function (v) { return Array.from(v).length; };
   var str = function (v, max) { if (typeof v !== 'string') return null; var t = v.trim(); return t && len(t) <= max ? t : null; };
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || typeof raw.is_it !== 'boolean') return null;
-  if (raw.is_it === false) return { is_it: false, one_line: '', situations: [], origin: null, compare: null, example: null };
+  if (raw.is_it === false) return { is_it: false, one_line: '', situations: [], origin: null, compare: null };
   var one = str(raw.one_line, 60);
   if (!one) return null;
   if (!Array.isArray(raw.situations) || raw.situations.length !== 2) return null;
@@ -2973,11 +2972,8 @@ function validateItTerm(raw) {
     if (!term || !diff) return null;
     cmp = { term: term, diff: diff };
   }
-  var ex = raw.example;
-  if (!ex || typeof ex !== 'object') return null;
-  var en = str(ex.en, 200), ko = str(ex.ko, 200);
-  if (!en || !ko) return null;
-  return { is_it: true, one_line: one, situations: sit, origin: { text: otext, sure: o.sure }, compare: cmp, example: { en: en, ko: ko } };
+  // 작업409: example 은 더 이상 쓰지 않는다(예전에 저장된 data.it.example 이 있어도 통과하되 화면에는 내지 않는다)
+  return { is_it: true, one_line: one, situations: sit, origin: { text: otext, sure: o.sure }, compare: cmp };
 }
 // IT-VALIDATE-END
 
@@ -2992,20 +2988,18 @@ function buildItPrompt(word, lang, engTerms) {
     '"one_line": "한 줄 핵심 (60자 이내)", ' +
     '"situations": ["누가·언제·어떤 문제를 풀려고 이 말을 쓰는지 구체적 장면 (120자 이내)", "두 번째 장면 (120자 이내)"] (exactly 2), ' +
     '"origin": {"text": "왜 이런 이름·표현을 쓰게 되었는지 유래·비유 (200자 이내)", "sure": true or false (false if the origin is not certain; do not invent a plausible story)}, ' +
-    '"compare": {"term": "헷갈리기 쉬운 용어 1개", "diff": "차이 (100자 이내)"} or null, ' +
-    '"example": {"en": "short English example in an IT context", "ko": "한국어 번역"}}. ONLY JSON.';
+    '"compare": {"term": "헷갈리기 쉬운 용어 1개", "diff": "차이 (100자 이내)"} or null}. ONLY JSON.';
 }
 
 function escHtml(v) { return String(v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
 function itViewHtml(it, note) {
-  if (!it.is_it) return '<div class="it-body it-unsure">IT 분야에서 쓰이는 용례가 없는 단어입니다.</div>';
-  var sec = function (label, body) { return '<div class="it-sec"><div class="extra-trans-label">' + label + '</div>' + body + '</div>'; };
-  return '<div class="it-sec"><div class="it-body it-lead">' + escHtml(it.one_line) + '</div></div>' +
-    sec('이럴 때 씁니다', it.situations.map(function (x) { return '<div class="it-body">' + escHtml(x) + '</div>'; }).join('')) +
-    sec('왜 이렇게 부를까', '<div class="it-body' + (it.origin.sure ? '' : ' it-unsure') + '">' + escHtml(it.origin.text) + '</div>') +
-    (it.compare ? sec('헷갈리는 용어', '<div class="it-body"><b>' + escHtml(it.compare.term) + '</b> — ' + escHtml(it.compare.diff) + '</div>') : '') +
-    sec('예문', '<div class="it-body">' + escHtml(it.example.en) + '</div><div class="it-body it-unsure">' + escHtml(it.example.ko) + '</div>') +
+  if (!it.is_it) return '<div class="meaning-nuance it-unsure">IT 분야에서 쓰이는 용례가 없는 단어입니다.</div>';
+  var sec = function (label, body) { return '<div class="result-section"><div class="result-section-title">' + label + '</div>' + body + '</div>'; };
+  return '<div class="result-section"><div class="meaning-core">' + escHtml(it.one_line) + '</div></div>' +
+    sec('용도', it.situations.map(function (x) { return '<div class="meaning-set"><div class="meaning-nuance">' + escHtml(x) + '</div></div>'; }).join('')) +
+    sec('유래', '<div class="meaning-nuance' + (it.origin.sure ? '' : ' it-unsure') + '">' + escHtml(it.origin.text) + '</div>') +
+    (it.compare ? sec('관련어', '<div class="similar-list it-compare"><div class="similar-item"><div style="min-width:100px"><div class="similar-word">' + escHtml(it.compare.term) + '</div></div><div class="similar-diff">' + escHtml(it.compare.diff) + '</div></div></div>') : '') +
     (note ? '<div class="it-note">' + escHtml(note) + '</div>' : '');
 }
 

@@ -15,7 +15,7 @@ const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/ja
 const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
 const TOKEN = `${b64({ alg: 'none' })}.${b64({ id: 7, name: '테스터', exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`;
 
-const GOOD = { is_it: true, one_line: '자주 쓰는 데이터를 가까이 두는 저장소', situations: ['웹사이트가 느릴 때 같은 그림을 매번 새로 받지 않도록 둔다', '개발자가 화면을 빨리 열려고 쓴다'], origin: { text: '프랑스어로 숨긴다는 말에서 왔다는 설명이 흔하다', sure: true }, compare: { term: 'buffer', diff: '버퍼는 잠깐 쌓아 두는 곳' }, example: { en: 'Clear the cache.', ko: '캐시를 지우세요.' } };
+const GOOD = { is_it: true, one_line: '자주 쓰는 데이터를 가까이 두는 저장소', situations: ['웹사이트가 느릴 때 같은 그림을 매번 새로 받지 않도록 둔다', '개발자가 화면을 빨리 열려고 쓴다'], origin: { text: '프랑스어로 숨긴다는 말에서 왔다는 설명이 흔하다', sure: true }, compare: { term: 'buffer', diff: '버퍼는 잠깐 쌓아 두는 곳' } };
 let srv, base, browser;
 const state = { ai: [], patches: [], aiPlan: [], patchStatus: 200, rows: [] };
 test.before(async () => {
@@ -76,15 +76,15 @@ const resultText = page => page.eval("document.getElementById('extra-trans-resul
 const waitDone = page => page.waitFor("!document.querySelector('#extra-trans-result .loading') && document.getElementById('extra-trans-result').innerText.trim().length > 0", 6000);
 
 for (const kind of ['en', 'ko']) for (const width of [320, 390, 1280]) {
-  test(`A ${kind} ${width}px: 일본어·중국어·IT 용어 버튼이 한 줄·같은 폭·높이 44px 이상, 가로 스크롤 없음, 이모지 없음, radius 10px, 기존 두 버튼 글자 그대로`, { skip: SKIP }, async () => {
+  test(`A ${kind} ${width}px: 일본어·중국어·IT 용어 버튼이 한 줄·같은 폭·높이 44px 이상, 가로 스크롤 없음, 이모지 없음, radius 10px, 글자 한 줄(일본어·중국어·IT 용어)`, { skip: SKIP }, async () => {
     const page = await open({ width, kind });
-    const m = await page.eval(`(() => { const b = [...document.querySelectorAll('.extra-trans-btns .extra-trans-btn')].map(e => { const r = e.getBoundingClientRect(); return { t: e.textContent.trim(), top: Math.round(r.top), w: r.width, h: r.height, rad: getComputedStyle(e).borderRadius, sw: e.scrollWidth, cw: e.clientWidth, fs: getComputedStyle(e).fontSize }; });
+    const m = await page.eval(`(() => { const b = [...document.querySelectorAll('.extra-trans-btns .extra-trans-btn')].map(e => { const r = e.getBoundingClientRect(); return { t: e.textContent.trim(), top: Math.round(r.top), w: r.width, h: r.height, rad: getComputedStyle(e).borderRadius, sw: e.scrollWidth, cw: e.clientWidth, lines: (() => { const r = document.createRange(); r.selectNodeContents(e); return new Set([...r.getClientRects()].map(q => Math.round(q.top))).size; })(), fs: getComputedStyle(e).fontSize }; });
       const box = document.querySelector('.extra-trans-btns').getBoundingClientRect();
       return { b, vw: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth, x0: box.left, x1: box.right, last: [...document.querySelectorAll('.extra-trans-btns .extra-trans-btn')].pop().getBoundingClientRect().right }; })()`);
-    assert.deepEqual(m.b.map(x => x.t), ['일본어로 보기', '중국어로 보기', 'IT 용어']);
+    assert.deepEqual(m.b.map(x => x.t), ['일본어', '중국어', 'IT 용어']);
     assert.equal(new Set(m.b.map(x => x.top)).size, 1, '한 줄');
     assert.ok(Math.max(...m.b.map(x => x.w)) - Math.min(...m.b.map(x => x.w)) <= 1, '같은 폭 ' + m.b.map(x => x.w));
-    for (const x of m.b) { assert.ok(x.h >= 44, '높이 ' + x.h); assert.equal(x.rad, '10px'); assert.ok(x.sw <= x.cw + 1, '글자가 버튼 밖으로 넘치지 않음: ' + x.t); assert.ok(!/\p{Extended_Pictographic}/u.test(x.t)); assert.equal(x.fs, '13px'); }
+    for (const x of m.b) { assert.ok(x.h >= 44, '높이 ' + x.h); assert.equal(x.rad, '10px'); assert.equal(x.lines, 1, '글자 한 줄: ' + x.t); assert.ok(x.sw <= x.cw + 1, '글자가 버튼 밖으로 넘치지 않음: ' + x.t); assert.ok(!/\p{Extended_Pictographic}/u.test(x.t)); assert.equal(x.fs, '13px'); }
     assert.ok(m.sw <= m.vw, '가로 스크롤 없음 ' + m.sw + '/' + m.vw); assert.ok(m.last <= m.x1 + 1);
     assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
     await page.close();
@@ -97,11 +97,11 @@ test('B 영어: 클릭 1회 = AI 1회(단어 포함·로그인 헤더) + 저장 
   assert.equal(state.ai.length, 1); assert.match(state.ai[0].prompt, /"cache"/); assert.equal(state.ai[0].auth, 'Bearer ' + TOKEN);
   assert.equal(state.patches.length, 1); assert.equal(state.patches[0].id, 11); assert.deepEqual(state.patches[0].body, { it: GOOD }); assert.equal(state.patches[0].auth, 'Bearer ' + TOKEN);
   const t = await resultText(page);
-  const order = [GOOD.one_line, '이럴 때 씁니다', GOOD.situations[0], GOOD.situations[1], '왜 이렇게 부를까', GOOD.origin.text, '헷갈리는 용어', 'buffer', '예문', 'Clear the cache.'].map(s => t.indexOf(s));
+  const order = [GOOD.one_line, '용도', GOOD.situations[0], GOOD.situations[1], '유래', GOOD.origin.text, '관련어', 'buffer'].map(s => t.indexOf(s));
   assert.ok(order.every(i => i >= 0), '모두 표시 ' + order); assert.deepEqual(order, order.slice().sort((a, b) => a - b), '순서');
-  assert.ok(!/\p{Extended_Pictographic}/u.test(t)); assert.ok(!/저장하지 못했습니다/.test(t));
-  const css = await page.eval(`(() => { const l = document.querySelector('#extra-trans-result .extra-trans-label'), b = document.querySelector('#extra-trans-result .it-body.it-lead'); const cl = getComputedStyle(l), cb = getComputedStyle(b); return { fs: cl.fontSize, fw: cl.fontWeight, ls: cl.letterSpacing, color: cl.color, bfs: cb.fontSize, bg: cb.backgroundColor, shadow: cb.boxShadow, rad: cb.borderRadius }; })()`);
-  assert.equal(css.fs, '12px'); assert.equal(css.fw, '700'); assert.equal(css.ls, '0.48px'); assert.equal(css.color, 'rgb(184, 68, 46)'); assert.equal(css.bfs, '15px'); assert.equal(css.bg, 'rgba(0, 0, 0, 0)'); assert.equal(css.shadow, 'none'); assert.equal(css.rad, '0px');
+  assert.ok(!/\p{Extended_Pictographic}/u.test(t)); assert.ok(!/저장하지 못했습니다/.test(t)); for (const old of ['이럴 때 씁니다', '왜 이렇게 부를까', '헷갈리는 용어', '예문', 'Clear the cache']) assert.ok(!t.includes(old), '없어야 함: ' + old);
+  const css = await page.eval(`(() => { const l = document.querySelector('#extra-trans-result .result-section-title'), b = document.querySelector('#extra-trans-result .meaning-nuance'); const cl = getComputedStyle(l), cb = getComputedStyle(b); return { fs: cl.fontSize, fw: cl.fontWeight, ls: cl.letterSpacing, color: cl.color, bfs: cb.fontSize, bg: cb.backgroundColor, shadow: cb.boxShadow, rad: cb.borderRadius }; })()`);
+  assert.equal(css.fs, '12px'); assert.equal(css.fw, '700'); assert.equal(css.ls, '0.48px'); assert.equal(css.color, 'rgb(184, 68, 46)'); assert.equal(css.bfs, '13px'); assert.equal(css.bg, 'rgba(0, 0, 0, 0)'); assert.equal(css.shadow, 'none'); assert.equal(css.rad, '0px');
   await click(page); await sleep(200);
   assert.equal(state.ai.length, 1, '재클릭 AI 0회'); assert.equal(state.patches.length, 1);
   assert.ok((await resultText(page)).includes(GOOD.one_line));
@@ -155,7 +155,7 @@ test('B is_it=false: 안내 문구를 보이고 저장한다(재클릭 AI 0회).
   const p2 = await open({ rows: [row(11, EN)] });
   state.aiPlan.push({ text: JSON.stringify({ ...GOOD, origin: { text: '아마 이런 이야기일 것이다', sure: false } }) });
   await click(p2); await waitDone(p2);
-  const o = await p2.eval(`(() => { const e = [...document.querySelectorAll('#extra-trans-result .it-sec')].find(s => s.textContent.includes('왜 이렇게 부를까')).querySelector('.it-body'); return { text: e.textContent, color: getComputedStyle(e).color, normal: getComputedStyle(document.querySelector('#extra-trans-result .it-body.it-lead')).color }; })()`);
+  const o = await p2.eval(`(() => { const e = [...document.querySelectorAll('#extra-trans-result .result-section')].find(s => s.textContent.includes('유래')).querySelector('.meaning-nuance'); return { text: e.textContent, color: getComputedStyle(e).color, normal: getComputedStyle(document.querySelector('#extra-trans-result .meaning-core')).color }; })()`);
   assert.equal(o.text, '정확한 유래는 확인이 필요합니다.'); assert.notEqual(o.color, o.normal, '보조색');
   assert.equal(state.patches[0].body.it.origin.text, '정확한 유래는 확인이 필요합니다.');
   await p2.close();
@@ -183,4 +183,34 @@ test('B 한국어 결과: 프롬프트에 한국어 단어와 대응 영어 표�
   const p2 = await open({ kind: 'ko', rows: [row(22, { ...KO, it: GOOD })] });
   await click(p2); await sleep(250); assert.equal(state.ai.length, 0); assert.ok((await resultText(p2)).includes(GOOD.one_line));
   await p2.close();
+});
+
+test('C 예전에 저장된 data.it.example 은 표시하지 않고 AI 도 부르지 않는다', { skip: SKIP }, async () => {
+  const page = await open({ rows: [row(31, { ...EN, it: { ...GOOD, example: { en: 'Clear the cache.', ko: '캐시를 지우세요.' } } })] });
+  await click(page); await sleep(300);
+  const t = await resultText(page);
+  assert.equal(state.ai.length, 0); assert.ok(t.includes(GOOD.one_line)); assert.ok(!t.includes('Clear the cache') && !t.includes('예문'));
+  await page.close();
+});
+
+test('C IT 결과의 글자 크기·간격·구분선이 위쪽 단어 결과와 같은 값(계산 스타일 비교)', { skip: SKIP }, async () => {
+  const data = { ...EN, meanings: [{ pos: 'noun', definition: '캐시', usage_note: '설명', example: 'a b', translation: '가' }, { pos: 'verb', definition: '저장하다' }], similar: [{ word: 'buffer', core_meaning: '버퍼', diff: '다름' }], collocations: [] };
+  const page = await open({ rows: [row(11, data)] });
+  await page.eval('renderResultEN(' + JSON.stringify(data) + ', true)');
+  await click(page); await waitDone(page);
+  const m = await page.eval(`(() => { const g = (sel, props) => { const e = document.querySelector(sel); if (!e) return null; const c = getComputedStyle(e); return props.map(p => c[p]).join('|'); };
+    const T = '#search-result > .result-card > ';
+    const P = ['fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'color', 'marginBottom', 'fontFamily'];
+    const cmp = (top, it, props) => ({ top: g(top, props), it: g(it, props) });
+    return {
+      title: cmp(T + '.result-section .result-section-title', '#extra-trans-result .result-section-title', P),
+      secgap: cmp(T + '.result-section', '#extra-trans-result .result-section', ['marginBottom', 'borderBottomWidth', 'borderTopWidth', 'paddingTop']),
+      body: cmp(T + '.result-section .meaning-nuance', '#extra-trans-result .meaning-nuance', ['fontSize', 'lineHeight', 'color']),
+      item: cmp(T + '.result-section .meaning-set', '#extra-trans-result .meaning-set', ['paddingBottom', 'marginBottom', 'borderBottomWidth', 'borderBottomColor']),
+      lead: cmp(T + '.result-section .meaning-core', '#extra-trans-result .meaning-core', ['fontSize', 'fontWeight', 'color']),
+      sim: cmp(T + '.result-section .similar-item', '#extra-trans-result .similar-item', ['paddingTop', 'paddingBottom', 'gap', 'display', 'borderBottomWidth']),
+      simw: cmp(T + '.result-section .similar-word', '#extra-trans-result .similar-word', ['fontSize', 'fontWeight', 'fontFamily', 'minWidth']),
+      simd: cmp(T + '.result-section .similar-diff', '#extra-trans-result .similar-diff', ['fontSize', 'color', 'lineHeight']) }; })()`);
+  for (const [k, v] of Object.entries(m)) { assert.ok(v.top && v.it, k + ' 요소 없음'); assert.equal(v.it, v.top, k + ': 위쪽 ' + v.top + ' / IT ' + v.it); }
+  await page.close();
 });
