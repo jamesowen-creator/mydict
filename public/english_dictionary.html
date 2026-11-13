@@ -1837,7 +1837,6 @@ async function initAuth() {
   try {
     await loadWordbookFromDB();
     updateBadges();
-    backfillShortMeanings();
     setupBackButtonBlock();
   } catch (e) {
     console.error('[initAuth] 로그인 후 초기화 중 예외 발생 (검색 화면은 계속 진행함):', e);
@@ -1938,7 +1937,7 @@ async function callAI(prompt) {
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 function save() {
-  localStorage.setItem('mydict_wrong', JSON.stringify(wrongNote));
+  try { localStorage.setItem('mydict_wrong', JSON.stringify(wrongNote)); } catch (e) { /* 작업416: 저장소가 막힌 환경(사생활 모드 등)에서도 화면은 계속 동작한다 */ }
   updateBadges();
 }
 
@@ -2206,6 +2205,47 @@ async function retryDetail() {
 // 기본 파생어만 빠르게 받아 즉시 렌더링하고, 나머지는 2차 호출로 이어받아
 // 채워넣는다. 최종 result 객체의 필드 구성은 기존과 동일하게 맞춰서
 // 단어장/퀴즈 등 다른 기능이 이 함수 밖에서 받는 데이터 형태는 그대로다.
+// 작업416: 영어 뜻 표현 원칙 검증. 문장체를 걸러 내고(마침표 등), 대응어는 뜻마다 최대 3개, 대표 뜻(short_meaning)은 뜻별 첫 항목을 ", " 로 합친다. DOM·네트워크 없음.
+// GLOSS-START
+var GLOSS_ITEM_MAX = 20;      // 항목 하나의 여유 상한(글자 수 기준은 아님)
+var GLOSS_PER_MEANING = 3;    // 뜻 하나에 남기는 대응어 수
+var GLOSS_SHORT_MAX = 3;      // 대표 뜻에 합치는 뜻 수
+function splitDefinition(text) {
+  if (typeof text !== 'string') return [];
+  return text.split(/\s*[,;，、；]\s*/).map(function (x) { return x.trim(); }).filter(Boolean);
+}
+function glossItemOk(it) { return !!it && Array.from(it).length <= GLOSS_ITEM_MAX && !/[.!?。！？]/.test(it); }
+// meanings → { ok, meanings }. 유효한 뜻(유효 항목 1개 이상)만 남기고 definition 은 ", " 로 정리한다. 하나도 없으면 ok=false(원본은 건드리지 않는다)
+function validateGloss(meanings) {
+  if (!Array.isArray(meanings)) return { ok: false, meanings: [] };
+  var out = [];
+  meanings.forEach(function (m) {
+    if (!m || typeof m !== 'object') return;
+    var items = splitDefinition(m.definition).filter(glossItemOk).slice(0, GLOSS_PER_MEANING);
+    if (!items.length) return;
+    out.push(Object.assign({}, m, { definition: items.join(', ') }));
+  });
+  return { ok: out.length > 0, meanings: out };
+}
+function deriveShortMeaning(meanings) {
+  var heads = [];
+  (Array.isArray(meanings) ? meanings : []).forEach(function (m) {
+    var first = m && typeof m.definition === 'string' ? splitDefinition(m.definition)[0] : '';
+    if (first && heads.indexOf(first) < 0 && heads.length < GLOSS_SHORT_MAX) heads.push(first);
+  });
+  return heads.join(', ');
+}
+// 1차 응답에 적용: 통과하면 definition·short_meaning 을 새 원칙 값으로 바꾸고 gloss_v=1, 통과하지 못하면 원본을 그대로 두고 short_meaning 은 첫 뜻의 definition(예전 방식), gloss_v 없음. short_gloss 는 더 이상 만들지 않는다
+function applyGloss(result) {
+  delete result.short_gloss;
+  var g = validateGloss(result.meanings);
+  if (g.ok) { result.meanings = g.meanings; result.short_meaning = deriveShortMeaning(g.meanings); result.gloss_v = 1; return true; }
+  var m0 = Array.isArray(result.meanings) ? result.meanings[0] : null;
+  result.short_meaning = (m0 && typeof m0.definition === 'string' ? m0.definition : '') || '';
+  return false;
+}
+// GLOSS-END
+
 function buildDictQuickPrompt(query) {
   return `You are an English dictionary assistant for a Korean learner. This is STEP 1 of 2 - respond with ONLY the core lookup info as fast as possible. A second call right after this one will fill in usage notes, examples, synonyms and collocations, so do NOT include those here.
 For the English word or phrase: "${query}"
@@ -2217,12 +2257,11 @@ Respond ONLY in valid JSON with this exact structure:
   "word": "base form dictionary entry",
   "search_query": "${query}",
   "pronunciation": "/prəˌnʌnsiˈeɪʃən/",
-  "short_gloss": "가장 흔한 의미 하나를 1~3단어의 아주 간결한 한국어 대응어로 (예: apple→사과, severe→심각한, run→달리다)",
   "meanings": [
     {
       "pos": "noun",
       "domain": "일반",
-      "definition": "암기하기 쉬운 짧은 한국어 대응어/구 2~4개를 쉼표로 나열 (완전한 문장 금지, 예: '심한, 극심한' - '정도가 심하거나 극단적인' 같은 문장형 금지)"
+      "definition": "그 뜻의 한국어 대응어 2~3개를 쉼표로 나열 (문장·마침표·설명 금지, 예: '신중하게 검토하다, 정밀 조사하다')"
     }
   ],
   "derivatives": [
@@ -2236,10 +2275,9 @@ Respond ONLY in valid JSON with this exact structure:
 
 Rules:
 - meanings: 2-4 entries, ordered by REAL-WORLD USAGE FREQUENCY (most common sense first). If the word has senses across different parts of speech, include them all in this SAME array (still frequency-ordered overall) - each entry's "pos" marks which part of speech it belongs to.
-- definition: 짧고 기억하기 쉬운 한국어 단어/구 위주로 작성. "정도가 심하거나 극단적인" 같은 완전한 문장 대신 "심한, 극심한"처럼 짧은 대응어 2~4개를 쉼표로 나열. 의미가 안 통할 정도로 지나치게 줄이지는 말고, 단어 하나로 어색하면 2~3단어 짧은 구 형태(예: "정도가 심한")는 허용. 이 필드는 short_gloss(퀴즈용으로 쓰이는 가장 흔한 의미 1개, 1~3단어)와는 별개이니 통합하거나 혼동하지 말 것 - definition은 그 의미 하나를 설명하는 여러 개의 간결한 한국어 대응어 나열이다.
+- 뜻 표현 원칙: 한국어 뜻은 문장이 아니라, 학습자가 바로 떠올릴 수 있는 직관적인 한국어 단어나 짧은 구로 쓴다. '~하는 것', '무언가를 ~' 같은 사전식 문장체, 마침표, 설명 덧붙이기를 쓰지 않는다. 뜻이 여럿이면 중요한 순서대로 모두 쓴다. meanings[].definition에는 그 뜻의 대응어를 2~3개 쉼표로 나열한다. 쓰임·뉘앙스·상황 설명은 2차 usage_note가 맡으므로 definition에 넣지 않는다. 예(형식 참고용, 해당 단어에만 해당): scrutinize → 신중하게 검토하다, 정밀 조사하다 / ambiguous → 애매한, 모호한 / run → (뜻1) 달리다, 뛰다 (뜻2) 운영하다, 경영하다 (뜻3) 흐르다.
 - derivatives: up to 5 related word forms.
 - domain: one of 일반, 비즈니스, 의학, 법률, 기술, 구어체, 문학, 격식체, 비격식.
-- short_gloss must be a single short word/phrase (1-3 words), never a full clause or sentence - it is used as a multiple-choice quiz answer, not a definition.
 - Do NOT include etymology or word-origin information anywhere in the response.
 - Do NOT include usage_note, example, translation, similar, or collocations fields - those belong to the follow-up call only.
 YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT ONLY.`;
@@ -2297,7 +2335,7 @@ async function searchEnglish(query, resultDiv, source = 'manual') {
 
   // 1차만으로도 화면에 바로 보여줄 수 있는 최소 필드(short_meaning)는 지금
   // 채워두고, usage_note가 필요한 nuance는 2차 완료 후 다시 계산한다.
-  result.short_meaning = result.short_gloss || result.meanings?.[0]?.definition || '';
+  applyGloss(result);   // 작업416: 뜻 표현 원칙 검증·정리(short_meaning·gloss_v). short_gloss 는 더 이상 쓰지 않는다
   result.nuance = '';
 
   // 활용/예문/유의어/Collocation은 아직 없음 - 스켈레톤과 함께 1차 결과부터 즉시 렌더링
@@ -4220,20 +4258,7 @@ async function clearWrong() {
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
 
-// short_meaning 백필
-async function backfillShortMeanings() {
-  const missing = wordbook.filter(w => !w.short_meaning && (w.lang || 'en') === 'en');
-  if (missing.length === 0) return;
-  for (const w of missing) {
-    try {
-      const text = await callAI(`영어 단어 또는 표현 "${w.word}"의 가장 흔한 뜻 하나를 1~3단어의 아주 간결한 한국어 대응어로만 답하세요 (예: apple→사과). 다른 설명 없이 뜻만 출력하세요.`);
-      w.short_meaning = text.trim().replace(/"/g, '');
-    } catch (e) {
-      w.short_meaning = w.nuance ? w.nuance.slice(0, 20) : '';
-    }
-  }
-  save();
-}
+// 작업416: short_meaning 백필(로드할 때마다 /api/ai 호출·DB 미저장)은 없앴다. short_meaning 이 없는 옛 단어는 meaningOf 대체 규칙으로 보이고, 기존 단어 수정은 관리자 도구(417)가 맡는다.
 
 // ─── TTS ─────────────────────────────────────────────────────────────────────
 const ttsMemCache = {};
