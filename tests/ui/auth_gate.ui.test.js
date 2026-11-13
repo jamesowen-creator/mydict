@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { launchBrowser, findChrome } = require('./helpers/cdp');
+const { launchBrowser, findChrome, sleep } = require('./helpers/cdp');
 
 const SKIP = findChrome() ? false : 'Chrome을 찾을 수 없어 건너뜀';
 const PUB = path.join(__dirname, '..', '..', 'public');
@@ -27,8 +27,9 @@ const PAGES = [
 // 같은 Chrome 프로필의 localStorage 는 시험끼리 이어지므로, 첫 문서에서 토큰을 정확히 원하는 상태(넣기/지우기)로 만든다
 const seed = (page, token) => page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { if (!sessionStorage.getItem('__seeded')) { sessionStorage.setItem('__seeded', '1'); ${token ? `localStorage.setItem('mydict_token', ${JSON.stringify(token)});` : `localStorage.removeItem('mydict_token');`} } } catch (e) {}` });
 let srv, base, browser;
-const state = { me: null, meCalls: 0, homeHits: 0, hang: false };
-function resetState() { Object.assign(state, { me: { status: 200, body: ME_OK }, meCalls: 0, homeHits: 0, hang: false }); }
+const state = { me: null, meCalls: 0, meByTab: {}, homeHits: 0, hang: false };   // 작업418: meByTab = 탭(주소의 ?tab=) 별 /api/me 호출 수. 앞 시험의 탭이 늦게 보내는 요청이 다음 시험의 수에 섞이지 않게 한다
+let tabSeq = 0;
+function resetState() { Object.assign(state, { me: { status: 200, body: ME_OK }, meCalls: 0, meByTab: {}, homeHits: 0, hang: false }); }
 
 test.before(async () => {
   if (SKIP) return;
@@ -37,6 +38,7 @@ test.before(async () => {
     const json = (c, b) => { res.writeHead(c, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(b)); };
     if (u === '/api/me') {
       state.meCalls++;
+      try { const t = new URL(req.headers.referer || 'http://x/').searchParams.get('tab'); if (t) state.meByTab[t] = (state.meByTab[t] || 0) + 1; } catch (e) { /* Referer 없음 */ }
       if (state.me.destroy) return req.socket.destroy();
       if (state.me.raw !== undefined) { res.writeHead(state.me.status, { 'Content-Type': 'text/html' }); return res.end(state.me.raw); }
       return json(state.me.status, state.me.body);
@@ -59,8 +61,16 @@ async function open(p, { token = TOKEN, width = 390 } = {}) {
   // 하니스의 token 옵션은 새 문서마다 토큰을 다시 넣어, 게이트가 지운 토큰이 홈에서 되살아난다 → 첫 문서에서만 넣는다(sessionStorage 표지)
   const page = await browser.newPage({ width, height: 844, token: null });
   await seed(page, token);
-  await page.send('Page.navigate', { url: base + p.url });
+  page.tab = 't' + (++tabSeq);   // 이 탭만의 표지. 화면이 스스로 다시 불러와도 주소의 쿼리는 유지된다
+  await page.send('Page.navigate', { url: base + p.url + (p.url.includes('?') ? '&' : '?') + 'tab=' + page.tab });
   return page;
+}
+const meOf = page => state.meByTab[page.tab] || 0;
+// 이 탭의 /api/me 호출 수가 잠시 변하지 않을 때까지 기다린다(사전 화면은 게이트와 별개로 스스로도 /api/me 를 부르는데, 그 요청이 늦게 도착해 기준 수에 섞이는 것을 막는다). 고정 시간이 아니라 "수가 연속 5번 같음"이 조건
+async function meSettled(page) {
+  let last = -1, same = 0;
+  for (let i = 0; i < 100 && same < 5; i++) { const n = meOf(page); same = n === last ? same + 1 : 0; last = n; await sleep(60); }
+  return last;
 }
 const gateShown = page => page.exists('.metis-gate h1');
 const bodyVisible = (page, sel) => page.eval(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return false; const cs = getComputedStyle(e); return cs.visibility !== 'hidden' && e.getBoundingClientRect().height > 0; })()`);
@@ -72,7 +82,7 @@ for (const p of PAGES) {
     const page = await open(p, { token: null });
     try {
       await page.waitFor(`location.pathname === '/'`, 8000, '홈으로 이동');
-      assert.equal(state.meCalls, 0, '토큰이 없으면 /api/me 를 부르지 않는다');
+      assert.equal(meOf(page), 0, '토큰이 없으면 /api/me 를 부르지 않는다');
       assert.ok(state.homeHits >= 1);
     } finally { await page.close(); }
   });
@@ -83,7 +93,7 @@ for (const p of PAGES) {
       await page.waitFor(`document.readyState === 'complete' && !document.documentElement.classList.contains('metis-gate-pending')`, 8000, '게이트 통과');
       assert.ok(await bodyVisible(page, p.body.split(',')[0].trim()) || await page.exists(p.body.split(',')[0].trim()), '본문 표시');
       assert.equal(await page.exists('.metis-gate'), false);
-      assert.equal(state.meCalls, 1, '/api/me 호출 수');
+      assert.equal(meOf(page), 1, '/api/me 호출 수');
     } finally { await page.close(); }
   });
 
@@ -106,10 +116,10 @@ for (const p of PAGES) {
       assert.equal(await bodyShowing(page, p.body.split(',')[0].trim()), false, '본문 숨김');
       assert.equal(await page.eval(`document.querySelector('.metis-gate').getBoundingClientRect().height >= innerHeight - 1`), true, '화면 전체를 덮음');
       // 아직 승인 전: 다시 확인 → 같은 안내가 남는다
-      const calls = state.meCalls;
+      const calls = await meSettled(page);
       await page.click('.metis-gate button[data-gate="recheck"]');
       await page.waitFor(`document.querySelector('.metis-gate button[data-gate="recheck"]') && !document.querySelector('.metis-gate button[data-gate="recheck"]').disabled`, 8000, '재확인 끝');
-      assert.equal(state.meCalls, calls + 1, '[다시 확인]이 /api/me 를 한 번 더 부름');
+      assert.equal(meOf(page), calls + 1, '[다시 확인]이 /api/me 를 한 번 더 부름');
       assert.ok(await gateShown(page));
       // 승인됨: 다시 확인 → 화면이 다시 불러와져 본문이 열린다
       state.me = { status: 200, body: ME_OK };

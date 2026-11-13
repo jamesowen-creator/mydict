@@ -400,7 +400,9 @@ test('작업400 소리 표기 블록: 구 수만큼 줄, "/"는 구 수-1개, �
   await page.eval("document.querySelectorAll('.sound .phrase')[2].click()");
   await page.waitFor("window.__plays.length === 1", 3000);
   assert.deepEqual(await plays(page), ['m-delay.l1.c2']);
-  assert.equal(await page.eval("(() => { const c = getComputedStyle(document.querySelectorAll('.sound .phrase')[2].querySelector('.en-line')); return c.fontWeight + ':' + c.textDecorationLine; })()"), '700:underline', '재생 중인 구: 굵기+밑줄');
+  const playingStyle = "(() => { const c = getComputedStyle(document.querySelectorAll('.sound .phrase')[2].querySelector('.en-line')); return c.fontWeight + ':' + c.textDecorationLine; })()";
+  await page.waitFor(playingStyle + " === '700:underline'", 4000, '재생 중 스타일(굵기·밑줄) 적용');   // 작업418: 재생 기록 직후 스타일이 아직 안 바뀌어 있을 수 있어 적용될 때까지 기다린 뒤 같은 값을 단언한다
+  assert.equal(await page.eval(playingStyle), '700:underline', '재생 중인 구: 굵기+밑줄');
   await page.close();
 });
 

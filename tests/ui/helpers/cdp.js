@@ -73,10 +73,16 @@ class Page {
   }
   // 실제 마우스 입력으로 클릭한다(다른 요소에 가려지면 엉뚱한 곳이 눌려 테스트가 실패한다)
   async click(selector, { index = 0 } = {}) {
-    const box = await this.eval(`(() => { const e = document.querySelectorAll(${JSON.stringify(selector)})[${index}]; if (!e) return null; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, disabled: !!e.disabled }; })()`);
-    if (!box) throw new Error('클릭할 요소 없음: ' + selector);
-    if (box.disabled) throw new Error('비활성 요소: ' + selector);
-    const hit = await this.eval(`(() => { const t = document.elementFromPoint(${box.x}, ${box.y}); const e = document.querySelectorAll(${JSON.stringify(selector)})[${index}]; return !!t && (t === e || e.contains(t)); })()`);
+    // 작업418: 화면 전환·애니메이션·토스트가 잠깐 위를 덮을 수 있어, 가려져 있으면 최대 약 1.5초 동안(다시 위치를 재며) 가려짐이 풀리기를 기다린 뒤에도 가려져 있을 때만 실패한다
+    let box, hit;
+    for (let i = 0; i < 25; i++) {
+      box = await this.eval(`(() => { const e = document.querySelectorAll(${JSON.stringify(selector)})[${index}]; if (!e) return null; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, disabled: !!e.disabled }; })()`);
+      if (!box) throw new Error('클릭할 요소 없음: ' + selector);
+      if (box.disabled) throw new Error('비활성 요소: ' + selector);
+      hit = await this.eval(`(() => { const t = document.elementFromPoint(${box.x}, ${box.y}); const e = document.querySelectorAll(${JSON.stringify(selector)})[${index}]; return !!t && (t === e || e.contains(t)); })()`);
+      if (hit) break;
+      await sleep(60);
+    }
     if (!hit) throw new Error('다른 요소에 가려져 클릭할 수 없음: ' + selector);
     await this.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: box.x, y: box.y, button: 'left', clickCount: 1 });
     await this.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: box.x, y: box.y, button: 'left', clickCount: 1 });

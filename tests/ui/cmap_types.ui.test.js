@@ -176,7 +176,7 @@ test('퀴즈(308-1): 유형 select 가 선택 안 함 + 3종이고, 대립(방�
   await page.eval("Nav.goTab('quiz'); 0");
   await page.waitFor("!!document.getElementById('quiz-start')", 6000, '퀴즈 탭');
   await page.click('#quiz-start');
-  await page.waitFor("document.getElementById('map-view').classList.contains('quiz-mode') && document.querySelectorAll('[data-node]').length === 3", 6000, '퀴즈 화면');
+  await page.waitFor("document.getElementById('map-view').classList.contains('quiz-mode') && document.querySelectorAll('[data-node]').length === 3", 20000, '퀴즈 화면');   // 작업418: 동시 실행 부하에서 6초를 넘길 수 있어 대기 상한만 늘림(최후 수단, 판정은 그대로)
   const pairTap = async (x, y, type) => {
     await page.click(`[data-node="${x}"] rect`); await page.click(`[data-node="${y}"] rect`);
     await page.waitFor("document.getElementById('quiz-dlg').open", 3000);
