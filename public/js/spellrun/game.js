@@ -51,6 +51,7 @@ const els = {
   meaning: $('meaning'), speedTag: $('speedTag'), word: $('word'), pop: $('pop'), popTag: $('popTag'), popWord: $('popWord'), popMean: $('popMean'), popNote: $('popNote'),
   start: $('start'), startBtn: $('startBtn'), startInfo: $('startInfo'), startExcluded: $('startExcluded'), speechNote: $('speechNote'),
   result: $('result'), resTitle: $('resTitle'), resScore: $('resScore'), resDone: $('resDone'), resCombo: $('resCombo'),
+  resStars: $('resStars'), resBestRow: $('resBestRow'), resBest: $('resBest'), resNew: $('resNew'),
   resChips: $('resChips'), revBtn: $('revBtn'), againBtn: $('againBtn'), live: $('live'),
   bossBanner: $('bossBanner'), bossSub: $('bossSub'), cont: $('cont'), contBtn: $('contBtn'), endBtn: $('endBtn')
 };
@@ -209,11 +210,51 @@ function fitPop() {
   fitFont(els.popMean, LAYOUT.POPM_MAX || 22, 12, px => (px > 16 ? 1 : 2));
   if (!els.popEx.hidden) fitFont(els.popEx, LAYOUT.POPE_MAX || 13, 9, () => 3);
 }
+// 작업425: 결과 화면의 제목·점수는 가로 폭만 기준으로 최대 크기부터 맞춘다(한글 글자 높이가 줄 높이를 넘어 세로 판정이 항상 실패해 최소 크기로 줄던 문제). 공용 fitFont 는 그대로 두고 이 화면에서만 쓴다.
+// 그다음 카드가 세로로 넘치면 점수 36·제목 20 까지 조금씩 줄여 스크롤이 없게 한다
+function fitWidth(el, max, min) {
+  if (!el || !el.clientWidth) return max;
+  el.style.whiteSpace = 'nowrap';
+  for (let px = max; px >= min; px -= 0.5) { el.style.fontSize = 'calc(' + px + ' * var(--u))'; if (el.scrollWidth <= el.clientWidth + 1) return px; }
+  return min;
+}
 function fitResult() {
   if (els.result.hidden) return;
-  fitFont(els.resTitle, 36, 16, () => 1);
-  fitFont(els.resScore, 56, 20, () => 1);
+  let tp = fitWidth(els.resTitle, 36, 16), sp = fitWidth(els.resScore, 56, 20);
+  const card = els.result.querySelector('.card'), set = (e, px) => { e.style.fontSize = 'calc(' + px + ' * var(--u))'; };
+  while (card.scrollHeight > card.clientHeight && (sp > 36 || tp > 20)) {
+    if (sp > 36) { sp -= 2; set(els.resScore, sp); }
+    if (tp > 20) { tp -= 1; set(els.resTitle, tp); }
+  }
 }
+// 작업425: 신기록은 이 기기(localStorage spellrun_best, JSON {키: 최고 점수})에만. 읽기·쓰기 실패나 깨진 값은 무시한다
+const BEST_KEY = 'spellrun_best';
+function bestRead() { try { const o = JSON.parse(localStorage.getItem(BEST_KEY)); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+function bestWrite(o) { try { localStorage.setItem(BEST_KEY, JSON.stringify(o)); } catch (e) { /* 저장 실패는 무시 */ } }
+// 별이 하나씩 커지고(0.25초 간격) 점수가 0 에서 올라간다(약 0.8초). 결과 카드를 누르면 즉시 끝. 움직임 줄이기면 처음부터 최종 상태
+const RESANIM = { raf: 0, finish: null };
+function resAnimStop() { if (RESANIM.raf) cancelAnimationFrame(RESANIM.raf); RESANIM.raf = 0; RESANIM.finish = null; els.resStars.querySelectorAll('.star').forEach(e => e.classList.remove('go')); }
+function resAnimRun(finalScore, stars) {
+  resAnimStop();
+  const final = finalScore.toLocaleString('en-US');
+  els.resScore.textContent = final;
+  if (reduce || !(finalScore > 0 || stars > 0)) return;
+  const starEls = [...els.resStars.querySelectorAll('.star.on')];
+  starEls.forEach((e, i) => { e.style.setProperty('--i', i); void e.getBoundingClientRect(); e.classList.add('go'); });
+  const t0 = performance.now(), DUR = 800;
+  const end = () => { resAnimStop(); els.resScore.textContent = final; };
+  RESANIM.finish = end;
+  const tick = now => {
+    if (els.result.hidden) { resAnimStop(); return; }
+    const k = Math.max(0, Math.min(1, (now - t0) / DUR));
+    els.resScore.textContent = Math.round(finalScore * (1 - Math.pow(1 - k, 3))).toLocaleString('en-US');
+    if (k >= 1) { end(); return; }
+    RESANIM.raf = requestAnimationFrame(tick);
+  };
+  els.resScore.textContent = '0';
+  RESANIM.raf = requestAnimationFrame(tick);
+}
+els.result.addEventListener('pointerdown', e => { if (RESANIM.finish && !(e.target.closest && e.target.closest('button'))) RESANIM.finish(); });
 function fitAll() {
   if (G.plan && !els.hud.hidden) { layoutWord(); if (G.iActive) els.hintbox.style.transform = ''; fitHud(); if (G.iActive) { measureIntro(); applyIntro(); } }
   fitPop(); fitResult();
@@ -1166,11 +1207,33 @@ function appendChip(w, cls) {
     els.resChips.appendChild(b);
   }
 }
+// 작업425: 기본 모드 결과의 별·최고 기록·신기록(생존 모드는 숨김). 복습 판은 별만 보이고 기록은 갱신하지 않는다
+const RES = { stars: 0 };
+function resultExtras(surv) {
+  RES.stars = 0;
+  const stars = els.resStars, row = els.resBestRow;
+  if (surv) { stars.hidden = true; row.hidden = true; els.resNew.hidden = true; els.resBest.textContent = ''; return; }
+  const total = G.words.length, done = Math.min(G.wordsDone, total);
+  let first = 0; for (let i = 0; i < done; i++) if (G.mist[i] === 0) first++;
+  const n = L.starsFor({ done: done, total: total, firstTry: first });
+  RES.stars = n;
+  stars.hidden = false; stars.setAttribute('aria-label', '별 3개 중 ' + n + '개');
+  stars.querySelectorAll('.star').forEach((e, i) => e.classList.toggle('on', i < n));
+  row.hidden = true; els.resNew.hidden = true; els.resBest.textContent = '';
+  if (G.review || !total) return;
+  const r = L.updateBest(bestRead(), L.bestKey('basic', viewMode, total), Math.max(0, Math.round(G.score)));
+  if (r.store && (r.isNew || r.prev === null)) bestWrite(r.store);
+  if (r.prev !== null) {
+    row.hidden = false; els.resNew.hidden = !r.isNew;
+    els.resBest.textContent = r.isNew ? '이전 기록 ' + r.prev.toLocaleString('en-US') + '점' : '최고 기록 ' + r.best.toLocaleString('en-US') + '점';
+  }
+}
 function finishRest(cleared) {
   const surv = G.survival;
   const hasBoss = G.words.some(w => w.boss);
   els.resTitle.textContent = cleared ? (hasBoss ? '보스 격파!' : G.words.length + '단어 완주') : '게임 오버';
   els.resScore.textContent = G.score.toLocaleString('en-US');
+  resultExtras(surv);
   els.resDone.textContent = surv ? String(G.wordsDone) : G.wordsDone + ' / ' + G.words.length;
   els.resCombo.textContent = G.maxCombo;
   if (surv) {   // 생존 시간(게임 시간: 탭이 가려진 동안은 흐르지 않는다)
@@ -1188,6 +1251,7 @@ function finishRest(cleared) {
   els.revBtn.disabled = n === 0;
   els.result.hidden = false;
   fitResult();
+  if (!surv) resAnimRun(Math.max(0, Math.round(G.score)), RES.stars); else resAnimStop();
   els.live.textContent = cleared ? '완주했습니다' : '게임 오버';
 }
 

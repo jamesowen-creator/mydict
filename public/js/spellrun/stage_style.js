@@ -218,6 +218,16 @@
 .sr-box .toggle:focus-visible{outline:calc(3 * var(--u)) solid var(--ink);outline-offset:calc(3 * var(--u))}
 .sr-box .big{font-family:var(--f-letter);font-weight:700;white-space:nowrap;font-size:calc(var(--bfs,56) * var(--u));line-height:1;text-align:center;font-variant-numeric:tabular-nums}
 .sr-box .stats{display:flex;justify-content:center;gap:calc(22 * var(--u));font-size:calc(13 * var(--u));font-weight:700;text-align:center}
+/* 작업425: 결과 화면 별 3칸·최고 기록·신기록 표시(기본 모드만). 획득 별은 코랄, 빈 별은 연한 남색 회색 */
+.sr-box .stars{display:flex;justify-content:center;gap:calc(6 * var(--u))}
+.sr-box #result .card{gap:calc(7 * var(--u))}
+.sr-box .star{width:calc(30 * var(--u));height:calc(30 * var(--u));min-width:20px;min-height:20px;overflow:visible}
+.sr-box .star path{fill:#e3e7f4;stroke:#9aa3c2;stroke-width:1.6;stroke-linejoin:round}
+.sr-box .star.on path{fill:var(--coral);stroke:var(--ink);stroke-width:1.8}
+.sr-box .star.on.go{animation:sr-starin .38s cubic-bezier(.2,1.4,.4,1) backwards;animation-delay:calc(var(--i) * 250ms)}
+@keyframes sr-starin{0%{transform:scale(.15) rotate(-30deg);opacity:0}60%{transform:scale(1.3) rotate(6deg);opacity:1}100%{transform:none;opacity:1}}
+.sr-box .resbest{display:flex;justify-content:center;align-items:center;gap:calc(8 * var(--u));font-size:max(11px,calc(13 * var(--u)));font-weight:700;color:var(--ink-soft);text-align:center}
+.sr-box .newtag{background:var(--coral);color:var(--ink);border:calc(2 * var(--u)) solid var(--ink);border-radius:10px;padding:calc(2 * var(--u)) calc(8 * var(--u));font-size:max(11px,calc(13 * var(--u)));font-weight:700}
 .sr-box .stats > div{min-width:0}
 .sr-box .stats b{display:block;font-family:var(--f-letter);font-size:calc(22 * var(--u));font-variant-numeric:tabular-nums}
 .sr-box .chips{display:flex;flex-wrap:wrap;gap:calc(6 * var(--u));justify-content:center}
@@ -326,6 +336,8 @@ body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
 .sr-box.land #resInfo{grid-column:1;grid-row:1;display:flex;flex-direction:column;gap:calc(8 * var(--u));justify-content:center}
 .sr-box.land #resMain{grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:calc(8 * var(--u))}
 .sr-box.land #resTitle{font-size:calc(30 * var(--u))}
+.sr-box.land #result .btn{padding-top:calc(8 * var(--u));padding-bottom:calc(8 * var(--u));font-size:calc(20 * var(--u))}
+.sr-box.land .star{width:calc(28 * var(--u));height:calc(28 * var(--u))}
 /* 작업419: 가로는 [넘김]이 카드 오른쪽 가운데, [건너뛰기]는 왼쪽 아래 가장자리. 읽기 칼럼은 그 왼쪽 영역 가운데 */
 .sr-box.land #pv .card{grid-template-columns:auto 1fr auto;grid-template-rows:auto minmax(0,1fr) auto;column-gap:calc(16 * var(--u));row-gap:calc(2 * var(--u));align-content:center}
 .sr-box.land .pvtop{grid-column:1 / -1;grid-row:1}
@@ -409,7 +421,7 @@ body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
 .sr-box.land #optRow{margin-top:max(0px,calc(44px - 36 * var(--u)))}
 .sr-box.land #startBtn{margin-top:max(0px,calc((44px - 36 * var(--u)) / 2))}
 @media (prefers-reduced-motion:reduce){
-.sr-box .word > .iv,.sr-box .popword.go .pl,.sr-box .slot.cur .cell,.sr-box .slot.done .cell.pop,.sr-box .slot.bad,.sr-box .popword.go,.sr-box .banner.go,.sr-box .meaning.enter{animation:sr-none}
+.sr-box .word > .iv,.sr-box .popword.go .pl,.sr-box .slot.cur .cell,.sr-box .slot.done .cell.pop,.sr-box .slot.bad,.sr-box .popword.go,.sr-box .banner.go,.sr-box .meaning.enter,.sr-box .star.on.go{animation:sr-none}
 }
 `;
   var s = document.createElement('style');

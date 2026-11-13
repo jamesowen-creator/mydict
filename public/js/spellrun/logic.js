@@ -1101,6 +1101,29 @@ function eventVoices(e, sec) {
   return [{ type: e.midi % 2 ? 'sine' : 'triangle', f0: midiFreq(e.midi), dur: Math.max(0.1, d * 0.95), vol: e.vol, att: 0.01 }];
 }
 // ---- 효과음 계획(순수): 소리 목록 [{ type, f0, f1?, dur, vol, att, t0, wob?:{hz,cents}, noise?, filter? }] ----
+// 작업425: 결과 화면 별(기본 모드). 0~3. 단어 수가 0이면 0. 정수 비교로 경계(0.5, 1.0, 80%)를 정확히 맞춘다
+//  1개 = 완성 비율 0.5 이상, 2개 = 모두 완성, 3개 = 모두 완성하고 한 번에 완성(실수 0)한 단어가 전체의 80% 이상
+function starsFor(o) {
+  const total = Math.floor(Number(o && o.total)), done = Math.floor(Number(o && o.done)), first = Math.floor(Number(o && o.firstTry));
+  if (!(total > 0) || !(done > 0)) return 0;
+  if (done >= total) return (first >= 0 && first * 10 >= total * 8) ? 3 : 2;
+  return done * 2 >= total ? 1 : 0;
+}
+// 작업425: 신기록. store 는 {키: 최고 점수} 객체(깨진 값은 무시하고 새로 시작). 이전 기록이 있고 더 높을 때만 isNew(첫 기록은 저장만).
+// 받은 store 를 바꾸지 않고 새 객체를 돌려준다. prev = 이번 판 이전 기록(없으면 null)
+function updateBest(store, key, score) {
+  const base = {};
+  if (store && typeof store === 'object' && !Array.isArray(store)) Object.keys(store).forEach(function (k) { if (typeof store[k] === 'number' && isFinite(store[k]) && store[k] >= 0) base[k] = store[k]; });
+  const prev = Object.prototype.hasOwnProperty.call(base, key) ? base[key] : null;
+  const sc = Number(score);
+  if (!isFinite(sc) || sc < 0) return { isNew: false, best: prev, prev: prev, store: base };
+  const next = Object.assign({}, base);
+  if (prev === null) { next[key] = sc; return { isNew: false, best: sc, prev: null, store: next }; }
+  if (sc > prev) { next[key] = sc; return { isNew: true, best: sc, prev: prev, store: next }; }
+  return { isNew: false, best: prev, prev: prev, store: next };
+}
+function bestKey(mode, view, total) { return mode + '|' + (view === 'land' ? 'l' : 'p') + '|' + total; }
+
 function sfxPlan(name, arg) {
   const V = (SOUND.VOL[name] === undefined ? 1 : SOUND.VOL[name]), out = [];
   const add = v => out.push(Object.assign({ type: 'sine', att: 0.008, t0: 0 }, v, { vol: v.vol * V }));
@@ -1391,7 +1414,7 @@ return {
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, RUN_LEN_DEF: RUN_LEN_DEF, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT, LAYOUT_LAND: LAYOUT_LAND, layoutFor: layoutFor, LAND_RUNNER_X: LAND_RUNNER_X, LAND_GRAB_DX: LAND_GRAB_DX, AIR_GAP_MARGIN: AIR_GAP_MARGIN, airSeconds: airSeconds, doubleAirSeconds: doubleAirSeconds, airGapSeconds: airGapSeconds,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
-  survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, balloonRise: balloonRise, balloonRiseY: balloonRiseY, SOUND: SOUND, PENTA: PENTA, comboNote: comboNote, tempoCoef: tempoCoef, tempoStep: tempoStep, slotSec: slotSec, resumePos: resumePos, duckLevel: duckLevel, rampValue: rampValue, noiseSamples: noiseSamples, noteMidi: noteMidi, midiFreq: midiFreq, SONGS: SONGS, songEvents: songEvents, eventVoices: eventVoices, sfxPlan: sfxPlan, buildSoundGraph: buildSoundGraph, makeNoiseBuffer: makeNoiseBuffer, playVoices: playVoices, CHAR_FX: CHAR_FX, charSquash: charSquash, runBob: runBob, charShadow: charShadow, wrongFx: wrongFx, rightHop: rightHop, starFx: starFx, reactNext: reactNext, reactKind: reactKind, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
+  starsFor: starsFor, updateBest: updateBest, bestKey: bestKey, survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, balloonRise: balloonRise, balloonRiseY: balloonRiseY, SOUND: SOUND, PENTA: PENTA, comboNote: comboNote, tempoCoef: tempoCoef, tempoStep: tempoStep, slotSec: slotSec, resumePos: resumePos, duckLevel: duckLevel, rampValue: rampValue, noiseSamples: noiseSamples, noteMidi: noteMidi, midiFreq: midiFreq, SONGS: SONGS, songEvents: songEvents, eventVoices: eventVoices, sfxPlan: sfxPlan, buildSoundGraph: buildSoundGraph, makeNoiseBuffer: makeNoiseBuffer, playVoices: playVoices, CHAR_FX: CHAR_FX, charSquash: charSquash, runBob: runBob, charShadow: charShadow, wrongFx: wrongFx, rightHop: rightHop, starFx: starFx, reactNext: reactNext, reactKind: reactKind, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamOffscreen: streamOffscreen,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords, previewInfo: previewInfo, previewStep: previewStep
 };

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<script src="/js/common/authGate.js?v=107"></script>
+<script src="/js/common/authGate.js?v=108"></script>
 <link rel="manifest" href="/manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -270,7 +270,13 @@
           <div class="card">
             <div class="c1w" id="resInfo">
               <h2 class="title small" id="resTitle"></h2>
+              <div class="stars" id="resStars" role="img" hidden>
+                <svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17l-5.7 3.1 1.2-6.4-4.7-4.4 6.4-.8z"/></svg>
+                <svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17l-5.7 3.1 1.2-6.4-4.7-4.4 6.4-.8z"/></svg>
+                <svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17l-5.7 3.1 1.2-6.4-4.7-4.4 6.4-.8z"/></svg>
+              </div>
               <div class="big" id="resScore">0</div>
+              <p class="resbest" id="resBestRow" hidden><span class="newtag" id="resNew" hidden>신기록!</span><span id="resBest"></span></p>
               <div class="stats">
                 <div><b id="resDone">0</b>완성한 단어</div>
                 <div><b id="resCombo">0</b>최고 콤보</div>
@@ -297,8 +303,8 @@
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=107"></script>
-<script src="/js/spellrun/stage_style.js?v=107"></script>
-<script src="/js/spellrun/game.js?v=107"></script>
+<script src="/js/spellrun/logic.js?v=108"></script>
+<script src="/js/spellrun/stage_style.js?v=108"></script>
+<script src="/js/spellrun/game.js?v=108"></script>
 </body>
 </html>
