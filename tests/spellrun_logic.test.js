@@ -551,10 +551,10 @@ test('318-5. 주소 옵션: 허용 항목·범위, 범위 밖·숫자 아님은 
   // 기본 CONFIG 는 옵션 없이 이전과 같다
   const d = L.buildConfig();
   for (const k of Object.keys(CONFIG)) assert.deepEqual(d[k], CONFIG[k], k);
-  assert.equal(d.HP, 5); assert.equal(d.WORD_START_DELAY, 2.2); assert.equal(d.POP_SEC, 1.6); assert.equal(d.POP_SEC_FINAL, 3.2); assert.equal(d.FINAL_REPEAT_SEC, 1.6); assert.equal(d.HEART_EVERY, 3);
+  assert.equal(d.HP, 5); assert.equal(d.WORD_START_DELAY, 2.2); assert.equal(d.POP_SEC, 1.6); assert.equal(d.POP_SEC_FINAL, 3.2); assert.equal(d.FINAL_REPEAT_SEC, undefined, '작업428: 느린 반복 상수 없음'); assert.equal(d.HEART_EVERY, 3);
   // 옵션 적용
   const o = L.buildConfig({ hp: 7, startdelay: 2.6, popsec: 2, highprob: 0.3, heartevery: 4, dj: 1 });
-  assert.deepEqual([o.HP, o.WORD_START_DELAY, o.POP_SEC, o.POP_SEC_FINAL, o.FINAL_REPEAT_SEC, o.HIGH_SLOT_PROB, o.HEART_EVERY, o.DJ_ENABLED], [7, 2.6, 2, 4, 2, 0.3, 4, true]);
+  assert.deepEqual([o.HP, o.WORD_START_DELAY, o.POP_SEC, o.POP_SEC_FINAL, o.HIGH_SLOT_PROB, o.HEART_EVERY, o.DJ_ENABLED], [7, 2.6, 2, 4, 0.3, 4, true]);
   assert.equal(o.SPEED_MIN, CONFIG.SPEED_MIN, 'pace 가 없으면 속도 그대로');
   // pace: 속도(px/초)는 곱하고 간격·점프 시간은 나눈다(같은 비율)
   const a = L.buildConfig({ pace: 1.3 }), b = L.buildConfig({ pace: 1.04 });
@@ -568,7 +568,7 @@ test('318-5. 주소 옵션: 허용 항목·범위, 범위 밖·숫자 아님은 
 });
 
 test('318-2. 시작 대기: WORD_START_DELAY 1.6 → 2.2, 첫 단어 추가 0.4초와 팝업 시간(1.6·3.2)은 그대로', () => {
-  assert.equal(CONFIG.WORD_START_DELAY, 2.2); assert.equal(CONFIG.POP_SEC, 1.6); assert.equal(CONFIG.POP_SEC_FINAL, 3.2); assert.equal(CONFIG.FINAL_REPEAT_SEC, 1.6);
+  assert.equal(CONFIG.WORD_START_DELAY, 2.2); assert.equal(CONFIG.POP_SEC, 1.6); assert.equal(CONFIG.POP_SEC_FINAL, 3.2); assert.equal(CONFIG.FINAL_REPEAT_SEC, undefined); assert.equal(CONFIG.FINAL_SLOW_RATE, undefined);
   assert.equal(CONFIG.GAP_SEC_FAST, 0.554); assert.equal(CONFIG.JUMP_BUFFER, 0.12);
 });
 

@@ -1079,7 +1079,7 @@ test('320-3) 보스 구성: 12단어 중 10단어 판에서 5번째·10번째가
   const hpAtBoss = await page.eval('SpellRun.G.hp');
   await advance(page, 'G.state === "pop"', {});
   assert.equal(await page.text('#popTag'), '보스 격파!');
-  assert.equal(await page.eval('SpellRun.G.repeatT'), 0, '중간 보스는 마지막 단어 재발음 없음');
+  assert.equal(await page.eval('SpellRun.G.popT'), 1.6, '중간 보스는 일반 팝업 시간(작업428: 마지막 단어 재발음 자체가 없다)');
   await advance(page, 'G.state === "run" && G.wi === 5', {});
   assert.equal(await page.eval("SpellRun.G.bossMode"), false, '보스가 끝나면 일반 배경'); assert.equal(await page.eval("document.getElementById('box').classList.contains('boss')"), false);
   assert.equal(await page.text('#progress'), '단어 5 / 8', '보스는 세지 않는다');
@@ -1088,7 +1088,7 @@ test('320-3) 보스 구성: 12단어 중 10단어 판에서 5번째·10번째가
   // 마지막(10번째) 보스까지 끝내면 결과, 마지막 단어 규칙(재발음 예약)
   await advance(page, 'G.state === "run" && G.wi === 9', {});
   await advance(page, 'G.state === "pop"', {});
-  assert.equal(await page.eval('SpellRun.G.repeatT > 0'), true, '마지막 단어는 천천히 한 번 더 발음 예약');
+  assert.equal(await page.eval("'repeatT' in SpellRun.G"), false, '작업428: 마지막 단어 느린 재발음 예약 상태가 없다');
   assert.equal(await page.eval('SpellRun.G.popT'), 3.2, '마지막 단어 팝업 시간 그대로');
   await advance(page, 'G.state === "over"', {});
   assert.equal(await page.text('#resTitle'), '보스 격파!');
@@ -1430,8 +1430,8 @@ test('325-1) 서버 응답 시간 초과는 그 호출을 내장 음성으로 �
   const b = await sayWord(page, 'apple');
   assert.equal(b.src, '서버 음성(새로 생성)'); assert.equal(ttsCalls().length, 2, '실패한 단어는 서버를 다시 부른다');
   assert.deepEqual(await spokenTexts(page), ['apple'], '두 번째는 내장 음성을 쓰지 않았다');
-  // 성공한 단어는 다시 요청하지 않는다(기존 동작), 천천히 재생도 서버 호출 추가 없음
-  const c = await sayWord(page, 'apple', { slow: true });
+  // 성공한 단어는 다시 요청하지 않는다(기존 동작), 다시 재생해도 서버 호출 추가 없음
+  const c = await sayWord(page, 'apple');
   assert.equal(ttsCalls().length, 2); assert.equal(c.src, '서버 음성', '다시 재생하는 오디오는 캐시 여부를 말하지 않는다');
   assert.deepEqual(JSON.parse(ttsCalls()[0].body), { text: 'apple', lang: 'en' }, '요청 인자 그대로'); assert.ok(ttsCalls().every(r => /^Bearer /.test(r.auth || '')));
   await page.close();

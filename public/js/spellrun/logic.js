@@ -57,8 +57,6 @@ function buildConfig(v) {
   POP_SEC: 1.6,           // 단어 완성 연출 시간(초)
   HINT_SEC: 0.9,          // 오답 시 정답 강조 시간(초)
   POP_SEC_FINAL: 3.2,     // 마지막 단어 완성 연출 시간(초). 발음 두 번이 끝날 때까지 기다린다
-  FINAL_REPEAT_SEC: 1.6,  // 마지막 단어의 두 번째(느린) 발음까지 대기(초)
-  FINAL_SLOW_RATE: 0.6,   // 두 번째 발음 속도
   // 보스 단어: 한 판의 마지막에 나오는 긴 단어 (복습 판에는 나오지 않는다)
   BOSS_ENABLED: true,
   BOSS_POSITIONS: [5, 10], // 작업320: 한 판에서 보스가 되는 단어 순서(1부터). 그 위치에 단어가 있을 때만(5개 미만이면 보스 없음). 글자 수 조건은 없다
@@ -137,7 +135,7 @@ function buildConfig(v) {
   };
   if (v.hp) cfg.HP = v.hp;
   if (v.startdelay) cfg.WORD_START_DELAY = v.startdelay;
-  if (v.popsec) { cfg.POP_SEC = v.popsec; cfg.POP_SEC_FINAL = Math.round(v.popsec * 2 * 100) / 100; cfg.FINAL_REPEAT_SEC = v.popsec; }
+  if (v.popsec) { cfg.POP_SEC = v.popsec; cfg.POP_SEC_FINAL = Math.round(v.popsec * 2 * 100) / 100 }
   if (v.highprob !== undefined) cfg.HIGH_SLOT_PROB = v.highprob;
   if (v.heartevery) cfg.HEART_EVERY = v.heartevery;
   if (v.dj !== undefined) cfg.DJ_ENABLED = !!v.dj;

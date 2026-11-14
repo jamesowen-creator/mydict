@@ -163,22 +163,21 @@ for (const delay of [0, 1000, 3000, 9000]) {
     assert.ok(ev.filter(e => e.k === 'builtin' && !/^a /.test(e.x)).length <= 1, '기기 음성 대체는 최대 한 번');
     const playing = ev.filter(e => e.k === 'playing' && e.t > res.t + 30);
     assert.equal(playing.length, 0);
+    assert.equal(ev.filter(e => (e.k === 'play' || e.k === 'builtin') && /rate=0.6/.test(e.x)).length, 0, '작업428: 느린(0.6배속) 재생 없음');
+    assert.ok(ev.filter(e => e.k === 'play').length <= 1, '서버 발음은 한 번만');
   });
 }
 
-test('427 마지막 단어 반복: 팝업 안에 끝날 때만 시작한다(1.0초 소리는 첫 발음이 끝나는 대로 시작해 결과 화면 전에 끝난다)', { skip: SKIP, timeout: 30000 }, async () => {
+test('428 마지막 단어 발음은 한 번만: 느린 재생 없이 일반 속도 한 번이 결과 화면 전에 끝난다(1.0초 소리)', { skip: SKIP, timeout: 30000 }, async () => {
   const ev = await finalWord(0);
   const res = ev.find(e => e.k === 'result');
-  const slow = ev.filter(e => e.k === 'play' && e.x === 'rate=0.6'), end = ev.filter(e => e.k === 'ended' && e.x.startsWith('rate=0.6'));
-  assert.equal(slow.length, 1, '느린 반복은 한 번: ' + JSON.stringify(ev));
-  assert.equal(end.length, 1, JSON.stringify(ev)); assert.ok(end[0].t <= res.t, '느린 반복이 결과 화면 전에 끝남');
-  assert.ok(ev.filter(e => e.k === 'play' && e.x === 'rate=1').length === 1, '일반 속도 한 번');
-});
-
-test('427 마지막 단어 반복: 응답이 늦어 시간이 부족하면(1초 지연) 느린 반복을 시작하지 않는다', { skip: SKIP, timeout: 30000 }, async () => {
-  const ev = await finalWord(1000);
-  assert.equal(ev.filter(e => e.k === 'play' && e.x === 'rate=0.6').length, 0, '느린 반복 없음: ' + JSON.stringify(ev));
+  assert.ok(res);
+  assert.equal(ev.filter(e => e.k === 'play').length, 1, '재생 한 번: ' + JSON.stringify(ev));
   assert.equal(ev.filter(e => e.k === 'play' && e.x === 'rate=1').length, 1);
+  assert.equal(ev.filter(e => e.k === 'play' && e.x.startsWith('rate=0.6')).length, 0, '느린 재생 없음');
+  const end = ev.filter(e => e.k === 'ended');
+  assert.equal(end.length, 1); assert.ok(end[0].t <= res.t, '발음이 결과 화면 전에 끝남');
+  assert.equal(await (async () => { const p = await openGame(); const v = await p.eval("'repeatT' in SpellRun.G"); await p.close(); return v; })(), false, '반복 예약 상태 없음');
 });
 
 test('427 판이 바뀐 뒤 도착한 응답은 재생하지 않는다(기기 음성으로도 대신하지 않는다)', { skip: SKIP, timeout: 30000 }, async () => {
@@ -195,7 +194,7 @@ test('427 판이 바뀐 뒤 도착한 응답은 재생하지 않는다(기기 �
 });
 
 test('427 시간 초과(8초) 뒤 도착: 이미 결과 화면이면 기기 음성도 내지 않는다. 시간 초과 값은 8초 그대로', { skip: SKIP, timeout: 60000 }, async () => {
-  assert.equal(await (async () => { const p = await openGame(); const v = await p.eval('SpellRun.CONFIG.FINAL_REPEAT_SEC + "|" + SpellRun.CONFIG.POP_SEC_FINAL + "|" + SpellRun.CONFIG.FINAL_SLOW_RATE'); await p.close(); return v; })(), '1.6|3.2|0.6', '반복 관련 값은 그대로');
+  assert.equal(await (async () => { const p = await openGame(); const v = await p.eval('SpellRun.CONFIG.POP_SEC_FINAL + "|" + SpellRun.CONFIG.FINAL_REPEAT_SEC + "|" + SpellRun.CONFIG.FINAL_SLOW_RATE'); await p.close(); return v; })(), '3.2|undefined|undefined', '팝업 시간 3.2초 그대로, 느린 반복 상수는 없다');
   const ev = await finalWord(9000);
   const res = ev.find(e => e.k === 'result');
   assert.ok(res);
