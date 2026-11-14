@@ -253,14 +253,19 @@ function mapHtml(data) {
 :root { --bg:#fafaf9; --card:#ffffff; --text:#1a1a1a; --sub:#555b66; --line:#c9c9c2; --sel:#b8442e; --selbg:#fdf0ec; --rel:#2f7d57; --relbg:#eaf4ee; --c-screen:#2b5d9b; --c-engine:#7a3fa0; --c-store:#9a6b00; --c-external:#555b66; --c-module:#2f7d57; }
 @media (prefers-color-scheme: dark) { :root { --bg:#17181a; --card:#212326; --text:#f1f1ee; --sub:#a9adb5; --line:#43464b; --sel:#ff8c73; --selbg:#3a2520; --rel:#5fc08e; --relbg:#1d3327; --c-screen:#7fb0ee; --c-engine:#c79af0; --c-store:#e0b050; --c-external:#a9adb5; --c-module:#6fcf9b; } }
 * { box-sizing: border-box; }
-body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 16px/1.5 -apple-system, "Segoe UI", "Noto Sans KR", "Malgun Gothic", sans-serif; }
+body { margin: 0; padding: 16px 0; background: var(--bg); color: var(--text); font: 16px/1.5 -apple-system, "Segoe UI", "Noto Sans KR", "Malgun Gothic", sans-serif; }
 h1 { font-size: 20px; margin: 0 0 4px; }
 .hint { font-size: 14px; color: var(--sub); margin: 0 0 12px; }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 16px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); font-size: 14px; }
 .legend .lg { display: inline-flex; align-items: center; gap: 8px; }
 .legend .rels { flex-basis: 100%; color: var(--sub); }
-.grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
-@media (min-width: 720px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; }
+@media (min-width: 720px) {
+  .layout { grid-template-columns: minmax(0, 65fr) minmax(0, 35fr); gap: 24px; align-items: start; }
+  #detail { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
+}
 .col h2 { font-size: 14px; margin: 0 0 8px; color: var(--sub); font-weight: 700; }
 .col .group { font-size: 14px; color: var(--sub); margin: 12px 0 4px; }
 .item, .sample { --bc: var(--kc, var(--line)); --bg2: var(--card); position: relative; display: block; width: 100%; text-align: left; margin: 0 0 8px; padding: 10px 14px; min-height: 44px; border: 1.5px solid var(--bc); background: var(--bg2); color: var(--text); font: inherit; font-size: 16px; overflow-wrap: anywhere; }
@@ -270,19 +275,19 @@ h1 { font-size: 20px; margin: 0 0 4px; }
 .t-todo { --kc: var(--line); border-radius: 12px; border-style: dashed; color: var(--sub); background: transparent; --bg2: transparent; }
 .t-external { --kc: var(--c-external); border-radius: 4px; border-style: dashed; }
 .t-module { --kc: var(--c-module); border-radius: 0; }
-.t-db, .t-cache { --kc: var(--c-store); border-radius: 14px / 10px; padding-top: 16px; }
+.t-db, .t-cache { --kc: var(--c-store); border-radius: 14px / 10px; padding-top: 16px; width: fit-content; min-width: 150px; max-width: 100%; }
 .t-db::before, .t-cache::before { content: ""; position: absolute; left: -1.5px; right: -1.5px; top: 0; height: 14px; border: 1.5px solid var(--bc); border-radius: 50%; background: var(--bg2); }
 .t-cache::before { border-style: dashed; }
-.t-engine { --kc: var(--c-engine); border: 0; background: var(--bc); padding: 10px 24px; clip-path: polygon(7% 0, 93% 0, 100% 50%, 93% 100%, 7% 100%, 0 50%); }
-.t-engine::before { content: ""; position: absolute; inset: 2px; background: var(--bg2); clip-path: polygon(7% 0, 93% 0, 100% 50%, 93% 100%, 7% 100%, 0 50%); }
+.t-engine { --kc: var(--c-engine); border: 0; background: var(--bc); padding: 10px 30px; width: fit-content; min-width: 170px; max-width: 100%; clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 16px 100%, 0 50%); }
+.t-engine::before { content: ""; position: absolute; inset: 2px; background: var(--bg2); clip-path: polygon(15px 0, calc(100% - 15px) 0, 100% 50%, calc(100% - 15px) 100%, 15px 100%, 0 50%); }
 .item > .lbl, .sample > .lbl { position: relative; }
 .sample { display: inline-block; width: auto; margin: 0; padding: 4px 14px; min-height: 0; font-size: 14px; }
 .sample.t-db, .sample.t-cache { padding-top: 14px; }
 .sample.t-engine { padding: 4px 22px; }
 .item.sel { --bc: var(--sel); --bg2: var(--selbg); }
 .item.rel { --bc: var(--rel); --bg2: var(--relbg); }
-.dim .item:not(.sel):not(.rel) { opacity: .35; }
-#detail { margin-top: 16px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); font-size: 15px; overflow-wrap: anywhere; }
+.dim .item:not(.sel):not(.rel) { opacity: .62; }   /* 강조 해제 항목: 글자 대비 약 4.5:1 이상 유지(라이트·다크), 강조(sel·rel)는 테두리·배경으로 구분 */
+#detail { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); font-size: 15px; overflow-wrap: anywhere; }
 #detail .head { font-weight: 700; margin-bottom: 6px; }
 #detail .rel-row { margin: 6px 0; }
 #detail .rk { display: inline-block; min-width: 4.5em; font-weight: 700; color: var(--sel); }
@@ -291,8 +296,9 @@ h1 { font-size: 20px; margin: 0 0 4px; }
 </style>
 </head>
 <body>
+<div class="wrap">
 <h1>METIS-3 도면</h1>
-<p class="hint">항목을 누르면 연결된 항목이 강조되고 나머지는 흐려집니다. 같은 항목을 다시 누르면 해제됩니다. 기기 저장값·API는 아래 상자에 나옵니다.</p>
+<p class="hint">항목을 누르면 연결된 항목이 강조되고 나머지는 흐려집니다. 같은 항목을 다시 누르면 해제됩니다. 기기 저장값·API는 상세 상자(넓은 화면은 오른쪽, 좁은 화면은 목록 아래)에 나옵니다.</p>
 <div class="legend" aria-label="범례">
   <span class="lg"><span class="sample t-screen"><span class="lbl">화면</span></span></span>
   <span class="lg"><span class="sample t-engine"><span class="lbl">엔진</span></span></span>
@@ -303,13 +309,16 @@ h1 { font-size: 20px; margin: 0 0 4px; }
   <span class="lg"><span class="sample t-todo"><span class="lbl">미작성</span></span></span>
   <span class="rels">관계: →호출 · →읽기 · →쓰기 · →이동(화면→화면) · ⇢대체(앞이 실패하면 뒤) · →필요(로그인·권한). 모양: 화면=둥근 사각, 엔진=육각형, DB=원통, 캐시=점선 윗면 원통, 외부=점선 사각, 모듈=직각 사각, 미작성=회색 점선.</span>
 </div>
-<div class="grid" id="grid">
-  <div class="col" id="col-1"><h2>화면</h2></div>
-  <div class="col" id="col-2"><h2>엔진 · 모듈</h2></div>
-  <div class="col" id="col-3"><h2>저장소 · 외부</h2></div>
+<div class="layout">
+  <div class="lists" id="grid">
+    <div class="col" id="col-1"><h2>화면</h2></div>
+    <div class="col" id="col-2"><h2>엔진 · 모듈</h2></div>
+    <div class="col" id="col-3"><h2>저장소 · 외부</h2></div>
+  </div>
+  <aside id="detail" aria-live="polite">항목을 누르면 연결이 여기에 표시됩니다.</aside>
 </div>
-<div id="detail" aria-live="polite">항목을 눌러 보세요.</div>
 <p class="foot">이 파일은 <code>npm run blueprint:gen</code> 이 docs/blueprint/screens 의 머리말에서 만든다(직접 고치지 않는다). 화면 파일 마지막 확인 커밋: <span id="commit"></span></p>
+</div>
 <script id="data" type="application/json">${json}</script>
 <script>
 (function () {
@@ -330,6 +339,7 @@ h1 { font-size: 20px; margin: 0 0 4px; }
     b.addEventListener('click', function () { select(selected === n.id ? null : n.id); });
     n.el = b; cols[c].appendChild(b);
   });
+  var EMPTY_MSG = '항목을 누르면 연결이 여기에 표시됩니다.';
   var selected = null, grid = document.getElementById('grid'), detail = document.getElementById('detail');
   function nameOf(id) { return byId[id].label; }
   function row(kind, items) {
@@ -346,7 +356,7 @@ h1 { font-size: 20px; margin: 0 0 4px; }
     selected = id;
     nodes.forEach(function (n) { n.el.classList.remove('sel', 'rel'); n.el.setAttribute('aria-pressed', 'false'); });
     detail.textContent = '';
-    if (!id) { grid.classList.remove('dim'); detail.textContent = '항목을 눌러 보세요.'; return; }
+    if (!id) { grid.classList.remove('dim'); detail.textContent = EMPTY_MSG; return; }
     var n = byId[id]; grid.classList.add('dim');
     n.el.classList.add('sel'); n.el.setAttribute('aria-pressed', 'true');
     edges.forEach(function (e) { if (e[0] === id) byId[e[1]].el.classList.add('rel'); if (e[1] === id) byId[e[0]].el.classList.add('rel'); });
