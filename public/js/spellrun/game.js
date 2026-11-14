@@ -447,6 +447,32 @@ function showTtsSource(label) {
   if (!ttsSrcEl) { ttsSrcEl = document.createElement('div'); ttsSrcEl.className = 'ttssrc'; ttsSrcEl.id = 'ttsSrc'; box.appendChild(ttsSrcEl); }
   ttsSrcEl.textContent = label;
 }
+// 작업433: 점검 옵션 judgedebug=1 일 때만 오답·놓침이 난 이유를 한 줄로 화면 아래쪽에 작게 보인다(최대 2줄, 약 6초). 꺼져 있으면 DOM·표시·동작이 이전과 같고 값도 쌓지 않는다.
+// 이벤트 처리 경로(onHit·onFail)의 맨 앞에서 값을 읽기만 한다(판정·상태·점수·타이머·난수는 건드리지 않는다). window.__judgeLog 에 최근 20건.
+const judgeDebug = OPT.values.judgedebug === 1;
+const JD = { wordT: 0, ttl: 6000, el: null, lines: [] };
+function judgeNote(t, kind) {
+  const slots = G.plan && G.plan.slots, cur = slots && slots[G.si], need = cur ? cur.text : '', n = slots ? slots.length : 0;
+  const hasId = t.wi !== undefined;
+  let cls;
+  if (kind === 'hit') cls = '정답';
+  else if (kind === 'miss') cls = '정답 풍선 놓침';
+  else if (hasId && t.wi < G.wi) cls = '이전 단어 소속 풍선';
+  else if (t.correct) cls = '정답 풍선이지만 다른 칸 소속';
+  else cls = t.text === need ? '오답 풍선(필요한 글자와 같은 글자)' : '오답 풍선(다른 글자)';
+  const since = Math.round((G.time - JD.wordT) * 10) / 10;
+  const info = { kind: kind === 'hit' ? '정답' : kind === 'miss' ? '놓침' : '오답!', text: t.text, correct: !!t.correct, cls: cls, tileWi: t.wi, tileSi: t.si, curWi: G.wi, curSi: G.si, slots: n, need: need, combo: G.combo, speed: Math.round(G.speed), high: !!t.high, sinceWord: since, mode: edgeOn() ? 'edge' : 'classic' };
+  const log = window.__judgeLog || (window.__judgeLog = []);
+  log.push(info); if (log.length > 20) log.shift();
+  if (kind === 'hit') return;   // 정답은 기록만(앞뒤 흐름 확인용), 화면에는 오답·놓침만
+  const text = info.kind + ' ' + info.text + ' · ' + cls + ' · 필요 ' + (need || '-') + ' · 칸 ' + (G.si + 1) + '/' + n
+    + (hasId && (t.wi !== G.wi || t.si !== G.si) ? ' · 풍선 소속 단어' + (t.wi + 1) + '·칸' + (t.si + 1) : '')
+    + ' · 콤보 ' + info.combo + ' · 속도 ' + info.speed + (info.high ? ' · 높은 칸' : '') + ' · 단어 전환 후 ' + since + 's';
+  if (!JD.el) { JD.el = document.createElement('div'); JD.el.className = 'judgelog'; JD.el.id = 'judgeLog'; box.appendChild(JD.el); }
+  const line = document.createElement('div'); line.textContent = text; JD.el.appendChild(line); JD.lines.push(line);
+  while (JD.lines.length > 2) { const o = JD.lines.shift(); if (o.parentNode) o.parentNode.removeChild(o); }
+  setTimeout(() => { const i = JD.lines.indexOf(line); if (i >= 0) JD.lines.splice(i, 1); if (line.parentNode) line.parentNode.removeChild(line); }, JD.ttl);
+}
 function authHeaders() {
   let t = null; try { t = localStorage.getItem('mydict_token'); } catch (e) {}
   return t ? { Authorization: 'Bearer ' + t } : {};
@@ -773,6 +799,7 @@ function planWord(i, groupIn) {
 function applyWord(wp) {
   const i = wp.i;
   G.wi = i; G.plan = wp.plan; G.si = 0;
+  if (judgeDebug) JD.wordT = G.time;
   G.bossMode = wp.boss;   // 중간에 오는 보스 뒤에는 일반 배경으로 돌아간다
   G.heartPending = wp.heartPending; G.heartSlot = wp.heartSlot;
   G.obst = wp.obst;
@@ -1040,6 +1067,7 @@ function onSpeedItem(t) {
   floatText(RUNNER_X + 70, GROUND - 235, '빨라요!', '#0b7fc0', 22);
 }
 function onHit(t) {
+  if (judgeDebug) judgeNote(t, 'hit');
   t.state = 'taken'; t.t = 0; t.ok = true;
   if (balloonK(t) !== null) popBalloon(t);   // 작업361: 풍선은 바로 사라지고 색 조각이 퍼진다
   if (edgeOn()) clearRescue(); else endPack(false);   // 작업354: edge 는 같은 묶음의 남은 타일을 지우지 않는다
@@ -1089,6 +1117,7 @@ function doEnd() {
   els.cont.hidden = true; finish(false);
 }
 function onFail(t, kind) {
+  if (judgeDebug) judgeNote(t, kind);
   if (edgeOn()) { if (kind === 'wrong') { t.wrong = true; riseTile(t); } }   // 작업360: 가로(edge)는 틀린·놓친 타일이 희미해지거나 사라지지 않고 같은 선명도로 지나간다(틀린 타일에는 붉은 색조만)
   else if (kind === 'wrong') { t.state = 'taken'; t.t = 0; t.ok = false; }
   else { t.state = 'fade'; t.t = 0; }
@@ -2967,6 +2996,7 @@ for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, () => {
   window.addEventListener('pagehide', () => bgmHide());
   window.addEventListener('pageshow', e => { if (document.hidden || Date.now() - bgmResumedAt < 500) return; bgmShow(); });
 }
+API.judge = { on: judgeDebug, JD: JD, log: () => window.__judgeLog || [] };   // 작업433: 시험용 훅
 window.SpellRun = API;
 boot();
 })();
