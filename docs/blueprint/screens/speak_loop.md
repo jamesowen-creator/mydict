@@ -6,11 +6,16 @@ calls: [GET /api/me, GET /api/speakloop/content, GET /api/speakloop/audio-index,
 reads: [DB:users, DB:speakloop_audio, DB:speakloop_progress, 기기:mydict_token]
 writes: [DB:speakloop_progress]
 fallback: []
+flows: [
+  화면 열기 | →읽기 기기:mydict_token ; →필요 로그인 ; →호출 GET /api/me ; →읽기 users ; →필요 권한:perm_speakloop ; →호출 GET /api/speakloop/content ; →호출 GET /api/speakloop/audio-index ; →읽기 speakloop_audio ; →호출 GET /api/speakloop/progress ; →읽기 speakloop_progress,
+  음성 듣기 | →필요 권한:perm_speakloop ; →호출 GET /api/speakloop/audio/:clipKey ; →호출 저장 음성(Speak Loop) ; →읽기 speakloop_audio,
+  평가 기록(독백·이디엄) | →필요 권한:perm_speakloop ; →호출 POST /api/speakloop/progress ; →쓰기 speakloop_progress
+]
 requires: [로그인, 권한:perm_speakloop]
 navigates: [홈]
 externals: [Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js]
-last_checked: 034147d
+last_checked: 8753b0a
 ---
 
 # Speak Loop (public/speakloop.html) — 영어 말하기 연습(독백 + 이디엄)

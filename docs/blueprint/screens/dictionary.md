@@ -6,11 +6,19 @@ calls: [GET /api/me, POST /api/ai, GET /api/wordbook, POST /api/wordbook, DELETE
 reads: [DB:users, DB:wordbook, DB:api_usage, 캐시:tts_cache, 기기:mydict_token, 기기:mydict_wrong, 기기:metis_tts_mode, 기기:spellrun_landing_count]
 writes: [DB:wordbook, DB:review_log, DB:api_usage, 캐시:tts_cache, 기기:mydict_token, 기기:mydict_wrong, 기기:metis_tts_mode, 기기:spellrun_landing_count, 기기:spellrun_ids]
 fallback: [서버 음성(OpenAI TTS) ⇢ 기기 음성(speechSynthesis)]
+flows: [
+  검색 | →필요 로그인 ; →호출 POST /api/ai ; →필요 권한:can_search ; →읽기 api_usage ; →호출 AI 사전·단어 질의(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage,
+  단어장에 저장 | →필요 로그인 ; →호출 POST /api/wordbook ; →필요 권한:can_wordbook ; →쓰기 wordbook,
+  단어 발음 버튼 | →필요 로그인 ; →호출 POST /api/tts ; →호출 서버 음성(OpenAI TTS) ; ⇢대체 기기 음성(speechSynthesis) ; →필요 권한:can_tts ; →읽기 tts_cache ; →읽기 api_usage ; →호출 OpenAI TTS(음성 합성) ; →쓰기 tts_cache ; →쓰기 api_usage,
+  팟캐스트 듣기 | →필요 로그인 ; →호출 POST /api/tts ; →호출 서버 음성(OpenAI TTS),
+  복습 하기 | →호출 GET /api/review-due ; →읽기 wordbook ; →호출 POST /api/review-result ; →호출 간격 반복 복습(SM-2) ; →쓰기 wordbook ; →쓰기 review_log,
+  스펠링 런 시작 | →쓰기 기기:spellrun_ids ; →이동 스펠링 런
+]
 requires: [로그인, 권한:can_search, 권한:can_wordbook, 권한:can_tts]
 navigates: [스펠링 런, 홈]
 externals: [Anthropic API(Claude Haiku), OpenAI TTS(음성 합성), Google Fonts, jsDelivr(tesseract.js)]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js, public/js/ocr/ocrScanner.js]
-last_checked: 034147d
+last_checked: 8753b0a
 ---
 
 # 사전 (public/english_dictionary.html)

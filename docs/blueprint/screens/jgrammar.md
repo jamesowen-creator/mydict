@@ -6,11 +6,19 @@ calls: [GET /api/me, POST /api/jgrammar/explain, POST /api/jgrammar/ocr, GET /ap
 reads: [DB:users, 캐시:jgrammar_cache, DB:jgrammar_saved, DB:api_usage, 기기:mydict_token, 기기:jgrammar_lang, 기기:jgrammar_furigana, 기기:jgrammar_pinyin, 기기:jgrammar_zh]
 writes: [캐시:jgrammar_cache, DB:jgrammar_saved, DB:api_usage, 기기:jgrammar_lang, 기기:jgrammar_furigana, 기기:jgrammar_pinyin, 기기:jgrammar_zh]
 fallback: []
+flows: [
+  문장 분석 | →필요 로그인 ; →호출 POST /api/jgrammar/explain ; →필요 권한:perm_jgrammar ; →읽기 jgrammar_cache ; →읽기 api_usage ; →호출 AI 문장 해설(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage ; →쓰기 jgrammar_cache ; →쓰기 jgrammar_saved,
+  사진에서 문장 인식 | →필요 로그인 ; →호출 POST /api/jgrammar/ocr ; →필요 권한:perm_jgrammar ; →읽기 api_usage ; →호출 AI 사진 문장 인식(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage,
+  저장 목록 보기 | →호출 GET /api/jgrammar/saved ; →필요 권한:perm_jgrammar ; →읽기 jgrammar_saved,
+  저장 문장 삭제 | →호출 DELETE /api/jgrammar/saved/:id ; →필요 권한:perm_jgrammar ; →쓰기 jgrammar_saved,
+  읽어주기(듣기·천천히) | →호출 기기 음성(speechSynthesis),
+  언어 바꾸기 | →쓰기 기기:jgrammar_lang
+]
 requires: [로그인, 권한:perm_jgrammar]
 navigates: [홈]
 externals: [Anthropic API(Claude Haiku), Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 034147d
+last_checked: 8753b0a
 ---
 
 # 문장 학습 (public/jgrammar.html) — 파일명은 jgrammar(일본어 문법), 화면 제목은 "문장 학습"

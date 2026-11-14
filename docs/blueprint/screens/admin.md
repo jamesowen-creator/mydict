@@ -6,11 +6,19 @@ calls: [GET /api/me, GET /api/admin/users, PATCH /api/admin/users/:id, GET /api/
 reads: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 기기:mydict_token, 기기:gl_last_run]
 writes: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 캐시:tts_cache, 기기:gl_last_run]
 fallback: []
+flows: [
+  발음 캐시 지우기 | →필요 관리자 ; →호출 DELETE /api/tts/cache/entry ; →쓰기 tts_cache,
+  사용자 권한 변경 | →필요 관리자 ; →호출 PATCH /api/admin/users/:id ; →쓰기 users,
+  Speak Loop 음성 만들기 | →필요 관리자 ; →호출 POST /api/admin/speakloop/audio/generate ; →호출 저장 음성(Speak Loop) ; →호출 OpenAI TTS(음성 합성) ; →쓰기 speakloop_audio ; →쓰기 api_usage,
+  뜻 변환 샘플 보기 | →필요 관리자 ; →호출 POST /api/admin/gloss/sample ; →읽기 wordbook ; →호출 AI 단어 뜻 변환(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage,
+  뜻 변환 전체 적용 | →필요 관리자 ; →호출 POST /api/admin/gloss/run ; →읽기 wordbook ; →호출 AI 단어 뜻 변환(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 wordbook ; →쓰기 gloss_backup ; →쓰기 api_usage,
+  뜻 변환 되돌리기 | →필요 관리자 ; →호출 POST /api/admin/gloss/restore ; →읽기 gloss_backup ; →쓰기 wordbook
+]
 requires: [로그인, 관리자]
 navigates: [홈]
 externals: [Anthropic API(Claude Haiku), OpenAI TTS(음성 합성), Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js]
-last_checked: 034147d
+last_checked: 8753b0a
 ---
 
 # 관리자 (public/admin.html)

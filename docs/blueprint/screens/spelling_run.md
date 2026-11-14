@@ -6,11 +6,19 @@ calls: [GET /api/me, GET /api/wordbook, POST /api/tts, POST /api/versus/rooms, G
 reads: [DB:users, DB:wordbook, DB:api_usage, 캐시:tts_cache, 기기:mydict_token, 기기:spellrun_opts, 기기:spellrun_mode, 기기:spellrun_preview, 기기:spellrun_view, 기기:spellrun_bgm, 기기:spellrun_char, 기기:spellrun_best, 기기:metis_tts_mode, 기기:spellrun_ids]
 writes: [DB:api_usage, 캐시:tts_cache, 기기:spellrun_opts, 기기:spellrun_mode, 기기:spellrun_preview, 기기:spellrun_view, 기기:spellrun_bgm, 기기:spellrun_char, 기기:spellrun_best, 기기:metis_tts_mode]
 fallback: [서버 음성(OpenAI TTS) ⇢ 기기 음성(speechSynthesis)]
+flows: [
+  화면 열기(단어 불러오기) | →필요 로그인 ; →호출 GET /api/me ; →읽기 users ; →필요 권한:can_wordbook ; →읽기 기기:spellrun_ids ; →호출 GET /api/wordbook ; →읽기 wordbook,
+  시작 버튼(발음 미리 받기) | →호출 POST /api/tts ; →호출 서버 음성(OpenAI TTS) ; →읽기 tts_cache,
+  단어 발음(게임·미리 보기·결과 칩) | →호출 POST /api/tts ; →호출 서버 음성(OpenAI TTS) ; ⇢대체 기기 음성(speechSynthesis) ; →읽기 tts_cache ; →읽기 api_usage ; →호출 OpenAI TTS(음성 합성) ; →쓰기 tts_cache ; →쓰기 api_usage,
+  대결 방 만들기 | →필요 권한:perm_versus ; →호출 POST /api/versus/rooms ; →호출 2인 대결 방(서버 메모리),
+  대결 방 참가 | →필요 권한:perm_versus ; →호출 POST /api/versus/rooms/:id/join ; →호출 2인 대결 방(서버 메모리),
+  게임 끝(최고 점수 기록) | →쓰기 기기:spellrun_best
+]
 requires: [로그인, 권한:can_wordbook, 권한:perm_versus]
 navigates: [사전, 홈]
 externals: [OpenAI TTS(음성 합성), Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 034147d
+last_checked: 8753b0a
 ---
 
 # 스펠링 런 (public/spelling_run.html) — 내부 게임 로직은 쓰지 않고 공용 엔진·API·DB 연결만

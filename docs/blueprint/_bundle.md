@@ -1,7 +1,7 @@
 # METIS-3 도면 묶음 (_bundle.md)
 
 이 파일은 `npm run blueprint:gen` 이 만든다(직접 고치지 않는다). 용도: 이 한 파일을 웹 Claude 에 첨부해 프로젝트 문서로 복사한다.
-순서: README → LEGEND → screens(파일 이름 순). 기준 커밋(화면 파일의 last_checked): 034147d
+순서: README → LEGEND → screens(파일 이름 순). 기준 커밋(화면 파일의 last_checked): 8753b0a
 화면 파일 6개.
 
 =====================================================================
@@ -19,6 +19,7 @@
 - 표기 어휘(요소 7종·관계 6종·엔진 이름 고정 목록·근거 상태)는 [LEGEND.md](LEGEND.md)에 고정돼 있다. 화면 파일 머리말은 그 표준 키만 쓰고, 표준 밖의 키·이름이 있으면 `npm run blueprint:gen`이 오류로 멈춘다.
 - 화면마다 `screens/<이름>.md` 한 장. 맨 위 머리말(`---` 사이)은 기계가 읽는 목록이고, 본문은 5개 절(1 기능 / 2 엔진 / 3 경로 / 4 DB / 5 연결)이다. 경로는 `파일:줄`.
 - 아래 "생성 구간"은 머리말에서 `npm run blueprint:gen`이 만든다(손으로 고치지 않는다). 시각 도면은 [map.html](map.html)을 브라우저로 직접 연다(항목을 누르면 연결된 항목이 강조되고 관계 종류별로 나열된다).
+- 화면 파일 머리말의 `flows`는 "동작별 흐름"(사용자가 누르는 동작 하나마다 → 호출·읽기·쓰기 순서)이다. map.html에서 화면을 누르고 동작 카드를 누르면 왼쪽 목록에 ①②③ 번호가 붙는다. 문법은 LEGEND 2절.
 - 웹 Claude 등 저장소를 못 읽는 곳에 줄 때는 생성된 [_bundle.md](_bundle.md) 한 파일을 쓴다(README → LEGEND → screens).
 - 각 화면 파일의 `last_checked`(마지막 확인 커밋)보다 코드가 많이 바뀌었으면 낡았을 수 있다.
 
@@ -194,7 +195,7 @@
 ### 미작성 화면 (6개)
 홈(public/home/index.html), 개념 지도(public/concept_map.html), 문학 나침반(public/literature_compass.html), 한입 독서(public/digest_reading.html), 과학(public/science_reading.html), 작가 노트(public/artist_notes.html)
 
-화면 파일의 마지막 확인 커밋: 034147d
+화면 파일의 마지막 확인 커밋: 8753b0a
 <!-- gen:end -->
 
 ## 작업 블록 규칙
@@ -234,7 +235,13 @@
 | →필요 | 로그인·권한이 있어야 쓸 수 있다 | `requires` (`로그인` / `권한:이름` / `관리자`) |
 
 머리말 값의 모양: 목록은 `[항목, 항목]`(항목 안의 괄호 속 쉼표는 나누지 않음). `fallback` 항목은 `엔진A ⇢ 엔진B`. 항목이 없으면 `[]`.
-그 밖의 머리말 키: `screen`(5절 화면 이름), `file`(존재하는 html 경로), `last_checked`(마지막 확인 커밋).
+
+**동작별 흐름 `flows`**(작업449): 사용자가 누르는 동작 하나(버튼·메뉴)마다 한 항목, 화면당 3~6개. 여러 줄 목록으로 쓴다(`flows: [` 다음 줄부터 한 줄에 동작 하나, 마지막 줄은 `]`).
+- 항목 모양: `동작 이름 | 관계 대상 ; 관계 대상 ; …` (단계는 ` ; `로 나눈다, 단계 1개 이상, 동작 이름은 화면 안에서 중복 금지).
+- 관계는 위 6종만. 대상은 API(`METHOD /경로`), 엔진 이름(LEGEND 3절), 저장소(`DB:이름`·`캐시:이름`·`기기:키`, 화면 안에서 이름이 하나뿐이면 접두어 생략 가능), 외부·모듈 이름, 화면 이름, 필요(`로그인`·`관리자`·`권한:이름`) 중 하나이고 **같은 화면 머리말의 calls·reads·writes·externals·modules·navigates·requires에 있어야 한다**(엔진은 LEGEND 목록에 있으면 된다).
+- `→읽기` 대상은 reads에, `→쓰기` 대상은 writes에 있어야 한다. `⇢대체 엔진B`는 바로 앞 단계가 `→호출 엔진A`이고 머리말 fallback에 `엔진A ⇢ 엔진B`가 있어야 하며, 앞 단계와 같은 번호의 가지(a·b)로 표시된다.
+- 검증: 위반은 파일:줄과 함께 오류로 멈춘다. 오류가 아닌 경고로 두 가지를 센다: 흐름에만 있는 대상(엔진이 머리말 engines에 없음), 머리말에만 있고 어떤 흐름에도 안 나오는 대상(공용 모듈·/api/me·기기 저장값처럼 흐름이 없는 연결은 정상적으로 남는다). `npm run blueprint:gen -- --warn`으로 목록을 본다.
+그 밖의 머리말 키: `flows`(위), `screen`(5절 화면 이름), `file`(존재하는 html 경로), `last_checked`(마지막 확인 커밋).
 
 ## 3 엔진 이름 고정 목록 (이 이름만 쓴다)
 | 엔진 | 한 줄 설명 |
@@ -281,11 +288,19 @@ calls: [GET /api/me, GET /api/admin/users, PATCH /api/admin/users/:id, GET /api/
 reads: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 기기:mydict_token, 기기:gl_last_run]
 writes: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 캐시:tts_cache, 기기:gl_last_run]
 fallback: []
+flows: [
+  발음 캐시 지우기 | →필요 관리자 ; →호출 DELETE /api/tts/cache/entry ; →쓰기 tts_cache,
+  사용자 권한 변경 | →필요 관리자 ; →호출 PATCH /api/admin/users/:id ; →쓰기 users,
+  Speak Loop 음성 만들기 | →필요 관리자 ; →호출 POST /api/admin/speakloop/audio/generate ; →호출 저장 음성(Speak Loop) ; →호출 OpenAI TTS(음성 합성) ; →쓰기 speakloop_audio ; →쓰기 api_usage,
+  뜻 변환 샘플 보기 | →필요 관리자 ; →호출 POST /api/admin/gloss/sample ; →읽기 wordbook ; →호출 AI 단어 뜻 변환(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage,
+  뜻 변환 전체 적용 | →필요 관리자 ; →호출 POST /api/admin/gloss/run ; →읽기 wordbook ; →호출 AI 단어 뜻 변환(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 wordbook ; →쓰기 gloss_backup ; →쓰기 api_usage,
+  뜻 변환 되돌리기 | →필요 관리자 ; →호출 POST /api/admin/gloss/restore ; →읽기 gloss_backup ; →쓰기 wordbook
+]
 requires: [로그인, 관리자]
 navigates: [홈]
 externals: [Anthropic API(Claude Haiku), OpenAI TTS(음성 합성), Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js]
-last_checked: 034147d
+last_checked: 8753b0a
 ---
 
 # 관리자 (public/admin.html)
@@ -336,11 +351,19 @@ calls: [GET /api/me, POST /api/ai, GET /api/wordbook, POST /api/wordbook, DELETE
 reads: [DB:users, DB:wordbook, DB:api_usage, 캐시:tts_cache, 기기:mydict_token, 기기:mydict_wrong, 기기:metis_tts_mode, 기기:spellrun_landing_count]
 writes: [DB:wordbook, DB:review_log, DB:api_usage, 캐시:tts_cache, 기기:mydict_token, 기기:mydict_wrong, 기기:metis_tts_mode, 기기:spellrun_landing_count, 기기:spellrun_ids]
 fallback: [서버 음성(OpenAI TTS) ⇢ 기기 음성(speechSynthesis)]
+flows: [
+  검색 | →필요 로그인 ; →호출 POST /api/ai ; →필요 권한:can_search ; →읽기 api_usage ; →호출 AI 사전·단어 질의(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage,
+  단어장에 저장 | →필요 로그인 ; →호출 POST /api/wordbook ; →필요 권한:can_wordbook ; →쓰기 wordbook,
+  단어 발음 버튼 | →필요 로그인 ; →호출 POST /api/tts ; →호출 서버 음성(OpenAI TTS) ; ⇢대체 기기 음성(speechSynthesis) ; →필요 권한:can_tts ; →읽기 tts_cache ; →읽기 api_usage ; →호출 OpenAI TTS(음성 합성) ; →쓰기 tts_cache ; →쓰기 api_usage,
+  팟캐스트 듣기 | →필요 로그인 ; →호출 POST /api/tts ; →호출 서버 음성(OpenAI TTS),
+  복습 하기 | →호출 GET /api/review-due ; →읽기 wordbook ; →호출 POST /api/review-result ; →호출 간격 반복 복습(SM-2) ; →쓰기 wordbook ; →쓰기 review_log,
+  스펠링 런 시작 | →쓰기 기기:spellrun_ids ; →이동 스펠링 런
+]
 requires: [로그인, 권한:can_search, 권한:can_wordbook, 권한:can_tts]
 navigates: [스펠링 런, 홈]
 externals: [Anthropic API(Claude Haiku), OpenAI TTS(음성 합성), Google Fonts, jsDelivr(tesseract.js)]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js, public/js/ocr/ocrScanner.js]
-last_checked: 034147d
+last_checked: 8753b0a
 ---
 
 # 사전 (public/english_dictionary.html)
@@ -393,11 +416,19 @@ calls: [GET /api/me, POST /api/jgrammar/explain, POST /api/jgrammar/ocr, GET /ap
 reads: [DB:users, 캐시:jgrammar_cache, DB:jgrammar_saved, DB:api_usage, 기기:mydict_token, 기기:jgrammar_lang, 기기:jgrammar_furigana, 기기:jgrammar_pinyin, 기기:jgrammar_zh]
 writes: [캐시:jgrammar_cache, DB:jgrammar_saved, DB:api_usage, 기기:jgrammar_lang, 기기:jgrammar_furigana, 기기:jgrammar_pinyin, 기기:jgrammar_zh]
 fallback: []
+flows: [
+  문장 분석 | →필요 로그인 ; →호출 POST /api/jgrammar/explain ; →필요 권한:perm_jgrammar ; →읽기 jgrammar_cache ; →읽기 api_usage ; →호출 AI 문장 해설(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage ; →쓰기 jgrammar_cache ; →쓰기 jgrammar_saved,
+  사진에서 문장 인식 | →필요 로그인 ; →호출 POST /api/jgrammar/ocr ; →필요 권한:perm_jgrammar ; →읽기 api_usage ; →호출 AI 사진 문장 인식(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage,
+  저장 목록 보기 | →호출 GET /api/jgrammar/saved ; →필요 권한:perm_jgrammar ; →읽기 jgrammar_saved,
+  저장 문장 삭제 | →호출 DELETE /api/jgrammar/saved/:id ; →필요 권한:perm_jgrammar ; →쓰기 jgrammar_saved,
+  읽어주기(듣기·천천히) | →호출 기기 음성(speechSynthesis),
+  언어 바꾸기 | →쓰기 기기:jgrammar_lang
+]
 requires: [로그인, 권한:perm_jgrammar]
 navigates: [홈]
 externals: [Anthropic API(Claude Haiku), Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 034147d
+last_checked: 8753b0a
 ---
 
 # 문장 학습 (public/jgrammar.html) — 파일명은 jgrammar(일본어 문법), 화면 제목은 "문장 학습"
@@ -441,11 +472,16 @@ calls: [GET /api/me, GET /api/speakloop/content, GET /api/speakloop/audio-index,
 reads: [DB:users, DB:speakloop_audio, DB:speakloop_progress, 기기:mydict_token]
 writes: [DB:speakloop_progress]
 fallback: []
+flows: [
+  화면 열기 | →읽기 기기:mydict_token ; →필요 로그인 ; →호출 GET /api/me ; →읽기 users ; →필요 권한:perm_speakloop ; →호출 GET /api/speakloop/content ; →호출 GET /api/speakloop/audio-index ; →읽기 speakloop_audio ; →호출 GET /api/speakloop/progress ; →읽기 speakloop_progress,
+  음성 듣기 | →필요 권한:perm_speakloop ; →호출 GET /api/speakloop/audio/:clipKey ; →호출 저장 음성(Speak Loop) ; →읽기 speakloop_audio,
+  평가 기록(독백·이디엄) | →필요 권한:perm_speakloop ; →호출 POST /api/speakloop/progress ; →쓰기 speakloop_progress
+]
 requires: [로그인, 권한:perm_speakloop]
 navigates: [홈]
 externals: [Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js]
-last_checked: 034147d
+last_checked: 8753b0a
 ---
 
 # Speak Loop (public/speakloop.html) — 영어 말하기 연습(독백 + 이디엄)
@@ -489,11 +525,19 @@ calls: [GET /api/me, GET /api/wordbook, POST /api/tts, POST /api/versus/rooms, G
 reads: [DB:users, DB:wordbook, DB:api_usage, 캐시:tts_cache, 기기:mydict_token, 기기:spellrun_opts, 기기:spellrun_mode, 기기:spellrun_preview, 기기:spellrun_view, 기기:spellrun_bgm, 기기:spellrun_char, 기기:spellrun_best, 기기:metis_tts_mode, 기기:spellrun_ids]
 writes: [DB:api_usage, 캐시:tts_cache, 기기:spellrun_opts, 기기:spellrun_mode, 기기:spellrun_preview, 기기:spellrun_view, 기기:spellrun_bgm, 기기:spellrun_char, 기기:spellrun_best, 기기:metis_tts_mode]
 fallback: [서버 음성(OpenAI TTS) ⇢ 기기 음성(speechSynthesis)]
+flows: [
+  화면 열기(단어 불러오기) | →필요 로그인 ; →호출 GET /api/me ; →읽기 users ; →필요 권한:can_wordbook ; →읽기 기기:spellrun_ids ; →호출 GET /api/wordbook ; →읽기 wordbook,
+  시작 버튼(발음 미리 받기) | →호출 POST /api/tts ; →호출 서버 음성(OpenAI TTS) ; →읽기 tts_cache,
+  단어 발음(게임·미리 보기·결과 칩) | →호출 POST /api/tts ; →호출 서버 음성(OpenAI TTS) ; ⇢대체 기기 음성(speechSynthesis) ; →읽기 tts_cache ; →읽기 api_usage ; →호출 OpenAI TTS(음성 합성) ; →쓰기 tts_cache ; →쓰기 api_usage,
+  대결 방 만들기 | →필요 권한:perm_versus ; →호출 POST /api/versus/rooms ; →호출 2인 대결 방(서버 메모리),
+  대결 방 참가 | →필요 권한:perm_versus ; →호출 POST /api/versus/rooms/:id/join ; →호출 2인 대결 방(서버 메모리),
+  게임 끝(최고 점수 기록) | →쓰기 기기:spellrun_best
+]
 requires: [로그인, 권한:can_wordbook, 권한:perm_versus]
 navigates: [사전, 홈]
 externals: [OpenAI TTS(음성 합성), Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 034147d
+last_checked: 8753b0a
 ---
 
 # 스펠링 런 (public/spelling_run.html) — 내부 게임 로직은 쓰지 않고 공용 엔진·API·DB 연결만
@@ -538,11 +582,19 @@ calls: [GET /api/me, GET /api/voice-notes, POST /api/voice-notes, GET /api/voice
 reads: [DB:users, DB:api_usage, DB:voice_notes, DB:voice_quizzes, DB:voice_quiz_attempts, DB:voice_links, DB:voice_image_sets, DB:voice_images, 기기:mydict_token, 기기:voice_tts_rate]
 writes: [DB:voice_notes, DB:voice_quizzes, DB:voice_quiz_attempts, DB:voice_links, DB:voice_image_sets, DB:voice_images, DB:api_usage, 기기:voice_tts_rate]
 fallback: []
+flows: [
+  녹음 → 글자 변환 | →필요 로그인 ; →호출 POST /api/voice-notes/transcribe ; →필요 권한:perm_voice_study ; →읽기 api_usage ; →호출 음성 인식(OpenAI STT) ; →호출 OpenAI STT(음성 인식) ; →쓰기 api_usage,
+  요약 만들기 | →호출 POST /api/voice-notes/summarize ; →필요 권한:perm_voice_study ; →읽기 api_usage ; →호출 AI 음성 노트 처리(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage,
+  노트 저장 | →호출 POST /api/voice-notes ; →필요 권한:perm_voice_study ; →쓰기 voice_notes,
+  퀴즈 만들기 | →호출 POST /api/voice-notes/:id/quiz ; →필요 권한:perm_voice_study ; →읽기 voice_notes ; →읽기 api_usage ; →호출 AI 음성 노트 처리(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage ; →쓰기 voice_quizzes,
+  이미지 만들기 | →호출 POST /api/voice-notes/:id/image ; →필요 권한:perm_voice_study ; →쓰기 voice_image_sets ; →읽기 voice_notes ; →읽기 api_usage ; →호출 AI 음성 노트 처리(Claude Haiku) ; →쓰기 voice_images ; →호출 이미지 생성(OpenAI Images) ; →호출 OpenAI Images(이미지 생성) ; →쓰기 api_usage,
+  요약 읽어주기 | →호출 기기 음성(speechSynthesis) ; →쓰기 기기:voice_tts_rate
+]
 requires: [로그인, 권한:perm_voice_study]
 navigates: [홈]
 externals: [Anthropic API(Claude Haiku), OpenAI STT(음성 인식), OpenAI Images(이미지 생성), Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 034147d
+last_checked: 8753b0a
 ---
 
 # 음성 학습 (public/voice_study.html)
@@ -560,9 +612,9 @@ last_checked: 034147d
 - [화면] 음성 학습 →호출 [API] GET /api/me — voice_study.html:786 → routes/auth.js:101. →필요 로그인·권한:perm_voice_study(routes/voice_study.js:20, 모든 voice-notes 라우트는 guard :31)
 - 노트 목록·보기·저장·수정·삭제 →호출 [API] GET·POST·PATCH·DELETE /api/voice-notes… — :1028, :2750-2764 → routes/voice_study.js:117, :467, :492, :591. →읽기·쓰기 [DB] voice_notes
 - 합치기 →호출 [API] POST /api/voice-notes/merge — :1337 → routes/voice_study.js:541. →쓰기 [DB] voice_notes(:577)
-- 녹음 변환 →호출 [API] POST /api/voice-notes/transcribe — :1560 → routes/voice_study.js:652. →호출 [엔진] 음성 인식(OpenAI STT) →쓰기 [DB] api_usage(:693 'stt')
-- 요약 →호출 [API] POST /api/voice-notes/summarize — :1714 → routes/voice_study.js:777. →호출 [엔진] AI 음성 노트 처리 →쓰기 [DB] api_usage(:818)
-- 퀴즈 →호출 [API] GET·POST /api/voice-notes/:id/quiz — :2245, :2287 → routes/voice_study.js:927, :946. →읽기·쓰기 [DB] voice_quizzes(:1009)
+- 녹음 변환 →호출 [API] POST /api/voice-notes/transcribe — :1560 → routes/voice_study.js:652. →읽기 [DB] api_usage(하루 20회, routes/voice_study.js:659), →호출 [엔진] 음성 인식(OpenAI STT) →쓰기 [DB] api_usage(:693 'stt')
+- 요약 →호출 [API] POST /api/voice-notes/summarize — :1714 → routes/voice_study.js:777. →읽기 [DB] api_usage(하루 30회, routes/voice_study.js:791), →호출 [엔진] AI 음성 노트 처리 →쓰기 [DB] api_usage(:818)
+- 퀴즈 →호출 [API] GET·POST /api/voice-notes/:id/quiz — :2245, :2287 → routes/voice_study.js:927, :946. →읽기 [DB] voice_notes(원문, loadOwnTranscript :952)·api_usage(하루 10회, :963), →쓰기 [DB] voice_quizzes(:1009)
 - 퀴즈 기록 →호출 [API] POST·GET /api/voice-notes/:id/quiz/attempts — :2396, :2412 → routes/voice_study.js:2083, :2125. →쓰기 [DB] voice_quiz_attempts(:2109)
 - 오답·요약 →호출 [API] GET /api/voice-notes/wrong-answers·quiz-summary — :1121, :1224 → routes/voice_study.js:138, :153. →읽기 [DB] voice_quiz_attempts
 - 대화 →호출 [API] POST /api/voice-notes/:id/chat — :2522 → routes/voice_study.js:1085. →호출 [엔진] AI 음성 노트 처리
@@ -581,4 +633,4 @@ last_checked: 034147d
 - [API] 위 3절. [외부] Anthropic(요약·퀴즈·대화·연결), OpenAI STT(녹음 변환), OpenAI Images(이미지 생성), Google Fonts.
 - [기기] localStorage `mydict_token`(:772, :783), `voice_tts_rate`(읽어주기 속도, 읽기 :2223 쓰기 :2212).
 - [모듈] public/js/common/authGate.js, appHeader.js, dialog.js.
-- [미확인] 하루 한도 전체 목록(STT 20회 외 summary·quiz·chat 한도 값), 이미지 모델 실제 기본값 동작.
+- [미확인] chat·연결·이미지의 하루 한도 값(STT 20 :611, 요약 30 :704, 퀴즈 10 :849 는 확인함), 이미지 모델 실제 기본값 동작.

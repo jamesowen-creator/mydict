@@ -6,11 +6,19 @@ calls: [GET /api/me, GET /api/voice-notes, POST /api/voice-notes, GET /api/voice
 reads: [DB:users, DB:api_usage, DB:voice_notes, DB:voice_quizzes, DB:voice_quiz_attempts, DB:voice_links, DB:voice_image_sets, DB:voice_images, 기기:mydict_token, 기기:voice_tts_rate]
 writes: [DB:voice_notes, DB:voice_quizzes, DB:voice_quiz_attempts, DB:voice_links, DB:voice_image_sets, DB:voice_images, DB:api_usage, 기기:voice_tts_rate]
 fallback: []
+flows: [
+  녹음 → 글자 변환 | →필요 로그인 ; →호출 POST /api/voice-notes/transcribe ; →필요 권한:perm_voice_study ; →읽기 api_usage ; →호출 음성 인식(OpenAI STT) ; →호출 OpenAI STT(음성 인식) ; →쓰기 api_usage,
+  요약 만들기 | →호출 POST /api/voice-notes/summarize ; →필요 권한:perm_voice_study ; →읽기 api_usage ; →호출 AI 음성 노트 처리(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage,
+  노트 저장 | →호출 POST /api/voice-notes ; →필요 권한:perm_voice_study ; →쓰기 voice_notes,
+  퀴즈 만들기 | →호출 POST /api/voice-notes/:id/quiz ; →필요 권한:perm_voice_study ; →읽기 voice_notes ; →읽기 api_usage ; →호출 AI 음성 노트 처리(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage ; →쓰기 voice_quizzes,
+  이미지 만들기 | →호출 POST /api/voice-notes/:id/image ; →필요 권한:perm_voice_study ; →쓰기 voice_image_sets ; →읽기 voice_notes ; →읽기 api_usage ; →호출 AI 음성 노트 처리(Claude Haiku) ; →쓰기 voice_images ; →호출 이미지 생성(OpenAI Images) ; →호출 OpenAI Images(이미지 생성) ; →쓰기 api_usage,
+  요약 읽어주기 | →호출 기기 음성(speechSynthesis) ; →쓰기 기기:voice_tts_rate
+]
 requires: [로그인, 권한:perm_voice_study]
 navigates: [홈]
 externals: [Anthropic API(Claude Haiku), OpenAI STT(음성 인식), OpenAI Images(이미지 생성), Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 034147d
+last_checked: 8753b0a
 ---
 
 # 음성 학습 (public/voice_study.html)
@@ -28,9 +36,9 @@ last_checked: 034147d
 - [화면] 음성 학습 →호출 [API] GET /api/me — voice_study.html:786 → routes/auth.js:101. →필요 로그인·권한:perm_voice_study(routes/voice_study.js:20, 모든 voice-notes 라우트는 guard :31)
 - 노트 목록·보기·저장·수정·삭제 →호출 [API] GET·POST·PATCH·DELETE /api/voice-notes… — :1028, :2750-2764 → routes/voice_study.js:117, :467, :492, :591. →읽기·쓰기 [DB] voice_notes
 - 합치기 →호출 [API] POST /api/voice-notes/merge — :1337 → routes/voice_study.js:541. →쓰기 [DB] voice_notes(:577)
-- 녹음 변환 →호출 [API] POST /api/voice-notes/transcribe — :1560 → routes/voice_study.js:652. →호출 [엔진] 음성 인식(OpenAI STT) →쓰기 [DB] api_usage(:693 'stt')
-- 요약 →호출 [API] POST /api/voice-notes/summarize — :1714 → routes/voice_study.js:777. →호출 [엔진] AI 음성 노트 처리 →쓰기 [DB] api_usage(:818)
-- 퀴즈 →호출 [API] GET·POST /api/voice-notes/:id/quiz — :2245, :2287 → routes/voice_study.js:927, :946. →읽기·쓰기 [DB] voice_quizzes(:1009)
+- 녹음 변환 →호출 [API] POST /api/voice-notes/transcribe — :1560 → routes/voice_study.js:652. →읽기 [DB] api_usage(하루 20회, routes/voice_study.js:659), →호출 [엔진] 음성 인식(OpenAI STT) →쓰기 [DB] api_usage(:693 'stt')
+- 요약 →호출 [API] POST /api/voice-notes/summarize — :1714 → routes/voice_study.js:777. →읽기 [DB] api_usage(하루 30회, routes/voice_study.js:791), →호출 [엔진] AI 음성 노트 처리 →쓰기 [DB] api_usage(:818)
+- 퀴즈 →호출 [API] GET·POST /api/voice-notes/:id/quiz — :2245, :2287 → routes/voice_study.js:927, :946. →읽기 [DB] voice_notes(원문, loadOwnTranscript :952)·api_usage(하루 10회, :963), →쓰기 [DB] voice_quizzes(:1009)
 - 퀴즈 기록 →호출 [API] POST·GET /api/voice-notes/:id/quiz/attempts — :2396, :2412 → routes/voice_study.js:2083, :2125. →쓰기 [DB] voice_quiz_attempts(:2109)
 - 오답·요약 →호출 [API] GET /api/voice-notes/wrong-answers·quiz-summary — :1121, :1224 → routes/voice_study.js:138, :153. →읽기 [DB] voice_quiz_attempts
 - 대화 →호출 [API] POST /api/voice-notes/:id/chat — :2522 → routes/voice_study.js:1085. →호출 [엔진] AI 음성 노트 처리
@@ -49,4 +57,4 @@ last_checked: 034147d
 - [API] 위 3절. [외부] Anthropic(요약·퀴즈·대화·연결), OpenAI STT(녹음 변환), OpenAI Images(이미지 생성), Google Fonts.
 - [기기] localStorage `mydict_token`(:772, :783), `voice_tts_rate`(읽어주기 속도, 읽기 :2223 쓰기 :2212).
 - [모듈] public/js/common/authGate.js, appHeader.js, dialog.js.
-- [미확인] 하루 한도 전체 목록(STT 20회 외 summary·quiz·chat 한도 값), 이미지 모델 실제 기본값 동작.
+- [미확인] chat·연결·이미지의 하루 한도 값(STT 20 :611, 요약 30 :704, 퀴즈 10 :849 는 확인함), 이미지 모델 실제 기본값 동작.
