@@ -790,6 +790,7 @@ function planWord(i, groupIn) {
   // 작업329: 구조 아이템(힌트·천사)은 체력이 낮을 때만. 우선순위 하트 > 구조 > 가속이라 구조가 정해지면 가속은 이 단어에 없다. 이 단어의 체력은 단어를 계획할 때 정한다(회복해서 기준을 넘으면 다음 단어부터 없다)
   const rs = planRescue({ roundSeq: G.roundSeq, regularIdx: regIdx, hp: G.hp, boss: boss, review: G.review, hasHeart: wp.heartPending, hasObst: !!wp.obst, nSlots: wp.plan.slots.length, });
   wp.rescuePending = !!rs; wp.rs = rs;
+  wp.rescueSlot = rs ? rs.slot : 0; wp.rescueKind = rs ? rs.kind : 'hint';   // 작업437: 가로(edgeCommit)가 읽는 값. 하트·번개의 wp.heartSlot·wp.speedSlot 과 같은 자리(354 에서 빠져 가로에서는 힌트·천사가 나오지 않았다). rs 가 없으면 rescuePending 이 거짓이라 쓰이지 않는다
   wp.groupBefore = groupIn;   // 작업341: 이어하기로 이 단어를 다시 시작할 때 번개 계획을 같은 모양으로 되돌린다
   const sIdx = planSpeedItem({ roundSeq: G.roundSeq, regularIdx: regIdx, boss: boss, review: G.review, hasHeart: wp.heartPending || !!rs, hasObst: !!wp.obst, nSlots: wp.plan.slots.length,
     groupTaken: groupIn, isHeartAt: G.survival ? (j => survHeartWord(j, G.roundSeq)) : (j => G.heartWords.has(j)), regularCount: G.survival ? undefined : G.regular });   // 작업339: 제외 대상이면 같은 그룹의 다음 후보로

@@ -13,6 +13,7 @@ const PUB = path.join(__dirname, '..', '..', 'public');
 const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
 const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
 const jwt = () => `${b64({ alg: 'none' })}.${b64({ id: 7, name: '테스터', exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`;
+const SEED = `(() => { let a = 1; window.__seed = s => { a = s >>> 0; }; Math.random = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })();`;
 const WORDS = ['apple', 'letter', 'garden', 'planet', 'river', 'cloud', 'bridge', 'window'];
 const rows = WORDS.map((w, i) => ({ id: i + 1, word: w, lang: 'en', created_at: new Date(2026, 9, 1, 0, 0, 100 - i).toISOString(), data: { word: w, lang: 'en', short_meaning: w + ' 뜻' } }));
 
@@ -40,8 +41,9 @@ test.before(async () => {
 });
 test.after(async () => { if (browser) await browser.close(); if (srv) await new Promise(r => srv.close(r)); });
 
-async function open(query, { width = 800, height = 400, reduce = false } = {}) {
+async function open(query, { width = 800, height = 400, reduce = false, seed = false } = {}) {
   const page = await browser.newPage({ width, height, token: jwt() });
+  if (seed) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: SEED });
   if (reduce) await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { localStorage.removeItem('spellrun_opts'); localStorage.setItem('spellrun_preview', '0'); localStorage.setItem('spellrun_bgm', '0'); localStorage.setItem('spellrun_mode', 'normal'); sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(rows.map(r => r.id)))}); } catch (e) {}` });
   await page.goto(base + '/spelling_run.html' + query);
@@ -80,8 +82,8 @@ test('435 정답을 터트리면 그 칸 소속의 남은 풍선(오답 후보)�
 });
 
 test('435 점수·콤보·체력·속도 규칙은 정답 처리에서 그대로다(같은 값 비교: 기존 정답 처리와 같은 계산)', { skip: SKIP }, async () => {
-  const page = await open('?mode=1');
-  const p = await page.eval(PREP);
+  const page = await open('?mode=1', { seed: true });
+  await page.eval('window.__seed(5)'); const p = await page.eval(PREP);
   const s0 = await snap(page);
   await page.eval(`SpellRun.G.combo = 2`);
   assert.equal(await page.eval(POP({ sid: 'hit', text: p.need, correct: true, wi: p.wi, si: p.si })), true);
@@ -89,8 +91,8 @@ test('435 점수·콤보·체력·속도 규칙은 정답 처리에서 그대로
   assert.equal(s1.si, p.si + 1); assert.equal(s1.combo, 3); assert.equal(s1.hp, s0.hp); assert.deepEqual(s1.mist, s0.mist);
   assert.ok(s1.score > s0.score, '점수 증가'); assert.ok(s1.speedBase > s0.speedBase, '속도 누적 증가');
   // 같은 입력을 풍선이 없는 묶음에서 한 것과 값이 같다(남은 풍선 유무가 점수·콤보에 영향 없음)
-  const page2 = await open('?mode=1');
-  const q = await page2.eval(PREP);
+  const page2 = await open('?mode=1', { seed: true });
+  await page2.eval('window.__seed(5)'); const q = await page2.eval(PREP);
   await page2.eval(`(() => { ${MK} G.tiles.push(mk({ sid: 'a', text: 'q', correct: false, wi: ${q.wi}, si: ${q.si}, x: R.RUNNER_X + 120 }), mk({ sid: 'b', text: 'w', correct: false, wi: ${q.wi}, si: ${q.si}, x: R.RUNNER_X + 240 })); G.combo = 2; })()`);
   await page2.eval(POP({ sid: 'hit', text: q.need, correct: true, wi: q.wi, si: q.si }));
   const t1 = await snap(page2);
