@@ -68,6 +68,7 @@ async function open({ token = true, speech = true } = {}) {
   const page = await browser.newPage({ width: 390, height: 844, token: 'x' });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: MOCKS(speech) });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: token ? `try { localStorage.setItem('mydict_token', ${JSON.stringify(TOKEN)}); } catch (e) {}` : "try { localStorage.removeItem('mydict_token'); } catch (e) {}" });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.setItem('metis_tts_mode', 'server'); } catch (e) {}" });   // 작업442: 단어 발음 기본이 기기 음성이 되어, 서버 발음 경로(335)를 보는 이 시험들은 서버 방식으로 고정한다
   await page.goto(base + '/english_dictionary.html');
   await page.waitFor("typeof playTTS === 'function' && typeof prefetchTTS === 'function' && !!document.querySelector('.metis-app-header-logo')", 12000);
   // 토스트 호출 기록(화면 모양은 그대로, 기존 showToast 를 감싸 기록만 한다)
@@ -93,9 +94,9 @@ test('토큰이 있으면 /api/tts 요청에 Authorization 헤더를 붙이고, 
   await page.close();
 });
 
-test('토큰이 없으면 서버 요청 없이 기기 음성으로 읽고(언어 매핑·속도 0.9), 안내 토스트는 방문당 한 번만 나온다', { skip: SKIP }, async () => {
+test('토큰이 없으면 서버 요청 없이 기기 음성으로 읽고(언어 매핑·속도 0.85), 안내 토스트는 방문당 한 번만 나온다', { skip: SKIP }, async () => {
   const page = await open({ token: false });
-  for (const [text, lang, want] of [['apple', 'en', 'en-US'], ['사과', 'ko', 'ko-KR'], ['りんご', 'ja', 'ja-JP'], ['苹果', 'zh', 'zh-CN']]) { await play(page, text, lang); await settle(page, 120); const sp = (await info(page)).spoken; assert.deepEqual(sp[sp.length - 1], { text, lang: want, rate: 0.9 }); }
+  for (const [text, lang, want] of [['apple', 'en', 'en-US'], ['사과', 'ko', 'ko-KR'], ['りんご', 'ja', 'ja-JP'], ['苹果', 'zh', 'zh-CN']]) { await play(page, text, lang); await settle(page, 120); const sp = (await info(page)).spoken; assert.deepEqual(sp[sp.length - 1], { text, lang: want, rate: 0.85 }); }
   assert.equal(state.reqs.length, 0, '서버 요청 0건');
   const i = await info(page);
   assert.equal(i.spoken.length, 4); assert.deepEqual(i.toasts, ['기기 음성으로 읽어요'], '안내는 한 번'); assert.equal(i.playing, false, '다 읽으면 버튼이 원래대로');

@@ -50,6 +50,7 @@ async function openGame({ width = 390, height = 844, query = '', best = null, su
   const page = await browser.newPage({ width, height, token: jwt() });
   await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { if (!sessionStorage.getItem('__i')) { sessionStorage.setItem('__i', '1'); localStorage.removeItem('spellrun_best'); localStorage.setItem('spellrun_preview', '0'); localStorage.setItem('spellrun_bgm', '0'); localStorage.setItem('spellrun_mode', ${JSON.stringify(surv ? 'survival' : 'normal')}); ${best !== null ? `localStorage.setItem('spellrun_best', ${JSON.stringify(JSON.stringify(best))});` : ''} } sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(rows.map(r => r.id)))}); } catch (e) {}` });
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.setItem('metis_tts_mode', 'server'); } catch (e) {}" });   // 작업442: 단어 발음 기본이 기기 음성이 되어, 서버 발음 경로(414·431)를 보는 이 시험은 서버 방식으로 고정한다
   await page.goto(base + '/spelling_run.html' + query);
   await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
   await page.eval('SpellRun.manual = true; SpellRun.CONFIG.CONT_ENABLED = false;');

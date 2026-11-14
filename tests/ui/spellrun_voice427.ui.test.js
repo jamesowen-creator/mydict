@@ -69,6 +69,8 @@ async function openGame(extra = '', query = '') {   // 작업441: extra = 페이
   const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { localStorage.setItem('spellrun_preview', '0'); localStorage.setItem('spellrun_mode', 'normal'); sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(rows.map(r => r.id)))}); } catch (e) {}` });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: LOG });
+  // 작업442: 기본이 기기 음성이 되어, 427 의 서버 경로 시험은 서버 방식으로 고정한다(extra·?tts= 가 있으면 그쪽이 이긴다)
+  if (!/tts=/.test(query)) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.setItem('metis_tts_mode', 'server'); } catch (e) {}" });
   if (extra) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: extra });
   await page.goto(base + '/spelling_run.html' + query);
   await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
@@ -220,37 +222,46 @@ test('427 결과 마무리 소리와 겹치지 않는다: finish 시점에 재�
   await page.close();
 });
 
-// 작업441: 발음 방식 옵션. 기기 음성(tts=device)이면 미리 받기·재생 모두 /api/tts 를 부르지 않고 기기 음성만 쓴다. 기본(서버)은 위 427 시험 그대로.
-test('441 tts=device(저장값): /api/tts 요청 0건, 단어 발음은 기기 음성(서버 오디오 재생 없음)', { skip: SKIP }, async () => {
+// 작업442: 단어 발음 기본은 기기 음성. 기본에서는 미리 받기·재생이 /api/tts 를 부르지 않고, ?tts=server 에서만 위 427 의 서버 경로가 동작한다. (441 시험을 새 기본에 맞게 뒤집음)
+test('442 기본(저장값 없음): /api/tts 요청 0건, 단어 발음은 기기 음성(서버 오디오 재생 없음)', { skip: SKIP }, async () => {
   reset();
-  const page = await openGame("try { localStorage.setItem('metis_tts_mode', 'device'); } catch (e) {}");
-  await page.eval('SpellRun.startRound(false)');
+  const p2 = await browser.newPage({ width: 390, height: 844, token: jwt() });
+  await p2.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.setItem('spellrun_preview', '0'); localStorage.setItem('spellrun_mode', 'normal'); localStorage.removeItem('metis_tts_mode'); sessionStorage.setItem('spellrun_ids', " + JSON.stringify(JSON.stringify(rows.map(r => r.id))) + "); } catch (e) {}" });
+  await p2.send('Page.addScriptToEvaluateOnNewDocument', { source: LOG });
+  await p2.goto(base + '/spelling_run.html');
+  await p2.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
+  for (const type of ['mousePressed', 'mouseReleased']) await p2.send('Input.dispatchMouseEvent', { type, x: 5, y: 5, button: 'left', clickCount: 1 });
+  await p2.eval('SpellRun.manual = true');
+  await p2.eval('SpellRun.startRound(false)');
   await wait(1500);
   assert.equal(T.reqs.length, 0, '미리 받기 요청 없음');
-  await page.eval('SpellRun.G.state = "run"; SpellRun.G.wi = 0; SpellRun.complete();');
-  await page.waitFor("window.__ev.some(e => e.k === 'builtin')", 5000);
+  await p2.eval('SpellRun.G.state = "run"; SpellRun.G.wi = 0; SpellRun.complete();');
+  await p2.waitFor("window.__ev.some(e => e.k === 'builtin')", 5000);
   assert.equal(T.reqs.length, 0, '재생 때도 요청 없음');
-  assert.ok(!(await events(page)).some(e => e.k === 'play'), '서버 오디오는 재생하지 않는다');
-  await page.close();
+  const ev = await events(p2);
+  assert.ok(!ev.some(e => e.k === 'play'), '서버 오디오는 재생하지 않는다');
+  assert.ok(ev.some(e => e.k === 'builtin' && /rate=0\.85/.test(e.x)), '기기 음성 속도 0.85');
+  await p2.close();
 });
 
-test('441 ?tts=device 는 저장되어 이후 주소 없이도 유지되고, ?tts=reset 은 지워 서버 발음으로 돌아간다. 저장소가 막혀 있어도 예외 없이 이번 방문에 적용된다', { skip: SKIP }, async () => {
+test('442 ?tts=server 는 저장되어 서버 발음(427 미리 받기)으로 동작하고, ?tts=reset 은 지워 기본(기기 음성)으로 돌아간다. 저장소가 막혀 있어도 예외 없이 이번 방문에 적용된다', { skip: SKIP }, async () => {
   reset();
-  let page = await openGame('', '?tts=device');
-  assert.equal(await page.eval("localStorage.getItem('metis_tts_mode')"), 'device');
-  await page.eval('SpellRun.startRound(false)'); await wait(800);
-  assert.equal(T.reqs.length, 0);
-  await page.close();
-  page = await openGame("try { localStorage.setItem('metis_tts_mode', 'device'); } catch (e) {}", '?tts=reset');
-  assert.equal(await page.eval("localStorage.getItem('metis_tts_mode')"), null, 'reset 은 저장값을 지운다');
+  let page = await openGame('', '?tts=server');
+  assert.equal(await page.eval("localStorage.getItem('metis_tts_mode')"), 'server');
   await page.eval('SpellRun.startRound(false)'); await wait(1500);
-  assert.ok(T.reqs.length >= 1, '서버 발음으로 돌아가 요청한다');
+  assert.ok(T.reqs.length >= 1, '서버 방식이면 미리 받기 요청');
+  await page.close();
+  reset();
+  page = await openGame("try { localStorage.setItem('metis_tts_mode', 'server'); } catch (e) {}", '?tts=reset');
+  assert.equal(await page.eval("localStorage.getItem('metis_tts_mode')"), null, 'reset 은 저장값을 지운다');
+  await page.eval('SpellRun.startRound(false)'); await wait(1000);
+  assert.equal(T.reqs.length, 0, 'reset 뒤에는 기본(기기 음성)');
   await page.close();
   reset();
   const block = "(() => { const g = Storage.prototype.getItem, st = Storage.prototype.setItem; Storage.prototype.getItem = function (k) { if (k === 'metis_tts_mode') throw new Error('blocked'); return g.apply(this, arguments); }; Storage.prototype.setItem = function (k) { if (k === 'metis_tts_mode') throw new Error('blocked'); return st.apply(this, arguments); }; })();";
-  page = await openGame(block, '?tts=device');
-  await page.eval('SpellRun.startRound(false)'); await wait(800);
-  assert.equal(T.reqs.length, 0, '저장 실패해도 이번 방문은 기기 음성');
+  page = await openGame(block, '?tts=server');
+  await page.eval('SpellRun.startRound(false)'); await wait(1500);
+  assert.ok(T.reqs.length >= 1, '저장 실패해도 이번 방문은 서버 방식');
   assert.deepEqual(page.errors.filter(e => /blocked/.test(e)), [], '예외가 밖으로 나오지 않는다');
   await page.close();
 });
