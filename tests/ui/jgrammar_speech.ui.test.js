@@ -316,3 +316,95 @@ test('390px 배치: 링크와 후리가나 토글이 한 줄(토글은 오른쪽
   }
   await page.close();
 });
+
+// 작업446: 읽어주기 실패 진단 한 줄 + 방어(내장 음성 우선, 오류 시 음성 지정 없이 1회 재시도). 가짜 speak 가 plan 순서대로 end / error:<코드> 를 낸다
+const PLAN = plan => `(() => { window.__plan = ${JSON.stringify(plan)}; const S = window.__speech; speechSynthesis.speak = u => { S.spoken.push({ text: u.text, lang: u.lang, rate: u.rate, voice: u.voice ? u.voice.name : null }); const a = window.__plan.shift() || 'end'; S.current = u; setTimeout(() => { if (S.current !== u) return; S.current = null; if (a === 'end') { u.onend && u.onend({}); } else if (a !== 'hang') { u.onerror && u.onerror(a === 'error:' ? {} : { error: a.slice(6) }); } }, 20); }; return 1; })()`;
+const diagLine = page => page.eval("(document.querySelector('#msg .msg-diag') || {}).textContent || ''");
+const msgText = page => page.eval("document.getElementById('msg').firstChild ? document.getElementById('msg').firstChild.textContent : ''");
+const JA_NET = { name: 'NetJa', lang: 'ja-JP', localService: false }, JA_LOCAL = { name: 'LocalJa', lang: 'ja-JP', localService: true };
+
+test('446 내장(localService) ja-JP 음성을 네트워크 음성보다 우선한다(목록 순서와 무관). 내장이 없으면 기존 순서', { skip: SKIP }, async () => {
+  let page = await open([JA_NET, JA_LOCAL]);
+  await analyze(page, S1); await tap(page, 'normal');
+  await page.waitFor('window.__speech.spoken.length === 1', 3000);
+  assert.equal((await spoken(page))[0].voice, 'LocalJa'); await page.close();
+  page = await open([JA_NET, { name: 'NetJa2', lang: 'ja-JP', localService: false }]);
+  await analyze(page, S1); await tap(page, 'normal');
+  await page.waitFor('window.__speech.spoken.length === 1', 3000);
+  assert.equal((await spoken(page))[0].voice, 'NetJa', '내장이 없으면 기존 순서(첫 ja-JP)'); await page.close();
+});
+
+test('446 오류가 나면 음성을 지정하지 않고(lang 만) 1회 재시도하고, 성공하면 메시지·진단이 없고 이어지는 조각도 음성 지정 없이 읽는다', { skip: SKIP }, async () => {
+  const page = await open([JA_LOCAL]);
+  await analyze(page, S1);
+  await page.eval(PLAN(['error:synthesis-failed', 'end']));
+  await tap(page, 'normal');
+  await page.waitFor('window.__speech.spoken.length === 2', 3000);
+  const sp = await spoken(page);
+  assert.equal(sp[0].voice, 'LocalJa'); assert.equal(sp[1].voice, null, '재시도는 음성 지정 없음'); assert.equal(sp[1].lang, 'ja-JP'); assert.equal(sp[1].text, sp[0].text, '같은 조각');
+  await sleep(150);
+  assert.equal(await page.eval("document.getElementById('msg').textContent"), '', '성공하면 메시지 없음');
+  assert.equal(await page.eval("document.querySelector('[data-speak=normal]').textContent"), '듣기', '끝까지 읽고 원래대로');
+  await page.close();
+});
+
+test('446 재시도도 실패하면 그때 메시지 + 진단 한 줄(오류 코드·음성 이름·lang·내장/네트워크, 12px 이상). 재시도는 1회뿐(무한 반복 없음)', { skip: SKIP }, async () => {
+  const page = await open([JA_NET]);
+  await analyze(page, S1);
+  await page.eval(PLAN(['error:synthesis-failed', 'error:language-unavailable', 'end', 'end']));
+  await tap(page, 'normal');
+  await page.waitFor("!!document.querySelector('#msg .msg-diag')", 3000);
+  await sleep(300);
+  assert.equal((await spoken(page)).length, 2, '원래 1회 + 재시도 1회');
+  assert.equal(await msgText(page), '읽는 중 문제가 발생했습니다. 다시 시도해 주세요.', '기존 문구 유지');
+  const d = await diagLine(page);
+  assert.match(d, /오류: synthesis-failed → 재시도 language-unavailable/); assert.match(d, /음성: NetJa · ja-JP · 네트워크/);
+  assert.ok(await page.eval("parseFloat(getComputedStyle(document.querySelector('#msg .msg-diag')).fontSize) >= 11"), '글자 11px 이상');
+  assert.equal(await page.eval("document.querySelector('[data-speak=normal]').textContent"), '듣기', '멈춘 상태로 복귀');
+  await page.close();
+});
+
+test('446 오류 코드가 없으면 "오류: 없음", 음성을 못 골랐으면(목록 비어 있음) 재시도 없이 바로 메시지', { skip: SKIP }, async () => {
+  let page = await open([JA_LOCAL]);
+  await analyze(page, S1);
+  await page.eval(PLAN(['error:', 'error:']));
+  await tap(page, 'normal');
+  await page.waitFor("!!document.querySelector('#msg .msg-diag')", 3000);
+  assert.match(await diagLine(page), /오류: 없음 → 재시도 없음/); await page.close();
+  page = await open([]);   // 목록이 비어 있는 채(1초 뒤에도) → 음성 지정 없이 읽기 시작
+  await analyze(page, S1);
+  await page.eval(PLAN(['error:synthesis-failed', 'end']));
+  await tap(page, 'normal');
+  await page.waitFor("!!document.querySelector('#msg .msg-diag')", 4000);
+  assert.equal((await spoken(page)).length, 1, '지정할 음성이 없으므로 재시도 없음');
+  assert.match(await diagLine(page), /오류: synthesis-failed \/ 음성: 지정 안 함/); await page.close();
+});
+
+test('446 interrupted·canceled 는 지금처럼 메시지도 재시도도 없고, 재시도 대기 중 정지하면 다시 읽지 않는다', { skip: SKIP }, async () => {
+  const page = await open([JA_LOCAL]);
+  await analyze(page, S1);
+  for (const code of ['interrupted', 'canceled']) {
+    await page.eval(PLAN(['error:' + code]));
+    const before = (await spoken(page)).length;
+    await tap(page, 'normal');
+    await page.waitFor(`window.__speech.spoken.length === ${before + 1}`, 3000);
+    await sleep(200);
+    assert.equal((await spoken(page)).length, before + 1, code + ': 재시도 없음');
+    assert.equal(await page.eval("document.getElementById('msg').textContent"), '', code + ': 메시지 없음');
+    await page.eval("window.__speech.current = null; 1");
+    await page.eval("document.querySelector('[data-speak=normal]').textContent === '멈춤' && document.querySelector('[data-speak=normal]').click(); 1");   // 상태 정리
+    await sleep(60);
+  }
+  // 정지 vs 재시도: 오류 직후(재시도 대기 50ms 안에) 정지
+  await page.eval(PLAN(['error:synthesis-failed', 'end']));
+  const n0 = (await spoken(page)).length;
+  await tap(page, 'normal');
+  await page.waitFor(`window.__speech.spoken.length === ${n0 + 1}`, 3000);
+  await page.eval("new Promise(r => setTimeout(r, 22))");   // 가짜 오류(20ms) 직후
+  await page.eval("document.querySelector('[data-speak=normal]').click(); 1");   // 같은 링크 = 중지
+  await sleep(250);
+  assert.equal((await spoken(page)).length, n0 + 1, '정지했으면 재시도하지 않는다');
+  assert.equal(await page.eval("document.getElementById('msg').textContent"), '', '정지는 오류 메시지를 내지 않는다');
+  await page.close();
+});
+

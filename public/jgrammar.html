@@ -62,6 +62,7 @@
   .speak-area { display: flex; align-items: center; }
   .speak-area .btn.text { min-width: var(--ctl-min-h); }   /* 짧은 글자(듣기)도 터치 가로 44px 이상 */
   .speak-note { font-size: var(--fs-12); color: var(--color-text-sub); }
+  .msg-diag { margin-top: var(--sp-8); font-size: var(--fs-12); color: var(--color-text-sub); word-break: break-all; }   /* 작업446: 읽어주기 실패 진단 한 줄 */
   .furi-toggle { margin-left: auto; }
   .source { padding-bottom: var(--sp-8); font-size: var(--fs-22); line-height: 1.6; }
   .source rt { font-size: var(--fs-11); font-weight: 400; color: var(--color-text-sub); }
@@ -175,7 +176,7 @@
   var OCR_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
   function token() { try { return localStorage.getItem('mydict_token'); } catch (e) { return null; } }
-  function setMsg(text, isError) { msg.textContent = text || ''; msg.className = 'msg' + (isError ? ' error' : ''); }
+  function setMsg(text, isError, diag) { msg.textContent = text || ''; msg.className = 'msg' + (isError ? ' error' : ''); if (diag) msg.appendChild(el('div', 'msg-diag', diag)); }   // 작업446: diag = 작은 진단 한 줄(읽어주기 실패 때만)
   function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
 
   // 작업JG-2: /api/me 에서 perm_jgrammar 가 true 이거나 관리자일 때만 입력창을 보여 준다(fail-closed). 서버도 같은 기준으로 다시 검사한다.
@@ -344,8 +345,13 @@
       if (!v || normLang(v.lang).indexOf(base) !== 0) return false;
       return !(zh && (normLang(v.lang).indexOf('yue') >= 0 || normLang(v.lang).indexOf('-hk') >= 0 || /cantonese|粵|粤/i.test(String(v.name || ''))));
     });
-    return m.filter(function (v) { return normLang(v.lang) === pref; })[0] || m[0] || null;
+    var exact = m.filter(function (v) { return normLang(v.lang) === pref; });
+    // 작업446: 일본어는 기기 내장(localService) ja-JP 음성을 우선한다. 네트워크 음성은 오프라인·데이터 부족일 때 오류가 나기 쉽다. 없으면 기존 순서
+    if (base === 'ja') { var local = exact.filter(function (v) { return v.localService === true; })[0]; if (local) return local; }
+    return exact[0] || m[0] || null;
   }
+  // 작업446: 진단 한 줄에 보이는 음성 설명(이름·lang·내장/네트워크)
+  function describeVoice(v) { return v ? (String(v.name || '?') + ' · ' + String(v.lang || '?') + ' · ' + (v.localService === true ? '내장' : v.localService === false ? '네트워크' : '구분 불명')) : '지정 안 함'; }
   // 일본어(ja 로 시작) 음성 중 ja-JP 를 우선해 고른다. 없으면 null
   function pickJapaneseVoice(voices) { return pickVoice(voices, 'ja'); }
   // 긴 문장은 일부 브라우저가 15초 안팎에서 읽기를 끊으므로 문장(。！？) 단위, 너무 길면 쉼표 단위로 max 글자 이하 조각으로 나눈다. 이어 붙이면 (공백·줄바꿈을 뺀) 원래 텍스트와 같다
@@ -428,20 +434,23 @@
       if (list.length && !voice) { stopSpeech(); renderSpeakArea(); return; }   // 선택한 언어의 음성이 없으면 읽지 않고 안내만
       var chunks = splitForSpeech(text, SPEAK_CHUNK_MAX, lang);
       if (!chunks.length) { stopSpeech(); return; }
+      var noVoice = false, firstErr = null;   // 작업446: 음성을 고른 채 실패하면 음성을 지정하지 않고(lang 만) 한 번만 다시 시도한다. 성공하면 이어지는 조각도 그대로 쓴다
       var next = function (i) {
         if (run !== speakRun) return;
         if (i >= chunks.length) { speakMode = null; syncSpeakUi(); return; }
         var u = new SpeechSynthesisUtterance(chunks[i]);
-        u.lang = voice ? voice.lang : LANG_UI[lang].speech;
-        if (voice) u.voice = voice;
+        var useVoice = voice && !noVoice;
+        u.lang = useVoice ? voice.lang : LANG_UI[lang].speech;
+        if (useVoice) u.voice = voice;
         u.rate = SPEAK_RATE[mode];
         u.onend = function () { next(i + 1); };
         u.onerror = function (ev) {
           if (run !== speakRun) return;
           var err = ev && ev.error;
           if (err === 'canceled' || err === 'interrupted') return;
+          if (useVoice) { noVoice = true; firstErr = err || '없음'; setTimeout(function () { next(i); }, 50); return; }   // 한 번만 재시도(정지·다른 재생이면 next 맨 앞에서 멈춘다)
           stopSpeech();
-          setMsg('읽는 중 문제가 발생했습니다. 다시 시도해 주세요.', true);
+          setMsg('읽는 중 문제가 발생했습니다. 다시 시도해 주세요.', true, '오류: ' + (firstErr ? firstErr + ' → 재시도 ' + (err || '없음') : (err || '없음')) + ' / 음성: ' + describeVoice(voice) + (noVoice ? '(재시도는 지정 안 함)' : ''));
         };
         try { speechSynthesis.speak(u); } catch (e) { stopSpeech(); setMsg('읽어주기를 시작하지 못했습니다.', true); }
       };

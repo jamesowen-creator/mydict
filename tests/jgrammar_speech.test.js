@@ -48,6 +48,12 @@ test('일본어 음성 고르기: ja-JP 우선, 그다음 ja 로 시작하는 �
   assert.equal(F.pickJapaneseVoice([{ name: 'a', lang: 'JA-jp' }]).name, 'a');
   assert.equal(F.pickJapaneseVoice([en, { name: 'zh', lang: 'zh-CN' }, { name: 'ko', lang: 'ko-KR' }]), null);
   assert.equal(F.pickJapaneseVoice([]), null);
+  // 작업446: localService(내장) ja-JP 음성 우선, 없으면 기존 순서
+  const net = { name: 'net', lang: 'ja-JP', localService: false }, loc = { name: 'loc', lang: 'ja-JP', localService: true }, locOther = { name: 'locOther', lang: 'ja', localService: true };
+  assert.equal(F.pickJapaneseVoice([net, loc]), loc);
+  assert.equal(F.pickJapaneseVoice([net, locOther]), net, 'ja-JP 가 있으면 ja 계열 내장보다 ja-JP 유지(기존 순서)');
+  assert.equal(F.pickJapaneseVoice([net, { name: 'net2', lang: 'ja-JP' }]), net);
+  
   assert.equal(F.pickJapaneseVoice(null), null);
   assert.equal(F.pickJapaneseVoice([null, { lang: undefined }]), null);
 });
@@ -90,7 +96,7 @@ test('소스 규칙: speechSynthesis 만 쓰고(외부 음성 API·서버 호출
   assert.match(html, /addEventListener\('click', function \(\) \{ onSpeakClick\(m\); \}\)/);
   // 속도·언어
   assert.match(html, /SPEAK_RATE = \{ normal: 1\.0, slow: 0\.7 \}/);
-  assert.match(html, /u\.lang = voice \? voice\.lang : LANG_UI\[lang\]\.speech/);   // 작업313: 음성이 없을 때의 기본 lang 이 언어 설정(ja: 'ja-JP', en: 'en-US')에서 온다
+  assert.match(html, /u\.lang = useVoice \? voice\.lang : LANG_UI\[lang\]\.speech/);   // 작업313: 음성이 없을 때의 기본 lang 이 언어 설정(ja: 'ja-JP', en: 'en-US')에서 온다. 작업446: 음성을 지정하지 않는 재시도(useVoice=false)도 같은 기본 lang 을 쓴다(식 이름만 voice → useVoice)
   assert.match(html, /ja: \{[^\n]*speech: 'ja-JP'/);
   assert.match(html, /en: \{[^\n]*speech: 'en-US'/);
   // 읽는 텍스트는 fetch 본문으로 보내지 않는다: 이 파일의 fetch 호출은 기존 7개 주소뿐
