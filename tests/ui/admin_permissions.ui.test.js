@@ -36,7 +36,7 @@ test('사용자 현황 섹션과 #stats-grid 가 없고, API 비용 추정·사�
   const page = await openAdmin([userRow(7, '관리자', { role: 'admin' }), userRow(8, '학생')]);
   assert.equal(await page.eval("!!document.getElementById('stats-grid') || !!document.getElementById('stats-updated')"), false);
   const titles = await page.eval("[...document.querySelectorAll('.section-title')].map(e => e.textContent.trim())");
-  assert.deepEqual(titles, ['API 비용 추정', 'Speak Loop 음성', '단어 뜻 일괄 변환', '사용자 관리']);   // 작업395: Speak Loop 음성 구역 / 작업417: 단어 뜻 일괄 변환 구역
+  assert.deepEqual(titles, ['API 비용 추정', 'Speak Loop 음성', '단어 뜻 일괄 변환', '발음 캐시 지우기', '사용자 관리']);   // 작업395: Speak Loop 음성 구역 / 작업417: 단어 뜻 일괄 변환 구역 / 작업440: 발음 캐시 지우기 구역
   assert.equal(await page.eval("document.querySelectorAll('#cost-grid .cost-card').length"), 2, '비용 카드(전체 누적·이번달)가 그려짐');
   assert.deepEqual(page.errors.filter(e => !/Failed to load resource/.test(e)), []);
   await page.close();
@@ -44,7 +44,7 @@ test('사용자 현황 섹션과 #stats-grid 가 없고, API 비용 추정·사�
 
 for (const width of [1280, 390]) {
   test(`폭 ${width}px: 헤더·본문이 680px 이하로 가운데에 놓이고, 페이지는 가로로 스크롤되지 않으며 표만 스크롤된다`, { skip: SKIP }, async () => {
-    const page = await openAdmin([userRow(7, '관리자', { role: 'admin' }), userRow(8, '학생')], { width, height: 1800 });   // 작업417: 단어 뜻 일괄 변환 구역이 늘어 1400px 에서도 세로 스크롤바가 생겨 같은 어긋남이 나므로 1800px.  // 작업395: Speak Loop 음성 구역이 늘어 800px 에서는 세로 스크롤바가 생겨 가운데 측정이 7.5px 어긋난다
+    const page = await openAdmin([userRow(7, '관리자', { role: 'admin' }), userRow(8, '학생')], { width, height: 2200 });   // 작업440: 발음 캐시 지우기 구역이 늘어 1800px 에서 세로 스크롤바가 생기므로 2200px.  // 작업417: 단어 뜻 일괄 변환 구역이 늘어 1400px 에서도 세로 스크롤바가 생겨 같은 어긋남이 나므로 1800px.  // 작업395: Speak Loop 음성 구역이 늘어 800px 에서는 세로 스크롤바가 생겨 가운데 측정이 7.5px 어긋난다
     const m = await page.eval(`(() => {
       const r = e => { const b = document.querySelector(e).getBoundingClientRect(); return { left: b.left, right: b.right, width: b.width }; };
       const wrap = document.querySelector('.table-wrap');

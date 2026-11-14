@@ -22,6 +22,32 @@ router.delete('/api/tts/cache', requireAdmin, async (req, res) => {
   }
 });
 
+// 작업440: 단어 하나의 발음 캐시만 지운다(관리자 전용). 키는 POST /api/tts 와 같은 규칙(trim·500자·lang, 대소문자 구분).
+// variants=1 이면 소문자·첫 글자 대문자·전부 대문자 변형도 같은 lang 안에서 함께 지운다. OpenAI 호출·한도 계산은 없다.
+router.delete('/api/tts/cache/entry', requireAdmin, async (req, res) => {
+  try {
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const q = req.query || {};
+    const text = body.text !== undefined ? body.text : q.text;
+    const lang = body.lang !== undefined ? body.lang : (q.lang !== undefined ? q.lang : 'en');
+    const vr = body.variants !== undefined ? body.variants : q.variants;
+    const variants = vr === true || vr === 1 || vr === '1' || vr === 'true';
+    if (typeof text !== 'string' || !text.trim() || text.trim().length > 500) return res.status(400).json({ error: 'text 는 1~500자 문자열이어야 합니다.' });
+    if (typeof lang !== 'string' || !TTS_LANGS.includes(lang)) return res.status(400).json({ error: 'lang is not supported' });
+    const key = text.trim();
+    const keys = new Set([key]);
+    if (variants) { keys.add(key.toLowerCase()); keys.add(key.charAt(0).toUpperCase() + key.slice(1).toLowerCase()); keys.add(key.toUpperCase()); }
+    const list = [...keys].filter(k => k.length <= 500);
+    if (!process.env.DATABASE_URL) return res.json({ ok: true, deleted: 0 });
+    const { rowCount } = await pool.query('DELETE FROM tts_cache WHERE lang = $1 AND text_key = ANY($2::text[])', [lang, list]);
+    console.log(`TTS cache entry cleared: ${rowCount} rows deleted`);
+    res.json({ ok: true, deleted: rowCount });
+  } catch (e) {
+    console.error('TTS cache entry clear error:', e && e.message);
+    if (!res.headersSent) res.status(500).json({ error: '캐시 삭제에 실패했습니다.' });
+  }
+});
+
 // 작업337: 하루 사용량 제한. 서버가 OpenAI 를 실제로 부르는 경우(캐시 미스)만 센다. 환경변수가 없거나 범위 밖이면 기본값(30000자·150회)
 const envCap = (name, def, min, max) => { const n = parseInt(process.env[name], 10); return Number.isFinite(n) && n >= min && n <= max ? n : def; };
 const dailyCharsCap = () => envCap('TTS_DAILY_CHARS_CAP', 30000, 1, 10000000);

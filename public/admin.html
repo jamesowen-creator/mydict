@@ -310,6 +310,27 @@
       </div>
     </div>
 
+    <!-- 작업440: 발음 캐시 단건 삭제(단어 하나의 서버 발음 캐시만 지운다) -->
+    <div class="section" id="tc-section">
+      <div class="section-header">
+        <span class="section-title">발음 캐시 지우기</span>
+      </div>
+      <div class="section-body">
+        <label for="tc-word" style="font-size:13px;color:var(--text2)">단어 하나(영어). 예: snobbish</label>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:4px">
+          <input id="tc-word" type="text" maxlength="500" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:160px;box-sizing:border-box;font-size:16px;min-height:44px;padding:0 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface,#fff);color:var(--text)">
+          <button class="btn-save" id="tc-del" type="button">삭제</button>
+          <button class="btn-back" id="tc-cancel" type="button" style="display:none">취소</button>
+        </div>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text2);margin-top:12px;min-height:44px">
+          <input id="tc-variants" type="checkbox" checked> 대소문자 변형도 지우기
+        </label>
+        <div style="font-size:12px;line-height:1.6;color:var(--text2);margin-top:4px">지운 뒤 그 단어를 다시 검색하면 서버 발음을 새로 한 번 만듭니다(OpenAI 호출 1회, 사용량 집계에 포함).</div>
+        <div id="tc-confirm" style="display:none;font-size:13px;line-height:1.6;margin-top:12px"></div>
+        <div id="tc-msg" style="font-size:13px;line-height:1.6;margin-top:12px"></div>
+      </div>
+    </div>
+
     <!-- Users -->
     <div class="section">
       <div class="section-header">
@@ -910,6 +931,36 @@ glEl('gl-backup').addEventListener('click', glBackup);
 glEl('gl-cancel').addEventListener('click', () => { glConfirmOff(); glMsg(''); });
 glEl('gl-stop').addEventListener('click', () => { glStopFlag = true; glEl('gl-stop').style.display = 'none'; });
 try { glEl('gl-runid').value = localStorage.getItem('gl_last_run') || ''; } catch (e) { /* 저장값을 못 읽어도 직접 입력 */ }
+
+// ── 작업440: 발음 캐시 단건 삭제(첫 번째 누름 = 화면 안 확인 문구, 두 번째 누름 = 실행) ──
+(function () {
+  const $ = id => document.getElementById(id);
+  let armed = false, busy = false;
+  const msg = t => { $('tc-msg').textContent = t || ''; };
+  function off() { armed = false; $('tc-confirm').style.display = 'none'; $('tc-cancel').style.display = 'none'; $('tc-del').textContent = '삭제'; }
+  async function run() {
+    const text = $('tc-word').value.trim();
+    if (!text) { msg('지울 단어를 입력하세요.'); return; }
+    if (text.length > 500) { msg('500자 이하로 입력하세요.'); return; }
+    const variants = $('tc-variants').checked;
+    if (!armed) {
+      armed = true; msg('');
+      $('tc-confirm').textContent = '"' + text + '"' + (variants ? '(대소문자 변형 포함)' : '') + '의 서버 발음 캐시를 지웁니다. 다시 검색하면 발음을 새로 만듭니다. 한 번 더 누르면 실행합니다.';
+      $('tc-confirm').style.display = 'block'; $('tc-cancel').style.display = ''; $('tc-del').textContent = '삭제 실행';
+      return;
+    }
+    off(); busy = true; $('tc-del').disabled = true; msg('지우는 중입니다…');
+    try {
+      const r = await fetch('/api/tts/cache/entry', { method: 'DELETE', headers: authHeaders(), body: JSON.stringify({ text, lang: 'en', variants }) });
+      const d = await r.json().catch(() => ({}));
+      msg(r.ok ? (d.deleted + '건 삭제됨') : (d.error || ('실패했습니다(' + r.status + ').')));
+    } catch (e) { msg('요청에 실패했습니다. 네트워크를 확인하세요.'); }
+    busy = false; $('tc-del').disabled = false;
+  }
+  $('tc-del').addEventListener('click', () => { if (!busy) run(); });
+  $('tc-cancel').addEventListener('click', () => { off(); msg(''); });
+  $('tc-word').addEventListener('input', () => { if (armed) { off(); } });
+})();
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 MetisAppHeader.renderAuthWidget(document.getElementById('metis-header-auth'));

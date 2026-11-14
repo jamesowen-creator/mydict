@@ -23,6 +23,7 @@ function createDb() {
       db.queries.push(sql);
       if (/^SELECT audio FROM tts_cache/.test(sql)) { const r = db.cache.get(params[1] + '|' + params[0]); return { rows: r ? [{ audio: r }] : [] }; }
       if (/^\s*INSERT INTO tts_cache/.test(sql)) { const k = params[1] + '|' + params[0]; if (!db.cache.has(k)) db.cache.set(k, params[2]); return { rowCount: 1, rows: [] }; }
+      if (/^DELETE FROM tts_cache WHERE lang = \$1 AND text_key = ANY/.test(sql)) { if (db.failCache) throw new Error('boom: secret table detail'); let n = 0; for (const k of params[1]) { if (db.cache.delete(params[0] + '|' + k)) n++; } return { rowCount: n, rows: [] }; }
       if (/^DELETE FROM tts_cache/.test(sql)) { if (db.failCache) throw new Error('boom: secret table detail'); const n = db.cache.size; db.cache.clear(); return { rowCount: n, rows: [] }; }
       if (/^SELECT is_approved, is_blocked, role FROM users/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ is_approved: u.is_approved, is_blocked: u.is_blocked, role: u.role }] : [] }; }
       if (/^SELECT is_blocked, can_tts FROM users/.test(sql)) { const u = db.users.get(params[0]); return { rows: u ? [{ is_approved: true, is_blocked: u.is_blocked, can_tts: u.can_tts }] : [] }; }
@@ -263,4 +264,27 @@ test('439. 빈(0바이트) 응답은 캐시에 저장하지 않고 사용량도 
   await new Promise(r2 => setTimeout(r2, 20));
   assert.equal(a.db.cache.size, 1, '정상 응답은 저장됨'); assert.equal(a.db.usage.length, 1);
   assert.equal((await postRaw(a, { text: 'snobbish' })).cache, 'HIT'); assert.equal(a.db.usage.length, 1, '적중은 사용량 불변');
+});
+
+test('440. DELETE /api/tts/cache/entry: 401·403·400, 대상 키만 삭제(다른 단어·lang 유지), variants 변형, 삭제 후 재요청은 미스로 업스트림 1회·사용량 +1, 전체 삭제 경로 불변', async t => {
+  const a = await setup(); t.after(() => a.t.close());
+  const del = (body, user) => a.t.call('DELETE', '/api/tts/cache/entry', body, { user });
+  assert.equal((await del({ text: 'snobbish' }, null)).status, 401);
+  assert.equal((await del({ text: 'snobbish' }, 7)).status, 403);
+  for (const bad of [{}, { text: 5 }, { text: '   ' }, { text: 'x'.repeat(501) }, { text: 'a', lang: 'xx' }, { text: 'a', lang: 5 }]) assert.equal((await del(bad, 9)).status, 400, JSON.stringify(bad).slice(0, 40));
+  const keep = (w, l = 'en') => a.db.cache.set(l + '|' + w, Buffer.from('X'));
+  ['snobbish', 'Snobbish', 'SNOBBISH', 'snob', ' x'].forEach(w => keep(w.trim())); keep('snobbish', 'ko');
+  let r = await del({ text: '  snobbish ' }, 9);
+  assert.equal(r.status, 200); assert.equal(r.body.deleted, 1);
+  assert.deepEqual([...a.db.cache.keys()].sort(), ['en|SNOBBISH', 'en|Snobbish', 'en|snob', 'en|x', 'ko|snobbish']);
+  r = await del({ text: 'snobbish', variants: true }, 9);
+  assert.equal(r.body.deleted, 2); assert.ok(a.db.cache.has('ko|snobbish') && a.db.cache.has('en|snob'), '다른 lang·다른 단어 유지');
+  assert.equal((await del({ text: 'nothing' }, 9)).body.deleted, 0);
+  // 지운 뒤 재요청: 캐시 미스 → 업스트림 1회, 사용량 +1
+  const c0 = openai.calls.length, u0 = a.db.usage.length;
+  assert.equal((await postRaw(a, { text: 'snobbish' })).cache, 'MISS');
+  assert.equal(openai.calls.length, c0 + 1); assert.equal(a.db.usage.length, u0 + 1);
+  assert.equal(openai.calls.length - c0, 1, '삭제 요청 자체는 OpenAI 를 부르지 않음');
+  // 기존 전체 삭제는 그대로
+  assert.equal((await a.del(9)).status, 200); assert.equal(a.db.cache.size, 0);
 });
