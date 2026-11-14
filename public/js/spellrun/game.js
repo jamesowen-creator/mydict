@@ -458,6 +458,7 @@ function judgeNote(t, kind) {
   if (kind === 'hit') cls = '정답';
   else if (kind === 'miss') cls = '정답 풍선 놓침';
   else if (hasId && t.wi < G.wi) cls = '이전 단어 소속 풍선';
+  else if (hasId && t.wi === G.wi && t.si < G.si) cls = '이전 칸 소속 풍선';
   else if (t.correct) cls = '정답 풍선이지만 다른 칸 소속';
   else cls = t.text === need ? '오답 풍선(필요한 글자와 같은 글자)' : '오답 풍선(다른 글자)';
   const since = Math.round((G.time - JD.wordT) * 10) / 10;
@@ -1087,7 +1088,9 @@ function onHit(t) {
   if (t.high) floatText(RUNNER_X + 70, GROUND - 225, '2단 점프 +' + CONFIG.HIGH_BONUS, '#a86a00', 17);
   if (G.combo % 5 === 0) floatText(RUNNER_X + 80, GROUND - 120, '콤보 ' + G.combo + '!', BAD, 24);
   fillSlotUI(G.si);
+  const solvedWi = G.wi, solvedSi = G.si;
   G.si++;
+  if (edgeOn()) riseSolved(solvedWi, solvedSi);   // 작업435: 가로는 푼 칸 묶음의 남은 풍선을 떠오르게 하고 판정에서 뺀다
   renderScore();
   if (G.si >= G.plan.slots.length) completeWord();
   else { setCur(); G.spawnT = CONFIG.PACK_DELAY; }
@@ -1770,6 +1773,13 @@ function riseTile(t) {
 function riseUseless() {
   const cur = dimCur();
   for (const t of G.tiles) if (!t.kind && t.state === 'live' && !t.checked && t.correct && !L.streamIsCorrect(t, cur)) riseTile(t);
+}
+// 작업435(가로 edge 전용): 칸의 정답을 터트려 풀렸으면 그 칸 묶음에서 아직 러너에 닿지 않은 남은 풍선(같은 wi·si, 풍선 개체, 살아 있고 판정 전)을 riseUseless 와 같은 방식(riseTile)으로 떠오르게 하고 판정에서 뺀다.
+// 아이템(하트·번개·힌트·천사, t.kind)과 다른 칸·다음 단어의 풍선은 그대로다. 올라가는 소리 표지(riseSnd)는 오답·놓침 때만 쓰므로 원래 값으로 되돌려 새 소리가 나지 않게 한다.
+function riseSolved(wi, si) {
+  const keep = G.riseSnd;
+  for (const t of G.tiles) if (!t.kind && t.state === 'live' && !t.checked && t.wi === wi && t.si === si) riseTile(t);
+  G.riseSnd = keep;
 }
 function popBalloon(t) {
   const A = BALLOON_ART, n = reduce ? Math.ceil(A.POP_N / 2) : A.POP_N, y = (t.high ? HIGH_Y : TILE_Y) - tileLift(t);
