@@ -65,11 +65,12 @@ const LOG = `(() => { window.__ev = []; const t0 = performance.now(); const L = 
   window.SpeechSynthesisUtterance = function (t) { this.text = t; };
   Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { getVoices: () => [], speaking: false, pending: false, paused: false, cancel: () => { L('cancel'); }, resume: () => {}, speak: u => { L('builtin', u.text + ' rate=' + u.rate); setTimeout(() => u.onstart && u.onstart(), 0); setTimeout(() => u.onend && u.onend(), 30); } } });
 })();`;
-async function openGame() {
+async function openGame(extra = '', query = '') {   // 작업441: extra = 페이지 로드 전에 실행할 코드(저장값 준비), query = 주소 뒤에 붙일 문자열
   const page = await browser.newPage({ width: 390, height: 844, token: jwt() });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { localStorage.setItem('spellrun_preview', '0'); localStorage.setItem('spellrun_mode', 'normal'); sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(rows.map(r => r.id)))}); } catch (e) {}` });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: LOG });
-  await page.goto(base + '/spelling_run.html');
+  if (extra) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: extra });
+  await page.goto(base + '/spelling_run.html' + query);
   await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
   for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x: 5, y: 5, button: 'left', clickCount: 1 });   // 자동 재생 허용(사용자 누름)
   await page.eval('SpellRun.manual = true');
@@ -216,5 +217,40 @@ test('427 결과 마무리 소리와 겹치지 않는다: finish 시점에 재�
   const res = ev.find(e => e.k === 'result');
   assert.ok(res);
   assert.equal(ev.filter(e => e.k === 'playing' && e.t > res.t + 30).length, 0, '결과 화면 뒤 재생 중인 소리 없음');
+  await page.close();
+});
+
+// 작업441: 발음 방식 옵션. 기기 음성(tts=device)이면 미리 받기·재생 모두 /api/tts 를 부르지 않고 기기 음성만 쓴다. 기본(서버)은 위 427 시험 그대로.
+test('441 tts=device(저장값): /api/tts 요청 0건, 단어 발음은 기기 음성(서버 오디오 재생 없음)', { skip: SKIP }, async () => {
+  reset();
+  const page = await openGame("try { localStorage.setItem('metis_tts_mode', 'device'); } catch (e) {}");
+  await page.eval('SpellRun.startRound(false)');
+  await wait(1500);
+  assert.equal(T.reqs.length, 0, '미리 받기 요청 없음');
+  await page.eval('SpellRun.G.state = "run"; SpellRun.G.wi = 0; SpellRun.complete();');
+  await page.waitFor("window.__ev.some(e => e.k === 'builtin')", 5000);
+  assert.equal(T.reqs.length, 0, '재생 때도 요청 없음');
+  assert.ok(!(await events(page)).some(e => e.k === 'play'), '서버 오디오는 재생하지 않는다');
+  await page.close();
+});
+
+test('441 ?tts=device 는 저장되어 이후 주소 없이도 유지되고, ?tts=reset 은 지워 서버 발음으로 돌아간다. 저장소가 막혀 있어도 예외 없이 이번 방문에 적용된다', { skip: SKIP }, async () => {
+  reset();
+  let page = await openGame('', '?tts=device');
+  assert.equal(await page.eval("localStorage.getItem('metis_tts_mode')"), 'device');
+  await page.eval('SpellRun.startRound(false)'); await wait(800);
+  assert.equal(T.reqs.length, 0);
+  await page.close();
+  page = await openGame("try { localStorage.setItem('metis_tts_mode', 'device'); } catch (e) {}", '?tts=reset');
+  assert.equal(await page.eval("localStorage.getItem('metis_tts_mode')"), null, 'reset 은 저장값을 지운다');
+  await page.eval('SpellRun.startRound(false)'); await wait(1500);
+  assert.ok(T.reqs.length >= 1, '서버 발음으로 돌아가 요청한다');
+  await page.close();
+  reset();
+  const block = "(() => { const g = Storage.prototype.getItem, st = Storage.prototype.setItem; Storage.prototype.getItem = function (k) { if (k === 'metis_tts_mode') throw new Error('blocked'); return g.apply(this, arguments); }; Storage.prototype.setItem = function (k) { if (k === 'metis_tts_mode') throw new Error('blocked'); return st.apply(this, arguments); }; })();";
+  page = await openGame(block, '?tts=device');
+  await page.eval('SpellRun.startRound(false)'); await wait(800);
+  assert.equal(T.reqs.length, 0, '저장 실패해도 이번 방문은 기기 음성');
+  assert.deepEqual(page.errors.filter(e => /blocked/.test(e)), [], '예외가 밖으로 나오지 않는다');
   await page.close();
 });

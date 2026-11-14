@@ -438,6 +438,17 @@ const audioCache = new Map();   // 단어 → 오디오 주소(Promise). 작업3
 const audioMeta = new Map();    // 단어 → 서버 응답 헤더 X-TTS-Cache(HIT/MISS). 점검 옵션 ttsdebug 의 출처 문구용
 let serverTtsOff = false;       // 401·403·503을 받으면 이번 방문에서는 서버 발음을 더 부르지 않는다
 let serverTtsStatus = 0;        // 위 상태 코드(출처 문구용)
+// 작업441: 발음 방식 옵션(서버 음성 기본 / 기기 음성). 사전과 같은 키(metis_tts_mode)를 본다. 주소 ?tts=device|server 는 저장, ?tts=reset 은 삭제(저장 실패는 무시).
+// 기기 음성이면 서버 발음을 끈 것과 같게 시작한다(serverTtsOff) — 미리 받기·재생·미리 보기 모두 /api/tts 를 부르지 않고 기기 음성으로 간다.
+(function () {
+  let v = lsGet('metis_tts_mode');
+  try {
+    const q = new URLSearchParams(location.search).get('tts');
+    if (q === 'device' || q === 'server') { v = q; try { localStorage.setItem('metis_tts_mode', q); } catch (e) { /* 저장 실패는 무시 */ } }
+    else if (q === 'reset') { v = null; try { localStorage.removeItem('metis_tts_mode'); } catch (e) { /* 무시 */ } }
+  } catch (e) { /* 주소를 못 읽으면 저장값 */ }
+  if (v === 'device') { serverTtsOff = true; serverTtsStatus = 0; }
+})();
 // 작업325: 점검 옵션 ttsdebug=1 일 때만 발음 출처를 화면 한쪽에 작게 보인다. 꺼져 있으면 DOM·표시·동작은 이전과 같다.
 const ttsDebug = OPT.values.ttsdebug === 1;
 let ttsSrcEl = null;
