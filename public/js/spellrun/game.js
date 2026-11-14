@@ -425,6 +425,10 @@ function speakBuiltin(text, rate, queue, onResult) {
 const player = new Audio();
 player.addEventListener('playing', () => { if (player.src !== SILENT_WAV) voiceDuck('audio', true); });   // 작업365: 서버 발음이 나오는 동안 음악을 줄이고, 끝나면(ended·pause·error) 돌려놓는다
 for (const ev of ['ended', 'pause', 'error', 'emptied', 'abort']) player.addEventListener(ev, () => voiceDuck('audio', false));
+// 작업427: 마지막 단어 반복의 시작 판단용. 이번 단어의 첫 발음이 어느 엔진으로 시작됐는지('' = 아직 시작 안 함)
+const VOICE = { engine: '' };
+// 마지막 단어의 첫 발음(서버)이 끝나면 정해진 시각(FINAL_REPEAT_SEC)을 기다리지 않고 바로 느린 반복을 시작한다(팝업이 끝나기 전에 끝낼 시간을 최대한 확보). 시각 값 자체는 그대로
+player.addEventListener('ended', () => { if (G.repeatT > 0 && G.repeatWord && G.state === 'pop') G.repeatT = 0.0001; });
 const audioCache = new Map();   // 단어 → 오디오 주소(Promise). 작업325: 실패한 요청은 지워 다음 호출에서 다시 시도한다(실패가 방문 동안 반복되지 않게)
 const audioMeta = new Map();    // 단어 → 서버 응답 헤더 X-TTS-Cache(HIT/MISS). 점검 옵션 ttsdebug 의 출처 문구용
 let serverTtsOff = false;       // 401·403·503을 받으면 이번 방문에서는 서버 발음을 더 부르지 않는다
@@ -468,9 +472,10 @@ function getServerAudio(word) {
   audioCache.set(word, p);
   return p;
 }
-function playUrl(url, rate, queue) {
+function playUrl(url, rate, queue, stale) {
   return new Promise((resolve, reject) => {
     const go = () => {
+      if (stale && stale()) { resolve('stale'); return; }   // 작업427: 기다리는 사이 판이 끝났거나 바뀌었으면 재생하지 않는다
       try {
         player.defaultPlaybackRate = rate;
         player.src = url;
@@ -497,13 +502,22 @@ function pronounce(word, opts, onResult) {
   const slow = !!opts.slow, rate = slow ? CONFIG.FINAL_SLOW_RATE : 1;
   const report = (ok, why, src) => { if (onResult) onResult(ok, why, src); };
   if (!SND.on) { report(false, '소리 끔'); return; }
-  const fallback = info => speakBuiltin(word, slow ? CONFIG.FINAL_SLOW_RATE : undefined, !!opts.queue, (ok, why) => {
-    const label = L.ttsSourceLabel(ok ? Object.assign({ engine: 'builtin' }, info) : { engine: 'none' });
-    showTtsSource(label); report(ok, why, label);
-  });
+  // 작업427: opts.round 가 있으면 게임 진행 중 발음. 그 판이 끝났거나(결과 화면) 다른 판이 시작됐으면 늦게 온 소리를 내지 않는다
+  const round = opts.round, stale = () => round !== undefined && (G.roundSeq !== round || G.state === 'over');
+  if (round !== undefined && !slow) VOICE.engine = '';
+  const fallback = info => {
+    if (stale()) { report(true); return; }   // 시간 초과·오류 뒤 기기 음성으로 대신할 때도 같은 규칙
+    speakBuiltin(word, slow ? CONFIG.FINAL_SLOW_RATE : undefined, !!opts.queue, (ok, why) => {
+      if (ok && round !== undefined && !slow) VOICE.engine = 'builtin';
+      const label = L.ttsSourceLabel(ok ? Object.assign({ engine: 'builtin' }, info) : { engine: 'none' });
+      showTtsSource(label); report(ok, why, label);
+    });
+  };
   if (serverTtsOff && !audioCache.has(word)) { fallback({ status: serverTtsStatus }); return; }
   const fresh = !audioCache.has(word);
-  getServerAudio(word).then(url => playUrl(url, rate, !!opts.queue)).then(() => {
+  getServerAudio(word).then(url => (stale() ? 'stale' : playUrl(url, rate, !!opts.queue, stale))).then(r => {
+    if (r === 'stale') { report(true); return; }
+    if (round !== undefined && !slow) VOICE.engine = 'server';
     const label = L.ttsSourceLabel({ engine: 'server', cache: fresh ? (audioMeta.get(word) || '') : '' });   // 다시 재생하는 오디오는 캐시 여부를 말하지 않는다
     showTtsSource(label); report(true, undefined, label);
   }, err => {
@@ -513,6 +527,26 @@ function pronounce(word, opts, onResult) {
   });
 }
 // 시작·재도전 버튼을 누른 순간 호출: 소리 재생 권한(자동 재생 제한)을 미리 확보한다
+// 작업427: 판이 시작되면 그 판 단어의 서버 발음을 앞 순서부터 백그라운드로 미리 받는다(동시 2개). audioCache 를 그대로 쓰므로 이미 있거나 받는 중인 단어는 다시 요청하지 않는다.
+// 401·403·429·503 이면 더 요청하지 않고 조용히 멈춘다(재생 때 기존 방식으로 기기 음성). 실패한 단어는 getServerAudio 가 캐시에서 지워 재생 때 다시 시도한다.
+const PRE = { token: 0, active: 0, maxActive: 0, started: 0, stopped: false, ok: false };   // ok = 이번 판에서 한 번이라도 받기에 성공했는가(그 전에는 한 번에 1개만: 서버 발음이 막혀 있으면 요청이 1개로 끝난다)
+const PRE_CONCURRENCY = 2;
+function prefetchRound(words) {
+  const tk = ++PRE.token;
+  PRE.stopped = false; PRE.active = 0; PRE.ok = false;
+  if (!SND.on) return;
+  const list = [...new Set(words)];
+  let i = 0;
+  const pump = () => {
+    while (tk === PRE.token && !PRE.stopped && !serverTtsOff && PRE.active < (PRE.ok ? PRE_CONCURRENCY : 1) && i < list.length) {
+      const w = list[i++];
+      if (audioCache.has(w)) continue;
+      PRE.active++; PRE.started++; PRE.maxActive = Math.max(PRE.maxActive, PRE.active);
+      getServerAudio(w).then(() => { if (tk === PRE.token) PRE.ok = true; }, err => { const st = err && err.status; if (st === 401 || st === 403 || st === 429 || st === 503) PRE.stopped = true; }).then(() => { if (tk === PRE.token) PRE.active--; pump(); });
+    }
+  };
+  pump();
+}
 function primeAudio() {
   wakeAudio();   // 작업365: 시작 버튼을 누른 탭에서 AudioContext 를 깨운다
   try { player.src = SILENT_WAV; const pr = player.play(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {}
@@ -709,6 +743,7 @@ function startRound(reviewOnly, prepared) {
     obstacles: [], obst: null, obstSeq: 0, invuln: 0, stumble: 0, fall: 0, obstHits: 0,
     review: !!reviewOnly, survival: surv, supply: supply, startTime: G.time
   });
+  if (!surv) prefetchRound(pool.map(w => w.word));   // 작업427: 기본 모드·복습 판만(생존·대결은 판 단어가 구간별로 계속 공급돼 전체 목록을 모른다)
   els.start.hidden = true; els.result.hidden = true; els.pop.hidden = true; els.hud.hidden = false;
   renderHearts(); renderScore();
   loadWord(0);
@@ -1102,7 +1137,7 @@ function completeWord() {
   burst(RUNNER_X + 20, GROUND - 120, GOLD, isBoss ? 60 : 30);
   els.popNote.textContent = '';
   sfx.word();
-  pronounce(w.word, {}, ok => { if (!ok) els.popNote.textContent = '발음이 재생되지 않았습니다'; });
+  pronounce(w.word, { round: G.roundSeq }, ok => { if (!ok) els.popNote.textContent = '발음이 재생되지 않았습니다'; });
   // 마지막 단어는 발음을 한 번 더, 천천히 들려준다 (게임 시간 기준으로 예약)
   if (isFinal) { G.repeatT = CONFIG.FINAL_REPEAT_SEC; G.repeatWord = w.word; }
   els.popTag.textContent = isBoss ? '보스 격파!' : (perfect ? '한 번에 성공!' : '');
@@ -1170,6 +1205,7 @@ function finish(cleared) {
   closeMenu();   // 작업360
   musicJingle(!!cleared);   // 작업365: 결과 화면 마무리 소리(음악은 상태가 over 가 되면 페이드 아웃)
   G.state = 'over'; G.bossMode = false; G.cleared = !!cleared; clearIntro(); els.cont.hidden = true;
+  G.repeatT = 0; G.repeatWord = ''; stopVoices();   // 작업427: 결과 화면 뒤로 발음이 이어지지 않는다(재생 중·대기 중 발음 모두 멈춤. 대기 중이던 것은 재생 시점에 판이 끝난 걸 보고 취소)
   box.classList.remove('boss');
   els.pop.hidden = true; els.hud.hidden = true; els.bossBanner.hidden = true;
   if (VSG.on && VSG.running) { vsgOver(); return; }   // 작업347: 대결 판은 결과를 서버에 보내고 상대를 기다린다(일반 결과 화면을 쓰지 않는다)
@@ -1304,6 +1340,17 @@ els.resChips.addEventListener('click', e => {
   if (b && b.dataset.word) pronounce(b.dataset.word);
 });
 
+// 작업427: 마지막 단어의 느린 반복은 팝업이 끝나기 전에 끝날 때만 시작한다(결과 화면 뒤로 발음이 이어지지 않게).
+// 서버 음성: (아직 재생 중인 첫 발음의 남은 시간) + (오디오 길이 ÷ 0.6) 이 팝업 남은 시간(G.popT) - 여유 0.1초 이내여야 한다. 첫 발음이 아직 시작 안 했거나(응답 지연) 길이를 모르면 시작하지 않는다.
+// 첫 발음이 기기 음성이었으면 반복하지 않는다(기기 음성 대체는 최대 한 번)
+const FINAL_REPEAT_MARGIN = 0.3;
+function finalRepeatFits() {
+  if (G.state !== 'pop' || VOICE.engine !== 'server') return false;
+  const d = player.duration;
+  if (!(isFinite(d) && d > 0)) return false;
+  const rem = (!player.paused && !player.ended) ? Math.max(0, d - player.currentTime) : 0;
+  return rem + d / CONFIG.FINAL_SLOW_RATE <= G.popT - FINAL_REPEAT_MARGIN;
+}
 // ---------- 업데이트 ----------
 function step(dt) {
   if (G.state === 'choice' || VSG.quitOpen || menuPauses()) return;   // 작업360: 혼자 할 때 메뉴가 열려 있으면 게임 시간·타일·점수가 모두 멈춘다(대결은 멈추지 않는다). 작업341: 선택 화면에 머문 시간은 게임 시간(생존 시간)에 들어가지 않는다. 작업348: 대결 나가기 확인 대화상자가 열려 있는 동안도 같다
@@ -1312,7 +1359,7 @@ function step(dt) {
   box.classList.toggle('bsky', G.bossBlend >= 0.5);   // 보스 하늘이 절반 이상 보이면 위쪽 글자를 흰색으로(stage_style.js)
   if (G.repeatT > 0) {
     G.repeatT -= dt;
-    if (G.repeatT <= 0) { pronounce(G.repeatWord, { slow: true, queue: true }); G.repeatWord = ''; }
+    if (G.repeatT <= 0) { const w = G.repeatWord; G.repeatWord = ''; if (finalRepeatFits()) pronounce(w, { slow: true, queue: true, round: G.roundSeq }); }
   }
   if (G.state === 'idle' || G.state === 'over') { G.dist += 60 * dt; updateFx(dt); return; }
   G.boost = Math.max(0, G.boost - dt);

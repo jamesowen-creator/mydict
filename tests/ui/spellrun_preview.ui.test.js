@@ -147,7 +147,8 @@ test('끄기: 스위치로 끄면 저장(spellrun_preview)되고 시작이 바�
   await click(page, '#startBtn');
   await playing(page);
   assert.equal(await page.eval("document.getElementById('pv').hidden"), true, '끄면 미리 보기 화면 없음');
-  assert.equal(ttsCalls().length <= 1, true, '미리 보기용 발음 호출 없음(게임의 첫 단어 연출 발음만)');
+  // 작업427: 판이 시작되면 그 판 단어를 백그라운드로 미리 받는다. 미리 보기가 꺼졌으니 호출은 모두 그 미리 받기(단어당 한 번, 판 단어 수 이하)뿐이다
+  { const texts = ttsCalls().map(r => JSON.parse(r.body).text), n = await page.eval('SpellRun.G.words.length'); assert.equal(new Set(texts).size, texts.length, '같은 단어를 두 번 요청하지 않는다'); assert.ok(texts.length <= n, '판 단어 수(' + n + ') 이하: ' + texts.length); }
   await page.close();
 
   page = await openGame({ storage: "localStorage.setItem('spellrun_preview', '0');" });   // 저장값 꺼짐

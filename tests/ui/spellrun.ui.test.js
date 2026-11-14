@@ -294,7 +294,7 @@ test('5) 완벽 봇으로 한 판을 끝내면 /api/tts 는 단어당 1회만, A
 });
 
 // ───────── 6. TTS 실패 → 내장 음성 ─────────
-test('6) /api/tts 가 503 이면 브라우저 내장 음성으로 넘어가 단어를 읽고, 마지막 단어는 0.6배속으로 한 번 더 읽는다', { skip: SKIP }, async () => {
+test('6) /api/tts 가 503 이면 브라우저 내장 음성으로 넘어가 단어를 한 번씩 읽는다(작업427: 기기 음성 대체는 마지막 단어도 한 번, 느린 반복 없음)', { skip: SKIP }, async () => {
   resetState(); state.tts = 503;
   const page = await openGame({ ids: [1, 2, 3], speech: true });
   await gameReady(page);
@@ -308,8 +308,8 @@ test('6) /api/tts 가 503 이면 브라우저 내장 음성으로 넘어가 단�
   assert.deepEqual([...new Set(spoken.map(s => s.text))].sort(), ['apple', 'book', 'environment'], '내장 음성으로 세 단어 모두 읽음');
   const last = spoken[spoken.length - 1];
   const lastWord = await page.eval('SpellRun.G.words[SpellRun.G.words.length - 1].word');
-  assert.equal(last.text, lastWord); assert.equal(last.rate, 0.6, '마지막 단어 두 번째는 0.6배속');
-  assert.equal(spoken.filter(s => s.text === lastWord).length, 2, '마지막 단어는 두 번 읽는다');
+  assert.equal(last.text, lastWord); assert.notEqual(last.rate, 0.6, '작업427: 기기 음성은 마지막 단어도 느린 반복 없이 한 번');
+  assert.equal(spoken.filter(s => s.text === lastWord).length, 1, '마지막 단어도 한 번만 읽는다(일반+느린 두 번 연달아 안 나감)');
   assert.equal(ttsCalls().length, 1, '503을 받은 뒤에는 서버 발음을 더 부르지 않는다: ' + ttsCalls().length);
   assert.equal(await page.eval("document.getElementById('popNote').textContent"), '', '내장 음성이 시작됐으니 실패 안내는 없다');
   await page.close();
