@@ -221,7 +221,7 @@
 /* 작업425: 결과 화면 별 3칸·최고 기록·신기록 표시(기본 모드만). 획득 별은 코랄, 빈 별은 연한 남색 회색 */
 .sr-box .stars{display:flex;justify-content:center;gap:calc(6 * var(--u))}
 .sr-box #result .card{gap:calc(7 * var(--u))}
-.sr-box .star{width:calc(30 * var(--u));height:calc(30 * var(--u));min-width:20px;min-height:20px;overflow:visible}
+.sr-box .star{width:calc(var(--starsz,30) * var(--u));height:calc(var(--starsz,30) * var(--u));min-width:20px;min-height:20px;overflow:visible}
 .sr-box .star path{fill:#e3e7f4;stroke:#9aa3c2;stroke-width:1.6;stroke-linejoin:round}
 .sr-box .star.on path{fill:var(--coral);stroke:var(--ink);stroke-width:1.8}
 .sr-box .star.on.go{animation:sr-starin .38s cubic-bezier(.2,1.4,.4,1) backwards;animation-delay:calc(var(--i) * 250ms)}
@@ -230,15 +230,39 @@
 .sr-box .newtag{background:var(--coral);color:var(--ink);border:calc(2 * var(--u)) solid var(--ink);border-radius:10px;padding:calc(2 * var(--u)) calc(8 * var(--u));font-size:max(11px,calc(13 * var(--u)));font-weight:700}
 .sr-box .stats > div{min-width:0}
 .sr-box .stats b{display:block;font-family:var(--f-letter);font-size:calc(22 * var(--u));font-variant-numeric:tabular-nums}
-.sr-box .chips{display:flex;flex-wrap:wrap;gap:calc(6 * var(--u));justify-content:center}
+/* 작업431: 결과 화면 단어 목록 — 칩 대신 한 줄 행(상태 점 + 단어 + 뜻 한 줄 말줄임). 탭하면 그 행만 뜻이 두 줄까지 펼쳐진다. 그룹 제목이 범례를 대신한다 */
+.sr-box .reslist{display:flex;flex-direction:column;scrollbar-gutter:stable;overflow-y:auto;overflow-x:hidden;min-height:0;scrollbar-width:thin;scrollbar-color:#b9c0dc transparent;-webkit-overflow-scrolling:touch}
+.sr-box .rgrp{display:flex;justify-content:space-between;align-items:baseline;gap:calc(8 * var(--u));margin:calc(5 * var(--u)) 0 calc(1 * var(--u));font-size:max(11px,calc(11.5 * var(--u)));font-weight:700;line-height:1.3;color:var(--ink-soft);text-align:left}
+.sr-box .rgrp:first-child{margin-top:0}
+.sr-box .rgrp small{font-size:max(11px,calc(11 * var(--u)));font-weight:500;opacity:.85}
 .sr-box .chip{
-  border:calc(2 * var(--u)) solid var(--ink);border-radius:999px;padding:calc(3 * var(--u)) calc(10 * var(--u));
-  font-family:var(--f-body);font-size:calc(12 * var(--u));font-weight:700;line-height:1.35;background:#eef0f6;color:var(--ink-soft);
-  cursor:pointer;max-width:100%;text-align:left;word-break:keep-all;overflow-wrap:anywhere;
+  display:flex;align-items:center;gap:calc(6 * var(--u));flex:none;box-sizing:border-box;width:100%;min-height:var(--rowh,40px);padding:calc(2 * var(--u)) calc(4 * var(--u));
+  border:0;border-bottom:1px solid #e6e9f5;border-radius:0;background:transparent;color:var(--ink);
+  font-family:var(--f-body);font-size:max(12px,calc(13 * var(--u)));font-weight:700;line-height:1.3;white-space:nowrap;text-align:left;cursor:pointer;
 }
-.sr-box .chip:focus-visible{outline:calc(3 * var(--u)) solid var(--ink);outline-offset:calc(2 * var(--u))}
-.sr-box .chip.boss{border-color:var(--gold-deep);box-shadow:0 0 0 calc(2 * var(--u)) var(--gold)}
-.sr-box .chip em{font-style:normal;font-family:var(--f-letter);font-size:calc(10 * var(--u));background:var(--ink);color:var(--gold);border-radius:999px;padding:0 calc(6 * var(--u));margin-right:calc(5 * var(--u))}
+.sr-box .chip::before{content:"";flex:none;width:calc(9 * var(--u));height:calc(9 * var(--u));min-width:8px;min-height:8px;border-radius:50%;background:#aab2cc}
+.sr-box .chip.clean::before{background:#1fae68}
+.sr-box .chip.slip::before{background:#f0902a}
+.sr-box .chip.fail::before{background:#e8454f}
+.sr-box .chip:focus-visible{outline:calc(3 * var(--u)) solid var(--ink);outline-offset:-3px}
+.sr-box .chip em{flex:none;font-style:normal;font-family:var(--f-letter);font-size:max(11px,calc(11 * var(--u)));line-height:1.3;background:var(--ink);color:var(--gold);border-radius:4px;padding:0 calc(4 * var(--u))}
+.sr-box .chip i{flex:1 1 0;min-width:0;margin-left:calc(2 * var(--u));overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:normal;font-weight:500;color:var(--ink-soft)}
+.sr-box .chip.open{align-items:flex-start;padding-top:calc(5 * var(--u));padding-bottom:calc(5 * var(--u));background:#f3f5fb}
+.sr-box .chip.open::before{margin-top:calc(4 * var(--u))}
+.sr-box .chip.open i{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;word-break:keep-all;overflow-wrap:anywhere}
+.sr-box #result .card{display:flex;flex-direction:column;overflow:hidden;gap:calc(4 * var(--u));padding:calc(10 * var(--u)) calc(14 * var(--u)) calc(10 * var(--u))}
+.sr-box #result .resleft{display:contents}
+.sr-box #result #resInfo{order:1;display:flex;flex-direction:column;flex:none;gap:calc(3 * var(--u))}
+.sr-box #result #resMain{order:2;display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:calc(4 * var(--u))}
+.sr-box #result .reslist{flex:1 1 auto}
+.sr-box #result #resBtns{order:3;display:flex;flex-direction:column;flex:none;gap:calc(6 * var(--u))}
+.sr-box #result #resBtns.row{flex-direction:row}
+.sr-box #result #resBtns.row .btn{flex:1 1 0;min-width:0;font-size:max(13px,calc(14 * var(--u)));padding:calc(4 * var(--u)) calc(6 * var(--u))}
+.sr-box #result .btn{min-height:44px;padding:calc(8 * var(--u)) calc(12 * var(--u));font-size:calc(18 * var(--u));line-height:1.15;word-break:keep-all}
+.sr-box #result .note{font-size:max(11px,calc(11.5 * var(--u)))}
+.sr-box #result .stats{gap:calc(16 * var(--u));font-size:max(11px,calc(12 * var(--u)))}
+.sr-box #result .stats > div{display:flex;align-items:baseline;gap:calc(4 * var(--u))}
+.sr-box #result .stats b{display:inline;font-size:calc(17 * var(--u))}
 .sr-box.boss .progress{color:var(--bad)}
 .sr-box .banner{
   position:absolute;left:0;right:0;top:36%;display:flex;flex-direction:column;align-items:center;gap:calc(4 * var(--u));
@@ -249,16 +273,6 @@
 .sr-box .banner .b1{font-family:var(--f-letter);font-weight:700;font-size:calc(52 * var(--u));line-height:1;letter-spacing:.12em}
 .sr-box .banner .b2{font-family:var(--f-display);font-size:calc(17 * var(--u));color:#fff}
 @keyframes sr-slidein{0%{transform:translateX(-100%)}100%{transform:translateX(0)}}
-.sr-box .chip i{font-style:normal;font-weight:500;margin-left:calc(5 * var(--u));opacity:.8}
-.sr-box .chip.clean{background:#d4f4e3;color:var(--ink)}
-.sr-box .chip.slip{background:#ffe0c2;color:var(--ink)}
-.sr-box .chip.fail{background:#ffcfd3;color:var(--ink)}
-.sr-box .legend{display:flex;justify-content:center;gap:calc(12 * var(--u));flex-wrap:wrap;font-size:calc(11 * var(--u));color:var(--ink-soft)}
-.sr-box .legend span::before{content:"";display:inline-block;width:calc(9 * var(--u));height:calc(9 * var(--u));border-radius:50%;border:calc(1.5 * var(--u)) solid var(--ink);margin-right:calc(4 * var(--u));vertical-align:-1px}
-.sr-box .legend .c::before{background:#d4f4e3}
-.sr-box .legend .s::before{background:#ffe0c2}
-.sr-box .legend .f::before{background:#ffcfd3}
-.sr-box .legend .k::before{background:#eef0f6}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 /* 작업355: 꽉 찬 화면. 게임 화면에서는 앱 헤더·화면 바를 숨기고 판이 화면 전체(안전 여백 안)를 채운다. 배경은 화면 끝까지 */
 body.sr-full{max-width:none;margin:0;overflow:hidden;position:fixed;inset:0;width:100%;height:100%;overscroll-behavior:none}
@@ -326,18 +340,20 @@ body.sr-full .sr-box .screen{padding-top:calc(38 * var(--u))}
 .sr-box.land .card{max-width:calc(700 * var(--u));align-self:center;padding:calc(10 * var(--u)) calc(16 * var(--u))}
 .sr-box.land #cont .card,.sr-box.land #vsQuit .card,.sr-box.land #help .card{max-width:calc(520 * var(--u))}
 .sr-box.land #result .btn,.sr-box.land #cont .btn{min-height:44px}
-.sr-box.land #start .card,.sr-box.land #result .card{display:grid;grid-template-columns:1fr 1fr;column-gap:calc(18 * var(--u));row-gap:calc(8 * var(--u));align-content:center}
+.sr-box.land #start .card{display:grid;grid-template-columns:1fr 1fr;column-gap:calc(18 * var(--u));row-gap:calc(8 * var(--u));align-content:center}
 .sr-box.land #start .title{grid-column:1 / -1;grid-row:1;font-size:calc(32 * var(--u))}
 .sr-box.land #startInfoCol{grid-column:1;grid-row:2 / span 4;display:flex;flex-direction:column;gap:calc(8 * var(--u));justify-content:center}
 .sr-box.land #modeRow{grid-column:2;grid-row:2}
 .sr-box.land #viewRow{grid-column:2;grid-row:3}
 .sr-box.land #optRow{grid-column:2;grid-row:4}
 .sr-box.land #startBtn{grid-column:2;grid-row:5}
-.sr-box.land #resInfo{grid-column:1;grid-row:1;display:flex;flex-direction:column;gap:calc(8 * var(--u));justify-content:center}
-.sr-box.land #resMain{grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:calc(8 * var(--u))}
-.sr-box.land #resTitle{font-size:calc(30 * var(--u))}
-.sr-box.land #result .btn{padding-top:calc(8 * var(--u));padding-bottom:calc(8 * var(--u));font-size:calc(20 * var(--u))}
-.sr-box.land .star{width:calc(28 * var(--u));height:calc(28 * var(--u))}
+/* 작업431: 가로 결과 — 왼쪽 열(제목·별·점수·기록·통계 + 버튼), 오른쪽 열 전체가 단어 목록 */
+.sr-box.land #result .card{flex-direction:row;align-items:stretch;gap:calc(16 * var(--u));padding:calc(6 * var(--u)) calc(14 * var(--u))}
+.sr-box.land #result .resleft{display:flex;flex-direction:column;justify-content:space-between;gap:calc(8 * var(--u));flex:0 0 44%;min-width:0}
+.sr-box.land #result #resInfo,.sr-box.land #result #resMain,.sr-box.land #result #resBtns{order:0}
+.sr-box.land #result #resInfo{flex:1 1 auto;justify-content:center;gap:calc(5 * var(--u))}
+.sr-box.land #result #resMain{flex:1 1 0;min-width:0}
+.sr-box.land #result .btn{min-height:44px;padding-top:calc(6 * var(--u));padding-bottom:calc(6 * var(--u));font-size:calc(17 * var(--u))}
 /* 작업419: 가로는 [넘김]이 카드 오른쪽 가운데, [건너뛰기]는 왼쪽 아래 가장자리. 읽기 칼럼은 그 왼쪽 영역 가운데 */
 .sr-box.land #pv .card{grid-template-columns:auto 1fr auto;grid-template-rows:auto minmax(0,1fr) auto;column-gap:calc(16 * var(--u));row-gap:calc(2 * var(--u));align-content:center}
 .sr-box.land .pvtop{grid-column:1 / -1;grid-row:1}

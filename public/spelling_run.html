@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<script src="/js/common/authGate.js?v=111"></script>
+<script src="/js/common/authGate.js?v=112"></script>
 <link rel="manifest" href="/manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -268,6 +268,7 @@
 
         <section class="screen" id="result" hidden>
           <div class="card">
+            <div class="resleft">
             <div class="c1w" id="resInfo">
               <h2 class="title small" id="resTitle"></h2>
               <div class="stars" id="resStars" role="img" hidden>
@@ -282,12 +283,13 @@
                 <div><b id="resCombo">0</b>최고 콤보</div>
               </div>
             </div>
-            <div class="c1w" id="resMain">
-              <div class="chips" id="resChips"></div>
-              <div class="legend"><span class="c">한 번에 완성</span><span class="s">실수 후 완성</span><span class="f">미완성</span><span class="k">도전 안 함</span></div>
-              <p class="note">단어를 탭하면 발음을 다시 들을 수 있습니다.</p>
+            <div class="resbtns" id="resBtns">
               <button class="btn alt" id="revBtn" type="button">틀린 단어만 다시 도전</button>
               <button class="btn" id="againBtn" type="button">새 판 시작</button>
+            </div>
+            </div>
+            <div class="c1w" id="resMain">
+              <div class="reslist" id="resChips"></div>
             </div>
           </div>
         </section>
@@ -303,8 +305,8 @@
 </main>
 
 <!-- ?v= 값은 public/sw.js 의 CACHE_NAME(metis-vN) 숫자와 같게 두고 배포마다 함께 올린다(tests/spellrun_cache.test.js 가 검사) -->
-<script src="/js/spellrun/logic.js?v=111"></script>
-<script src="/js/spellrun/stage_style.js?v=111"></script>
-<script src="/js/spellrun/game.js?v=111"></script>
+<script src="/js/spellrun/logic.js?v=112"></script>
+<script src="/js/spellrun/stage_style.js?v=112"></script>
+<script src="/js/spellrun/game.js?v=112"></script>
 </body>
 </html>

@@ -220,12 +220,21 @@ function fitWidth(el, max, min) {
 }
 function fitResult() {
   if (els.result.hidden) return;
-  let tp = fitWidth(els.resTitle, 36, 16), sp = fitWidth(els.resScore, 56, 20);
-  const card = els.result.querySelector('.card'), set = (e, px) => { e.style.fontSize = 'calc(' + px + ' * var(--u))'; };
-  while (card.scrollHeight > card.clientHeight && (sp > 36 || tp > 20)) {
-    if (sp > 36) { sp -= 2; set(els.resScore, sp); }
-    if (tp > 20) { tp -= 1; set(els.resTitle, tp); }
-  }
+  els.resChips.style.height = '';   // 작업431: 행을 펼치면서 잡아 둔 목록 높이는 새로 맞출 때 푼다
+  const tp0 = fitWidth(els.resTitle, 36, 16), sp0 = fitWidth(els.resScore, 56, 20);
+  const card = els.result.querySelector('.card'), list = els.resChips, btns = $('resBtns'), set = (e, px) => { e.style.fontSize = 'calc(' + px + ' * var(--u))'; };
+  // 작업431: 카드 전체는 스크롤하지 않는다. 단어 목록이 넘치면 ① 위쪽 영역(점수 34·제목 18·별 20 까지)을 줄이고 ② 세로 화면이면 두 버튼을 나란히 놓고(위쪽부터 다시) ③ 행 높이를 40 → 32 까지 줄인다. 그래도 넘칠 때만 목록 안에서 스크롤
+  const over = () => list.scrollHeight > list.clientHeight + 0.5 || card.scrollHeight > card.clientHeight + 0.5;
+  const pass = side => {
+    let tp = tp0, sp = sp0, rowH = 40, star = 30;
+    btns.classList.toggle('row', side);
+    const apply = () => { list.style.setProperty('--rowh', rowH + 'px'); card.style.setProperty('--starsz', String(star)); set(els.resScore, sp); set(els.resTitle, tp); };
+    apply();
+    while (over() && (sp > 34 || tp > 18 || star > 20)) { if (sp > 34) sp -= 2; if (tp > 18) tp -= 1; if (star > 20) star -= 2; apply(); }
+    while (over() && rowH > 32) { rowH -= 1; apply(); }
+    return !over();
+  };
+  if (!pass(false) && !box.classList.contains('land')) pass(true);
 }
 // 작업425: 신기록은 이 기기(localStorage spellrun_best, JSON {키: 최고 점수})에만. 읽기·쓰기 실패나 깨진 값은 무시한다
 const BEST_KEY = 'spellrun_best';
@@ -1193,8 +1202,8 @@ function finish(cleared) {
   box.classList.remove('boss');
   els.pop.hidden = true; els.hud.hidden = true; els.bossBanner.hidden = true;
   if (VSG.on && VSG.running) { vsgOver(); return; }   // 작업347: 대결 판은 결과를 서버에 보내고 상대를 기다린다(일반 결과 화면을 쓰지 않는다)
-  els.resChips.textContent = '';
   const surv = G.survival;
+  const groups = { wrong: [], clean: [], none: [] };   // 작업431: 틀린 단어(실수 후 완성·미완성) · 잘한 단어(한 번에 완성) · 도전 안 함(미완성 뒤라 나오지 않은 단어. 다시 도전 개수에는 안 들어간다)
   const old = box.querySelectorAll('#resTime, #resMissNote, #resCont'); old.forEach(e => e.remove());   // 생존 모드 전용 요소는 매번 지우고 다시 만든다
   const shown = [];   // 생존 모드: 틀린 단어 칩(최근 SURV_CHIPS 개)
   G.words.forEach((w, i) => {
@@ -1206,16 +1215,30 @@ function finish(cleared) {
     } else if (i === G.wordsDone && !cleared) { cls = 'fail'; missedSet.add(w.word); }
     else cls = '';
     if (surv && cls !== 'slip' && cls !== 'fail') return;   // 생존 모드는 틀린 단어만 칩으로 보인다
-    if (surv) shown.push({ w: w, cls: cls }); else appendChip(w, cls);
+    if (surv) shown.push({ w: w, cls: cls }); else (cls === 'clean' ? groups.clean : cls === '' ? groups.none : groups.wrong).push({ w: w, cls: cls });
   });
   if (surv) {
     const keep = shown.slice(-CONFIG.SURV_CHIPS);
-    keep.forEach(x => appendChip(x.w, x.cls));
+    groups.wrong = keep;
     const note = document.createElement('p'); note.className = 'note'; note.id = 'resMissNote';
     note.textContent = shown.length ? '틀린 단어 ' + shown.length + '개' + (shown.length > keep.length ? ' 중 최근 ' + keep.length + '개' : '') : '틀린 단어 없음';
-    els.resChips.parentNode.insertBefore(note, els.resChips.nextSibling);
+    els.resChips.parentNode.insertBefore(note, els.resChips);
   }
+  renderResultList(groups);
   finishRest(cleared);
+}
+// 작업431: 그룹 제목(틀린 단어 N · 잘한 단어 N · 도전 안 함 N, 해당 단어가 있을 때만) + 한 줄 행. 첫 제목 옆에 짧은 안내
+function renderResultList(groups) {
+  els.resChips.textContent = '';
+  let first = true;
+  for (const [key, label] of [['wrong', '틀린 단어'], ['clean', '잘한 단어'], ['none', '도전 안 함']]) {
+    const list = groups[key]; if (!list.length) continue;
+    const h = document.createElement('h3'); h.className = 'rgrp'; h.dataset.group = key; h.appendChild(document.createTextNode(label + ' ' + list.length));
+    if (first) { const sm = document.createElement('small'); sm.textContent = '탭하면 발음·뜻 펼침'; h.appendChild(sm); first = false; }
+    els.resChips.appendChild(h);
+    list.forEach(x => appendChip(x.w, x.cls));
+  }
+  els.resChips.scrollTop = 0;
 }
 function appendChip(w, cls) {
   {
@@ -1321,7 +1344,14 @@ $('ttsTest').addEventListener('click', () => {
 });
 els.resChips.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('.chip');
-  if (b && b.dataset.word) pronounce(b.dataset.word);
+  if (!b || !b.dataset.word) return;
+  pronounce(b.dataset.word);
+  // 작업431: 뜻이 한 줄에 다 안 들어가 …로 잘린 행은 탭하면 두 줄까지 펼쳐진다. 다시 탭하거나 다른 행을 탭하면 접힌다
+  const was = b.classList.contains('open');
+  els.resChips.querySelectorAll('.chip.open').forEach(x => x.classList.remove('open'));
+  // 펼쳐도 목록 높이는 고정해(안에서 스크롤) 카드가 커지거나 버튼이 밀리지 않게 한다
+  if (!was) { if (!els.resChips.style.height) els.resChips.style.height = els.resChips.clientHeight + 'px'; b.classList.add('open'); }
+  else els.resChips.style.height = '';
 });
 
 // ---------- 업데이트 ----------

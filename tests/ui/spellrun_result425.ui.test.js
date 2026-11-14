@@ -171,7 +171,7 @@ test('425 글자 크기: 점수가 이 화면에서 가장 큰 글자(제목 이
     const tag = `${w}x${h} ${JSON.stringify(m)}`;
     assert.equal(m.text, '99,999'); assert.ok(m.fits && m.inCard && m.oneLine, '카드 폭 안에 한 줄: ' + tag);
     assert.ok(m.score >= m.title && m.score > m.maxOther, '점수가 가장 큰 글자: ' + tag);
-    assert.ok(m.score >= 36, '이전 20px 보다 크게: ' + tag);
+    assert.ok(m.score >= 26, '이전 20px 보다 크게(작업431: 목록을 한 화면에 넣으려고 점수가 34, 아주 낮은 가로 화면은 27까지 줄 수 있다): ' + tag);
     await page.close();
   }
 });
