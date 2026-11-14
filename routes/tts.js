@@ -109,6 +109,8 @@ router.post('/api/tts', requireAuth, async (req, res) => {
     }
 
     const audioBuffer = Buffer.from(await openaiRes.arrayBuffer());
+    // 작업439: 빈 응답(0바이트)은 정상 음성이 아니다 — 캐시에 저장하거나 사용량을 세지 않고 오류로 응답한다(catch 가 500 처리)
+    if (!audioBuffer.length) throw new Error('empty audio from upstream');
 
     if (process.env.DATABASE_URL) {
       pool.query(

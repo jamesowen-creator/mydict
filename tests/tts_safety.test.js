@@ -37,12 +37,13 @@ function createDb() {
 
 // 모의 OpenAI: 전역 fetch 중 OpenAI 주소만 가로챈다(시험 서버로 가는 요청은 그대로 통과)
 const realFetch = globalThis.fetch;
-const openai = { calls: [], fail: false };
+const openai = { calls: [], fail: false, empty: false };
 const AUDIO = Buffer.from('FAKE-MP3-BYTES');
 globalThis.fetch = async (url, opts) => {
   if (String(url).startsWith('https://api.openai.com/')) {
     openai.calls.push({ url: String(url), headers: opts.headers, body: JSON.parse(opts.body) });
     if (openai.fail) return { ok: false, text: async () => 'upstream error: internal-secret-detail', arrayBuffer: async () => new ArrayBuffer(0) };
+    if (openai.empty) return { ok: true, text: async () => '', arrayBuffer: async () => new ArrayBuffer(0) };
     return { ok: true, text: async () => '', arrayBuffer: async () => AUDIO.buffer.slice(AUDIO.byteOffset, AUDIO.byteOffset + AUDIO.length) };
   }
   return realFetch(url, opts);
@@ -56,7 +57,7 @@ test.after(() => process.off('unhandledRejection', onRej));
 
 async function setup() {
   const db = createDb();
-  openai.calls.length = 0; openai.fail = false; process.env.OPENAI_API_KEY = 'test-openai-key';
+  openai.calls.length = 0; openai.fail = false; openai.empty = false; process.env.OPENAI_API_KEY = 'test-openai-key';
   const t = await startApp(['routes/tts.js'], { db });
   const raw = (method, url, body, user = null) => t.call(method, url, body, { user });
   return { db, t, post: (body, user = 7) => raw('POST', '/api/tts', body, user), del: (user = null) => raw('DELETE', '/api/tts/cache', undefined, user) };
@@ -249,4 +250,17 @@ test('337-6. 제한 확인 중 DB 오류면 503(서버 음성을 쓰지 않는�
   assert.equal((await postRaw(a, { text: 'warm' })).cache, 'HIT', '적중은 제한 확인을 하지 않는다');
   a.db.failUsageCheck = false;
   assert.equal((await a.del(null)).status, 401); assert.equal((await a.del(7)).status, 403); assert.equal((await a.del(9)).status, 200);
+});
+
+test('439. 빈(0바이트) 응답은 캐시에 저장하지 않고 사용량도 세지 않으며 500, 정상 응답은 저장(MISS→HIT)되고 사용량 1회만 센다', async t => {
+  const a = await setup(); t.after(() => a.t.close());
+  const origErr = console.error; console.error = () => {};
+  openai.empty = true;
+  let r; try { r = await a.post({ text: 'snobbish' }); } finally { console.error = origErr; }
+  assert.equal(r.status, 500); assert.equal(a.db.cache.size, 0, '빈 음성은 저장 안 됨'); assert.equal(a.db.usage.length, 0, '사용량도 세지 않음');
+  openai.empty = false;
+  const ok = await postRaw(a, { text: 'snobbish' }); assert.equal(ok.cache, 'MISS'); assert.ok(ok.bytes.length > 0);
+  await new Promise(r2 => setTimeout(r2, 20));
+  assert.equal(a.db.cache.size, 1, '정상 응답은 저장됨'); assert.equal(a.db.usage.length, 1);
+  assert.equal((await postRaw(a, { text: 'snobbish' })).cache, 'HIT'); assert.equal(a.db.usage.length, 1, '적중은 사용량 불변');
 });
