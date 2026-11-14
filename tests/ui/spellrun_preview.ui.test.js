@@ -66,11 +66,10 @@ test.before(async () => {
 test.after(async () => { if (browser) await browser.close(); if (srv) await new Promise(r => srv.close(r)); });
 
 // 게임 페이지를 연다. 저장소는 비우고(미리 보기 켜짐이 기본), 시간 설정은 시험이 짧게 바꿔 쓴다. 장애물은 막아 두고 이어하기는 끈다(미리 보기와 무관한 요소를 줄인다)
-async function openGame({ query = '', width = 360, height = 640, speech = true, storage = '', ttsMode = 'server' } = {}) {   // 작업442: ttsMode 'server'(기본, 414 시험용 고정) | 'default'(저장값 없음 = 새 기본, 기기 음성)
+async function openGame({ query = '', width = 360, height = 640, speech = true, storage = '' } = {}) {
   state.requests.length = 0;
   const page = await browser.newPage({ width, height, token: jwt() });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { if (!sessionStorage.getItem('__init')) { sessionStorage.setItem('__init', '1'); localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.removeItem('spellrun_preview'); ${storage} } sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(state.rows.map(r => r.id)))}); } catch (e) {}` });
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: ttsMode === 'server' ? "try { localStorage.setItem('metis_tts_mode', 'server'); } catch (e) {}" : "try { localStorage.removeItem('metis_tts_mode'); } catch (e) {}" });   // 작업442: 단어 발음 기본이 기기 음성이 되어, 서버 발음 경로(414)를 보는 이 시험은 서버 방식으로 고정한다
   if (speech) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
   await page.goto(base + '/spelling_run.html' + query);
   await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
@@ -440,7 +439,6 @@ test('414 연타: 빨리 여러 번 넘겨도 이전 단어의 늦은 발음이 
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: AUDIO });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { if (!sessionStorage.getItem('__init')) { sessionStorage.setItem('__init', '1'); localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); localStorage.removeItem('spellrun_preview'); } sessionStorage.setItem('spellrun_ids', JSON.stringify(${JSON.stringify(state.rows.map(r => r.id))})); } catch (e) {}` });
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.setItem('metis_tts_mode', 'server'); } catch (e) {}" });   // 작업442: 단어 발음 기본이 기기 음성이 되어, 서버 발음 경로(414·431)를 보는 이 시험은 서버 방식으로 고정한다
   await page.goto(base + '/spelling_run.html');
   await page.waitFor("!document.getElementById('app').hidden && !document.getElementById('startBtn').disabled", 8000);
   await startGame(page);
@@ -665,13 +663,3 @@ for (const [w, h] of [[390, 844], [960, 460]]) {
     noErrors(page); await page.close();
   });
 }
-
-test('442 기본(저장값 없음): 미리 보기의 단어 발음은 /api/tts 를 부르지 않고 기기 음성으로 읽는다(미리 받기 없음)', { skip: SKIP }, async () => {
-  resetState();
-  const page = await openGame({ ttsMode: 'default' });
-  await startGame(page); await walkToLast(page); await sleep(300);
-  assert.equal(ttsCalls().length, 0, '서버 발음 요청 0건');
-  const spoken = await page.eval('window.__speech.spoken.length');
-  assert.ok(spoken >= 1, '기기 음성으로 읽음: ' + spoken);
-  await page.close();
-});

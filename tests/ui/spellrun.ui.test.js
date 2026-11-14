@@ -90,7 +90,7 @@ async function openGame({ ids, token = true, width = 390, height = 844, speech =
   const page = await browser.newPage({ width, height, token: token ? jwt() : null });
   await withDodge(page, dodge);
   if (blockObst) { await page.send('Network.enable'); await page.send('Network.setBlockedURLs', { urls: ['*spellrun_obstacles_sheet*'] }); }
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); " + (/preview=/.test(query) ? '' : "localStorage.setItem('spellrun_preview', '0'); ") + (/tts=/.test(query) ? '' : "localStorage.setItem('metis_tts_mode', 'server'); ") + "} catch (e) {}" });   // 작업442: 단어 발음 기본이 기기 음성이 되어, 서버 발음 경로(318·325·5·6)를 보는 이 시험들은 서버 방식으로 고정한다(?tts= 를 주면 그대로). 작업319: 저장된 주소 옵션이 다른 시험으로 새지 않게 비운다
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('spellrun_opts'); localStorage.removeItem('spellrun_mode'); " + (/preview=/.test(query) ? '' : "localStorage.setItem('spellrun_preview', '0'); ") + "} catch (e) {}" });   // 작업319: 저장된 주소 옵션이 다른 시험으로 새지 않게 비운다
   if (!token) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.removeItem('mydict_token'); } catch (e) {}" });   // 같은 Chrome 프로필을 쓰는 앞선 시험이 남긴 토큰 제거
   if (speech) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: SPEECH });
   if (ids) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { sessionStorage.setItem('spellrun_ids', ${JSON.stringify(JSON.stringify(ids))}); } catch (e) {}` });

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<script src="/js/common/authGate.js?v=117"></script>
+<script src="/js/common/authGate.js?v=118"></script>
 <title>METIS — A Lens for the Wisdom</title>
 
 <!-- PWA -->
@@ -1614,8 +1614,8 @@
         <button type="button" class="lang-tag" id="lang-tag-ja2" onclick="selectLang('ja')">일본어</button>
         <button type="button" class="lang-tag" id="lang-tag-zh2" onclick="selectLang('zh')">중국어</button>
       </div>
-      <!-- 작업441·442: 단어 발음 방식이 기본(기기 음성)이 아닌 '서버 음성'일 때만 보이는 한 줄(눌러서 기본으로) -->
-      <button type="button" id="tts-mode-note" hidden onclick="ttsModeRelease()" style="margin:8px auto 0;min-height:44px;padding:0 12px;border:0;background:transparent;color:var(--text2);font-size:12px;font-family:inherit;text-decoration:underline">발음 방식: 서버 음성(눌러서 기기 음성으로)</button>
+      <!-- 작업441: 발음 방식이 '기기 음성'일 때만 보이는 한 줄(눌러서 해제) -->
+      <button type="button" id="tts-mode-note" hidden onclick="ttsModeRelease()" style="margin:8px auto 0;min-height:44px;padding:0 12px;border:0;background:transparent;color:var(--text2);font-size:12px;font-family:inherit;text-decoration:underline">발음 방식: 기기 음성(눌러서 서버 음성으로)</button>
     </div>
     <!-- 작업107: OCR 인식 후보 순차 탐색 내비게이션 - #search-result는
          renderResult*()가 innerHTML을 통째로 갈아끼우므로, 그 바깥의
@@ -4267,10 +4267,9 @@ function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
 // ─── TTS ─────────────────────────────────────────────────────────────────────
 const ttsMemCache = {};
 let ttsCurrentAudio = null;
-// 작업442: 단어 발음 방식 옵션. 기본은 기기 음성(작업441 에서 서버 음성은 일부 단어가 잘리거나 무음이었다). 주소 ?tts=server 는 단어도 서버 음성으로(저장), ?tts=device 는 기본(저장), ?tts=reset 은 저장값 삭제.
-// 이 옵션은 사전 단어 발음 버튼·미리 받기(단어)에만 적용된다. 팟캐스트(문장·예문 포함 긴 텍스트)는 항상 서버 음성이다. 스펠링 런과 같은 키(metis_tts_mode)를 같이 본다. 저장소를 못 써도 이번 방문에는 적용된다.
+// 작업441: 발음 방식 옵션(서버 음성 기본 / 기기 음성). 주소 ?tts=device|server 는 저장하고 ?tts=reset 은 지운다. 스펠링 런과 같은 키(metis_tts_mode)를 같이 본다. 저장소를 못 써도 이번 방문에는 적용된다.
 const TTS_MODE_KEY = 'metis_tts_mode';
-let ttsWordServer = false;   // true 면 단어도 서버 음성
+let ttsDevice = false;
 (function () {
   let v = null;
   try { v = localStorage.getItem(TTS_MODE_KEY); } catch (e) { /* 저장소를 못 읽으면 기본 */ }
@@ -4279,16 +4278,14 @@ let ttsWordServer = false;   // true 면 단어도 서버 음성
     if (q === 'device' || q === 'server') { v = q; try { localStorage.setItem(TTS_MODE_KEY, q); } catch (e) { /* 저장 실패는 무시 */ } }
     else if (q === 'reset') { v = null; try { localStorage.removeItem(TTS_MODE_KEY); } catch (e) { /* 무시 */ } }
   } catch (e) { /* 주소를 못 읽으면 저장값 */ }
-  ttsWordServer = v === 'server';
-  const n = document.getElementById('tts-mode-note'); if (n) { n.hidden = !ttsWordServer; n.style.display = ttsWordServer ? 'block' : 'none'; }
+  ttsDevice = v === 'device';
+  const n = document.getElementById('tts-mode-note'); if (n) { n.hidden = !ttsDevice; n.style.display = ttsDevice ? 'block' : 'none'; }
 })();
-// 단어를 기기 음성으로 읽을 것인가(기본). 기기에 음성이 없으면 서버 음성으로 이어진다
-function ttsWordsOnDevice() { return !ttsWordServer && speechAvailable(); }
 function ttsModeRelease() {
-  ttsWordServer = false;
+  ttsDevice = false;
   try { localStorage.removeItem(TTS_MODE_KEY); } catch (e) { /* 무시 */ }
   const n = document.getElementById('tts-mode-note'); if (n) { n.hidden = true; n.style.display = 'none'; }
-  showToast('기기 음성으로 돌아갔어요');
+  showToast('서버 음성으로 돌아갔어요');
 }
 
 // 작업35: .tts-btn이 아이콘(.tts-icon) + "발음" 텍스트(.tts-label)로
@@ -4326,8 +4323,7 @@ function stopDeviceSpeech() {
   try { speechSynthesis.cancel(); } catch (e) { /* 무시 */ }
 }
 function noticeDeviceVoice(status) {
-  if (status === -1 || ttsFallbackNoticed) return;   // 작업442: -1 = 기본 방식으로 기기 음성을 쓰는 것(대체가 아니므로 안내하지 않는다)
-  
+  if (ttsFallbackNoticed) return;
   ttsFallbackNoticed = true;
   showToast(status === 429 ? '오늘 서버 발음 한도를 다 써서 기기 음성으로 읽어요' : '기기 음성으로 읽어요');
 }
@@ -4337,7 +4333,7 @@ function speakOnDevice(text, lang, key, btnEl, status) {
   try {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = TTS_SPEECH_LANG[lang] || 'en-US'; u.rate = 0.85;   // 작업442: 단어 발음 속도를 스펠링 런과 같은 0.85 로 통일
+    u.lang = TTS_SPEECH_LANG[lang] || 'en-US'; u.rate = 0.9;
     const done = () => { if (ttsSpeakingKey === key) { ttsSpeakingKey = null; if (btnEl) { setTtsIcon(btnEl, TTS_ICON.idle); btnEl.classList.remove('playing'); delete btnEl.dataset._ttsKey; } } };
     u.onend = done; u.onerror = done;
     ttsSpeakingKey = key;
@@ -4419,7 +4415,7 @@ async function playTTS(text, lang, btnEl) {
   }
 
   try {
-    if (ttsWordsOnDevice()) { if (speakOnDevice(text, lang, key, btnEl, -1)) return; }   // 작업442: 단어는 기본이 기기 음성(/api/tts 를 부르지 않는다, 안내 토스트 없음). 읽기에 실패하면 서버 음성으로 이어진다
+    if (ttsDevice) { fallback(0, '기기 음성을 쓸 수 없습니다.'); return; }   // 작업441: 기기 음성 방식이면 /api/tts 를 부르지 않는다
     let url = ttsMemCache[key];
     if (!url) {
       if (!getToken()) { fallback(401, '로그인이 필요합니다.'); return; }   // 토큰이 없으면 서버 요청 없이 기기 음성
@@ -4469,7 +4465,7 @@ async function playTTS(text, lang, btnEl) {
 async function prefetchTTS(text, lang) {
   const key = text + ':' + lang;
   if (ttsMemCache[key]) return;
-  if (ttsWordsOnDevice() || !getToken() || serverTtsOff) return;   // 작업442: 단어는 기본이 기기 음성이라 요청하지 않는다. 작업335: 토큰이 없거나 서버 발음이 꺼져 있으면 요청하지 않는다
+  if (ttsDevice || !getToken() || serverTtsOff) return;   // 작업441: 기기 음성 방식이면 요청하지 않는다. 작업335: 토큰이 없거나 서버 발음이 꺼져 있으면 요청하지 않는다
   try {
     const res = await fetch('/api/tts', {
       method: 'POST',
