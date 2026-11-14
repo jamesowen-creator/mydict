@@ -424,12 +424,15 @@ function mutateChunk(text, rng) {
 }
 
 // 후보 묶음: 정답 1개 + 오답. 오답은 헷갈리는 글자 → 같은 단어의 다른 글자 → 임의 알파벳 순서로 채운다.
-function makeCandidates(correct, word, rng, cfg) {
+// 작업430: avoid(문자열 배열, 생략 가능)에 든 글자·조각은 오답으로 쓰지 않고 건너뛰어 다음 후보로 채운다(난수 호출 순서는 같다). 가로(edge)가 다음 칸의 정답 글자를 넘긴다.
+// avoid 를 안 넘기면 지금까지와 완전히 같다.
+function makeCandidates(correct, word, rng, cfg, avoid) {
   rng = rng || Math.random; cfg = cfg || CONFIG;
   const need = Math.max(1, cfg.CANDIDATES - 1);
   const seen = new Set([correct]);
+  const skip = new Set(avoid || []);
   const wrongs = [];
-  const add = t => { if (t && !seen.has(t) && wrongs.length < need) { seen.add(t); wrongs.push(t); } };
+  const add = t => { if (t && !seen.has(t) && !skip.has(t) && wrongs.length < need) { seen.add(t); wrongs.push(t); } };
   if (correct.length === 1) {
     shuffle(CONFUSABLE[correct] || [], rng).forEach(add);
     shuffle(Array.from(new Set(word.toLowerCase().split('').filter(isAlpha))), rng).forEach(add);
@@ -1322,6 +1325,11 @@ function buildRound(words, missed, cfg, rng, reviewOnly) {
   return list.slice(0, cfg.WORDS_PER_ROUND);
 }
 function letterCount(word) { return Array.from(word).filter(isAlpha).length; }
+// 작업430: 가로 스트림에서 이 칸의 오답으로 쓰면 안 되는 글자 목록 = 다음 칸의 정답 글자(조각이면 조각 전체와 첫 글자 한 글자). 다음 칸이 없으면 빈 목록
+function nextSlotAvoid(nextSlot) {
+  if (!nextSlot || !nextSlot.text) return [];
+  return nextSlot.text.length > 1 ? [nextSlot.text, nextSlot.text[0]] : [nextSlot.text];
+}
 function bossConfig(cfg) {
   cfg = cfg || CONFIG;
   return Object.assign({}, cfg, { CANDIDATES: cfg.BOSS_CANDIDATES, CHUNK_PROB: cfg.BOSS_CHUNK_PROB, MAX_SLOTS: cfg.BOSS_MAX_SLOTS });
@@ -1412,7 +1420,7 @@ return {
   letterCount: letterCount, planRound: planRound, roundShape: roundShape, bossConfig: bossConfig,
   ttsSourceLabel: ttsSourceLabel, PENGUIN: PENGUIN, runFrameLength: runFrameLength, RUN_LEN_DEF: RUN_LEN_DEF, advanceRunPhase: advanceRunPhase, penguinFrame: penguinFrame, spinAngle: spinAngle, sparkleAlpha: sparkleAlpha, introTimeline: introTimeline, introState: introState, buildConfig: buildConfig, parseOptions: parseOptions, resolveOptions: resolveOptions, storedOptions: storedOptions, OPTION_KEY: OPTION_KEY, configure: configure, OPTION_RULES: OPTION_RULES, LAYOUT: LAYOUT, LAYOUT_LAND: LAYOUT_LAND, layoutFor: layoutFor, LAND_RUNNER_X: LAND_RUNNER_X, LAND_GRAB_DX: LAND_GRAB_DX, AIR_GAP_MARGIN: AIR_GAP_MARGIN, airSeconds: airSeconds, doubleAirSeconds: doubleAirSeconds, airGapSeconds: airGapSeconds,
   jumpV0: jumpV0, jumpG: jumpG, airHeight: airHeight, secondJumpLandTime: secondJumpLandTime, planHighSlots: planHighSlots,
-  starsFor: starsFor, updateBest: updateBest, bestKey: bestKey, survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, balloonRise: balloonRise, balloonRiseY: balloonRiseY, SOUND: SOUND, PENTA: PENTA, comboNote: comboNote, tempoCoef: tempoCoef, tempoStep: tempoStep, slotSec: slotSec, resumePos: resumePos, duckLevel: duckLevel, rampValue: rampValue, noiseSamples: noiseSamples, noteMidi: noteMidi, midiFreq: midiFreq, SONGS: SONGS, songEvents: songEvents, eventVoices: eventVoices, sfxPlan: sfxPlan, buildSoundGraph: buildSoundGraph, makeNoiseBuffer: makeNoiseBuffer, playVoices: playVoices, CHAR_FX: CHAR_FX, charSquash: charSquash, runBob: runBob, charShadow: charShadow, wrongFx: wrongFx, rightHop: rightHop, starFx: starFx, reactNext: reactNext, reactKind: reactKind, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
+  nextSlotAvoid: nextSlotAvoid, starsFor: starsFor, updateBest: updateBest, bestKey: bestKey, survHeartEvery: survHeartEvery, survHeartWord: survHeartWord, survHeartSlot: survHeartSlot, survRampCfg: survRampCfg, survPickBoss: survPickBoss, makeSurvSupply: makeSurvSupply, runState: runState, planRescue: planRescue, contHp: contHp, rescueLow: rescueLow, heartEffect: heartEffect, hashInt: hashInt, planSpeedItem: planSpeedItem, boostTarget: boostTarget, boostWordBonus: boostWordBonus, OBSTACLE_ART: OBSTACLE_ART, CHARS: CHARS, CHAR_KEYS: CHAR_KEYS, BALLOON_ART: BALLOON_ART, balloonColor: balloonColor, balloonPhase: balloonPhase, balloonMotion: balloonMotion, balloonStretch: balloonStretch, balloonRise: balloonRise, balloonRiseY: balloonRiseY, SOUND: SOUND, PENTA: PENTA, comboNote: comboNote, tempoCoef: tempoCoef, tempoStep: tempoStep, slotSec: slotSec, resumePos: resumePos, duckLevel: duckLevel, rampValue: rampValue, noiseSamples: noiseSamples, noteMidi: noteMidi, midiFreq: midiFreq, SONGS: SONGS, songEvents: songEvents, eventVoices: eventVoices, sfxPlan: sfxPlan, buildSoundGraph: buildSoundGraph, makeNoiseBuffer: makeNoiseBuffer, playVoices: playVoices, CHAR_FX: CHAR_FX, charSquash: charSquash, runBob: runBob, charShadow: charShadow, wrongFx: wrongFx, rightHop: rightHop, starFx: starFx, reactNext: reactNext, reactKind: reactKind, charFromOption: charFromOption, charFromStored: charFromStored, BG_ART: BG_ART, ITEM_ART: ITEM_ART, obstacleArtIndex: obstacleArtIndex, obstacleArtScale: obstacleArtScale, obstacleArtRect: obstacleArtRect, obstacleWarnDistance: obstacleWarnDistance, airWindow: airWindow, obstacleSpec: obstacleSpec, obstacleOverlaps: obstacleOverlaps, obstacleHit: obstacleHit, obstacleLayout: obstacleLayout, obstacleWindow: obstacleWindow, obstacleAddedSec: obstacleAddedSec, planObstacle: planObstacle, afterObstacleHit: afterObstacleHit,
   STREAM: STREAM, streamEntryX: streamEntryX, streamMinGap: streamMinGap, layoutGroup: layoutGroup, groupLeft: groupLeft, shiftGroup: shiftGroup, streamShift: streamShift, streamBaseR0: streamBaseR0, streamPlace: streamPlace, streamIsCorrect: streamIsCorrect, streamOffscreen: streamOffscreen,
   wordWidth: wordWidth, fitWord: fitWord, MASK: MASK, wordForms: wordForms, maskText: maskText, findWordRanges: findWordRanges, buildHint: buildHint, keywords: keywords, splitKeywords: splitKeywords, previewInfo: previewInfo, previewStep: previewStep
 };

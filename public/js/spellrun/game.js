@@ -911,7 +911,7 @@ function edgeCommit(key, kind, nearOnly) {
     G.obstacles.push({ kind: g.obstacle.kind, x: g.obstacle.x, w: g.obstacle.w, hit: false, age: 0, art: obstacleArtIndex(word.word, wp.obst.slot, G.obstSeq++), wp: wp });
     wp.obst.done = true;
   }
-  const cands = makeCandidates(slot.text, word.word, Math.random, ccfg);
+  const cands = makeCandidates(slot.text, word.word, Math.random, ccfg, L.nextSlotAvoid(wp.plan.slots[key.si + 1]));   // 작업430: 가로는 다음 칸의 정답 글자를 오답으로 쓰지 않는다(묶음이 이어서 나와 정답 직전에 같은 글자 오답이 오는 것을 막음). 단어의 마지막 칸은 다음 단어 팝업·시작 대기가 사이에 있어 제외 없음
   cands.forEach((c, i) => {
     const t = { id: pid, x: g.tiles[i].x, w: g.tiles[i].w, text: c.text, correct: c.correct, chunk: slot.chunk, high: !!slot.high, state: 'live', t: 0, age: 0,
       checked: false, ok: false, color: TILE_COLORS[(i + key.si) % TILE_COLORS.length], wi: key.wi, si: key.si, n: pid * 8 + i, bi: balloonColor(i, key.si) };   // 작업361: n·bi = 풍선 위상·색(난수 없음)
