@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>METIS-3 도면</title>
+<style>
+:root { --bg:#fafaf9; --card:#ffffff; --text:#1a1a1a; --sub:#555b66; --line:#d9d9d4; --accent:#b8442e; --accent-bg:#fdf0ec; --rel-bg:#eaf4ee; --rel-line:#2f7d57; }
+@media (prefers-color-scheme: dark) { :root { --bg:#17181a; --card:#212326; --text:#f1f1ee; --sub:#a9adb5; --line:#3a3d42; --accent:#ff8c73; --accent-bg:#3a2520; --rel-bg:#1d3327; --rel-line:#5fc08e; } }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 16px/1.5 -apple-system, "Segoe UI", "Noto Sans KR", "Malgun Gothic", sans-serif; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.hint { font-size: 14px; color: var(--sub); margin: 0 0 12px; }
+.grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 720px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+.col h2 { font-size: 14px; margin: 0 0 8px; color: var(--sub); font-weight: 700; }
+.col .group { font-size: 14px; color: var(--sub); margin: 12px 0 4px; }
+.item { display: block; width: 100%; text-align: left; margin: 0 0 8px; padding: 10px 12px; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); font: inherit; font-size: 16px; cursor: pointer; overflow-wrap: anywhere; }
+.item small { display: block; font-size: 14px; color: var(--sub); }
+.item.todo { border-style: dashed; color: var(--sub); background: transparent; }
+.item.sel { border-color: var(--accent); background: var(--accent-bg); box-shadow: 0 0 0 2px var(--accent) inset; }
+.item.rel { border-color: var(--rel-line); background: var(--rel-bg); }
+.dim .item:not(.sel):not(.rel) { opacity: .35; }
+#detail { margin-top: 16px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); font-size: 15px; overflow-wrap: anywhere; }
+#detail b { display: block; margin-bottom: 4px; }
+#detail ul { margin: 4px 0 8px; padding-left: 20px; }
+.foot { margin-top: 12px; font-size: 14px; color: var(--sub); }
+</style>
+</head>
+<body>
+<h1>METIS-3 도면</h1>
+<p class="hint">항목을 누르면 연결된 항목이 강조되고 나머지는 흐려집니다. 같은 항목을 다시 누르면 해제됩니다. 점선·회색 = 도면 미작성 화면.</p>
+<div class="grid" id="grid">
+  <div class="col" id="col-screen"><h2>화면</h2></div>
+  <div class="col" id="col-engine"><h2>엔진</h2></div>
+  <div class="col" id="col-store"><h2>DB · 외부 서비스</h2></div>
+</div>
+<div id="detail" aria-live="polite">항목을 눌러 보세요.</div>
+<p class="foot">이 파일은 <code>npm run blueprint:gen</code> 이 docs/blueprint/screens 의 머리말에서 만든다(직접 고치지 않는다). 화면 파일 마지막 확인 커밋: <span id="commit"></span></p>
+<script id="data" type="application/json">{"nodes":[{"id":"s:문장 학습","col":"screen","label":"문장 학습","file":"public/jgrammar.html","apis":["GET /api/me","POST /api/jgrammar/explain","POST /api/jgrammar/ocr","GET /api/jgrammar/saved","DELETE /api/jgrammar/saved/:id"],"storage":["localStorage mydict_token","localStorage jgrammar_lang","localStorage jgrammar_furigana","localStorage jgrammar_pinyin","localStorage jgrammar_zh"],"todo":false},{"id":"s:사전","col":"screen","label":"사전","file":"public/english_dictionary.html","apis":["GET /api/me","POST /api/ai","GET /api/wordbook","POST /api/wordbook","DELETE /api/wordbook/:id","PATCH /api/wordbook/:id/example","PATCH /api/wordbook/:id/it","DELETE /api/wordbook/:id/it","POST /api/quiz-correct","GET /api/review-due","POST /api/review-result","POST /api/tts"],"storage":["localStorage mydict_token","localStorage mydict_wrong","localStorage metis_tts_mode","주소 ?tts=server|device|reset","sessionStorage spellrun_ids"],"todo":false},{"id":"s:스펠링 런","col":"screen","label":"스펠링 런","file":"public/spelling_run.html","apis":["GET /api/me","GET /api/wordbook","POST /api/tts","POST /api/versus/rooms","GET /api/versus/rooms","GET /api/versus/rooms/:id","POST /api/versus/rooms/:id/join","POST /api/versus/rooms/:id/start","POST /api/versus/rooms/:id/state","POST /api/versus/rooms/:id/finish","POST /api/versus/rooms/:id/rematch","POST /api/versus/rooms/:id/leave"],"storage":["localStorage mydict_token","localStorage spellrun_opts","localStorage spellrun_mode","localStorage spellrun_preview","localStorage spellrun_view","localStorage spellrun_bgm","localStorage spellrun_char","localStorage spellrun_best","localStorage metis_tts_mode","sessionStorage spellrun_ids","주소 ?tts=server|device|reset","주소 점검 옵션 ttsdebug·judgedebug"],"todo":false},{"id":"s:METIS|public/home/index.html","col":"screen","label":"METIS","file":"public/home/index.html","apis":[],"storage":[],"todo":true},{"id":"s:METIS Admin|public/admin.html","col":"screen","label":"METIS Admin","file":"public/admin.html","apis":[],"storage":[],"todo":true},{"id":"s:Speak Loop|public/speakloop.html","col":"screen","label":"Speak Loop","file":"public/speakloop.html","apis":[],"storage":[],"todo":true},{"id":"s:개념 지도 - METIS|public/concept_map.html","col":"screen","label":"개념 지도 - METIS","file":"public/concept_map.html","apis":[],"storage":[],"todo":true},{"id":"s:과학 - METIS|public/science_reading.html","col":"screen","label":"과학 - METIS","file":"public/science_reading.html","apis":[],"storage":[],"todo":true},{"id":"s:문학 나침반|public/literature_compass.html","col":"screen","label":"문학 나침반","file":"public/literature_compass.html","apis":[],"storage":[],"todo":true},{"id":"s:음성 학습 - METIS|public/voice_study.html","col":"screen","label":"음성 학습 - METIS","file":"public/voice_study.html","apis":[],"storage":[],"todo":true},{"id":"s:작가 노트|public/artist_notes.html","col":"screen","label":"작가 노트","file":"public/artist_notes.html","apis":[],"storage":[],"todo":true},{"id":"s:한입 독서|public/digest_reading.html","col":"screen","label":"한입 독서","file":"public/digest_reading.html","apis":[],"storage":[],"todo":true},{"id":"e:2인 대결 방(서버 메모리)","col":"engine","label":"2인 대결 방(서버 메모리)"},{"id":"e:AI 문장 해설(Claude Haiku)","col":"engine","label":"AI 문장 해설(Claude Haiku)"},{"id":"e:AI 사전·단어 질의(Claude Haiku)","col":"engine","label":"AI 사전·단어 질의(Claude Haiku)"},{"id":"e:AI 사진 문장 인식(Claude Haiku)","col":"engine","label":"AI 사진 문장 인식(Claude Haiku)"},{"id":"e:간격 반복 복습(SM-2)","col":"engine","label":"간격 반복 복습(SM-2)"},{"id":"e:기기 글자 인식(Tesseract.js)","col":"engine","label":"기기 글자 인식(Tesseract.js)"},{"id":"e:기기 음성(speechSynthesis)","col":"engine","label":"기기 음성(speechSynthesis)"},{"id":"e:서버 음성(OpenAI TTS)","col":"engine","label":"서버 음성(OpenAI TTS)"},{"id":"e:스펠링 런 게임 엔진(캔버스)","col":"engine","label":"스펠링 런 게임 엔진(캔버스)"},{"id":"t:api_usage","col":"store","label":"api_usage","kind":"DB 테이블"},{"id":"t:jgrammar_cache","col":"store","label":"jgrammar_cache","kind":"DB 테이블"},{"id":"t:jgrammar_saved","col":"store","label":"jgrammar_saved","kind":"DB 테이블"},{"id":"t:review_log","col":"store","label":"review_log","kind":"DB 테이블"},{"id":"t:tts_cache","col":"store","label":"tts_cache","kind":"DB 테이블"},{"id":"t:users","col":"store","label":"users","kind":"DB 테이블"},{"id":"t:wordbook","col":"store","label":"wordbook","kind":"DB 테이블"},{"id":"x:Anthropic API(Claude Haiku)","col":"store","label":"Anthropic API(Claude Haiku)","kind":"외부 서비스"},{"id":"x:Google Fonts","col":"store","label":"Google Fonts","kind":"외부 서비스"},{"id":"x:OpenAI TTS(tts-1-hd)","col":"store","label":"OpenAI TTS(tts-1-hd)","kind":"외부 서비스"},{"id":"x:jsDelivr(tesseract.js)","col":"store","label":"jsDelivr(tesseract.js)","kind":"외부 서비스"}],"links":[["s:문장 학습","e:AI 문장 해설(Claude Haiku)"],["s:문장 학습","e:AI 사진 문장 인식(Claude Haiku)"],["s:문장 학습","e:기기 음성(speechSynthesis)"],["s:문장 학습","t:api_usage"],["s:문장 학습","t:jgrammar_cache"],["s:문장 학습","t:jgrammar_saved"],["s:문장 학습","t:users"],["s:문장 학습","x:Anthropic API(Claude Haiku)"],["s:문장 학습","x:Google Fonts"],["s:사전","e:AI 사전·단어 질의(Claude Haiku)"],["s:사전","e:간격 반복 복습(SM-2)"],["s:사전","e:기기 글자 인식(Tesseract.js)"],["s:사전","e:기기 음성(speechSynthesis)"],["s:사전","e:서버 음성(OpenAI TTS)"],["s:사전","t:api_usage"],["s:사전","t:review_log"],["s:사전","t:tts_cache"],["s:사전","t:users"],["s:사전","t:wordbook"],["s:사전","x:Anthropic API(Claude Haiku)"],["s:사전","x:Google Fonts"],["s:사전","x:OpenAI TTS(tts-1-hd)"],["s:사전","x:jsDelivr(tesseract.js)"],["s:스펠링 런","e:2인 대결 방(서버 메모리)"],["s:스펠링 런","e:기기 음성(speechSynthesis)"],["s:스펠링 런","e:서버 음성(OpenAI TTS)"],["s:스펠링 런","e:스펠링 런 게임 엔진(캔버스)"],["s:스펠링 런","t:api_usage"],["s:스펠링 런","t:tts_cache"],["s:스펠링 런","t:users"],["s:스펠링 런","t:wordbook"],["s:스펠링 런","x:Google Fonts"],["s:스펠링 런","x:OpenAI TTS(tts-1-hd)"]],"commit":"1a8e9cd"}</script>
+<script>
+(function () {
+  var data = JSON.parse(document.getElementById('data').textContent);
+  var nodes = data.nodes, byId = {};
+  nodes.forEach(function (n) { byId[n.id] = n; n.rel = []; });
+  data.links.forEach(function (l) { byId[l[0]].rel.push(l[1]); byId[l[1]].rel.push(l[0]); });
+  document.getElementById('commit').textContent = data.commit || '(없음)';
+  var cols = { screen: document.getElementById('col-screen'), engine: document.getElementById('col-engine'), store: document.getElementById('col-store') };
+  var lastKind = '';
+  nodes.forEach(function (n) {
+    if (n.col === 'store' && n.kind !== lastKind) { lastKind = n.kind; var g = document.createElement('div'); g.className = 'group'; g.textContent = n.kind; cols.store.appendChild(g); }
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'item' + (n.todo ? ' todo' : ''); b.setAttribute('aria-pressed', 'false'); b.dataset.id = n.id;
+    b.textContent = n.label;
+    if (n.todo) { var s = document.createElement('small'); s.textContent = '도면 미작성'; b.appendChild(s); }
+    b.addEventListener('click', function () { select(selected === n.id ? null : n.id); });
+    n.el = b; cols[n.col].appendChild(b);
+  });
+  var selected = null, grid = document.getElementById('grid'), detail = document.getElementById('detail');
+  function list(title, arr) {
+    if (!arr || !arr.length) return;
+    var b = document.createElement('b'); b.textContent = title; detail.appendChild(b);
+    var ul = document.createElement('ul'); arr.forEach(function (x) { var li = document.createElement('li'); li.textContent = x; ul.appendChild(li); }); detail.appendChild(ul);
+  }
+  function select(id) {
+    selected = id;
+    nodes.forEach(function (n) { n.el.classList.remove('sel', 'rel'); n.el.setAttribute('aria-pressed', 'false'); });
+    detail.textContent = '';
+    if (!id) { grid.classList.remove('dim'); detail.textContent = '항목을 눌러 보세요.'; return; }
+    var n = byId[id]; grid.classList.add('dim');
+    n.el.classList.add('sel'); n.el.setAttribute('aria-pressed', 'true');
+    n.rel.forEach(function (r) { byId[r].el.classList.add('rel'); });
+    var t = document.createElement('b'); t.textContent = n.label + (n.file ? '  (' + n.file + ')' : '') + (n.kind ? '  — ' + n.kind : ''); detail.appendChild(t);
+    if (n.todo) { var p = document.createElement('div'); p.textContent = '이 화면은 도면이 아직 없습니다(연결 정보 없음).'; detail.appendChild(p); return; }
+    var names = function (col) { return n.rel.filter(function (r) { return byId[r].col === col; }).map(function (r) { return byId[r].label; }); };
+    if (n.col === 'screen') { list('엔진', names('engine')); list('DB·외부 서비스', names('store')); list('API', n.apis); list('저장값·주소 옵션', n.storage); }
+    else list('이 항목을 쓰는 화면(도면이 있는 화면만)', names('screen'));
+  }
+})();
+</script>
+</body>
+</html>

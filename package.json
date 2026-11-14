@@ -8,6 +8,7 @@
     "test": "node --test --test-concurrency=3 \"tests/**/*.test.js\"",
     "test:ui": "node --test --test-concurrency=3 \"tests/ui/*.test.js\"",
     "test:unit": "node --test --test-concurrency=3 \"tests/*.test.js\"",
+    "blueprint:gen": "node scripts/blueprint_gen.js",
     "build:home": "npm --prefix home-wheel install && npm --prefix home-wheel run build",
     "validate:digest": "node scripts/validate_digest.js",
     "validate:science": "node scripts/validate_science.js",
