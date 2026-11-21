@@ -1,8 +1,8 @@
 # METIS-3 도면 묶음 (_bundle.md)
 
 이 파일은 `npm run blueprint:gen` 이 만든다(직접 고치지 않는다). 용도: 이 한 파일을 웹 Claude 에 첨부해 프로젝트 문서로 복사한다.
-순서: README → LEGEND → screens(파일 이름 순). 기준 커밋(화면 파일의 last_checked): 8753b0a
-화면 파일 6개.
+순서: README → LEGEND → screens(파일 이름 순). 기준 커밋(화면 파일의 last_checked): 8753b0a, bf7715c
+화면 파일 7개.
 
 =====================================================================
 ### 파일: docs/blueprint/README.md
@@ -31,7 +31,7 @@
 | 스펠링 런 | public/spelling_run.html | 단어장 단어로 하는 철자 게임(혼자·2인 대결) | 작성 |
 | 문장 학습 | public/jgrammar.html | 일본어·영어·중국어 문장 해설·사진 인식·저장·읽어주기(파일명 jgrammar) | 작성 |
 | 음성 학습 | public/voice_study.html | 음성 노트(녹음 변환·요약·퀴즈·대화·연결 지도·이미지)와 요약 읽어주기 | 작성 |
-| 개념 지도 | public/concept_map.html | 개념 지도·복습·서술 답변(/api/cmap…) | 미작성 |
+| 개념 지도 | public/concept_map.html | 개념 지도·복습·서술 답변(/api/cmap…) | 작성 |
 | Speak Loop | public/speakloop.html | 영어 말하기 연습(저장 음성, 이디엄 포함; /api/speakloop…) | 작성 |
 | 문학 나침반 | public/literature_compass.html | 정적 콘텐츠(literature_db.json) 읽기 | 미작성 |
 | 한입 독서 | public/digest_reading.html | 정적 콘텐츠(digest_db.json) 읽기 | 미작성 |
@@ -47,16 +47,18 @@
 ## 생성 구간 (npm run blueprint:gen 이 만든다. 이 안은 손으로 고치지 않는다)
 <!-- gen:start -->
 > 이 구간은 `npm run blueprint:gen` 이 화면 파일(docs/blueprint/screens)의 머리말에서 만든다. 손으로 고치지 않는다.
-> **도면이 작성된 화면(6개)만 반영한다.** 미작성 화면이 같은 엔진·API·저장소를 쓰는지는 이 목록에 나오지 않으므로 코드로 직접 확인한다.
+> **도면이 작성된 화면(7개)만 반영한다.** 미작성 화면이 같은 엔진·API·저장소를 쓰는지는 이 목록에 나오지 않으므로 코드로 직접 확인한다.
 
 ### 엔진별 사용 화면 (→호출)
 - **2인 대결 방(서버 메모리)** — 스펠링 런
+- **AI 개념 지도 처리(Claude Haiku)** — 개념 지도
 - **AI 단어 뜻 변환(Claude Haiku)** — 관리자
 - **AI 문장 해설(Claude Haiku)** — 문장 학습
 - **AI 사전·단어 질의(Claude Haiku)** — 사전
 - **AI 사진 문장 인식(Claude Haiku)** — 문장 학습
 - **AI 음성 노트 처리(Claude Haiku)** — 음성 학습
 - **간격 반복 복습(SM-2)** — 사전
+- **기기 PDF 저장(캔버스)** — 개념 지도
 - **기기 글자 인식(Tesseract.js)** — 사전
 - **기기 음성(speechSynthesis)** — 문장 학습, 사전, 스펠링 런, 음성 학습
 - **서버 음성(OpenAI TTS)** — 사전, 스펠링 런
@@ -81,8 +83,9 @@
 - **GET /api/admin/speakloop/audio/status** — 관리자
 - **GET /api/admin/stats** — 관리자
 - **GET /api/admin/users** — 관리자
+- **GET /api/cmap/topics/:rootId/map** — 개념 지도
 - **GET /api/jgrammar/saved** — 문장 학습
-- **GET /api/me** — Speak Loop, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **GET /api/me** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
 - **GET /api/review-due** — 사전
 - **GET /api/speakloop/audio-index** — Speak Loop
 - **GET /api/speakloop/audio/:clipKey** — Speak Loop, 관리자
@@ -114,6 +117,9 @@
 - **POST /api/admin/speakloop/audio/generate** — 관리자
 - **POST /api/admin/speakloop/audio/preview** — 관리자
 - **POST /api/ai** — 사전
+- **POST /api/cmap/maps/:id/edges** — 개념 지도
+- **POST /api/cmap/maps/:id/save** — 개념 지도
+- **POST /api/cmap/topics/:id/explain** — 개념 지도
 - **POST /api/jgrammar/explain** — 문장 학습
 - **POST /api/jgrammar/ocr** — 문장 학습
 - **POST /api/quiz-correct** — 사전
@@ -141,13 +147,19 @@
 - **POST /api/wordbook** — 사전
 
 ### 저장소별 사용 화면 ([DB]·[캐시], →읽기 / →쓰기)
-- **[DB] api_usage** — 읽기: 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **[DB] api_usage** — 읽기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **[DB] cmap_concept_marks** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_concepts** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_edges** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_map_nodes** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_maps** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_topics** — 읽기: 개념 지도 / 쓰기: -
 - **[DB] gloss_backup** — 읽기: 관리자 / 쓰기: 관리자
 - **[DB] jgrammar_saved** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **[DB] review_log** — 읽기: - / 쓰기: 사전
 - **[DB] speakloop_audio** — 읽기: Speak Loop, 관리자 / 쓰기: 관리자
 - **[DB] speakloop_progress** — 읽기: Speak Loop / 쓰기: Speak Loop
-- **[DB] users** — 읽기: Speak Loop, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 관리자
+- **[DB] users** — 읽기: Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 관리자
 - **[DB] voice_image_sets** — 읽기: 음성 학습 / 쓰기: 음성 학습
 - **[DB] voice_images** — 읽기: 음성 학습 / 쓰기: 음성 학습
 - **[DB] voice_links** — 읽기: 음성 학습 / 쓰기: 음성 학습
@@ -165,7 +177,7 @@
 - **jgrammar_pinyin** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **jgrammar_zh** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **metis_tts_mode** — 읽기: 사전, 스펠링 런 / 쓰기: 사전, 스펠링 런
-- **mydict_token** — 읽기: Speak Loop, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 사전
+- **mydict_token** — 읽기: Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 사전
 - **mydict_wrong** — 읽기: 사전 / 쓰기: 사전
 - **spellrun_best** — 읽기: 스펠링 런 / 쓰기: 스펠링 런
 - **spellrun_bgm** — 읽기: 스펠링 런 / 쓰기: 스펠링 런
@@ -179,23 +191,23 @@
 - **voice_tts_rate** — 읽기: 음성 학습 / 쓰기: 음성 학습
 
 ### 외부 서비스별 사용 화면 ([외부])
-- **Anthropic API(Claude Haiku)** — 관리자, 문장 학습, 사전, 음성 학습
-- **Google Fonts** — Speak Loop, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **Anthropic API(Claude Haiku)** — 개념 지도, 관리자, 문장 학습, 사전, 음성 학습
+- **Google Fonts** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
 - **OpenAI Images(이미지 생성)** — 음성 학습
 - **OpenAI STT(음성 인식)** — 음성 학습
 - **OpenAI TTS(음성 합성)** — 관리자, 사전, 스펠링 런
 - **jsDelivr(tesseract.js)** — 사전
 
 ### 모듈별 사용 화면 ([모듈])
-- **public/js/common/appHeader.js** — Speak Loop, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
-- **public/js/common/authGate.js** — Speak Loop, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **public/js/common/appHeader.js** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **public/js/common/authGate.js** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
 - **public/js/common/dialog.js** — 문장 학습, 사전, 스펠링 런, 음성 학습
 - **public/js/ocr/ocrScanner.js** — 사전
 
-### 미작성 화면 (6개)
-홈(public/home/index.html), 개념 지도(public/concept_map.html), 문학 나침반(public/literature_compass.html), 한입 독서(public/digest_reading.html), 과학(public/science_reading.html), 작가 노트(public/artist_notes.html)
+### 미작성 화면 (5개)
+홈(public/home/index.html), 문학 나침반(public/literature_compass.html), 한입 독서(public/digest_reading.html), 과학(public/science_reading.html), 작가 노트(public/artist_notes.html)
 
-화면 파일의 마지막 확인 커밋: 8753b0a
+화면 파일의 마지막 확인 커밋: 8753b0a, bf7715c
 <!-- gen:end -->
 
 ## 작업 블록 규칙
@@ -260,6 +272,8 @@
 | 간격 반복 복습(SM-2) | `/api/review-*`. 복습일 계산 |
 | 2인 대결 방(서버 메모리) | `/api/versus/rooms…`. DB 없이 서버 메모리(인스턴스 1개 전제) |
 | 스펠링 런 게임 엔진(캔버스) | logic.js·game.js. 스펠링 런 전용 |
+| AI 개념 지도 처리(Claude Haiku) | `/api/cmap/*`. 개념 설명·심화(explain·deepen)·지도 해설(narrate)·말로 설명하기 평가(answer). 같은 모델 CMAP_MODEL |
+| 기기 PDF 저장(캔버스) | 브라우저 안에서 지도 그림 → JPEG → 최소 PDF → 파일 다운로드(public/js/cmap/mapPdf.js). 서버 호출 없음 |
 
 **이름 추가 절차**: 새 엔진이 필요하면 이 표에 먼저 한 줄(이름·설명) 추가한다. 화면 파일에서 표에 없는 엔진 이름을 쓰면 `blueprint:gen`이 멈춘다. 이름을 바꾸면 모든 화면 파일에서 같이 바꾼다.
 
@@ -338,6 +352,65 @@ last_checked: 8753b0a
 - [기기] localStorage `mydict_token`(:374), `gl_last_run`(마지막 변환 실행 번호, 읽기 :933, 쓰기 :793).
 - [모듈] public/js/common/authGate.js, appHeader.js(관리자일 때만 헤더에 '관리자' 링크, appHeader.js:110).
 - 특이점: 발음 캐시 지우기는 tts_cache(서버 음성)만 지운다. Speak Loop 저장 음성(speakloop_audio)은 이 경로로 지워지지 않는다(별도 저장소).
+
+=====================================================================
+### 파일: docs/blueprint/screens/concept_map.md
+=====================================================================
+
+---
+screen: 개념 지도
+file: public/concept_map.html
+engines: [AI 개념 지도 처리(Claude Haiku), 기기 PDF 저장(캔버스)]
+calls: [GET /api/me, POST /api/cmap/topics/:id/explain, GET /api/cmap/topics/:rootId/map, POST /api/cmap/maps/:id/save, POST /api/cmap/maps/:id/edges]
+reads: [DB:users, DB:api_usage, DB:cmap_topics, DB:cmap_concepts, DB:cmap_maps, DB:cmap_map_nodes, DB:cmap_edges, DB:cmap_concept_marks, 기기:mydict_token]
+writes: [DB:api_usage, DB:cmap_concepts, DB:cmap_maps, DB:cmap_edges]
+fallback: []
+flows: [
+  개념 검색 | →필요 권한:perm_concept_map ; →호출 POST /api/cmap/topics/:id/explain ; →읽기 cmap_topics ; →읽기 cmap_concepts ; →읽기 api_usage ; →호출 AI 개념 지도 처리(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage ; →쓰기 cmap_concepts,
+  개념 누르면 설명 팝업 | →호출 GET /api/cmap/topics/:rootId/map ; →읽기 cmap_concepts,
+  지도 저장 | →필요 권한:perm_concept_map ; →호출 POST /api/cmap/maps/:id/save ; →읽기 cmap_maps ; →읽기 cmap_map_nodes ; →읽기 cmap_edges ; →쓰기 cmap_maps,
+  PDF 저장 | →호출 기기 PDF 저장(캔버스),
+  연결 만들기 | →필요 권한:perm_concept_map ; →호출 POST /api/cmap/maps/:id/edges ; →읽기 cmap_maps ; →읽기 cmap_map_nodes ; →읽기 cmap_edges ; →쓰기 cmap_edges
+]
+requires: [로그인, 권한:perm_concept_map]
+navigates: [홈]
+externals: [Anthropic API(Claude Haiku), Google Fonts]
+modules: [public/js/common/authGate.js, public/js/common/appHeader.js]
+last_checked: bf7715c
+---
+
+# 개념 지도 (public/concept_map.html)
+
+> **범위(작업451): 일부러 좁게 쓴 도면이다.** 개념 지도는 기능이 매우 많아(주제 트리 관리·개념 직접 입력·심화·일괄 연결·배치 최적화·해설·연결 퀴즈·말로 설명하기 답변(음성 인식)·복습 등) 이번에는 사용자가 누르는 동작 5개(개념 검색, 설명 팝업, 지도 저장, PDF 저장, 연결 만들기)와 그 동작에 필요한 연결만 적었다. 머리말에 없는 API·저장소·외부(예: `/api/cmap/maps/:id/narrate`, `…/quiz/*`, `…/answer/*`, OpenAI STT, 테이블 cmap_narrations·cmap_quiz_attempts·cmap_answer_attempts·cmap_topics의 변경)가 이 화면에 없다는 뜻이 아니다. 나머지는 [미확인]이며 후속 작업에서 채운다.
+
+## 1 기능
+- 이 도면이 다루는 것: 개념 검색(AI 설명을 받아 바로 저장) · 지도 편집 시트에서 개념을 누르면 그 옆에 뜨는 설명 팝업 · 지도 저장 · 지도 PDF 저장 · 두 개념을 이어 연결 만들기.
+- 접근: 로그인 + `users.perm_concept_map` 이 명시적으로 true 인 계정만(fail-closed).
+
+## 2 엔진
+- [엔진] AI 개념 지도 처리(Claude Haiku): 개념 검색은 `POST /api/cmap/topics/:id/explain` → `AI.callExplainAI`(lib/cmap_ai.js:261)가 Anthropic SDK(:265)로 모델 CMAP_MODEL claude-haiku-4-5-20251001(:11)을 부른다. 심화(routes/concept_map.js:468)·해설(lib/cmap_narrate.js:154)·서술 평가(lib/cmap_answer.js:81)도 같은 모델이지만 이번 도면 범위 밖이다. 하루 한도 AI.countToday(lib/cmap_ai.js:43) 초과는 429(routes/concept_map.js:318).
+- [엔진] 기기 PDF 저장(캔버스): 서버 호출 없음. 화면의 지도 SVG를 캔버스에 그려 JPEG(public/js/cmap/mapPdf.js:164)로 만들고 최소 PDF 바이트로 묶어(:167) 파일로 내려받는다. 공유 시트는 쓰지 않는다(451). 대체 경로 없음.
+
+## 3 경로 (동작 → 화면 코드 → 서버 라우트)
+- [화면] 개념 지도 →호출 [API] GET /api/me — public/concept_map.html:571 → routes/auth.js:101. →필요 로그인·권한:perm_concept_map(화면은 /api/me 결과의 perm 이 true 일 때만 보여 준다, :565). 모든 /api/cmap 라우트는 guard(routes/concept_map.js:31 = requireAuth + requireCmapPerm :18).
+- 개념 검색 →호출 [API] POST /api/cmap/topics/:id/explain — 검색 폼 제출(concept_map.html:1126) → api 호출(:1074) → routes/concept_map.js:296. →읽기 [DB] cmap_topics(loadTopics :92)·cmap_concepts(:304), api_usage(하루 한도 :318), →호출 [엔진] AI 개념 지도 처리 →호출 [외부] Anthropic API →쓰기 [DB] api_usage(trackUsage lib/cmap_ai.js:278)·cmap_concepts(INSERT :347). 같은 이름의 개념이 이미 있으면 AI를 부르지 않고 기존 개념을 돌려준다(:316, 200 existing).
+- 개념 누르면 설명 팝업 — 누를 때 서버 호출은 없다. 편집 시트를 열 때 받은 `GET /api/cmap/topics/:rootId/map`(public/js/cmap/mapView.js:297 open → routes/concept_map.js:558) 응답의 concepts[].brief(:582, briefOf :414)를 쓴다. 첫 선택 시 onFirst(mapView.js:310)가 briefId를 정하고 renderBrief(:237)가 이름+설명을 그리며 placeBrief(:162)가 그 노드 아래(없으면 위)에 놓는다. 팝업을 누르면 hideBrief(:236, 리스너 :789)로 팝업만 닫히고 선택은 유지된다. →읽기 [DB] cmap_concepts(treeOfMap :553). 이 GET은 지도가 없으면 cmap_maps를 만든다(:568, →쓰기 cmap_maps이지만 팝업 동작의 일은 아님).
+- 지도 저장 →호출 [API] POST /api/cmap/maps/:id/save — 저장 단추(mapView.js:813) → save()(:592, 호출 :596) → routes/concept_map.js:767. →읽기 [DB] cmap_maps(ownMap :541), cmap_map_nodes·cmap_edges(graphOf :529) →쓰기 [DB] cmap_maps(semantic_hash·saved_at, :773).
+- PDF 저장 →호출 [엔진] 기기 PDF 저장(캔버스) — 단추(mapView.js:791) → pdfSave(:278) → CmapPdf.make → deliver(mapPdf.js:173: createObjectURL → a[download] 클릭 → 10초 뒤 revoke). 요청 없음, 지도 데이터·저장 상태는 바꾸지 않는다. 끝나면 "PDF를 저장했어요"를 #map-note에 3초 보인다(mapView.js:286).
+- 연결 만들기 →호출 [API] POST /api/cmap/maps/:id/edges — 두 노드를 차례로 눌러 연결 대화상자(onPair :429 → openEdgeDialog :435)에서 확인하면 api 호출(:487) → routes/concept_map.js:659. →읽기 [DB] cmap_maps(ownMap), cmap_map_nodes(:670), cmap_edges(:672) →쓰기 [DB] cmap_edges(insertEdge :651, INSERT :653).
+
+## 4 DB
+- →읽기: [DB] users(권한 확인 routes/concept_map.js:18), api_usage(하루 한도), cmap_topics, cmap_concepts, cmap_maps, cmap_map_nodes, cmap_edges, cmap_concept_marks(지도 조회 :576, 모르는 개념 표시).
+- →쓰기: [DB] api_usage(AI 설명 사용량), cmap_concepts(AI 설명으로 개념 저장), cmap_maps(저장 시 해시·시각, 지도 조회 시 최초 생성), cmap_edges(연결 만들기).
+- 결과가 쌓이는 곳: 개념·설명은 cmap_concepts, 지도 저장 상태는 cmap_maps, 연결은 cmap_edges. DB 없으면 권한 확인에서 403(:19).
+- [미확인] 이번 범위 밖 테이블(cmap_narrations, cmap_quiz_attempts, cmap_answer_attempts)이 이 화면의 어떤 동작에서 쓰이는지는 코드로 줄 단위 확인하지 않았다(grep으로 라우트 파일에 존재만 확인).
+
+## 5 연결
+- [API] 위 3절. [외부] Anthropic(개념 검색), Google Fonts(concept_map.html:11).
+- [기기] localStorage `mydict_token`(concept_map.html:563). PDF 저장은 파일 다운로드이며 기기 저장값을 쓰지 않는다.
+- [모듈] public/js/common/authGate.js, appHeader.js. 이 화면 전용 스크립트(public/js/cmap/*.js)는 공용이 아니라서 머리말 modules에 적지 않는다.
+- [이동] 개념 지도 →이동 홈(concept_map.html:324 "METIS 홈으로", :1262 location.href = '/').
+- [미확인] iOS 설치 앱(홈 화면 웹앱)에서 a[download]로 PDF가 실제로 저장되는지(자동 시험 불가). 이번 범위 밖 기능 전부.
 
 =====================================================================
 ### 파일: docs/blueprint/screens/dictionary.md

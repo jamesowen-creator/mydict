@@ -52,6 +52,8 @@
 | 간격 반복 복습(SM-2) | `/api/review-*`. 복습일 계산 |
 | 2인 대결 방(서버 메모리) | `/api/versus/rooms…`. DB 없이 서버 메모리(인스턴스 1개 전제) |
 | 스펠링 런 게임 엔진(캔버스) | logic.js·game.js. 스펠링 런 전용 |
+| AI 개념 지도 처리(Claude Haiku) | `/api/cmap/*`. 개념 설명·심화(explain·deepen)·지도 해설(narrate)·말로 설명하기 평가(answer). 같은 모델 CMAP_MODEL |
+| 기기 PDF 저장(캔버스) | 브라우저 안에서 지도 그림 → JPEG → 최소 PDF → 파일 다운로드(public/js/cmap/mapPdf.js). 서버 호출 없음 |
 
 **이름 추가 절차**: 새 엔진이 필요하면 이 표에 먼저 한 줄(이름·설명) 추가한다. 화면 파일에서 표에 없는 엔진 이름을 쓰면 `blueprint:gen`이 멈춘다. 이름을 바꾸면 모든 화면 파일에서 같이 바꾼다.
 

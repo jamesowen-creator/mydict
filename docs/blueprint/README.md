@@ -21,7 +21,7 @@
 | 스펠링 런 | public/spelling_run.html | 단어장 단어로 하는 철자 게임(혼자·2인 대결) | 작성 |
 | 문장 학습 | public/jgrammar.html | 일본어·영어·중국어 문장 해설·사진 인식·저장·읽어주기(파일명 jgrammar) | 작성 |
 | 음성 학습 | public/voice_study.html | 음성 노트(녹음 변환·요약·퀴즈·대화·연결 지도·이미지)와 요약 읽어주기 | 작성 |
-| 개념 지도 | public/concept_map.html | 개념 지도·복습·서술 답변(/api/cmap…) | 미작성 |
+| 개념 지도 | public/concept_map.html | 개념 지도·복습·서술 답변(/api/cmap…) | 작성 |
 | Speak Loop | public/speakloop.html | 영어 말하기 연습(저장 음성, 이디엄 포함; /api/speakloop…) | 작성 |
 | 문학 나침반 | public/literature_compass.html | 정적 콘텐츠(literature_db.json) 읽기 | 미작성 |
 | 한입 독서 | public/digest_reading.html | 정적 콘텐츠(digest_db.json) 읽기 | 미작성 |
@@ -37,16 +37,18 @@
 ## 생성 구간 (npm run blueprint:gen 이 만든다. 이 안은 손으로 고치지 않는다)
 <!-- gen:start -->
 > 이 구간은 `npm run blueprint:gen` 이 화면 파일(docs/blueprint/screens)의 머리말에서 만든다. 손으로 고치지 않는다.
-> **도면이 작성된 화면(6개)만 반영한다.** 미작성 화면이 같은 엔진·API·저장소를 쓰는지는 이 목록에 나오지 않으므로 코드로 직접 확인한다.
+> **도면이 작성된 화면(7개)만 반영한다.** 미작성 화면이 같은 엔진·API·저장소를 쓰는지는 이 목록에 나오지 않으므로 코드로 직접 확인한다.
 
 ### 엔진별 사용 화면 (→호출)
 - **2인 대결 방(서버 메모리)** — 스펠링 런
+- **AI 개념 지도 처리(Claude Haiku)** — 개념 지도
 - **AI 단어 뜻 변환(Claude Haiku)** — 관리자
 - **AI 문장 해설(Claude Haiku)** — 문장 학습
 - **AI 사전·단어 질의(Claude Haiku)** — 사전
 - **AI 사진 문장 인식(Claude Haiku)** — 문장 학습
 - **AI 음성 노트 처리(Claude Haiku)** — 음성 학습
 - **간격 반복 복습(SM-2)** — 사전
+- **기기 PDF 저장(캔버스)** — 개념 지도
 - **기기 글자 인식(Tesseract.js)** — 사전
 - **기기 음성(speechSynthesis)** — 문장 학습, 사전, 스펠링 런, 음성 학습
 - **서버 음성(OpenAI TTS)** — 사전, 스펠링 런
@@ -71,8 +73,9 @@
 - **GET /api/admin/speakloop/audio/status** — 관리자
 - **GET /api/admin/stats** — 관리자
 - **GET /api/admin/users** — 관리자
+- **GET /api/cmap/topics/:rootId/map** — 개념 지도
 - **GET /api/jgrammar/saved** — 문장 학습
-- **GET /api/me** — Speak Loop, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **GET /api/me** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
 - **GET /api/review-due** — 사전
 - **GET /api/speakloop/audio-index** — Speak Loop
 - **GET /api/speakloop/audio/:clipKey** — Speak Loop, 관리자
@@ -104,6 +107,9 @@
 - **POST /api/admin/speakloop/audio/generate** — 관리자
 - **POST /api/admin/speakloop/audio/preview** — 관리자
 - **POST /api/ai** — 사전
+- **POST /api/cmap/maps/:id/edges** — 개념 지도
+- **POST /api/cmap/maps/:id/save** — 개념 지도
+- **POST /api/cmap/topics/:id/explain** — 개념 지도
 - **POST /api/jgrammar/explain** — 문장 학습
 - **POST /api/jgrammar/ocr** — 문장 학습
 - **POST /api/quiz-correct** — 사전
@@ -131,13 +137,19 @@
 - **POST /api/wordbook** — 사전
 
 ### 저장소별 사용 화면 ([DB]·[캐시], →읽기 / →쓰기)
-- **[DB] api_usage** — 읽기: 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **[DB] api_usage** — 읽기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **[DB] cmap_concept_marks** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_concepts** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_edges** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_map_nodes** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_maps** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_topics** — 읽기: 개념 지도 / 쓰기: -
 - **[DB] gloss_backup** — 읽기: 관리자 / 쓰기: 관리자
 - **[DB] jgrammar_saved** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **[DB] review_log** — 읽기: - / 쓰기: 사전
 - **[DB] speakloop_audio** — 읽기: Speak Loop, 관리자 / 쓰기: 관리자
 - **[DB] speakloop_progress** — 읽기: Speak Loop / 쓰기: Speak Loop
-- **[DB] users** — 읽기: Speak Loop, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 관리자
+- **[DB] users** — 읽기: Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 관리자
 - **[DB] voice_image_sets** — 읽기: 음성 학습 / 쓰기: 음성 학습
 - **[DB] voice_images** — 읽기: 음성 학습 / 쓰기: 음성 학습
 - **[DB] voice_links** — 읽기: 음성 학습 / 쓰기: 음성 학습
@@ -155,7 +167,7 @@
 - **jgrammar_pinyin** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **jgrammar_zh** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **metis_tts_mode** — 읽기: 사전, 스펠링 런 / 쓰기: 사전, 스펠링 런
-- **mydict_token** — 읽기: Speak Loop, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 사전
+- **mydict_token** — 읽기: Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 사전
 - **mydict_wrong** — 읽기: 사전 / 쓰기: 사전
 - **spellrun_best** — 읽기: 스펠링 런 / 쓰기: 스펠링 런
 - **spellrun_bgm** — 읽기: 스펠링 런 / 쓰기: 스펠링 런
@@ -169,23 +181,23 @@
 - **voice_tts_rate** — 읽기: 음성 학습 / 쓰기: 음성 학습
 
 ### 외부 서비스별 사용 화면 ([외부])
-- **Anthropic API(Claude Haiku)** — 관리자, 문장 학습, 사전, 음성 학습
-- **Google Fonts** — Speak Loop, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **Anthropic API(Claude Haiku)** — 개념 지도, 관리자, 문장 학습, 사전, 음성 학습
+- **Google Fonts** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
 - **OpenAI Images(이미지 생성)** — 음성 학습
 - **OpenAI STT(음성 인식)** — 음성 학습
 - **OpenAI TTS(음성 합성)** — 관리자, 사전, 스펠링 런
 - **jsDelivr(tesseract.js)** — 사전
 
 ### 모듈별 사용 화면 ([모듈])
-- **public/js/common/appHeader.js** — Speak Loop, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
-- **public/js/common/authGate.js** — Speak Loop, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **public/js/common/appHeader.js** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **public/js/common/authGate.js** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
 - **public/js/common/dialog.js** — 문장 학습, 사전, 스펠링 런, 음성 학습
 - **public/js/ocr/ocrScanner.js** — 사전
 
-### 미작성 화면 (6개)
-홈(public/home/index.html), 개념 지도(public/concept_map.html), 문학 나침반(public/literature_compass.html), 한입 독서(public/digest_reading.html), 과학(public/science_reading.html), 작가 노트(public/artist_notes.html)
+### 미작성 화면 (5개)
+홈(public/home/index.html), 문학 나침반(public/literature_compass.html), 한입 독서(public/digest_reading.html), 과학(public/science_reading.html), 작가 노트(public/artist_notes.html)
 
-화면 파일의 마지막 확인 커밋: 8753b0a
+화면 파일의 마지막 확인 커밋: 8753b0a, bf7715c
 <!-- gen:end -->
 
 ## 작업 블록 규칙
