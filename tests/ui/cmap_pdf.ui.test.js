@@ -78,11 +78,13 @@ for (const [w, h] of [[390, 844], [320, 640]]) {
     await page.eval("window.CmapPdf.deliverImpl = async () => { throw new Error('x'); }");
     await page.click('#map-pdf');
     await page.waitFor("document.getElementById('map-msg').textContent.length > 0", 8000, '오류 한 줄');
-    // 공유 시트 취소는 오류가 아니다
-    await page.eval("window.CmapPdf.deliverImpl = async () => 'cancelled'");
+    // 451: 저장이 시작되면 안내 한 줄(기존 #map-note)이 뜨고, 다시 누를 수 있다(오류 뒤에도)
+    await page.eval("window.CmapPdf.deliverImpl = async () => 'downloaded'");
     await page.eval("document.getElementById('map-msg').textContent = ''");
-    await page.click('#map-pdf'); await sleep(1500);
+    await page.click('#map-pdf');
+    await page.waitFor("document.getElementById('map-note').textContent === 'PDF를 저장했어요'", 8000, '저장 안내');
     assert.equal(await page.text('#map-msg'), '');
+    assert.equal(await page.eval("document.getElementById('map-pdf').disabled"), false, '다시 누를 수 있음');
     noErrors(page);
   });
 }
@@ -98,11 +100,65 @@ test('빈 지도: 버튼 비활성', { skip: SKIP, timeout: 60000 }, async t => 
   noErrors(page);
 });
 
-test('다운로드 경로: 공유를 쓸 수 없으면 <a download> 로 내려받는다(파일 이름 확인)', { skip: SKIP, timeout: 60000 }, async t => {
+// 451: 공유 시트(navigator.share/canShare)를 쓰지 않고 항상 <a download> 로 바로 저장한다(설치 앱·일반 브라우저 같은 경로)
+test('PDF 바로 저장: share 가 불리지 않고, download 속성 앵커가 한 번 클릭되며, blob PDF 를 만들고 URL 은 지연 해제', { skip: SKIP, timeout: 60000 }, async t => {
   const { page } = await open(t);
   await world(page);
-  const r = await page.eval(`(async () => { Object.defineProperty(navigator, 'canShare', { value: undefined, configurable: true }); const got = []; const orig = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { got.push(this.download); }; try { const st = await window.CmapPdf.deliverImpl(new Blob(['x'], { type: 'application/pdf' }), '지도-테스트-20261016.pdf'); return { st, got }; } finally { HTMLAnchorElement.prototype.click = orig; } })()`);
-  assert.deepEqual(r, { st: 'downloaded', got: ['지도-테스트-20261016.pdf'] });
+  const r = await page.eval(`(async () => {
+    const log = { share: 0, canShare: 0, clicks: [], created: [], revoked: [] };
+    Object.defineProperty(navigator, 'share', { value: async () => { log.share++; }, configurable: true });
+    Object.defineProperty(navigator, 'canShare', { value: () => { log.canShare++; return true; }, configurable: true });   // 공유가 가능한 기기를 흉내 내도 쓰지 않아야 한다
+    const oc = URL.createObjectURL.bind(URL), orv = URL.revokeObjectURL.bind(URL), oclick = HTMLAnchorElement.prototype.click;
+    URL.createObjectURL = b => { const u = oc(b); log.created.push({ type: b.type, size: b.size, url: u }); return u; };
+    URL.revokeObjectURL = u => { log.revoked.push(u); orv(u); };
+    HTMLAnchorElement.prototype.click = function () { log.clicks.push({ download: this.download, href: this.href, attached: document.body.contains(this) }); };
+    try {
+      const st = await window.CmapPdf.deliverImpl(new Blob(['%PDF-x'], { type: 'application/pdf' }), '지도-테스트-20261016.pdf');
+      const revokedAtOnce = log.revoked.length;
+      return { st, log, revokedAtOnce };
+    } finally { URL.createObjectURL = oc; URL.revokeObjectURL = orv; HTMLAnchorElement.prototype.click = oclick; }
+  })()`);
+  assert.equal(r.st, 'downloaded');
+  assert.equal(r.log.share, 0, 'navigator.share 는 불리지 않는다');
+  assert.equal(r.log.canShare, 0, 'navigator.canShare 도 보지 않는다');
+  assert.equal(r.log.clicks.length, 1, '앵커 클릭 한 번');
+  assert.equal(r.log.clicks[0].download, '지도-테스트-20261016.pdf');
+  assert.match(r.log.clicks[0].href, /^blob:/);
+  assert.equal(r.log.created.length, 1);
+  assert.equal(r.log.created[0].type, 'application/pdf');
+  assert.equal(r.log.clicks[0].href, r.log.created[0].url, '만든 blob URL 로 저장');
+  assert.equal(r.revokedAtOnce, 0, 'URL 해제는 클릭 뒤 지연(즉시 아님)');
+  noErrors(page);
+});
+
+test('PDF 저장 단추(실제 경로): 공유 가능 환경에서도 share 없이 앵커 다운로드 1회 + 안내, 오류 시 문구 후 재시도 가능', { skip: SKIP, timeout: 60000 }, async t => {
+  const { page } = await open(t);
+  await world(page);
+  await page.eval(`(() => {
+    window.__share = 0; window.__clicks = [];
+    Object.defineProperty(navigator, 'share', { value: async () => { window.__share++; }, configurable: true });
+    Object.defineProperty(navigator, 'canShare', { value: () => true, configurable: true });
+    HTMLAnchorElement.prototype.click = function () { window.__clicks.push({ d: this.download, h: this.href }); };
+  })()`);
+  await page.click('#map-pdf');
+  await page.waitFor("window.__clicks.length === 1 && !document.getElementById('map-pdf').disabled", 15000, '다운로드');
+  assert.equal(await page.eval('window.__share'), 0);
+  const c = await page.eval('window.__clicks[0]');
+  assert.match(c.d, /^지도-과학물리1-\d{8}\.pdf$/);
+  assert.match(c.h, /^blob:/);
+  assert.equal(await page.text('#map-note'), 'PDF를 저장했어요');
+  assert.equal(await page.text('#map-msg'), '');
+  // 실패(앵커 생성 단계에서 예외) → 기존 오류 문구, 그 뒤 다시 눌러 성공
+  await page.eval("window.__orig = URL.createObjectURL; URL.createObjectURL = () => { throw new Error('x'); }");
+  await page.eval("document.getElementById('map-note').textContent = ''");
+  await page.click('#map-pdf');
+  await page.waitFor("document.getElementById('map-msg').textContent.length > 0 && !document.getElementById('map-pdf').disabled", 15000, '오류 문구');
+  assert.match(await page.text('#map-msg'), /PDF를 만들지 못했어요/);
+  assert.equal(await page.text('#map-note'), '', '실패 때는 저장 안내 없음');
+  await page.eval('URL.createObjectURL = window.__orig');
+  await page.click('#map-pdf');
+  await page.waitFor("window.__clicks.length === 2", 15000, '재시도');
+  assert.equal(await page.text('#map-msg'), '');
   noErrors(page);
 });
 

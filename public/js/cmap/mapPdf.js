@@ -168,13 +168,9 @@
     return { blob: new Blob([bytes], { type: 'application/pdf' }), fileName: safeFileName(names, o.dateObj) };
   }
 
-  // 파일 공유가 되는 환경이면 공유 시트, 아니면 다운로드. 공유 시트를 닫아 취소한 경우(AbortError)는 오류가 아니다. 테스트에서는 api.deliverImpl 을 바꿔 끼운다
+  // 451: 공유 시트(navigator.share)를 쓰지 않고 항상 기기에 바로 저장한다: PDF Blob → URL.createObjectURL → <a download="파일이름"> 클릭 → 지연 URL.revokeObjectURL.
+  //   설치 앱과 일반 브라우저가 같은 경로를 쓴다(분기 없음). 테스트에서는 api.deliverImpl 을 바꿔 끼운다
   async function deliver(blob, fileName) {
-    const file = new File([blob], fileName, { type: 'application/pdf' });
-    if (navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: fileName }); return 'shared'; }
-      catch (e) { if (e && e.name === 'AbortError') return 'cancelled'; throw e; }
-    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = fileName;

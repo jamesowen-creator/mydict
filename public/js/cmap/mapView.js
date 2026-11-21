@@ -283,6 +283,8 @@
       const now = new Date(), cvs = getComputedStyle($('map-canvas')), body = getComputedStyle(document.body);
       const r = await window.CmapPdf.make({ svg: M.svg, pts: [...M.nodes.keys()].map(posOf), nodeW: G.NODE_W, nodeH: G.NODE_H, names, date: window.CmapPdf.dateText(now, '-'), dateObj: now, background: cvs.backgroundColor, ink: body.color, fontFamily: body.fontFamily });
       await window.CmapPdf.deliver(r.blob, r.fileName);
+      mapNote('PDF를 저장했어요');   // 451: 다운로드를 시작했다는 안내(기존 #map-note 한 줄). 잠깐 뒤 스스로 지운다
+      setTimeout(() => { if ($('map-note').textContent === 'PDF를 저장했어요') mapNote(''); }, 3000);
     } catch (e) { mapMsg('PDF를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.'); }
     pdfBusy = false; renderPdfBtn();
   }
