@@ -110,6 +110,7 @@
     svg.append(defs, edgeLayer, nodeLayer);
     applyView();
     renderHint();
+    renderBrief();   // 451: 안내 줄·버튼 줄이 정해진 뒤에 팝업 자리를 잡는다(아래 줄을 가리지 않으려고)
     renderPdfBtn();
     $('map-count').textContent = '지도에 ' + M.nodes.size + '개 · 연결 ' + M.edges.length + '개';
     updateMeta();
@@ -126,7 +127,7 @@
     const r = M.svg.getBoundingClientRect();
     const cw = r.width || 1, ch = r.height || 1;
     M.svg.setAttribute('viewBox', `${M.view.tx} ${M.view.ty} ${cw / M.view.scale} ${ch / M.view.scale}`);
-    placePopup();
+    placePopup(); placeBrief();
   }
 
   // ── 간략 설명 팝업과 모르는 개념 표시(작업275-4) ──
@@ -155,6 +156,23 @@
     let top = r.bottom - cv.top + 8;
     if (top + ph > cv.height - 8) top = r.top - cv.top - ph - 8;
     top = Math.max(8, Math.min(cv.height - ph - 8, top));
+    el.style.left = left + 'px'; el.style.top = top + 'px';
+  }
+  // 451: 편집 시트 설명 팝업 자리. 선택한 노드 아래(자리가 없으면 위)에 두고 캔버스 안(아래 안내 줄 위)에 맞춘다. 너비는 CSS(max-width: min(280px, 80%))가 정하고 여기서는 재서 맞춘다
+  function placeBrief() {
+    const el = $('map-brief');
+    if (!el || el.hidden || M.selected === null || !M.svg) return;
+    const nd = M.svg.querySelector('[data-node="' + M.selected + '"] rect');
+    if (!nd) return;
+    const cv = $('map-canvas').getBoundingClientRect(), r = nd.getBoundingClientRect();
+    const ob = document.querySelector('.map-overlay-bottom'), obr = ob ? ob.getBoundingClientRect() : null;
+    const bottomLimit = obr && obr.height > 0 ? Math.min(cv.height, obr.top - cv.top) : cv.height;   // 아래 안내 줄·버튼 줄을 가리지 않는다
+    const w = el.offsetWidth, ph = el.offsetHeight;
+    let left = r.left + r.width / 2 - cv.left - w / 2;
+    left = Math.max(8, Math.min(cv.width - w - 8, left));
+    let top = r.bottom - cv.top + 8;
+    if (top + ph > bottomLimit - 8) top = r.top - cv.top - ph - 8;
+    top = Math.max(8, Math.min(bottomLimit - ph - 8, top));
     el.style.left = left + 'px'; el.style.top = top + 'px';
   }
   function hidePopup() { M.popup = null; const el = $('map-popup'); if (el) el.hidden = true; }
@@ -213,8 +231,8 @@
     const x0 = M.view.tx, y0 = M.view.ty, x1 = x0 + r.width / M.view.scale, y1 = y0 + r.height / M.view.scale;
     if (p.x < x0 || p.y < y0 || p.x + G.NODE_W > x1 || p.y + G.NODE_H > y1) fit();
   }
-  // 291-1: 편집 시트에서 첫 노드를 고르면 개념 이름 + 정의 한 줄(brief)을 안내 줄 위에 보인다. 이미 불러온 지도 응답의 brief 만 쓰고 표시(marks)는 건드리지 않는다
-  const BRIEF_LINES = 2;
+  // 291-1 → 451: 편집 시트에서 첫 노드를 고르면 개념 이름 + 설명(brief)을 그 노드 옆 팝업으로 보인다(이전: 하단 오버레이). 이미 불러온 지도 응답의 brief 만 쓰고 표시(marks)는 건드리지 않는다.
+  //   팝업을 누르면 팝업만 닫힌다: briefId 만 비우고 선택(M.selected·picker)은 그대로라서 같은 선택 상태에서는 다시 뜨지 않는다.
   function hideBrief() { M.briefId = null; const b = $('map-brief'); if (b) { b.hidden = true; b.textContent = ''; } }
   function renderBrief() {
     const el = $('map-brief');
@@ -222,12 +240,11 @@
     if (!(M.sheet.open && M.mode === 'map' && !M.preview && M.selected !== null && M.briefId === M.selected)) { hideBrief(); return; }
     const c = M.concepts.get(M.selected);
     el.textContent = '';
-    el.append(h('span', { class: 'b-term', text: termOf(M.selected) }), h('span', { class: 'b-text', text: c && c.brief ? c.brief : '설명이 아직 없습니다' }));
-    el.style.setProperty('--brief-lines', BRIEF_LINES);
+    el.append(h('div', { class: 'p-term', text: termOf(M.selected) }), h('div', { class: 'p-text', text: c && c.brief ? c.brief : '설명이 아직 없습니다' }));
     el.hidden = false;
+    placeBrief();
   }
   function renderHint() {
-    renderBrief();
     const el = $('map-hint');
     if (M.preview || M.mode !== 'map') $('map-bulk-row').hidden = true;
     if (M.preview) { el.textContent = '미리보기예요. 마음에 들면 [적용], 아니면 [취소]를 눌러 주세요. 노드와 연결은 그대로이고 자리만 바뀌어요.'; return; }
@@ -739,6 +756,7 @@
   }
   function zoomBy(f) {
     if (!M.sheet.open) return;
+    hideBrief();   // 451
     const r = M.svg.getBoundingClientRect();
     const cx = M.view.tx + r.width / M.view.scale / 2, cy = M.view.ty + r.height / M.view.scale / 2;
     M.view.scale = zclamp(M.view.scale * f);
@@ -766,6 +784,7 @@
       else if (ed) { ev.preventDefault(); const e = M.edges.find(x => x.id === Number(ed.dataset.edge)); if (e) openEdgeDialog('edit', { edge: e, from: e.from_concept_id, to: e.to_concept_id }); }
     });
     $('map-sheet').addEventListener('pointerdown', ev => { if (M.popup !== null && !$('map-popup').contains(ev.target) && !M.svg.contains(ev.target)) closePopupOnly(); });   // 팝업·지도 밖(툴바 등)을 누르면 팝업만 닫는다
+    $('map-brief').addEventListener('click', hideBrief);   // 451: 팝업을 누르면 팝업만 닫힌다(선택 유지, 같은 선택에서는 다시 뜨지 않음)
     $('map-fit').addEventListener('click', () => { fit(); });
     $('map-pdf').addEventListener('click', pdfSave);
     $('map-zoom-in').addEventListener('click', () => zoomBy(1.25));
@@ -825,6 +844,7 @@
     const dx = ev.clientX - g.x, dy = ev.clientY - g.y;
     if (!g.moved && Math.hypot(dx, dy) < TAP_PX) return;
     g.moved = true;
+    hideBrief();   // 451: 끌기를 시작하면 설명 팝업만 닫는다(선택 유지)
     if (g.kind === 'node') {
       if (g.noDrag) return;
       const n = M.nodes.get(g.id);
@@ -874,6 +894,7 @@
     if (M.ptrs.size < 2) M.pinch = null;
   }
   function startPinch() {
+    hideBrief();   // 451: 확대·축소 시작 → 설명 팝업만 닫는다
     const g = M.gest;
     if (g && g.kind === 'node' && g.moved) { const n = M.nodes.get(g.id); if (n) { n.x = g.orig.x; n.y = g.orig.y; } render(); }   // 두 번째 손가락이 닿으면 진행 중이던 노드 이동은 취소(저장하지 않음)
     M.gest = null;
@@ -892,6 +913,7 @@
   }
   function onWheel(ev) {
     ev.preventDefault();
+    hideBrief();   // 451
     const rect = M.svg.getBoundingClientRect();
     const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
     const wx = M.view.tx + mx / M.view.scale, wy = M.view.ty + my / M.view.scale;
