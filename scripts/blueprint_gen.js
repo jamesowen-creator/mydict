@@ -1433,6 +1433,10 @@ function serviceData(L, screens, groups, dbItems, api, warnN) {
     for (const f of r.files) { edge(aid, 'f:' + f, 'read'); cnt.file++; }
   }
   edge('g:gate', 'd:users', 'read');   // 관문이 매 요청마다 읽는 users: 이 선 하나만 그린다(API 마다 그리지 않음)
+  // 정적 파일은 API 를 거치지 않으므로 api.md 에 없다. 화면 머리말 reads 의 파일: 중 어떤 API 행에도 없는 것만 화면 → 파일 선(fread, 점선)으로 직접 잇는다
+  const apiFiles = new Set(); api.rows.forEach(r => r.files.forEach(f => apiFiles.add(f)));
+  cnt.fread = 0;
+  for (const s of screens) for (const it of s.reads) if (it.startsWith('파일:') && !apiFiles.has(it.slice(3))) { edge('s:' + s.screen, 'f:' + it.slice(3), 'fread'); cnt.fread++; }
   const bad = edges.filter(([a, b]) => !idxOf.has(a) || !idxOf.has(b));
   const hashes = [...new Set(screens.map(s => s.last_checked))].sort(byCode);
   const kinds = {}; edges.forEach(e => { kinds[e[2]] = (kinds[e[2]] || 0) + 1; });
@@ -1443,6 +1447,495 @@ function serviceData(L, screens, groups, dbItems, api, warnN) {
   };
   return { nodes, edges, groups: groups.map(g => ({ name: g.name, screens: g.screens })), apiGroups: API_GROUPS, commit: hashes.join(', '), warnN: warnN, stat };
 }
+
+// <svc-html-begin>
+// service.html: 서비스 흐름도(로그인 → 기능 → API 묶음 → 엔진·외부·저장소). 데이터는 serviceData(). 외부 주소 없는 한 파일, 라이트·다크.
+const SERVICE = path.join(DIR, 'service.html');
+function serviceHtml(data) {
+  const json = JSON.stringify(data).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  return `<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>METIS-3 서비스 흐름도</title>
+<style>
+:root { --bg:#fafaf9; --card:#ffffff; --text:#1a1a1a; --sub:#555b66; --line:#c9c9c2; --sel:#b8442e; --selbg:#fdf0ec; --c-screen:#2b5d9b; --c-engine:#7a3fa0; --c-store:#9a6b00; --c-external:#555b66; --c-api:#555b66; --c-file:#2f7d57; --c-gate:#b8442e; --c-grp:#2b5d9b; }
+@media (prefers-color-scheme: dark) { :root { --bg:#17181a; --card:#212326; --text:#f1f1ee; --sub:#a9adb5; --line:#43464b; --sel:#ff8c73; --selbg:#3a2520; --c-screen:#7fb0ee; --c-engine:#c79af0; --c-store:#e0b050; --c-external:#a9adb5; --c-api:#a9adb5; --c-file:#6fcf9b; --c-gate:#ff8c73; --c-grp:#7fb0ee; } }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font: 16px/1.45 -apple-system, "Segoe UI", "Noto Sans KR", "Malgun Gothic", sans-serif; }
+#app { display: flex; flex-direction: column; height: 100vh; }
+.top { flex: none; padding: 8px 16px 6px; }
+.top h1 { font-size: 18px; margin: 0; display: inline-block; }
+.top .use { font-size: 14px; color: var(--sub); margin-left: 12px; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 6px; }
+button { font: inherit; }
+.zbtn { min-height: 32px; padding: 2px 12px; border: 1.5px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); font-size: 15px; cursor: pointer; min-width: 38px; word-break: keep-all; }
+.zbtn:hover { background: var(--selbg); }
+.zbtn[aria-pressed="true"] { border-color: var(--sel); background: var(--selbg); font-weight: 700; }
+.zoomv { font-size: 14px; color: var(--sub); min-width: 4.2em; }
+.leg { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-top: 6px; font-size: 14px; color: var(--sub); }
+.leg .s { position: relative; display: inline-block; padding: 1px 12px; border: 1.5px solid var(--bc, var(--line)); background: var(--card); color: var(--text); font-size: 14px; line-height: 1.4; }
+.leg .s.t-db, .leg .s.t-cache { padding-top: 11px; }
+.leg svg { vertical-align: middle; }
+.status { margin-top: 6px; font-size: 15px; font-weight: 700; min-height: 1.5em; color: var(--sel); }
+#main { flex: 1; min-height: 0; display: flex; margin: 0 16px 6px; gap: 8px; }
+#vp { position: relative; flex: 1; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--card); cursor: grab; touch-action: none; user-select: none; }
+#vp.drag { cursor: grabbing; }
+#heads { position: absolute; left: 0; right: 0; top: 0; height: 38px; z-index: 5; background: var(--card); border-bottom: 1.5px solid var(--line); overflow: hidden; }
+#heads .hd { position: absolute; top: 0; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: var(--sub); text-align: center; line-height: 1.15; white-space: nowrap; overflow: hidden; }
+#view { position: absolute; left: 0; right: 0; top: 38px; bottom: 0; overflow: hidden; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; z-index: 2; }
+.col { position: absolute; z-index: 1; display: flex; flex-direction: column; gap: 32px; }
+#c1, #c3 { gap: 56px; }
+#panel { flex: none; width: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 10px 12px; font-size: 14px; }
+#panel.off { display: none; }
+#panel h2 { font-size: 16px; margin: 0 0 6px; word-break: keep-all; overflow-wrap: anywhere; }
+#panel h3 { font-size: 14px; margin: 10px 0 3px; color: var(--sub); }
+#panel .kv { margin: 0 0 2px; }
+#panel .kv b { color: var(--sub); font-weight: 600; }
+#panel ul { margin: 2px 0 0; padding-left: 0; list-style: none; }
+#panel li { margin: 1px 0; }
+#panel .lk { border: 0; background: none; padding: 1px 0; color: var(--c-screen); cursor: pointer; text-align: left; font-size: 14px; }
+#panel .lk:hover { text-decoration: underline; }
+#panel .au { color: var(--sub); font-size: 14px; }
+.foot { flex: none; padding: 2px 16px 8px; font-size: 14px; color: var(--sub); line-height: 1.4; }
+/* 칸 */
+.cell { --bc: var(--kc, var(--line)); --bg2: var(--card); position: relative; display: block; width: 100%; min-height: 48px; text-align: left; margin: 0; padding: 12px 16px; border: 1.5px solid var(--bc); background: var(--bg2); color: var(--text); font: inherit; font-size: 15px; line-height: 1.35; cursor: pointer; }
+.cell small { display: block; font-size: 15px; color: var(--sub); line-height: 1.3; }
+.cell .nb { white-space: nowrap; }
+.cell .m { font-weight: 700; margin-right: .35em; }
+.t-gate { --kc: var(--c-gate); border-radius: 999px; padding: 12px 22px; }
+.t-gate .nm { font-weight: 700; display: block; }
+.t-screen { --kc: var(--c-screen); border-radius: 12px; }
+.t-screen .nm { font-weight: 700; display: block; }
+.t-apigrp { --kc: var(--c-grp); border-radius: 6px; border-width: 2px; }
+.t-apigrp .nm { font-weight: 700; }
+.t-apigrp .ct { float: right; font-size: 15px; color: var(--sub); }
+.t-api { --kc: var(--c-api); border-radius: 4px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 15px; padding: 12px 16px; }
+.t-external { --kc: var(--c-external); border-radius: 4px; border-style: dashed; }
+.t-db, .t-cache { --kc: var(--c-store); border-radius: 14px / 10px; padding-top: 20px; }
+.t-db::before, .t-cache::before { content: ""; position: absolute; left: -1.5px; right: -1.5px; top: 0; height: 12px; border: 1.5px solid var(--bc); border-radius: 50%; background: var(--bg2); }
+.t-cache::before { border-style: dashed; }
+.t-cache { border-style: dashed; }
+.t-engine { --kc: var(--c-engine); border: 0; background: var(--bc); padding: 12px 30px; clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 16px 100%, 0 50%); }
+.t-engine::before { content: ""; position: absolute; inset: 2px; background: var(--bg2); clip-path: polygon(15px 0, calc(100% - 15px) 0, 100% 50%, calc(100% - 15px) 100%, 15px 100%, 0 50%); }
+.t-file { --kc: var(--c-file); border: 0; background: var(--bc); padding: 12px 20px; clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); }
+.t-file::before { content: ""; position: absolute; inset: 2px; background: var(--bg2); clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 13px, 100% 100%, 0 100%); }
+.cell .tx { position: relative; display: block; }
+.cell.on { --bc: var(--sel); --bg2: var(--selbg); }
+.cell.dim { opacity: .22; }
+.hid { display: none !important; }
+.fbox { border: 1.5px dashed var(--line); border-radius: 12px; padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 32px; }
+.fbox .gl, .sec-l { font-size: 15px; font-weight: 700; color: var(--sub); }
+.gbox { display: flex; flex-direction: column; gap: 32px; }
+.secbox { display: flex; flex-direction: column; gap: 32px; }
+.gbox .list { display: none; flex-direction: column; gap: 32px; padding-left: 20px; }
+.gbox.open .list { display: flex; }
+.sec-l { margin-bottom: -16px; }
+.ln { fill: none; stroke: var(--sub); stroke-width: 2; opacity: .75; stroke-linejoin: round; }
+.ln.k-write { stroke-width: 3; }
+.ln.k-fread { stroke-dasharray: 9 6; }
+.ln.dim { opacity: .1; }
+.ln.on { stroke: var(--sel); stroke-width: 3.5; opacity: 1; }
+marker path { fill: var(--sub); }
+marker.mo path { fill: var(--sel); }
+</style>
+</head>
+<body>
+<div id="app">
+<div class="top">
+  <h1>METIS-3 서비스 흐름도</h1><span class="use">로그인 → 기능 → API → 엔진·외부·저장소 · 휠: 확대·축소 · 빈 곳을 끌어 이동 · API 묶음 박스를 누르면 펼침 · 칸을 누르면 이어진 경로만 진하게(빈 곳을 누르면 해제)</span>
+  <div class="bar">
+    <button class="zbtn" id="zin" type="button" aria-label="확대">＋</button><button class="zbtn" id="zout" type="button" aria-label="축소">－</button><button class="zbtn" id="zfit" type="button">전체 맞춤</button><button class="zbtn" id="z100" type="button">100%로 보기</button><button class="zbtn" id="gosel" type="button">선택 항목으로 이동</button><span class="zoomv" id="zv">100%</span>
+    <button class="zbtn" id="expAll" type="button">모두 펼치기</button><button class="zbtn" id="colAll" type="button">모두 접기</button>
+    <button class="zbtn" id="filt" type="button" aria-pressed="false">연결된 것만 보기</button><button class="zbtn" id="ptog" type="button" aria-pressed="true">상세 패널</button>
+  </div>
+  <div class="leg" id="leg"></div>
+  <div class="status" id="status" aria-live="polite"></div>
+</div>
+<div id="main">
+  <div id="vp"><div id="heads"></div><div id="view"><div id="world"></div></div></div>
+  <aside id="panel" aria-label="상세"></aside>
+</div>
+<div class="foot" id="foot"></div>
+</div>
+<script id="data" type="application/json">/*__DATA__*/</script>
+<script>
+(function () {
+  var D = JSON.parse(document.getElementById('data').textContent);
+  var nodes = D.nodes, edges = D.edges, N = {}, OUT = {}, INN = {};
+  nodes.forEach(function (n) { N[n.id] = n; });
+  edges.forEach(function (e, i) { (OUT[e[0]] = OUT[e[0]] || []).push(i); (INN[e[1]] = INN[e[1]] || []).push(i); });
+  var NS = 'http://www.w3.org/2000/svg';
+  var HEADS = ['입구 · 관문', '기능(화면)', 'API 묶음', '엔진 · 외부 · 저장소'], HSHORT = ['입구', '기능', 'API', '저장소'];
+  var CW = [260, 320, 460, 380], GUT = 160, PAD = 24, RM = 40, TOP = 96, CHS = 8, CHN = 12, RAD = 8, GAP = 12;
+  var colX = [], gutX = [], x0 = PAD; CW.forEach(function (w, c) { colX[c] = x0; gutX[c] = x0 + w; x0 += w + GUT; });
+  var WORLD_W = colX[3] + CW[3] + RM, WORLD_H = 0;
+  var vp = document.getElementById('vp'), view = document.getElementById('view'), world = document.getElementById('world'), heads = document.getElementById('heads');
+  var statusEl = document.getElementById('status'), zv = document.getElementById('zv'), panel = document.getElementById('panel');
+  var k = 1, tx = 0, ty = 0, MINK = 0.1, MAXK = 3, fitK = 1, raf = 0;
+  var open = {}, sel = null, filterOn = false, els = {}, unitIds = {}, lineRecs = [];
+  function mk(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function nb(text) { var s = mk('span', 'nb'); s.textContent = text; return s; }
+  function putPath(el, path) {   // 경로는 슬래시 앞에서만 줄바꿈한다(각 조각은 쪼개지지 않는다)
+    var parts = String(path).split('/');
+    parts.forEach(function (p, i) { if (i === 0) return; if (i > 1) el.appendChild(document.createElement('wbr')); el.appendChild(nb('/' + p)); });
+  }
+  function putName(el, text) {   // 이름은 여는 괄호 앞에서만 줄바꿈한다
+    var parts = String(text).split('(');
+    parts.forEach(function (p, i) { if (i > 0) { el.appendChild(document.createElement('wbr')); el.appendChild(nb('(' + p)); } else el.appendChild(nb(p)); });
+  }
+  HEADS.forEach(function (h) { heads.appendChild(mk('div', 'hd', h)); });
+
+  /* ── 범례 ── */
+  (function () {
+    var L = document.getElementById('leg');
+    var sp = function (cls, text, style) { var s = mk('span', 's ' + cls, text); if (style) s.setAttribute('style', style); L.appendChild(s); };
+    sp('t-gate', '입구·관문', '--bc:var(--c-gate);border-radius:999px');
+    sp('t-screen', '기능(화면)', '--bc:var(--c-screen);border-radius:12px');
+    sp('t-apigrp', 'API 묶음', '--bc:var(--c-grp);border-radius:6px;border-width:2px');
+    sp('t-api', 'API', '--bc:var(--c-api);border-radius:4px;font-family:ui-monospace,Consolas,monospace');
+    sp('t-engine', '엔진', '--bc:var(--c-engine);border-radius:0;clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%);padding:1px 20px');
+    sp('t-external', '외부', '--bc:var(--c-external);border-radius:4px;border-style:dashed');
+    sp('t-db', 'DB', '--bc:var(--c-store);border-radius:14px/10px');
+    sp('t-cache', '캐시', '--bc:var(--c-store);border-radius:14px/10px;border-style:dashed');
+    sp('t-file', '파일', '--bc:var(--c-file);border-radius:0;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,0 100%)');
+    function lineSample(w, text) { var wrap = mk('span', ''); wrap.innerHTML = '<svg width="40" height="12" aria-hidden="true"><line x1="0" y1="6" x2="40" y2="6" stroke="currentColor" stroke-width="' + w + '"/></svg> '; wrap.appendChild(document.createTextNode(text)); L.appendChild(wrap); }
+    lineSample(2, '호출·읽기'); lineSample(3, '쓰기'); lineSample(3.5, '선택'); (function () { var w = mk('span', ''); w.innerHTML = '<svg width="40" height="12" aria-hidden="true"><line x1="0" y1="6" x2="40" y2="6" stroke="currentColor" stroke-width="2" stroke-dasharray="9 6"/></svg> '; w.appendChild(document.createTextNode('화면이 직접 읽는 정적 파일')); L.appendChild(w); })();
+  })();
+
+  /* ── 칸 만들기 ── */
+  var world0 = mk('div', 'colwrap'); world.appendChild(world0);
+  var svg = document.createElementNS(NS, 'svg'); svg.setAttribute('id', 'lines'); svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = '<defs><marker id="ah" viewBox="0 0 14 12" refX="14" refY="6" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="12" orient="auto"><path d="M0 0L14 6L0 12z"/></marker><marker id="aho" class="mo" viewBox="0 0 14 12" refX="14" refY="6" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="12" orient="auto"><path d="M0 0L14 6L0 12z"/></marker></defs>';
+  world.appendChild(svg);
+  var cols = [0, 1, 2, 3].map(function (c) { var d = mk('div', 'col'); d.id = 'c' + c; d.style.left = colX[c] + 'px'; d.style.top = TOP + 'px'; d.style.width = CW[c] + 'px'; world.appendChild(d); return d; });
+  function cell(id, cls) {
+    var e = mk('button', 'cell ' + cls); e.type = 'button'; e.dataset.unit = id; els[id] = e;
+    e.addEventListener('click', function (ev) { ev.stopPropagation(); onCell(id); });
+    return e;
+  }
+  function onCell(id) {
+    if (N[id] && N[id].type === 'apigrp') {   // 묶음 박스: 펼침·접힘 + 선택(같은 박스를 다시 누르면 접고 해제)
+      var name = N[id].label, was = sel === id;
+      open[name] = !open[name]; sel = was ? null : id; applyAll(false); if (sel) focusSel(); else fit(true); return;
+    }
+    sel = (sel === id) ? null : id; applyAll(false); if (sel) focusSel();
+  }
+  nodes.forEach(function (n) {
+    var e;
+    if (n.type === 'gate') {
+      e = cell(n.id, 't-gate'); var t = mk('span', 'tx'); t.appendChild(mk('span', 'nm', n.label)); e.appendChild(t); cols[0].appendChild(e);
+      if (n.id === 'g:login') cols[0].appendChild(mk('div', '')).style.height = '60px';
+    } else if (n.type === 'screen') {
+      e = cell(n.id, 't-screen'); var t2 = mk('span', 'tx'); t2.appendChild(mk('span', 'nm', n.label));
+      var sm = mk('small', ''); (n.requires && n.requires.length ? n.requires : ['로그인 없이 열림']).forEach(function (q, i) { if (i > 0) { sm.appendChild(document.createTextNode(' · ')); sm.appendChild(document.createElement('wbr')); } sm.appendChild(nb(q)); }); t2.appendChild(sm); e.appendChild(t2); n._el = e;
+    } else if (n.type === 'apigrp') {
+      var gb = mk('div', 'gbox'); gb.dataset.group = n.label;
+      e = cell(n.id, 't-apigrp'); var t3 = mk('span', 'tx'); t3.appendChild(mk('span', 'ct', n.count + '개')); t3.appendChild(mk('span', 'nm', n.label)); e.appendChild(t3);
+      var ls = mk('div', 'list'); gb.appendChild(e); gb.appendChild(ls); cols[2].appendChild(gb); n._box = gb; n._list = ls;
+    } else if (n.type === 'api') {
+      e = cell(n.id, 't-api'); var t4 = mk('span', 'tx'); var sp2 = n.label.indexOf(' ');
+      var l1 = mk('span', ''); l1.appendChild(mk('span', 'm', n.label.slice(0, sp2))); putPath(l1, n.label.slice(sp2 + 1)); t4.appendChild(l1); t4.appendChild(mk('small', '', n.auth)); e.appendChild(t4);
+      N['G:' + n.group]._list.appendChild(e);
+    } else {
+      var cls = 't-' + n.type; e = cell(n.id, cls); var t5 = mk('span', 'tx'); putName(t5, n.label); e.appendChild(t5);
+    }
+  });
+  // 기능: 묶음(입구·학습·읽기·관리)별 상자
+  D.groups.forEach(function (g) {
+    var fb = mk('div', 'fbox'); fb.appendChild(mk('div', 'gl', g.name));
+    g.screens.forEach(function (s) { var e = els['s:' + s]; if (e) fb.appendChild(e); });
+    cols[1].appendChild(fb);
+  });
+  // 엔진·외부·저장소 구역
+  var SEC = [['engine', '엔진'], ['external', '외부'], ['db', 'DB'], ['cache', '캐시'], ['file', '파일']];
+  SEC.forEach(function (s) {
+    var items = nodes.filter(function (n) { return n.type === s[0]; });
+    var sb = mk('div', 'secbox'); sb.dataset.sec = s[0];
+    var lb = mk('div', 'sec-l', s[1] + ' (' + items.length + ')'); lb.dataset.sec = s[0]; sb.appendChild(lb);
+    items.forEach(function (n) { sb.appendChild(els[n.id]); });
+    cols[3].appendChild(sb);
+  });
+
+  /* ── 선택: 이어진 경로 ── */
+  function memberIds(id) { var n = N[id]; return n.type === 'apigrp' ? nodes.filter(function (m) { return m.type === 'api' && m.group === n.label; }).map(function (m) { return m.id; }) : [id]; }
+  function walk(starts, dir, S, E) {
+    var q = starts.slice(), i = 0;
+    while (i < q.length) {
+      var u = q[i++], list = (dir === 'f' ? OUT : INN)[u] || [];
+      list.forEach(function (ei) { E[ei] = 1; var v = dir === 'f' ? edges[ei][1] : edges[ei][0]; if (!S[v]) { S[v] = 1; q.push(v); } });
+    }
+  }
+  function compute(id) {
+    var S = {}, E = {}, n = N[id], starts = memberIds(id); starts.forEach(function (s) { S[s] = 1; });
+    var fwd = n.type === 'screen' || n.type === 'api' || n.type === 'apigrp' || n.type === 'gate';
+    var bwd = n.type === 'api' || n.type === 'apigrp' || n.type === 'gate' || ['engine', 'external', 'db', 'cache', 'file'].indexOf(n.type) >= 0;
+    if (fwd) walk(starts, 'f', S, E);
+    if (bwd) walk(starts, 'b', S, E);
+    return { S: S, E: E };
+  }
+  function unitOf(id) { var n = N[id]; return n.type === 'api' ? (open[n.group] ? id : 'G:' + n.group) : id; }
+  function colOf(u) { return u.indexOf('G:') === 0 ? 2 : N[u].col; }
+  function visible(u) { var e = els[u]; return !!e && e.offsetParent !== null; }
+  function rectOf(el) { var r = el.getBoundingClientRect(), w = world.getBoundingClientRect(); return { l: (r.left - w.left) / k, r: (r.right - w.left) / k, t: (r.top - w.top) / k, b: (r.bottom - w.top) / k }; }
+  function hash(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
+
+  /* ── 선 그리기 ──
+     선은 열 사이 틈(gutter)에만 놓이고 칸 위를 지나가지 않는다. 한 칸으로 들어오거나 나가는 선은 칸 테두리의 서로 다른 지점(12px 간격)에 붙고,
+     그 수만큼 칸 높이를 늘린다. 두 열 이상 건너뛰는 선은 칸이 시작되는 위쪽 띠(lane)로 돌아간다. 꺾이는 곳은 반경 8px 로 둥글게 한다. */
+  function roundedPath(pts) {
+    var d = 'M' + pts[0][0] + ',' + pts[0][1], minR = 99;
+    for (var i = 1; i < pts.length - 1; i++) {
+      var p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1];
+      var la = Math.abs(p1[0] - p0[0]) + Math.abs(p1[1] - p0[1]), lb = Math.abs(p2[0] - p1[0]) + Math.abs(p2[1] - p1[1]);
+      var r = Math.min(RAD, la / 2, lb / 2); minR = Math.min(minR, r);
+      var ax = p1[0] - Math.sign(p1[0] - p0[0]) * r, ay = p1[1] - Math.sign(p1[1] - p0[1]) * r;
+      var bx = p1[0] + Math.sign(p2[0] - p1[0]) * r, by = p1[1] + Math.sign(p2[1] - p1[1]) * r;
+      d += ' L' + ax + ',' + ay + ' Q' + p1[0] + ',' + p1[1] + ' ' + bx + ',' + by;
+    }
+    var L = pts[pts.length - 1]; d += ' L' + L[0] + ',' + L[1];
+    return { d: d, minR: minR };
+  }
+  function layoutLines() {
+    Array.prototype.slice.call(svg.querySelectorAll('path.ln')).forEach(function (p) { svg.removeChild(p); });
+    // 1) 선 모으기(접힌 묶음은 묶음 박스로 합친다)
+    var agg = {}, order = [];
+    edges.forEach(function (e, i) {
+      var a = unitOf(e[0]), b = unitOf(e[1]), key = a + '|' + b + '|' + e[2];
+      if (!agg[key]) { agg[key] = { a: a, b: b, kind: e[2], idx: [] }; order.push(key); }
+      agg[key].idx.push(i);
+    });
+    var recs = order.map(function (key) { return agg[key]; }).filter(function (r) { return visible(r.a) && visible(r.b); });
+    // 2) 칸마다 붙는 선 수만큼 높이를 늘린다(선 사이 12px)
+    var outN = {}, inN = {};
+    recs.forEach(function (r) { if (colOf(r.a) !== colOf(r.b)) { outN[r.a] = (outN[r.a] || 0) + 1; inN[r.b] = (inN[r.b] || 0) + 1; } });
+    Object.keys(els).forEach(function (u) { els[u].style.minHeight = ''; });
+    Object.keys(els).forEach(function (u) { var n = Math.max(outN[u] || 0, inN[u] || 0); if (n > 3) els[u].style.minHeight = (24 + (n - 1) * GAP + 24) + 'px'; });
+    WORLD_H = 0; cols.forEach(function (c) { WORLD_H = Math.max(WORLD_H, TOP + c.offsetHeight + 40); });
+    world.style.width = WORLD_W + 'px'; world.style.height = WORLD_H + 'px'; svg.setAttribute('width', WORLD_W); svg.setAttribute('height', WORLD_H);
+    // 3) 칸 위치를 재고, 붙는 지점(상대 칸의 위치 순서)과 틈 안의 세로 길(출발 칸 순서 12가닥)을 정한다
+    var R = {}; Object.keys(els).forEach(function (u) { if (visible(u)) R[u] = rectOf(els[u]); });
+    var cy = function (u) { return (R[u].t + R[u].b) / 2; };
+    var outL = {}, inL = {}; recs.forEach(function (r) { if (colOf(r.a) === colOf(r.b)) return; (outL[r.a] = outL[r.a] || []).push(r); (inL[r.b] = inL[r.b] || []).push(r); });
+    Object.keys(outL).forEach(function (u) { var l = outL[u].sort(function (x, y) { return cy(x.b) - cy(y.b) || (x.kind < y.kind ? -1 : 1); }); l.forEach(function (r, i) { r.ay = cy(u) + (i - (l.length - 1) / 2) * GAP; }); });
+    Object.keys(inL).forEach(function (u) { var l = inL[u].sort(function (x, y) { return cy(x.a) - cy(y.a) || (x.kind < y.kind ? -1 : 1); }); l.forEach(function (r, i) { r.by = cy(u) + (i - (l.length - 1) / 2) * GAP; }); });
+    var chIdx = {};   // 틈마다 출발 칸을 위에서 아래로 세워 0..11 번 길을 돌려 쓴다
+    [0, 1, 2].forEach(function (g) {
+      var srcs = {}; recs.forEach(function (r) { if (colOf(r.a) <= g && colOf(r.b) > g && (colOf(r.a) === g || colOf(r.b) === g + 1 || true)) srcs[r.a + '>' + g] = r.a; });
+      Object.keys(srcs).sort(function (x, y) { return cy(srcs[x]) - cy(srcs[y]); }).forEach(function (key, i) { chIdx[key] = i % CHN; });
+    });
+    var chX = function (u, g) { return gutX[g] + 18 + (chIdx[u + '>' + g] || 0) * CHS; };
+    lineRecs = []; var lane = 0, lanes = {};
+    recs.forEach(function (r) {
+      var A = R[r.a], B = R[r.b], ca = colOf(r.a), cb = colOf(r.b), pts;
+      if (ca === cb) { var ax0 = (A.l + A.r) / 2; pts = [[ax0, A.b], [ax0, B.t - 2]]; }
+      else {
+        var ay = r.ay, by = r.by, x1 = A.r, x2 = B.l - 2, c1 = chX(r.a, ca);
+        if (by !== ay && Math.abs(by - ay) < 16) {   // 짧게 꺾이면 둥근 모서리가 8px 보다 작아진다: 칸에 선이 하나뿐이면 같은 높이로 맞춘다
+          if ((inN[r.b] || 0) === 1 && ay > B.t + 8 && ay < B.b - 8) by = ay;
+          else if ((outN[r.a] || 0) === 1 && by > A.t + 8 && by < A.b - 8) ay = by;
+        }
+        if (cb === ca + 1) pts = [[x1, ay], [c1, ay], [c1, by], [x2, by]];
+        else {
+          var lk = r.a + '>' + r.b; if (lanes[lk] === undefined) lanes[lk] = lane++;
+          var ly = 18 + (lanes[lk] % 7) * 10, c2 = chX(r.a, cb - 1);
+          pts = [[x1, ay], [c1, ay], [c1, ly], [c2, ly], [c2, by], [x2, by]]; r.bypass = true;
+        }
+        // 같은 높이면 꺾지 않는다
+        pts = pts.filter(function (p, i) { return i === 0 || i === pts.length - 1 || !(p[0] === pts[i - 1][0] && p[1] === pts[i - 1][1]); });
+      }
+      var rp = roundedPath(pts), p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', rp.d); p.setAttribute('class', 'ln k-' + r.kind); p.setAttribute('marker-end', 'url(#ah)'); svg.appendChild(p);
+      r.el = p; r.d = rp.d; r.minR = rp.minR; r.pts = pts; lineRecs.push(r);
+    });
+  }
+
+  /* ── 표시 갱신 ── */
+  function applyAll(refit) {
+    nodes.forEach(function (n) { if (n.type === 'apigrp') n._box.classList.toggle('open', !!open[n.label]); });
+    var C = sel ? compute(sel) : null;
+    // 칸
+    Object.keys(els).forEach(function (u) { els[u].classList.remove('on', 'dim', 'hid'); });
+    var onUnits = {};
+    if (C) Object.keys(C.S).forEach(function (id) { onUnits[unitOf(id)] = 1; if (N[id].type === 'api') onUnits['G:' + N[id].group] = 1; });
+    if (C) { Object.keys(els).forEach(function (u) { els[u].classList.toggle('on', !!onUnits[u]); els[u].classList.toggle('dim', !onUnits[u]); }); }
+    // 연결된 것만 보기: 이어지지 않은 칸을 숨기고, 빈 상자·구역 이름도 숨긴다
+    var hideAll = filterOn && !!C;
+    if (hideAll) Object.keys(els).forEach(function (u) { if (!onUnits[u]) els[u].classList.add('hid'); });
+    Array.prototype.forEach.call(world.querySelectorAll('.fbox, .gbox'), function (b) {
+      var any = Array.prototype.some.call(b.querySelectorAll('.cell'), function (c) { return !c.classList.contains('hid') && (c.offsetParent !== null || !hideAll); });
+      b.classList.toggle('hid', hideAll && !any);
+    });
+    cols[3].querySelectorAll('.secbox').forEach(function (l) {
+      var t = l.dataset.sec, any = nodes.some(function (n) { return n.type === t && !els[n.id].classList.contains('hid'); });
+      l.classList.toggle('hid', hideAll && !any);
+    });
+    layoutLines();
+    // 선
+    lineRecs.forEach(function (r) {
+      var on = !!C && r.idx.some(function (i) { return C.E[i]; });
+      r.on = on; r.el.classList.toggle('on', on); r.el.classList.toggle('dim', !!C && !on);
+      r.el.setAttribute('marker-end', on ? 'url(#aho)' : 'url(#ah)');
+    });
+    // 상태줄·패널·주소
+    if (C) {
+      var cnt = { s: 0, a: 0, st: 0, ex: 0 };
+      Object.keys(C.S).forEach(function (id) { var t = N[id].type; if (t === 'screen') cnt.s++; else if (t === 'api') cnt.a++; else if (t === 'db' || t === 'cache' || t === 'file') cnt.st++; else if (t === 'engine' || t === 'external') cnt.ex++; });
+      statusEl.textContent = '선택: ' + N[sel].label + ' — 기능 ' + cnt.s + '개, API ' + cnt.a + '개, 저장소 ' + cnt.st + '개, 엔진·외부 ' + cnt.ex + '개';
+      statusEl.dataset.counts = JSON.stringify(cnt);
+    } else { statusEl.textContent = '선택 없음 — 칸을 누르면 이어진 경로만 진하게 보입니다'; statusEl.dataset.counts = ''; }
+    showPanel();
+    writeHash();
+    if (refit) fit(false);
+  }
+
+  /* ── 상세 패널 ── */
+  function pl(txt, cls) { return mk('p', cls || 'kv', txt); }
+  function kv(label, val) { var p = mk('p', 'kv'); p.appendChild(mk('b', '', label + ' ')); p.appendChild(document.createTextNode(val)); return p; }
+  function list(title, items, linkFn) {
+    var f = document.createDocumentFragment(); f.appendChild(mk('h3', '', title + ' (' + items.length + ')'));
+    var ul = mk('ul'); items.forEach(function (it) { var li = mk('li'); if (linkFn) { var b = mk('button', 'lk', it.text); b.type = 'button'; b.addEventListener('click', function () { sel = it.id; applyAll(false); focusSel(); }); li.appendChild(b); } else li.appendChild(document.createTextNode(it.text)); if (it.sub) li.appendChild(mk('span', 'au', ' ' + it.sub)); ul.appendChild(li); });
+    if (!items.length) ul.appendChild(mk('li', 'au', '(없음)'));
+    f.appendChild(ul); return f;
+  }
+  function neighbors(id, dir) { var res = [], seen = {}; ((dir === 'f' ? OUT : INN)[id] || []).forEach(function (ei) { var o = dir === 'f' ? edges[ei][1] : edges[ei][0]; if (!seen[o + edges[ei][2]]) { seen[o + edges[ei][2]] = 1; res.push({ id: o, kind: edges[ei][2] }); } }); return res; }
+  function showPanel() {
+    panel.textContent = '';
+    if (!sel) { panel.appendChild(mk('h2', '', '상세')); panel.appendChild(pl('칸을 누르면 이 자리에 자세한 내용이 나옵니다.')); panel.appendChild(pl('API 묶음 박스를 누르면 개별 API 가 펼쳐집니다.')); return; }
+    var n = N[sel], apiN = function (id) { return N[id]; };
+    panel.appendChild(mk('h2', '', n.label));
+    var t = n.type;
+    if (t === 'screen') {
+      panel.appendChild(kv('묶음', n.group)); panel.appendChild(kv('파일', n.file)); panel.appendChild(kv('필요', n.requires.length ? n.requires.join(', ') : '(없음: 로그인 없이 열림)'));
+      var calls = neighbors(sel, 'f').filter(function (x) { return N[x.id].type === 'api'; });
+      panel.appendChild(list('부르는 API', calls.map(function (x) { return { id: x.id, text: N[x.id].label, sub: N[x.id].auth }; }), true));
+      if (n.gated) panel.appendChild(pl('공용 모듈(authGate.js·appHeader.js)이 관문을 거쳐 GET /api/me·GET /auth/google 을 부른다. 이 선은 화면마다 따로 그리지 않고 관문에 연결했다.', 'au'));
+      if (n.navigates && n.navigates.length) panel.appendChild(kv('이동 가능한 화면', n.navigates.join(', ')));
+    } else if (t === 'api') {
+      panel.appendChild(kv('묶음', n.group)); panel.appendChild(kv('정의', n.def)); panel.appendChild(kv('인증', n.auth));
+      panel.appendChild(kv('읽기', n.reads.join(', ') || '-')); panel.appendChild(kv('쓰기', n.writes.join(', ') || '-')); panel.appendChild(kv('엔진', n.engines.join(', ') || '-'));
+      panel.appendChild(kv('외부', n.externals.join(', ') || '-')); panel.appendChild(kv('파일', n.files.join(', ') || '-')); panel.appendChild(kv('호출 화면', n.screens.join(', ') || '-')); panel.appendChild(kv('근거', n.basis));
+      if (n.auth !== '공개') panel.appendChild(pl('인증이 공개가 아니므로 requireAuth 가 users 를 읽는다(선으로 그리지 않음).', 'au'));
+    } else if (t === 'apigrp') {
+      var mem = memberIds(sel).map(function (id) { return N[id]; });
+      panel.appendChild(kv('API 수', String(mem.length))); var au = {}; mem.forEach(function (m) { au[m.auth] = (au[m.auth] || 0) + 1; });
+      panel.appendChild(kv('인증별', Object.keys(au).sort().map(function (a) { return a + ' ' + au[a]; }).join(' · ')));
+      panel.appendChild(list('API', mem.map(function (m) { return { id: m.id, text: m.label, sub: m.auth }; }), true));
+    } else if (t === 'db' || t === 'cache' || t === 'file') {
+      var rd = 0, wr = 0, scr = {}, ws = {};
+      var fr = 0; (INN[sel] || []).forEach(function (ei) { var e = edges[ei]; if (e[2] === 'read') rd++; else if (e[2] === 'write') wr++; else if (e[2] === 'fread') fr++; });
+      var back = compute(sel);
+      Object.keys(back.S).forEach(function (id) { if (N[id].type === 'screen') scr[N[id].label] = 1; });
+      (INN[sel] || []).forEach(function (ei) { var e = edges[ei]; if (e[2] === 'write' && N[e[0]].type === 'api') { var c2 = compute(e[0]); Object.keys(c2.S).forEach(function (id) { if (N[id].type === 'screen') ws[N[id].label] = 1; }); } });
+      panel.appendChild(kv('종류', t === 'db' ? 'DB 테이블' : t === 'cache' ? '서버 캐시' : '파일')); if (n.path) panel.appendChild(kv('경로', n.path)); if (n.desc) panel.appendChild(kv('담는 것', n.desc)); if (n.scope) panel.appendChild(kv('범위', n.scope));
+      panel.appendChild(kv('읽는 API', rd + '개(선으로 그린 것)')); panel.appendChild(kv('쓰는 API', wr + '개')); if (fr) panel.appendChild(kv('화면이 직접 읽음', fr + '개 화면(API 를 거치지 않는 정적 파일, 점선)'));
+      panel.appendChild(list('쓰는 기능', Object.keys(ws).sort().map(function (s) { return { id: 's:' + s, text: s }; }), true));
+      panel.appendChild(list('이어진 기능 전체', Object.keys(scr).sort().map(function (s) { return { id: 's:' + s, text: s }; }), true));
+      if (sel === 'd:users') panel.appendChild(pl('requireAuth 의 매 요청 읽기는 선으로 그리지 않았다. 여기에는 관문과 API 가 직접 읽고 쓰는 선만 있다.', 'au'));
+    } else if (t === 'engine' || t === 'external') {
+      if (n.desc) panel.appendChild(pl(n.desc));
+      panel.appendChild(list('쓰는 API', (INN[sel] || []).map(function (ei) { return { id: edges[ei][0], text: N[edges[ei][0]].label }; }), true));
+    } else if (t === 'gate') { panel.appendChild(pl(n.note)); }
+  }
+
+  /* ── 확대·이동 ── */
+  function setT() {
+    world.style.transform = 'translate(' + tx.toFixed(2) + 'px,' + ty.toFixed(2) + 'px) scale(' + k.toFixed(4) + ')'; zv.textContent = Math.round(k * 100) + '%';
+    var hs = heads.children; for (var c = 0; c < 4; c++) { hs[c].style.left = (tx + colX[c] * k) + 'px'; hs[c].style.width = (CW[c] * k) + 'px'; hs[c].textContent = CW[c] * k < 130 ? HSHORT[c] : HEADS[c]; }
+  }
+  function clamp(v) { return Math.max(MINK, Math.min(MAXK, v)); }
+  function zoomAt(mx, my, nk) { nk = clamp(nk); tx = mx - (mx - tx) * nk / k; ty = my - (my - ty) * nk / k; k = nk; setT(); }
+  function animTo(nk, ntx, nty, ms) {   // 부드럽게 이동·확대(기본 0.3초)
+    if (raf) cancelAnimationFrame(raf);
+    if (!ms) { k = nk; tx = ntx; ty = nty; setT(); raf = 0; return; }
+    var s = { k: k, tx: tx, ty: ty }, t0 = performance.now();
+    function step(t) { var p = Math.min(1, (t - t0) / ms), e = p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; k = s.k + (nk - s.k) * e; tx = s.tx + (ntx - s.tx) * e; ty = s.ty + (nty - s.ty) * e; setT(); raf = p < 1 ? requestAnimationFrame(step) : 0; }
+    raf = requestAnimationFrame(step);
+  }
+  function fit(smooth) {
+    var w = view.clientWidth, h = view.clientHeight, m = 12;
+    WORLD_H = world.offsetHeight; var nk = clamp(Math.min((w - 2 * m) / WORLD_W, (h - 2 * m) / WORLD_H)); fitK = nk;
+    animTo(nk, (w - WORLD_W * nk) / 2, Math.max(m, (h - WORLD_H * nk) / 2), smooth ? 300 : 0);
+  }
+  function focusSel() {   // 선택한 칸을 100% 로 화면 가운데에 보인다(0.3초)
+    if (!sel) return; var u = unitOf(sel), el = els[u]; if (!el || !visible(u)) return;
+    var r = rectOf(el), w = view.clientWidth, h = view.clientHeight;
+    animTo(1, w / 2 - (r.l + r.r) / 2, h / 2 - (r.t + r.b) / 2, 300);
+  }
+  vp.addEventListener('wheel', function (e) { e.preventDefault(); var r = view.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, k * Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+  function cz(f) { zoomAt(view.clientWidth / 2, view.clientHeight / 2, f); }
+  document.getElementById('zin').addEventListener('click', function () { cz(k * 1.25); });
+  document.getElementById('zout').addEventListener('click', function () { cz(k / 1.25); });
+  document.getElementById('zfit').addEventListener('click', function () { fit(true); });
+  document.getElementById('z100').addEventListener('click', function () { var w = view.clientWidth, h = view.clientHeight, cx = (w / 2 - tx) / k, cy = (h / 2 - ty) / k; animTo(1, w / 2 - cx, h / 2 - cy, 300); });
+  document.getElementById('gosel').addEventListener('click', focusSel);
+  document.getElementById('expAll').addEventListener('click', function () { D.apiGroups.forEach(function (g) { open[g] = true; }); applyAll(true); });
+  document.getElementById('colAll').addEventListener('click', function () { D.apiGroups.forEach(function (g) { open[g] = false; }); applyAll(true); });
+  var fb = document.getElementById('filt');
+  fb.addEventListener('click', function () { filterOn = !filterOn; fb.setAttribute('aria-pressed', filterOn ? 'true' : 'false'); applyAll(true); });
+  var pb = document.getElementById('ptog');
+  pb.addEventListener('click', function () { var off = !panel.classList.contains('off'); panel.classList.toggle('off', off); pb.setAttribute('aria-pressed', off ? 'false' : 'true'); setTimeout(function () { fit(false); }, 0); });
+  var drag = null;
+  vp.addEventListener('mousedown', function (e) {
+    if (e.button !== 0 || e.target.closest('.cell')) return;
+    drag = { x: e.clientX, y: e.clientY, tx: tx, ty: ty, moved: false }; vp.classList.add('drag');
+  });
+  window.addEventListener('mousemove', function (e) {
+    if (!drag) return; var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+    tx = drag.tx + dx; ty = drag.ty + dy; setT();
+  });
+  window.addEventListener('mouseup', function () { if (!drag) return; var m = drag.moved; drag = null; vp.classList.remove('drag'); if (!m && sel) { sel = null; applyAll(false); if (filterOn) fit(true); } });
+  window.addEventListener('resize', function () { fit(false); });
+
+  /* ── 주소(#sel=종류:이름&open=묶음,…) ── */
+  var KIND = { gate: 'g', screen: 's', api: 'a', apigrp: 'G', engine: 'e', external: 'x', db: 'd', cache: 'c', file: 'f' };
+  function selToken(id) { var n = N[id], kd = n.type === 'gate' ? 'gate' : KIND[n.type]; return kd + ':' + (n.type === 'apigrp' || n.type === 'api' ? n.label : n.type === 'gate' ? id.slice(2) : n.label); }
+  function tokenToId(tok) {
+    var i = tok.indexOf(':'); if (i < 0) return null; var kd = tok.slice(0, i), name = tok.slice(i + 1);
+    if (kd === 'gate') return N['g:' + name] ? 'g:' + name : null;
+    if (kd === 'a') { var f = nodes.filter(function (n) { return n.type === 'api' && n.label === name; })[0]; return f ? f.id : null; }
+    var id = (kd === 'G' ? 'G:' : kd + ':') + name; return N[id] ? id : null;
+  }
+  function writeHash() {
+    var o = D.apiGroups.filter(function (g) { return open[g]; }), h = '#';
+    var parts = []; if (sel) parts.push('sel=' + encodeURIComponent(selToken(sel))); if (o.length) parts.push('open=' + o.map(encodeURIComponent).join(','));
+    h += parts.join('&'); try { history.replaceState(null, '', parts.length ? h : location.pathname + location.search); } catch (e) { location.hash = h; }
+  }
+  function readHash() {
+    var p = new URLSearchParams(location.hash.replace(/^#/, '')), r = { sel: null, open: [] };
+    var s = p.get('sel'); if (s) r.sel = tokenToId(s);
+    var o = p.get('open'); if (o) r.open = o.split(',').map(decodeURIComponent).filter(function (g) { return D.apiGroups.indexOf(g) >= 0; });
+    return r;
+  }
+  function restore() { var h = readHash(); open = {}; h.open.forEach(function (g) { open[g] = true; }); sel = h.sel; applyAll(true); if (sel) focusSel(); }
+  window.addEventListener('hashchange', restore);
+
+  /* ── 맨 아래 ── */
+  document.getElementById('foot').textContent = '데이터 출처: docs/blueprint/api.md(API ' + nodes.filter(function (n) { return n.type === 'api'; }).length + '행) · db.md · LEGEND · 화면 머리말(modules·requires), 기준 커밋 ' + D.commit + '. 규칙: requireAuth 가 매 요청마다 하는 users 읽기(api.md 공통 규칙)는 선으로 그리지 않는다 — users 에는 관문과 API 가 직접 읽고 쓰는 선만 있다. 화면 머리말과 api.md 의 접근 차이 경고가 ' + D.warnN + '건 있다(B-006 에서 정리 예정).';
+
+  window.__svc = {
+    state: function () { return { sel: sel, open: Object.keys(open).filter(function (g) { return open[g]; }), k: k, tx: tx, ty: ty, worldW: WORLD_W, worldH: WORLD_H, fitK: fitK, minK: MINK, maxK: MAXK, filter: filterOn }; },
+    select: function (id) { sel = id; applyAll(false); },
+    openAll: function () { document.getElementById('expAll').click(); }, closeAll: function () { document.getElementById('colAll').click(); },
+    view: function (nk, wx, wy) { animTo(nk, view.clientWidth / 2 - wx * nk, view.clientHeight / 2 - wy * nk, 0); },
+    fit: function (s) { fit(s); }, focus: focusSel, anim: function () { return !!raf; }, lines: function () { return lineRecs.map(function (r) { return { a: r.a, b: r.b, kind: r.kind, d: r.d, pts: r.pts, minR: r.minR, on: !!r.on, n: r.idx.length, bypass: !!r.bypass }; }); },
+    rects: function () { return Object.keys(els).filter(visible).map(function (u) { var r = rectOf(els[u]); return { u: u, l: r.l, r: r.r, t: r.t, b: r.b }; }); },
+    data: D
+  };
+  var run = function () { restore(); };
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(run); else run();
+})();
+</script>
+</body>
+</html>
+`.replace('/*__DATA__*/', () => json);
+}
+// <svc-html-end>
 
 function main() {
   const errs = [];
@@ -1465,6 +1958,7 @@ function main() {
   if (sx.badEdges) svcErr.push('끝점이 없는 선 ' + sx.badEdges + '개');
   if (kk.call !== cc.engine + cc.external) svcErr.push('call 선 ' + kk.call + ' != 엔진·외부 칸 합 ' + (cc.engine + cc.external));
   if (kk.read !== cc.read + cc.file + 1) svcErr.push('read 선 ' + kk.read + ' != 읽기·파일 칸 합 ' + (cc.read + cc.file) + ' + 관문 users 1');
+  if ((kk.fread || 0) !== cc.fread) svcErr.push('fread 선 ' + (kk.fread || 0) + ' != 화면 머리말의 API 없는 파일 읽기 ' + cc.fread);
   if (kk.write !== cc.write) svcErr.push('write 선 ' + kk.write + ' != 쓰기 칸 합 ' + cc.write);
   if (kk.flow !== cc.flowCells - cc.flowSkipped + 1 + gatedN + 2) svcErr.push('flow 선 ' + kk.flow + ' != 호출 화면 칸 합 ' + cc.flowCells + ' - 공용 생략 ' + cc.flowSkipped + ' + 입구 1 + 관문→화면 ' + gatedN + ' + 로그인→API 2');
   if (svcErr.length) { console.error('blueprint:gen 서비스 흐름도 데이터 불일치:\n' + svcErr.map(e => ' - ' + e).join('\n')); process.exit(1); }
@@ -1476,7 +1970,8 @@ function main() {
   const flowOnly = WARNS.filter(w => w.kind === 'flowOnly'), headerOnly = WARNS.filter(w => w.kind === 'headerOnly');
   console.log('흐름: 동작 ' + nFlows + '개, 단계 ' + nSteps + '개 (' + screens.map(s => s.screen + ' ' + s._flows.length).join(', ') + ')');
   console.log('경고(오류 아님): 흐름에만 있는 대상 ' + flowOnly.length + '건, 머리말에만 있고 흐름에 안 나오는 대상 ' + headerOnly.length + '건(그중 기기 저장값 ' + headerOnly.filter(w => w.device).length + '건)');
-  console.log('서비스 흐름도 데이터: 노드 ' + sx.nodes + '개(입구·관문 2, 기능 ' + sx.screens + ', API 묶음 ' + sx.groups + ', API ' + sx.apis + ', 엔진 ' + sx.engines + ', 외부 ' + sx.externals + ', DB ' + sx.db + ', 캐시 ' + sx.cache + ', 파일 ' + sx.files + '), 선 ' + sx.edges + '개(flow ' + kk.flow + ', call ' + kk.call + ', read ' + kk.read + ', write ' + kk.write + ')');
+  fs.writeFileSync(SERVICE, serviceHtml(svc));
+  console.log('서비스 흐름도 데이터: 노드 ' + sx.nodes + '개(입구·관문 2, 기능 ' + sx.screens + ', API 묶음 ' + sx.groups + ', API ' + sx.apis + ', 엔진 ' + sx.engines + ', 외부 ' + sx.externals + ', DB ' + sx.db + ', 캐시 ' + sx.cache + ', 파일 ' + sx.files + '), 선 ' + sx.edges + '개(flow ' + kk.flow + ', call ' + kk.call + ', read ' + kk.read + ', write ' + kk.write + ', fread ' + (kk.fread || 0) + ')');
   const apiN = k => API_WARNS.filter(w => w.kind === k).length;
   console.log('api.md: API ' + api.rows.length + '개. 경고(오류 아님): 화면이 부르는데 api.md 에 없는 경로 ' + apiN('noRoute') + '건(검사한 문자열 ' + aw.literals + '개), 화면 머리말과 api.md 의 접근 차이 ' + apiN('screenDiff') + '건, 접근하는 API 가 없는 db.md 항목 ' + apiN('noApi') + '건');
   if (process.argv.includes('--warn')) for (const w of WARNS) console.log(' - [' + (w.kind === 'flowOnly' ? '흐름에만' : '머리말에만') + '] ' + w.screen + ': ' + w.text);

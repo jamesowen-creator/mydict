@@ -18,7 +18,7 @@ requires: [로그인]
 navigates: [홈]
 externals: [Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 49287a8
+last_checked: 23d581c
 ---
 
 # 작가 노트 (public/artist_notes.html)

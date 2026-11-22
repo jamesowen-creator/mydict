@@ -15,7 +15,7 @@ requires: [로그인, 권한:perm_speakloop]
 navigates: [홈]
 externals: [Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js]
-last_checked: 8753b0a
+last_checked: 23d581c
 ---
 
 # Speak Loop (public/speakloop.html) — 영어 말하기 연습(독백 + 이디엄)

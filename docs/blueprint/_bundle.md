@@ -1,7 +1,7 @@
 # METIS-3 도면 묶음 (_bundle.md)
 
 이 파일은 `npm run blueprint:gen` 이 만든다(직접 고치지 않는다). 용도: 이 한 파일을 웹 Claude 에 첨부해 프로젝트 문서로 복사한다.
-순서: README → LEGEND → db → api → screens(파일 이름 순). 기준 커밋(화면 파일의 last_checked): 49287a8, 8753b0a, bf7715c
+순서: README → LEGEND → db → api → screens(파일 이름 순). 기준 커밋(화면 파일의 last_checked): 23d581c, 49287a8, 8753b0a, bf7715c
 화면 파일 12개.
 
 =====================================================================
@@ -19,6 +19,7 @@
 - 표기 어휘(요소 7종·관계 6종·엔진 이름 고정 목록·근거 상태)는 [LEGEND.md](LEGEND.md)에 고정돼 있다. 화면 파일 머리말은 그 표준 키만 쓰고, 표준 밖의 키·이름이 있으면 `npm run blueprint:gen`이 오류로 멈춘다.
 - 저장소(DB 테이블·서버 캐시)는 [db.md](db.md) 한 장에 모았다(표기는 LEGEND 7절, 읽는·쓰는 화면은 gen 이 만든다).
 - 서버 API(라우트)는 [api.md](api.md) 한 장에 모았다(한 줄 = 라우트 하나: 인증·읽기·쓰기·엔진·외부·파일·호출 화면, 표기는 LEGEND 10절). 코드에 라우트가 늘었는데 api.md 에 없으면 gen 이 멈춘다. 줄 단위 근거는 [_draft/api-catalog-draft.md](_draft/api-catalog-draft.md).
+- 서비스 흐름도(로그인 → 기능 → API 묶음 → 엔진·외부·저장소)는 [service.html](service.html)을 브라우저로 직접 연다(API 묶음 박스를 누르면 펼침, 칸을 누르면 이어진 경로만 진하게, 데이터는 api.md 에서 gen 이 만든다).
 - 화면마다 `screens/<이름>.md` 한 장. 맨 위 머리말(`---` 사이)은 기계가 읽는 목록이고, 본문은 5개 절(1 기능 / 2 엔진 / 3 경로 / 4 DB / 5 연결)이다. 경로는 `파일:줄`.
 - 아래 "생성 구간"은 머리말에서 `npm run blueprint:gen`이 만든다(손으로 고치지 않는다). 시각 도면은 [map.html](map.html)을 브라우저로 직접 연다(항목을 누르면 연결된 항목이 강조되고 관계 종류별로 나열된다).
 - 화면 파일 머리말의 `flows`는 "동작별 흐름"(사용자가 누르는 동작 하나마다 → 호출·읽기·쓰기 순서)이다. map.html에서 화면을 누르고 동작 카드를 누르면 왼쪽 목록에 ①②③ 번호가 붙는다. 문법은 LEGEND 2절.
@@ -225,7 +226,7 @@
 ### 미작성 화면 (0개)
 (없음)
 
-화면 파일의 마지막 확인 커밋: 49287a8, 8753b0a, bf7715c
+화면 파일의 마지막 확인 커밋: 23d581c, 49287a8, 8753b0a, bf7715c
 <!-- gen:end -->
 
 ## 작업 블록 규칙
@@ -250,7 +251,7 @@
 | [DB] | 저장소(DB 테이블) | PostgreSQL 테이블 | `reads`·`writes` 의 `DB:이름` |
 | [캐시] | 저장소(서버 캐시) | 같은 결과를 다시 만들지 않으려고 서버가 저장하는 테이블 | `reads`·`writes` 의 `캐시:이름` |
 | [기기] | 저장소(기기 저장값) | 브라우저 localStorage·sessionStorage 키 | `reads`·`writes` 의 `기기:키` |
-| [파일] | 저장소(파일) | DB 가 아닌 데이터 파일. 서버가 읽는 파일(data/ 아래)과 정적으로 내려주는 파일(public/ 아래 JSON·텍스트). 아래 9절 고정 목록의 이름만 쓴다 | `reads`·`writes` 의 `파일:이름` |
+| [파일] | 저장소(파일) | DB 가 아닌 데이터 파일. 서버가 읽는 파일(data/ 아래)과 정적으로 내려주는 파일(public/ 아래 JSON·텍스트). 아래 9절 고정 목록의 이름만 쓴다. service.html 에서는 접힌 모서리 사각으로 그린다 | `reads`·`writes` 의 `파일:이름` |
 | [외부] | 외부 | 앱 밖의 서비스(아래 4절 고정 목록) | `externals` |
 | [모듈] | 모듈 | 여러 화면이 같이 쓰는 파일(저장소 안 경로, 존재하는 파일이어야 함) | `modules` |
 | [미작성] | 미작성 | 도면이 아직 없는 화면(README 화면 목록·map.html 점선) | (화면 파일 없음) |
@@ -704,7 +705,7 @@ requires: [로그인, 관리자]
 navigates: [홈]
 externals: [Anthropic API(Claude Haiku), OpenAI TTS(음성 합성), Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js]
-last_checked: 8753b0a
+last_checked: 23d581c
 ---
 
 # 관리자 (public/admin.html)
@@ -769,7 +770,7 @@ requires: [로그인]
 navigates: [홈]
 externals: [Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 49287a8
+last_checked: 23d581c
 ---
 
 # 작가 노트 (public/artist_notes.html)
@@ -887,7 +888,7 @@ requires: [로그인, 권한:can_search, 권한:can_wordbook, 권한:can_tts]
 navigates: [스펠링 런, 홈]
 externals: [Anthropic API(Claude Haiku), OpenAI TTS(음성 합성), Google Fonts, jsDelivr(tesseract.js)]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js, public/js/ocr/ocrScanner.js]
-last_checked: 8753b0a
+last_checked: 23d581c
 ---
 
 # 사전 (public/english_dictionary.html)
@@ -954,7 +955,7 @@ requires: [로그인, 권한:perm_digest_reading]
 navigates: [홈]
 externals: [Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 49287a8
+last_checked: 23d581c
 ---
 
 # 한입 독서 (public/digest_reading.html)
@@ -1125,7 +1126,7 @@ requires: [로그인, 권한:perm_literature_compass]
 navigates: [홈, 사전]
 externals: [Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 49287a8
+last_checked: 23d581c
 ---
 
 # 문학 나침반 (public/literature_compass.html)
@@ -1180,7 +1181,7 @@ requires: [로그인, 권한:perm_science_reading]
 navigates: [홈]
 externals: [Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 49287a8
+last_checked: 23d581c
 ---
 
 # 과학 (public/science_reading.html)
@@ -1235,7 +1236,7 @@ requires: [로그인, 권한:perm_speakloop]
 navigates: [홈]
 externals: [Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js]
-last_checked: 8753b0a
+last_checked: 23d581c
 ---
 
 # Speak Loop (public/speakloop.html) — 영어 말하기 연습(독백 + 이디엄)

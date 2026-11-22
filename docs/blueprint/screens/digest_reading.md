@@ -18,7 +18,7 @@ requires: [로그인, 권한:perm_digest_reading]
 navigates: [홈]
 externals: [Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 49287a8
+last_checked: 23d581c
 ---
 
 # 한입 독서 (public/digest_reading.html)

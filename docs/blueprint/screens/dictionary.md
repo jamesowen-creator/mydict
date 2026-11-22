@@ -18,7 +18,7 @@ requires: [로그인, 권한:can_search, 권한:can_wordbook, 권한:can_tts]
 navigates: [스펠링 런, 홈]
 externals: [Anthropic API(Claude Haiku), OpenAI TTS(음성 합성), Google Fonts, jsDelivr(tesseract.js)]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js, public/js/ocr/ocrScanner.js]
-last_checked: 8753b0a
+last_checked: 23d581c
 ---
 
 # 사전 (public/english_dictionary.html)
