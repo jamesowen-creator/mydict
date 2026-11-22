@@ -938,66 +938,67 @@ body { background: var(--bg); color: var(--text); font: 16px/1.5 -apple-system, 
 .grp .gl { font-size: 14px; font-weight: 700; color: var(--sub); }
 button { font: inherit; }
 .sbtn, .zbtn { min-height: 34px; padding: 3px 12px; border: 1.5px solid var(--c-screen); border-radius: 12px; background: var(--card); color: var(--text); font-size: 15px; cursor: pointer; word-break: keep-all; }
-.sbtn[aria-pressed="true"] { border-color: var(--sel); background: var(--selbg); font-weight: 700; }
+.sbtn[aria-pressed="true"], .zbtn[aria-pressed="true"] { border-color: var(--sel); background: var(--selbg); font-weight: 700; }
 .zbtn { border-color: var(--line); border-radius: 8px; min-width: 38px; }
 .zbtn:hover, .sbtn:hover { background: var(--selbg); }
 .zoomv { font-size: 14px; color: var(--sub); min-width: 4.5em; }
 .leg { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-top: 6px; font-size: 14px; color: var(--sub); }
 .leg .s { --bc: var(--kc, var(--line)); --bg2: var(--card); position: relative; display: inline-block; padding: 1px 12px; border: 1.5px solid var(--bc); background: var(--bg2); color: var(--text); font-size: 14px; line-height: 1.4; }
 .leg .s.t-db, .leg .s.t-cache { padding-top: 11px; }
-.leg .s.t-engine { padding: 1px 20px; border: 0; background: var(--bc); }
-.leg .s.t-engine { isolation: isolate; }
+.leg .s.t-engine { padding: 1px 20px; border: 0; background: var(--bc); isolation: isolate; }
 .leg .s.t-engine::before { z-index: -1; }
 .status { margin-top: 6px; font-size: 15px; font-weight: 700; min-height: 1.5em; color: var(--sel); }
 #vp { position: relative; overflow: hidden; margin: 0 16px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); cursor: grab; touch-action: none; user-select: none; }
 #vp.drag { cursor: grabbing; }
+#heads { position: absolute; left: 0; right: 0; top: 0; height: 38px; z-index: 5; background: var(--card); border-bottom: 1.5px solid var(--line); overflow: hidden; }
+#heads .hd { position: absolute; top: 0; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: var(--sub); text-align: center; line-height: 1.15; word-break: keep-all; overflow: hidden; }
+#view { position: absolute; left: 0; right: 0; top: 38px; bottom: 0; overflow: hidden; }
 #world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
-#lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
-.hd { position: absolute; top: 10px; font-size: 14px; font-weight: 700; color: var(--sub); text-align: center; padding-bottom: 4px; border-bottom: 1.5px solid var(--line); }
-.col { position: absolute; display: flex; flex-direction: column; gap: 38px; }
-.card, .chip { --bc: var(--kc, var(--line)); --bg2: var(--card); position: relative; display: block; width: 100%; text-align: left; margin: 0; padding: 8px 12px; border: 1.5px solid var(--bc); background: var(--bg2); color: var(--text); font: inherit; font-size: 15px; line-height: 1.35; overflow-wrap: break-word; word-break: keep-all; cursor: pointer; z-index: 1; }
-.card { --kc: var(--c-screen); border-radius: 12px; }
+#lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; z-index: 2; }
+.strip { width: 100%; }
+.strip + .strip { border-top: 1.5px dashed var(--line); }
+.sg { display: grid; grid-template-columns: 270px 310px 330px 330px; column-gap: 150px; row-gap: 22px; padding: 12px 24px 14px; }
+.strip.dimmed { opacity: .25; }
+.card, .chip { --bc: var(--kc, var(--line)); --bg2: var(--card); position: relative; display: block; width: 100%; text-align: left; margin: 0; padding: 5px 12px; border: 1.5px solid var(--bc); background: var(--bg2); color: var(--text); font: inherit; font-size: 15px; line-height: 1.35; overflow-wrap: break-word; word-break: keep-all; cursor: pointer; align-self: start; z-index: 1; }
+.card { --kc: var(--c-screen); border-radius: 12px; padding: 7px 12px; grid-column: 1; grid-row: 1; }
 .card .nm { display: block; font-weight: 700; }
-.card small, .chip small { display: block; font-size: 14px; color: var(--sub); }
-.t-need { --kc: var(--c-need); border-radius: 999px; border-style: dashed; padding: 6px 18px; }
+.card small { display: block; font-size: 14px; color: var(--sub); }
+.chip small { display: inline; font-size: 14px; color: var(--sub); margin-right: 6px; }
+.t-need { --kc: var(--c-need); border-radius: 999px; border-style: dashed; padding: 5px 18px; }
 .t-api { --kc: var(--c-api); border-radius: 4px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
 .t-module { --kc: var(--c-module); border-radius: 0; }
 .t-external { --kc: var(--c-external); border-radius: 4px; border-style: dashed; }
-.t-device { --kc: var(--c-device); border-radius: 999px; border-style: dotted; padding: 6px 18px; }
+.t-device { --kc: var(--c-device); border-radius: 999px; border-style: dotted; padding: 5px 18px; }
 .t-screen.chip { --kc: var(--c-screen); border-radius: 12px; }
-.t-db, .t-cache { --kc: var(--c-store); border-radius: 14px / 10px; padding-top: 18px; }
-.t-db::before, .t-cache::before { content: ""; position: absolute; left: -1.5px; right: -1.5px; top: 0; height: 14px; border: 1.5px solid var(--bc); border-radius: 50%; background: var(--bg2); }
+.t-db, .t-cache { --kc: var(--c-store); border-radius: 14px / 10px; padding-top: 16px; }
+.t-db::before, .t-cache::before { content: ""; position: absolute; left: -1.5px; right: -1.5px; top: 0; height: 12px; border: 1.5px solid var(--bc); border-radius: 50%; background: var(--bg2); }
 .t-cache::before { border-style: dashed; }
-.t-engine { --kc: var(--c-engine); border: 0; background: var(--bc); padding: 8px 28px; clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 16px 100%, 0 50%); }
+.t-engine { --kc: var(--c-engine); border: 0; background: var(--bc); padding: 6px 28px; clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 16px 100%, 0 50%); }
 .t-engine::before { content: ""; position: absolute; inset: 2px; background: var(--bg2); clip-path: polygon(15px 0, calc(100% - 15px) 0, 100% 50%, calc(100% - 15px) 100%, 15px 100%, 0 50%); }
 .chip .in { position: relative; display: flex; align-items: flex-start; gap: 8px; }
 .chip .in .tx { min-width: 0; flex: 1; }
-.bdgs { display: none; flex: none; gap: 3px; flex-wrap: wrap; max-width: 90px; }
-.chip.has-b .bdgs { display: flex; }
-.num { display: inline-block; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 12px; background: var(--sel); color: #fff; font-size: 14px; font-weight: 700; line-height: 24px; text-align: center; white-space: nowrap; }
-.dimmed { opacity: .35; }
+.num { flex: none; display: inline-block; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 12px; background: var(--sel); color: #fff; font-size: 14px; font-weight: 700; line-height: 24px; text-align: center; white-space: nowrap; }
 .card.on, .chip.on { --bc: var(--sel); --bg2: var(--selbg); }
-.chip.rel { --bc: var(--rel); --bg2: var(--relbg); }
-.ln { fill: none; stroke: var(--sub); stroke-width: 1.8; opacity: .25; }
+.ln { fill: none; stroke: var(--sub); stroke-width: 1.8; opacity: .7; }
 .ln.dash { stroke-dasharray: 7 6; }
-.ln.on { stroke: var(--sel); stroke-width: 2.6; opacity: 1; }
-.ln.off { opacity: .1; }
+.sg-g.sel .ln, .ln.on { stroke: var(--sel); stroke-width: 2.6; opacity: 1; }
+.sg-g.dimmed { opacity: .25; }
 marker path { fill: var(--sub); }
 marker.mo path { fill: var(--sel); }
-.empty { position: absolute; left: 20px; top: 60px; color: var(--sub); }
+.folded .chip { display: none; }
 </style>
 </head>
 <body>
 <div class="top">
-  <h1>METIS-3 화면 도면판</h1><span class="use">휠: 확대·축소 · 빈 곳을 끌어 이동 · 동작 카드나 부품 칸을 누르면 그 흐름만 진하게(빈 곳을 누르면 해제)</span>
+  <h1>METIS-3 화면 도면판</h1><span class="use">동작마다 띠 하나(위→아래가 단계 순서) · 휠: 확대·축소 · 빈 곳을 끌어 이동 · 동작 카드나 부품 칸을 누르면 그 흐름만 진하게(빈 곳을 누르면 해제)</span>
   <div class="bar">
     <span id="sbar" class="bar" style="margin:0"></span>
-    <span class="grp"><button class="zbtn" id="zin" type="button" aria-label="확대">＋</button><button class="zbtn" id="zout" type="button" aria-label="축소">－</button><button class="zbtn" id="zfit" type="button">전체 맞춤</button><button class="zbtn" id="z100" type="button">100%</button><span class="zoomv" id="zv"></span></span>
+    <span class="grp"><button class="zbtn" id="zin" type="button" aria-label="확대">＋</button><button class="zbtn" id="zout" type="button" aria-label="축소">－</button><button class="zbtn" id="zfit" type="button">전체 맞춤</button><button class="zbtn" id="z100" type="button">100%</button><button class="zbtn" id="fold" type="button" aria-pressed="false">선택하지 않은 동작 접기</button><span class="zoomv" id="zv"></span></span>
   </div>
   <div class="leg"><span class="s t-screen" style="--kc:var(--c-screen);border-radius:12px">화면</span><span class="s t-engine" style="--kc:var(--c-engine)">엔진</span><span class="s t-db" style="--kc:var(--c-store);border-radius:14px/10px">DB</span><span class="s t-cache" style="--kc:var(--c-store);border-radius:14px/10px">캐시</span><span class="s" style="--kc:var(--c-device);border-radius:999px;border-style:dotted">기기</span><span class="s" style="--kc:var(--c-api);border-radius:4px">API</span><span class="s" style="--kc:var(--c-external);border-radius:4px;border-style:dashed">외부</span><span class="s" style="--kc:var(--c-module)">모듈</span><span class="s" style="--kc:var(--c-need);border-radius:999px;border-style:dashed">필요</span><span>점선 화살표 = ⇢대체(3a→3b) · 번호 ①②③ = 단계 순서</span></div>
   <div class="status" id="status" aria-live="polite"></div>
 </div>
-<div id="vp"><div id="world"></div></div>
+<div id="vp"><div id="heads"></div><div id="view"><div id="world"></div></div></div>
 <script id="data" type="application/json">${json}</script>
 <script>
 (function () {
@@ -1005,194 +1006,149 @@ marker.mo path { fill: var(--sel); }
   var screens = D.screens, groups = D.groups, byName = {};
   screens.forEach(function (s) { byName[s.label] = s; });
   var RELW = { call: '호출', read: '읽기', write: '쓰기', move: '이동', need: '필요', fallback: '대체' };
-  var COLOF = { need: 1, api: 1, engine: 2, module: 2, db: 3, cache: 3, device: 3, external: 3, screen: 3 };
+  var COLOF = { device: 0, need: 1, api: 1, engine: 2, module: 2, db: 3, cache: 3, external: 3, screen: 3 };
   var CIRC = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩', '⑪', '⑫', '⑬', '⑭', '⑮', '⑯', '⑰', '⑱', '⑲', '⑳'];
-  var HEADS = ['화면 · 동작', '경로 (필요 · API)', '엔진 · 모듈', '저장소 · 외부'];
-  var CW = [270, 310, 330, 330], GUT = 150, PAD = 24, RM = 80, TOP = 50;
+  var HEADS = ['화면 · 동작 · 기기 저장값', '경로 (필요 · API)', '엔진 · 모듈', '저장소 · 외부'];
+  var CW = [270, 310, 330, 330], GUT = 150, PAD = 24, RM = 80, HEAD_H = 30;
   var colX = [], x0 = PAD; CW.forEach(function (w, c) { colX[c] = x0; x0 += w + GUT; });
   var WORLD_W = colX[3] + CW[3] + RM;
-  var vp = document.getElementById('vp'), world = document.getElementById('world'), statusEl = document.getElementById('status'), zv = document.getElementById('zv');
-  var k = 1, tx = 0, ty = 0, WORLD_H = 0, MINK = 0.25, MAXK = 3;
-  var cur = null, B = null;   // cur: 화면 이름, B: 현재 도면판 구조 { cards, chips, paths, flows }
-  var sel = null;             // { t: 'flow', fi } | { t: 'chip', key }
+  var vp = document.getElementById('vp'), view = document.getElementById('view'), world = document.getElementById('world'), heads = document.getElementById('heads');
+  var statusEl = document.getElementById('status'), zv = document.getElementById('zv'), foldBtn = document.getElementById('fold');
+  var k = 1, tx = 0, ty = 0, WORLD_H = 0, MINK = 0.25, MAXK = 3, fitK = 1;   // 전체 맞춤 배율이 0.25 보다 작아야 하는 긴 화면은 그 배율까지 줄일 수 있다
+  var cur = null, B = null, sel = null, foldOn = false;   // sel: { t: 'flow', fi } | { t: 'chip', key }
   function mk(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function numLabel(n) { var d = parseInt(n, 10), rest = String(n).replace(/^\\d+/, ''); return (CIRC[d - 1] || String(d)) + rest; }
   function putText(el, text, type) {   // API·파일 경로는 슬래시 뒤에서만, 그 밖의 이름은 여는 괄호 뒤에서만 줄바꿈한다
     var sep = (type === 'api' || type === 'module') ? '/' : '(';
     String(text).split(sep).forEach(function (part, i) { if (i > 0) { el.appendChild(document.createTextNode(sep)); el.appendChild(document.createElement('wbr')); } el.appendChild(document.createTextNode(part)); });
   }
-  function hash(str) { var h = 0; for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h; }
+  var NS = 'http://www.w3.org/2000/svg';
+  HEADS.forEach(function (h) { heads.appendChild(mk('div', 'hd', h)); });
 
-  /* ── 선택 영역 ── */
+  /* ── 화면 선택 ── */
   var sbar = document.getElementById('sbar'), sbtns = {};
   groups.forEach(function (g) {
     var s = mk('span', 'grp'); s.appendChild(mk('span', 'gl', g.name));
-    g.screens.forEach(function (n) { if (!byName[n]) return; var b = mk('button', 'sbtn', n); b.type = 'button'; b.setAttribute('aria-pressed', 'false'); b.addEventListener('click', function () { openScreen(n, true); }); sbtns[n] = b; s.appendChild(b); });
+    g.screens.forEach(function (n) { if (!byName[n]) return; var b = mk('button', 'sbtn', n); b.type = 'button'; b.setAttribute('aria-pressed', 'false'); b.addEventListener('click', function () { openScreen(n); }); sbtns[n] = b; s.appendChild(b); });
     sbar.appendChild(s);
   });
 
-  /* ── 도면판 구성 ── */
+  /* ── 도면판 구성: 동작 하나 = 띠 하나, 단계는 위에서 아래로 한 줄씩 ── */
   function chipKey(st) { return st.type + ':' + st.label; }
   function build(name) {
-    var sc = byName[name]; world.textContent = '';
-    B = { cards: [], chips: {}, order: [], paths: [], flows: sc.flows, segs: [], cols: [] };
-    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('id', 'lines'); svg.setAttribute('aria-hidden', 'true');
+    var sc = byName[name]; world.textContent = ''; world.style.width = WORLD_W + 'px';
+    B = { strips: [], flows: sc.flows, edges: [], rects: [], segs: [], keys: {} };
+    var svg = document.createElementNS(NS, 'svg'); svg.setAttribute('id', 'lines'); svg.setAttribute('aria-hidden', 'true');
     svg.innerHTML = '<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z"/></marker><marker id="aho" class="mo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z"/></marker></defs>';
-    world.appendChild(svg);
-    HEADS.forEach(function (h, c) { var e = mk('div', 'hd', h); e.style.left = colX[c] + 'px'; e.style.width = CW[c] + 'px'; world.appendChild(e); });
-    var cols = [0, 1, 2, 3].map(function (c) { var d = mk('div', 'col'); d.style.left = colX[c] + 'px'; d.style.top = TOP + 'px'; d.style.width = CW[c] + 'px'; world.appendChild(d); return d; });
-    B.cols = cols;
+    world.appendChild(svg); B.svg = svg;
     sc.flows.forEach(function (f, fi) {
-      var c = mk('button', 'card'); c.type = 'button'; c.dataset.fi = String(fi);
-      c.appendChild(mk('span', 'nm', f.name)); c.appendChild(mk('small', '', f.steps.length + '단계'));
-      c.addEventListener('click', function (e) { e.stopPropagation(); pick(sel && sel.t === 'flow' && sel.fi === fi ? null : { t: 'flow', fi: fi }); });
-      cols[0].appendChild(c); B.cards.push(c);
-    });
-    // 칸: 같은 대상은 한 번만. 순서는 동작 순서·단계 순서로 처음 나온 위치
-    sc.flows.forEach(function (f, fi) {
-      f.steps.forEach(function (st) {
-        var key = chipKey(st), ch = B.chips[key];
-        if (!ch) {
-          var el = mk('div', 'chip t-' + st.type); el.tabIndex = 0; el.setAttribute('role', 'button'); el.dataset.key = key;
-          var inn = mk('div', 'in'); inn.appendChild(mk('span', 'bdgs')); var tx = mk('div', 'tx'); var lb = mk('span', 'lbl'); putText(lb, st.label, st.type); tx.appendChild(lb);
-          var sm = mk('small', 'rl'); tx.appendChild(sm); inn.appendChild(tx); el.appendChild(inn);
-          el.addEventListener('click', function (e) { e.stopPropagation(); pick(sel && sel.t === 'chip' && sel.key === key ? null : { t: 'chip', key: key }); });
-          cols[COLOF[st.type]].appendChild(el);
-          ch = B.chips[key] = { el: el, key: key, type: st.type, label: st.label, col: COLOF[st.type], rels: [], flows: {}, small: sm, bdgs: inn.firstChild };
-          B.order.push(key);
-        }
-        if (ch.rels.indexOf(RELW[st.rel]) < 0) ch.rels.push(RELW[st.rel]);
-        ch.flows[fi] = 1;
+      var strip = mk('div', 'strip'), sg = mk('div', 'sg'); strip.appendChild(sg);
+      var card = mk('button', 'card'); card.type = 'button';
+      card.appendChild(mk('span', 'nm', f.name)); card.appendChild(mk('small', '', f.steps.length + '단계'));
+      card.addEventListener('click', function (e) { e.stopPropagation(); pick(sel && sel.t === 'flow' && sel.fi === fi ? null : { t: 'flow', fi: fi }); });
+      sg.appendChild(card);
+      var S = { fi: fi, el: strip, card: card, chips: [], edges: [], g: document.createElementNS(NS, 'g') };
+      S.g.setAttribute('class', 'sg-g'); svg.appendChild(S.g);
+      f.steps.forEach(function (st, j) {   // 단계 j 는 띠의 j+2 번째 줄(1번째 줄은 동작 카드)
+        var el = mk('div', 'chip t-' + st.type); el.tabIndex = 0; el.setAttribute('role', 'button');
+        el.style.gridColumn = String(COLOF[st.type] + 1); el.style.gridRow = String(j + 2);
+        var inn = mk('div', 'in'); inn.appendChild(mk('span', 'num', numLabel(st.n)));
+        var t = mk('div', 'tx'); t.appendChild(mk('small', '', RELW[st.rel])); var lb = mk('span', 'lbl'); putText(lb, st.label, st.type); t.appendChild(lb); inn.appendChild(t); el.appendChild(inn);
+        var key = chipKey(st); el.dataset.key = key;
+        el.addEventListener('click', function (e) { e.stopPropagation(); pick(sel && sel.t === 'chip' && sel.key === key ? null : { t: 'chip', key: key }); });
+        sg.appendChild(el); S.chips.push({ el: el, key: key, step: st, col: COLOF[st.type] });
+        (B.keys[key] = B.keys[key] || {})[fi] = 1;
       });
+      S.chips.forEach(function (c, j) { S.edges.push({ fromEl: j === 0 ? card : S.chips[j - 1].el, toEl: c.el, dashed: c.step.rel === 'fallback', fromKey: j === 0 ? 'card' : S.chips[j - 1].key, toKey: c.key, j: j }); });
+      world.appendChild(strip); B.strips.push(S);
     });
-    B.order.forEach(function (key) { var ch = B.chips[key]; ch.small.textContent = ch.rels.join('·'); });
-    // 선: 동작 카드 → 첫 단계 → 다음 단계. 대체 가지(3a→3b)는 점선. 같은 (출발, 도착) 선은 한 줄로 합치고 어느 동작의 몇 번째 단계인지 기록한다
-    var emap = {};
-    function addEdge(from, to, dashed, fi, n) { var id = from + '>' + to + '>' + (dashed ? 'd' : 's'); var e = emap[id]; if (!e) { e = emap[id] = { id: id, from: from, to: to, dashed: dashed, occ: [] }; B.paths.push(e); } e.occ.push({ fi: fi, n: n }); }
-    sc.flows.forEach(function (f, fi) {
-      var gs = []; f.steps.forEach(function (st) { var gi = parseInt(st.n, 10) - 1; (gs[gi] = gs[gi] || []).push(st); });
-      var prev = 'a:' + fi;
-      gs.forEach(function (g) {
-        g.forEach(function (st, bi) { if (bi === 0) addEdge(prev, chipKey(st), false, fi, st.n); else addEdge(chipKey(g[bi - 1]), chipKey(st), true, fi, st.n); });
-        prev = chipKey(g[g.length - 1]);
-      });
-    });
-    var c0 = cols.map(function (c) { return c; });
-    requestAnimationFrame(function () { layoutLines(); });
-    layoutLines();
-    apply();
+    applyFold(); layoutLines(); apply();
   }
-  function rectOf(el) {   // 도면판 좌표(배율 1 기준) 안의 위치
+  function rectOf(el) {
     var r = el.getBoundingClientRect(), w = world.getBoundingClientRect();
-    return { l: (r.left - w.left) / k, r: (r.right - w.left) / k, t: (r.top - w.top) / k, b: (r.bottom - w.top) / k, cy: ((r.top + r.bottom) / 2 - w.top) / k };
+    return { l: (r.left - w.left) / k, r: (r.right - w.left) / k, t: (r.top - w.top) / k, b: (r.bottom - w.top) / k };
   }
+  /* 선: 앞 칸의 아래 가운데 → 두 줄 사이 틈의 가운데 높이 → 옆으로 → 뒤 칸의 위 가운데. 선은 아래로만 가고 줄 사이 틈에만 놓인다 */
   function layoutLines() {
     if (!B) return;
-    var svg = document.getElementById('lines');
-    Array.prototype.slice.call(svg.querySelectorAll('path.ln')).forEach(function (p) { p.remove(); });
-    var R = {}, colChips = [[], [], [], []];
-    B.cards.forEach(function (c, fi) { R['a:' + fi] = rectOf(c); R['a:' + fi].col = 0; colChips[0].push(R['a:' + fi]); });
-    B.order.forEach(function (key) { var ch = B.chips[key]; R[key] = rectOf(ch.el); R[key].col = ch.col; colChips[ch.col].push(R[key]); });
-    colChips.forEach(function (l) { l.sort(function (a, b) { return a.t - b.t; }); });
-    var maxB = 0; Object.keys(R).forEach(function (k2) { maxB = Math.max(maxB, R[k2].b); });
-    WORLD_H = maxB + 40;
-    world.style.width = WORLD_W + 'px'; world.style.height = WORLD_H + 'px';
-    svg.setAttribute('width', WORLD_W); svg.setAttribute('height', WORLD_H);
-    function gapY(c, desired) {   // 열 c 안에서 칸과 칸 사이(또는 맨 위·맨 아래) 중 desired 에 가장 가까운 높이
-      var l = colChips[c]; if (!l.length) return desired;
-      var cand = [l[0].t - 16];
-      for (var i = 0; i < l.length - 1; i++) cand.push((l[i].b + l[i + 1].t) / 2);
-      cand.push(l[l.length - 1].b + 16);
-      var best = cand[0]; cand.forEach(function (y) { if (Math.abs(y - desired) < Math.abs(best - desired)) best = y; });
-      return best;
-    }
-    function gx(c, off) { return colX[c] + CW[c] + GUT / 2 + off; }   // 열 c 오른쪽 틈의 세로 길
-    B.segs = [];
-    B.paths.forEach(function (e) {
-      var A = R[e.from], T = R[e.to]; if (!A || !T) return;
-      var off = ((hash(e.id) % 9) - 4) * 9, pts = [], ca = A.col, cb = T.col;
-      if (e.from === e.to) {
-        pts = [[A.r, A.cy - 9], [A.r + 28, A.cy - 9], [A.r + 28, A.cy + 9], [A.r, A.cy + 9]];
-      } else if (cb > ca) {
-        pts.push([A.r, A.cy]); var y = A.cy;
-        for (var c = ca; c < cb; c++) {
-          var lane = gx(c, off), nx = c + 1, yn = (nx === cb) ? T.cy : gapY(nx, T.cy);
-          pts.push([lane, y]); pts.push([lane, yn]);
-          if (nx === cb) pts.push([T.l, T.cy]); else { pts.push([colX[nx] + CW[nx], yn]); }
-          y = yn;
-        }
-      } else if (cb < ca) {
-        pts.push([A.l, A.cy]); var y2 = A.cy;
-        for (var c2 = ca; c2 > cb; c2--) {
-          var lane2 = gx(c2 - 1, off), nx2 = c2 - 1, yn2 = (nx2 === cb) ? T.cy : gapY(nx2, T.cy);
-          pts.push([lane2, y2]); pts.push([lane2, yn2]);
-          if (nx2 === cb) pts.push([T.r, T.cy]); else pts.push([colX[nx2], yn2]);
-          y2 = yn2;
-        }
-      } else {
-        var ln = gx(ca, off); pts = [[A.r, A.cy], [ln, A.cy], [ln, T.cy], [T.r, T.cy]];
-      }
-      var d = pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
-      var p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d); p.setAttribute('class', 'ln' + (e.dashed ? ' dash' : '')); p.setAttribute('marker-end', 'url(#ah)');
-      svg.appendChild(p); e.el = p;
-      for (var i = 1; i < pts.length; i++) B.segs.push({ x1: pts[i - 1][0], y1: pts[i - 1][1], x2: pts[i][0], y2: pts[i][1], from: e.from, to: e.to, id: e.id });
+    B.rects = []; B.segs = []; B.edges = [];
+    WORLD_H = world.offsetHeight;
+    var svg = B.svg; svg.setAttribute('width', WORLD_W); svg.setAttribute('height', WORLD_H);
+    B.strips.forEach(function (S) {
+      while (S.g.firstChild) S.g.removeChild(S.g.firstChild);
+      S.g.style.display = S.el.classList.contains('folded') ? 'none' : '';
+      S.cardRect = rectOf(S.card); B.rects.push({ id: S.fi + ':card', r: S.cardRect });
+      if (S.el.classList.contains('folded')) { S.rect = rectOf(S.el); return; }
+      S.chips.forEach(function (c, j) { c.rect = rectOf(c.el); B.rects.push({ id: S.fi + ':' + j, r: c.rect }); });
+      S.edges.forEach(function (e) {
+        var A = rectOf(e.fromEl), T = rectOf(e.toEl);
+        var ax = (A.l + A.r) / 2, bx = (T.l + T.r) / 2, y1 = A.b, y2 = T.t, ym = (y1 + y2) / 2;
+        var d = ax === bx ? 'M' + ax + ',' + y1 + ' V' + (y2 - 1) : 'M' + ax + ',' + y1 + ' V' + ym + ' H' + bx + ' V' + (y2 - 1);
+        var p = document.createElementNS(NS, 'path'); p.setAttribute('d', d); p.setAttribute('class', 'ln' + (e.dashed ? ' dash' : '')); p.setAttribute('marker-end', 'url(#ah)'); S.g.appendChild(p); e.el = p;
+        e.y1 = y1; e.y2 = y2; e.ax = ax; e.bx = bx; e.fi = S.fi; B.edges.push(e);
+        var sid = S.fi + ':' + (e.j === 0 ? 'card' : e.j - 1), tid = S.fi + ':' + e.j;
+        if (ax === bx) B.segs.push({ x1: ax, y1: y1, x2: bx, y2: y2, from: sid, to: tid });
+        else { B.segs.push({ x1: ax, y1: y1, x2: ax, y2: ym, from: sid, to: tid }); B.segs.push({ x1: ax, y1: ym, x2: bx, y2: ym, from: sid, to: tid }); B.segs.push({ x1: bx, y1: ym, x2: bx, y2: y2, from: sid, to: tid }); }
+      });
+      S.rect = rectOf(S.el);
     });
-    B.R = R; apply();
+    apply(true);
   }
 
-  /* ── 선택 표시 ── */
-  function pick(s) { sel = s; apply(); writeHash(); }
-  function apply() {
+  /* ── 선택 표시·접기 ── */
+  function stripHas(S, key) { return !!(B.keys[key] && B.keys[key][S.fi]); }
+  function applyFold() {
     if (!B) return;
-    var fi = sel && sel.t === 'flow' ? sel.fi : -1, key = sel && sel.t === 'chip' ? sel.key : null;
-    var flowKeys = {}, flowSteps = null;
-    B.order.forEach(function (kk) { var ch = B.chips[kk]; ch.el.classList.remove('on', 'rel', 'dimmed', 'has-b'); ch.bdgs.textContent = ''; });
-    B.cards.forEach(function (c) { c.classList.remove('on', 'dimmed'); });
-    var touchFlows = {}, relKeys = {};
-    if (fi >= 0) {
-      var f = B.flows[fi];
-      f.steps.forEach(function (st) { var ch = B.chips[chipKey(st)]; flowKeys[ch.key] = 1; ch.el.classList.add('has-b'); ch.bdgs.appendChild(mk('span', 'num', numLabel(st.n))); });
-      statusEl.textContent = '선택: ' + f.name + ' — ' + f.steps.length + '단계';
-    } else if (key) {
-      Object.keys(B.chips[key].flows).forEach(function (x) { touchFlows[x] = 1; });
-      statusEl.textContent = '선택: ' + B.chips[key].label + ' — 동작 ' + Object.keys(touchFlows).length + '개가 지나감';
-    } else statusEl.textContent = '선택 없음 — 동작 카드나 부품 칸을 누르세요';
-    B.cards.forEach(function (c, i) { if (fi >= 0) { c.classList.toggle('on', i === fi); c.classList.toggle('dimmed', i !== fi); } else if (key) { c.classList.toggle('on', !!touchFlows[i]); c.classList.toggle('dimmed', !touchFlows[i]); } });
-    B.paths.forEach(function (e) {
-      if (!e.el) return;
-      var on = false;
-      if (fi >= 0) on = e.occ.some(function (o) { return o.fi === fi; });
-      else if (key) { on = (e.from === key || e.to === key); if (on) { relKeys[e.from] = 1; relKeys[e.to] = 1; } }
-      e.el.classList.toggle('on', on); e.el.classList.toggle('off', (fi >= 0 || !!key) && !on);
-      e.el.setAttribute('marker-end', on ? 'url(#aho)' : 'url(#ah)');
-      if (on) e.el.parentNode.appendChild(e.el);   // 진한 선을 위로
+    B.strips.forEach(function (S) {
+      var keep = !sel || (sel.t === 'flow' && sel.fi === S.fi) || (sel.t === 'chip' && stripHas(S, sel.key));
+      S.el.classList.toggle('folded', !!(foldOn && sel && !keep));
     });
-    B.order.forEach(function (kk) {
-      var ch = B.chips[kk];
-      if (fi >= 0) { if (flowKeys[kk]) ch.el.classList.add('on'); else ch.el.classList.add('dimmed'); }
-      else if (key) { if (kk === key) ch.el.classList.add('on'); else if (relKeys[kk]) ch.el.classList.add('rel'); else ch.el.classList.add('dimmed'); }
+  }
+  function apply(noLayout) {
+    if (!B) return;
+    var key = sel && sel.t === 'chip' ? sel.key : null, fi = sel && sel.t === 'flow' ? sel.fi : -1, hit = 0;
+    B.strips.forEach(function (S) {
+      var inSel = fi >= 0 ? S.fi === fi : key ? stripHas(S, key) : true;
+      if (key && stripHas(S, key)) hit++;
+      S.el.classList.toggle('dimmed', !!sel && !inSel); S.g.classList.toggle('dimmed', !!sel && !inSel); S.g.classList.toggle('sel', fi === S.fi);
+      S.card.classList.toggle('on', fi === S.fi || (!!key && stripHas(S, key)));
+      S.chips.forEach(function (c) { c.el.classList.toggle('on', !!key && c.key === key); });
+      S.edges.forEach(function (e) { if (!e.el) return; var on = !!key && (e.fromKey === key || e.toKey === key); e.el.classList.toggle('on', on); e.el.setAttribute('marker-end', (on || fi === S.fi) ? 'url(#aho)' : 'url(#ah)'); });
     });
-    layoutBadges();
+    if (fi >= 0) statusEl.textContent = '선택: ' + B.flows[fi].name + ' — ' + B.flows[fi].steps.length + '단계';
+    else if (key) statusEl.textContent = '선택: ' + key.replace(/^[a-z]+:/, '') + ' — 동작 ' + hit + '개 지나감';
+    else statusEl.textContent = '선택 없음 — 동작 카드나 부품 칸을 누르세요';
   }
-  function layoutBadges() { /* 배지는 칸 안에 들어가 칸 높이가 바뀔 수 있어, 바뀌면 선을 다시 그린다 */
-    if (!B) return; var h = 0; B.order.forEach(function (kk) { h += B.chips[kk].el.offsetHeight; }); if (B._h !== h) { B._h = h; layoutLines(); }
+  function pick(s) {
+    var before = foldOn && (!!sel || !!s);
+    sel = s; applyFold(); layoutLines(); writeHash();
+    if (s && s.t === 'flow') focusStrip(s.fi);
+    else if (foldOn && (before || s)) fit();
   }
+  foldBtn.addEventListener('click', function () { foldOn = !foldOn; foldBtn.setAttribute('aria-pressed', foldOn ? 'true' : 'false'); applyFold(); layoutLines(); if (sel && sel.t === 'flow') focusStrip(sel.fi); else fit(); });
 
   /* ── 확대·이동 ── */
-  function setT() { world.style.transform = 'translate(' + tx.toFixed(2) + 'px,' + ty.toFixed(2) + 'px) scale(' + k.toFixed(4) + ')'; zv.textContent = Math.round(k * 100) + '%'; }
-  function clamp(v) { return Math.max(MINK, Math.min(MAXK, v)); }
+  function setT() {
+    world.style.transform = 'translate(' + tx.toFixed(2) + 'px,' + ty.toFixed(2) + 'px) scale(' + k.toFixed(4) + ')'; zv.textContent = Math.round(k * 100) + '%';
+    var hs = heads.children; for (var c = 0; c < 4; c++) { hs[c].style.left = (tx + colX[c] * k) + 'px'; hs[c].style.width = (CW[c] * k) + 'px'; }
+  }
+  function clamp(v) { return Math.max(Math.min(MINK, fitK), Math.min(MAXK, v)); }
   function zoomAt(mx, my, nk) { nk = clamp(nk); tx = mx - (mx - tx) * nk / k; ty = my - (my - ty) * nk / k; k = nk; setT(); }
   function fit() {
-    var w = vp.clientWidth, h = vp.clientHeight, m = 16;
-    var fk = clamp(Math.min((w - 2 * m) / WORLD_W, (h - 2 * m) / WORLD_H));
-    k = fk; tx = (w - WORLD_W * k) / 2; ty = Math.max(m, (h - WORLD_H * k) / 2); setT();
+    var w = view.clientWidth, h = view.clientHeight, m = 16; WORLD_H = world.offsetHeight;
+    fitK = 0.05; k = clamp(Math.min((w - 2 * m) / WORLD_W, (h - 2 * m) / WORLD_H)); fitK = k; tx = (w - WORLD_W * k) / 2; ty = Math.max(m, (h - WORLD_H * k) / 2); setT();
+  }
+  function focusStrip(fi) {   // 고른 띠가 화면 안에 들어오게 확대·이동한다
+    var S = B.strips[fi], w = view.clientWidth, h = view.clientHeight, m = 16, sh = S.rect.b - S.rect.t;
+    k = clamp(Math.min((w - 2 * m) / WORLD_W, (h - 2 * m) / sh, 1)); tx = (w - WORLD_W * k) / 2; ty = Math.max(m - S.rect.t * k, (h - sh * k) / 2 - S.rect.t * k); setT();
   }
   function sizeVp() { var r = vp.getBoundingClientRect(); vp.style.height = Math.max(320, window.innerHeight - r.top - 14) + 'px'; }
-  vp.addEventListener('wheel', function (e) { e.preventDefault(); var r = vp.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, k * Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
-  document.getElementById('zin').addEventListener('click', function () { zoomAt(vp.clientWidth / 2, vp.clientHeight / 2, k * 1.25); });
-  document.getElementById('zout').addEventListener('click', function () { zoomAt(vp.clientWidth / 2, vp.clientHeight / 2, k / 1.25); });
+  vp.addEventListener('wheel', function (e) { e.preventDefault(); var r = view.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, k * Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+  function cz(f) { zoomAt(view.clientWidth / 2, view.clientHeight / 2, f); }
+  document.getElementById('zin').addEventListener('click', function () { cz(k * 1.25); });
+  document.getElementById('zout').addEventListener('click', function () { cz(k / 1.25); });
   document.getElementById('zfit').addEventListener('click', fit);
-  document.getElementById('z100').addEventListener('click', function () { zoomAt(vp.clientWidth / 2, vp.clientHeight / 2, 1); });
+  document.getElementById('z100').addEventListener('click', function () { cz(1); });
   var drag = null;
   vp.addEventListener('mousedown', function (e) {
     if (e.button !== 0 || e.target.closest('.chip,.card')) return;
@@ -1213,33 +1169,29 @@ marker.mo path { fill: var(--sel); }
     else if (sel && sel.t === 'chip') h += '&p=' + encodeURIComponent(sel.key);
     try { history.replaceState(null, '', h); } catch (e) { location.hash = h; }
   }
-  function readHash() {
-    var p = new URLSearchParams(location.hash.replace(/^#/, ''));
-    return { s: p.get('s'), f: p.get('f'), p: p.get('p') };
-  }
-  function openScreen(name, fromUser, preset) {
+  function readHash() { var p = new URLSearchParams(location.hash.replace(/^#/, '')); return { s: p.get('s'), f: p.get('f'), p: p.get('p') }; }
+  function openScreen(name, preset) {
     cur = name; sel = null;
     Object.keys(sbtns).forEach(function (n) { sbtns[n].setAttribute('aria-pressed', n === name ? 'true' : 'false'); });
-    build(name); sizeVp(); layoutLines(); fit();
+    sizeVp(); build(name); fit();
     if (preset) {
-      if (preset.f) { for (var i = 0; i < B.flows.length; i++) if (B.flows[i].name === preset.f) sel = { t: 'flow', fi: i }; }
-      else if (preset.p && B.chips[preset.p]) sel = { t: 'chip', key: preset.p };
-      apply();
+      if (preset.f) { for (var i = 0; i < B.flows.length; i++) if (B.flows[i].name === preset.f) { pick({ t: 'flow', fi: i }); } }
+      else if (preset.p && B.keys[preset.p]) pick({ t: 'chip', key: preset.p });
     }
     writeHash();
   }
-  window.addEventListener('hashchange', function () { var h = readHash(); if (h.s && byName[h.s]) openScreen(h.s, false, h); });
+  window.addEventListener('hashchange', function () { var h = readHash(); if (h.s && byName[h.s]) openScreen(h.s, h); });
   window.__board = {
-    open: function (n) { openScreen(n, true); },
+    open: function (n) { openScreen(n); },
     pickFlow: function (i) { pick(i == null ? null : { t: 'flow', fi: i }); },
     pickChip: function (key) { pick(key ? { t: 'chip', key: key } : null); },
-    state: function () { return { screen: cur, sel: sel, k: k, tx: tx, ty: ty, worldW: WORLD_W, worldH: WORLD_H, minK: MINK, maxK: MAXK }; },
+    state: function () { return { screen: cur, sel: sel, k: k, tx: tx, ty: ty, worldW: WORLD_W, worldH: WORLD_H, minK: MINK, maxK: MAXK, fold: foldOn }; },
     data: function () { return B; },
     fit: fit
   };
   var h0 = readHash();
   var first = (h0.s && byName[h0.s]) ? h0.s : screens[0].label;
-  document.fonts && document.fonts.ready ? document.fonts.ready.then(function () { openScreen(first, false, h0.s ? h0 : null); }) : openScreen(first, false, h0.s ? h0 : null);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { openScreen(first, h0.s ? h0 : null); }); else openScreen(first, h0.s ? h0 : null);
 })();
 </script>
 </body>
