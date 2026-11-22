@@ -1,7 +1,7 @@
 ---
 screen: 관리자
 file: public/admin.html
-engines: [AI 단어 뜻 변환(Claude Haiku), 저장 음성(Speak Loop)]
+engines: [AI 단어 뜻 변환(Claude Haiku), 저장 음성(Speak Loop), 서버 음성(OpenAI TTS), 서버 메모리 작업 상태]
 calls: [GET /api/me, GET /api/admin/users, PATCH /api/admin/users/:id, GET /api/admin/stats, GET /api/admin/speakloop/audio/status, GET /api/admin/speakloop/audio/list, POST /api/admin/speakloop/audio/preview, POST /api/admin/speakloop/audio/generate, GET /api/speakloop/content, GET /api/speakloop/audio/:clipKey, GET /api/admin/gloss/status, POST /api/admin/gloss/sample, POST /api/admin/gloss/run, POST /api/admin/gloss/restore, GET /api/admin/gloss/backup, DELETE /api/tts/cache/entry]
 reads: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 파일:speakloop_content, 기기:mydict_token, 기기:gl_last_run]
 writes: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 캐시:tts_cache, 기기:gl_last_run]
@@ -34,6 +34,7 @@ last_checked: 23d581c
 - [엔진] AI 단어 뜻 변환(Claude Haiku): `/api/admin/gloss/*`, lib/gloss_backfill.js:77 (GLOSS_MODEL claude-haiku-4-5, :10). 관리자 전용, 샘플 1회마다 호출 비용 발생.
 - [엔진] 저장 음성(Speak Loop): 생성은 관리자만. `POST /api/admin/speakloop/audio/generate`가 OpenAI로 만든 mp3를 speakloop_audio에 저장(lib/speakloop_tts.js:159). 기본 모델 gpt-4o-mini-tts(:13). 미리듣기(preview)는 저장하지 않고 OpenAI를 부른다(routes/speakloop.js:132).
 - 서버 음성(OpenAI TTS) 엔진 자체는 이 화면이 부르지 않는다. 이 화면은 그 캐시(tts_cache)를 지우기만 한다.
+- [엔진] 서버 음성(OpenAI TTS): Speak Loop 음성 만들기·미리듣기(`POST /api/admin/speakloop/audio/generate·preview`, routes/speakloop.js:165·132 → lib/speakloop_tts.js:66, 기본 모델 gpt-4o-mini-tts). [엔진] 서버 메모리 작업 상태: 단어 뜻 변환 잠금(routes/gloss.js:51 → lib/gloss_backfill.js:175), 음성 생성 잠금(routes/speakloop.js:177)·미리듣기 횟수 제한(lib/speakloop_tts.js:137).
 
 ## 3 경로 (화면 →호출 API → 서버 라우트)
 - [화면] 관리자 →호출 [API] GET /api/me — public/admin.html:410·:979 → routes/auth.js:101. →필요 로그인·관리자

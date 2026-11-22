@@ -37,18 +37,18 @@ lib/db.js 의 DB init 에서 확인되는 테이블·서버 캐시마다 한 줄
 
 ## 읽는 화면·쓰는 화면 (npm run blueprint:gen 이 만든다. 이 안은 손으로 고치지 않는다)
 <!-- gen:start -->
-> 화면 파일 12개의 머리말(reads·writes)에서 만든다. 항목 26개, 화면 연결 없음 4개.
+> 화면 파일 12개의 머리말(reads·writes)에서 만든다. 항목 26개, 화면 연결 없음 1개.
 
 - **[DB] api_usage** — 읽기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
-- **[DB] cmap_answer_attempts** — 화면 연결 없음
-- **[DB] cmap_concept_marks** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_answer_attempts** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_concept_marks** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] cmap_concepts** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] cmap_edges** — 읽기: 개념 지도 / 쓰기: 개념 지도
-- **[DB] cmap_map_nodes** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_map_nodes** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] cmap_maps** — 읽기: 개념 지도 / 쓰기: 개념 지도
-- **[DB] cmap_narrations** — 화면 연결 없음
-- **[DB] cmap_quiz_attempts** — 화면 연결 없음
-- **[DB] cmap_topics** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_narrations** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_quiz_attempts** — 읽기: - / 쓰기: 개념 지도
+- **[DB] cmap_topics** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] gloss_backup** — 읽기: 관리자 / 쓰기: 관리자
 - **[캐시] jgrammar_cache** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **[DB] jgrammar_saved** — 읽기: 문장 학습 / 쓰기: 문장 학습

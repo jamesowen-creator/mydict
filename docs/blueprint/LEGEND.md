@@ -108,3 +108,4 @@ Anthropic API(Claude Haiku) / OpenAI TTS(음성 합성) / OpenAI STT(음성 인�
 - 호출 화면: 5절 화면 이름을 쉼표로. `공용` 은 authGate.js·appHeader.js 가 부르는 것이며 gen 이 화면 머리말 modules 에 authGate.js 가 있는 화면으로 펼쳐 계산한다. 없으면 `-`.
 - 근거: 확인함 / 추정 / 미확인(6절).
 - gen 이 검증한다(위반은 api.md 파일:줄과 함께 오류로 멈춘다): 이름이 db.md·LEGEND 에 없음 / METHOD 경로 중복 / 칸 수 불일치 / 인증 값이 허용 목록 밖 / 정의 줄이 없거나 그 줄 ±3줄에 경로가 없음 / **코드에 있는 라우트가 api.md 에 없음** / api.md 에 있는데 코드에 없음. 오류가 아닌 경고: 화면이 부르는데 api.md 에 없는 경로, 화면 머리말과 api.md 로 계산한 화면별 접근의 차이, 어떤 API 도 접근하지 않는 db.md 항목(`npm run blueprint:gen -- --warn`).
+- **관문 공통 규칙**: authGate.js 를 쓰는 화면은 `GET /api/me` 를 거치며, 이 호출의 users 읽기·갱신(routes/auth.js:127, ADMIN_EMAILS 조건일 때 UPDATE)은 화면 머리말에 적지 않는다. 생성기가 관문 통과 화면(머리말 modules 에 authGate.js 가 있는 화면)에는 자동으로 인정하고 접근 차이 비교에서 제외한다.

@@ -63,9 +63,10 @@
 - **기기 PDF 저장(캔버스)** — 개념 지도
 - **기기 글자 인식(Tesseract.js)** — 사전
 - **기기 음성(speechSynthesis)** — 문장 학습, 사전, 스펠링 런, 음성 학습
-- **서버 음성(OpenAI TTS)** — 사전, 스펠링 런
+- **서버 메모리 작업 상태** — 개념 지도, 관리자, 음성 학습
+- **서버 음성(OpenAI TTS)** — 관리자, 사전, 스펠링 런
 - **스펠링 런 게임 엔진(캔버스)** — 스펠링 런
-- **음성 인식(OpenAI STT)** — 음성 학습
+- **음성 인식(OpenAI STT)** — 개념 지도, 음성 학습
 - **이미지 생성(OpenAI Images)** — 음성 학습
 - **저장 음성(Speak Loop)** — Speak Loop, 관리자
 
@@ -152,12 +153,15 @@
 
 ### 저장소별 사용 화면 ([DB]·[캐시], →읽기 / →쓰기)
 - **[DB] api_usage** — 읽기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
-- **[DB] cmap_concept_marks** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_answer_attempts** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_concept_marks** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] cmap_concepts** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] cmap_edges** — 읽기: 개념 지도 / 쓰기: 개념 지도
-- **[DB] cmap_map_nodes** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_map_nodes** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] cmap_maps** — 읽기: 개념 지도 / 쓰기: 개념 지도
-- **[DB] cmap_topics** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_narrations** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_quiz_attempts** — 읽기: - / 쓰기: 개념 지도
+- **[DB] cmap_topics** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] gloss_backup** — 읽기: 관리자 / 쓰기: 관리자
 - **[DB] jgrammar_saved** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **[DB] review_log** — 읽기: - / 쓰기: 사전
@@ -210,9 +214,9 @@
 ### 외부 서비스별 사용 화면 ([외부])
 - **Anthropic API(Claude Haiku)** — 개념 지도, 관리자, 문장 학습, 사전, 음성 학습
 - **Google Fonts** — Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서
-- **Google 로그인(OAuth)** — 홈
+- **Google 로그인(OAuth)** — 사전, 스펠링 런, 홈
 - **OpenAI Images(이미지 생성)** — 음성 학습
-- **OpenAI STT(음성 인식)** — 음성 학습
+- **OpenAI STT(음성 인식)** — 개념 지도, 음성 학습
 - **OpenAI TTS(음성 합성)** — 관리자, 사전, 스펠링 런
 - **jsDelivr(tesseract.js)** — 사전
 
@@ -346,6 +350,7 @@ Anthropic API(Claude Haiku) / OpenAI TTS(음성 합성) / OpenAI STT(음성 인�
 - 호출 화면: 5절 화면 이름을 쉼표로. `공용` 은 authGate.js·appHeader.js 가 부르는 것이며 gen 이 화면 머리말 modules 에 authGate.js 가 있는 화면으로 펼쳐 계산한다. 없으면 `-`.
 - 근거: 확인함 / 추정 / 미확인(6절).
 - gen 이 검증한다(위반은 api.md 파일:줄과 함께 오류로 멈춘다): 이름이 db.md·LEGEND 에 없음 / METHOD 경로 중복 / 칸 수 불일치 / 인증 값이 허용 목록 밖 / 정의 줄이 없거나 그 줄 ±3줄에 경로가 없음 / **코드에 있는 라우트가 api.md 에 없음** / api.md 에 있는데 코드에 없음. 오류가 아닌 경고: 화면이 부르는데 api.md 에 없는 경로, 화면 머리말과 api.md 로 계산한 화면별 접근의 차이, 어떤 API 도 접근하지 않는 db.md 항목(`npm run blueprint:gen -- --warn`).
+- **관문 공통 규칙**: authGate.js 를 쓰는 화면은 `GET /api/me` 를 거치며, 이 호출의 users 읽기·갱신(routes/auth.js:127, ADMIN_EMAILS 조건일 때 UPDATE)은 화면 머리말에 적지 않는다. 생성기가 관문 통과 화면(머리말 modules 에 authGate.js 가 있는 화면)에는 자동으로 인정하고 접근 차이 비교에서 제외한다.
 
 =====================================================================
 ### 파일: docs/blueprint/db.md
@@ -390,18 +395,18 @@ lib/db.js 의 DB init 에서 확인되는 테이블·서버 캐시마다 한 줄
 
 ## 읽는 화면·쓰는 화면 (npm run blueprint:gen 이 만든다. 이 안은 손으로 고치지 않는다)
 <!-- gen:start -->
-> 화면 파일 12개의 머리말(reads·writes)에서 만든다. 항목 26개, 화면 연결 없음 4개.
+> 화면 파일 12개의 머리말(reads·writes)에서 만든다. 항목 26개, 화면 연결 없음 1개.
 
 - **[DB] api_usage** — 읽기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
-- **[DB] cmap_answer_attempts** — 화면 연결 없음
-- **[DB] cmap_concept_marks** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_answer_attempts** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_concept_marks** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] cmap_concepts** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] cmap_edges** — 읽기: 개념 지도 / 쓰기: 개념 지도
-- **[DB] cmap_map_nodes** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_map_nodes** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] cmap_maps** — 읽기: 개념 지도 / 쓰기: 개념 지도
-- **[DB] cmap_narrations** — 화면 연결 없음
-- **[DB] cmap_quiz_attempts** — 화면 연결 없음
-- **[DB] cmap_topics** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_narrations** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_quiz_attempts** — 읽기: - / 쓰기: 개념 지도
+- **[DB] cmap_topics** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] gloss_backup** — 읽기: 관리자 / 쓰기: 관리자
 - **[캐시] jgrammar_cache** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **[DB] jgrammar_saved** — 읽기: 문장 학습 / 쓰기: 문장 학습
@@ -687,7 +692,7 @@ lib/db.js 의 DB init 에서 확인되는 테이블·서버 캐시마다 한 줄
 ---
 screen: 관리자
 file: public/admin.html
-engines: [AI 단어 뜻 변환(Claude Haiku), 저장 음성(Speak Loop)]
+engines: [AI 단어 뜻 변환(Claude Haiku), 저장 음성(Speak Loop), 서버 음성(OpenAI TTS), 서버 메모리 작업 상태]
 calls: [GET /api/me, GET /api/admin/users, PATCH /api/admin/users/:id, GET /api/admin/stats, GET /api/admin/speakloop/audio/status, GET /api/admin/speakloop/audio/list, POST /api/admin/speakloop/audio/preview, POST /api/admin/speakloop/audio/generate, GET /api/speakloop/content, GET /api/speakloop/audio/:clipKey, GET /api/admin/gloss/status, POST /api/admin/gloss/sample, POST /api/admin/gloss/run, POST /api/admin/gloss/restore, GET /api/admin/gloss/backup, DELETE /api/tts/cache/entry]
 reads: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 파일:speakloop_content, 기기:mydict_token, 기기:gl_last_run]
 writes: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 캐시:tts_cache, 기기:gl_last_run]
@@ -720,6 +725,7 @@ last_checked: 23d581c
 - [엔진] AI 단어 뜻 변환(Claude Haiku): `/api/admin/gloss/*`, lib/gloss_backfill.js:77 (GLOSS_MODEL claude-haiku-4-5, :10). 관리자 전용, 샘플 1회마다 호출 비용 발생.
 - [엔진] 저장 음성(Speak Loop): 생성은 관리자만. `POST /api/admin/speakloop/audio/generate`가 OpenAI로 만든 mp3를 speakloop_audio에 저장(lib/speakloop_tts.js:159). 기본 모델 gpt-4o-mini-tts(:13). 미리듣기(preview)는 저장하지 않고 OpenAI를 부른다(routes/speakloop.js:132).
 - 서버 음성(OpenAI TTS) 엔진 자체는 이 화면이 부르지 않는다. 이 화면은 그 캐시(tts_cache)를 지우기만 한다.
+- [엔진] 서버 음성(OpenAI TTS): Speak Loop 음성 만들기·미리듣기(`POST /api/admin/speakloop/audio/generate·preview`, routes/speakloop.js:165·132 → lib/speakloop_tts.js:66, 기본 모델 gpt-4o-mini-tts). [엔진] 서버 메모리 작업 상태: 단어 뜻 변환 잠금(routes/gloss.js:51 → lib/gloss_backfill.js:175), 음성 생성 잠금(routes/speakloop.js:177)·미리듣기 횟수 제한(lib/speakloop_tts.js:137).
 
 ## 3 경로 (화면 →호출 API → 서버 라우트)
 - [화면] 관리자 →호출 [API] GET /api/me — public/admin.html:410·:979 → routes/auth.js:101. →필요 로그인·관리자
@@ -811,10 +817,10 @@ last_checked: 23d581c
 ---
 screen: 개념 지도
 file: public/concept_map.html
-engines: [AI 개념 지도 처리(Claude Haiku), 기기 PDF 저장(캔버스)]
+engines: [AI 개념 지도 처리(Claude Haiku), 기기 PDF 저장(캔버스), 음성 인식(OpenAI STT), 서버 메모리 작업 상태]
 calls: [GET /api/me, POST /api/cmap/topics/:id/explain, GET /api/cmap/topics/:rootId/map, POST /api/cmap/maps/:id/save, POST /api/cmap/maps/:id/edges]
-reads: [DB:users, DB:api_usage, DB:cmap_topics, DB:cmap_concepts, DB:cmap_maps, DB:cmap_map_nodes, DB:cmap_edges, DB:cmap_concept_marks, 기기:mydict_token]
-writes: [DB:api_usage, DB:cmap_concepts, DB:cmap_maps, DB:cmap_edges]
+reads: [DB:users, DB:api_usage, DB:cmap_topics, DB:cmap_concepts, DB:cmap_maps, DB:cmap_map_nodes, DB:cmap_edges, DB:cmap_concept_marks, DB:cmap_narrations, DB:cmap_answer_attempts, 기기:mydict_token]
+writes: [DB:api_usage, DB:cmap_concepts, DB:cmap_maps, DB:cmap_edges, DB:cmap_topics, DB:cmap_map_nodes, DB:cmap_concept_marks, DB:cmap_narrations, DB:cmap_quiz_attempts, DB:cmap_answer_attempts]
 fallback: []
 flows: [
   개념 검색 | →필요 권한:perm_concept_map ; →호출 POST /api/cmap/topics/:id/explain ; →읽기 cmap_topics ; →읽기 cmap_concepts ; →읽기 api_usage ; →호출 AI 개념 지도 처리(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage ; →쓰기 cmap_concepts,
@@ -825,7 +831,7 @@ flows: [
 ]
 requires: [로그인, 권한:perm_concept_map]
 navigates: [홈]
-externals: [Anthropic API(Claude Haiku), Google Fonts]
+externals: [Anthropic API(Claude Haiku), Google Fonts, OpenAI STT(음성 인식)]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js]
 last_checked: bf7715c
 ---
@@ -885,7 +891,7 @@ flows: [
 ]
 requires: [로그인, 권한:can_search, 권한:can_wordbook, 권한:can_tts]
 navigates: [스펠링 런, 홈]
-externals: [Anthropic API(Claude Haiku), OpenAI TTS(음성 합성), Google Fonts, jsDelivr(tesseract.js)]
+externals: [Anthropic API(Claude Haiku), OpenAI TTS(음성 합성), Google Fonts, jsDelivr(tesseract.js), Google 로그인(OAuth)]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js, public/js/ocr/ocrScanner.js]
 last_checked: 23d581c
 ---
@@ -929,6 +935,7 @@ last_checked: 23d581c
 - [기기] localStorage `mydict_token`(로그인; 쓰기는 주소 ?token= 처리 :1765), `mydict_wrong`(퀴즈 오답, :1942), `metis_tts_mode`(단어 발음 방식, 스펠링 런과 공용; :4271), `spellrun_landing_count`(스펠링 런 한 번에 풀 단어 수 10|20, :3334; 사전 쪽 키 이름이지만 이름에 spellrun이 들어 있다), sessionStorage `spellrun_ids`(스펠링 런에 넘기는 단어 id). 주소 옵션 `?tts=server|device|reset`.
 - [모듈] public/js/common/authGate.js(진입 시 /api/me 1회 확인·401이면 홈), appHeader.js(헤더·로그인 위젯), dialog.js, public/js/ocr/ocrScanner.js(카메라 글자 인식 패널).
 - [파일] ocr_word_list(public/data/ocr-word-list.txt, LEGEND 9절).
+- [외부] Google 로그인(OAuth): 로그아웃 상태의 로그인 링크가 `/auth/google?next=/english_dictionary.html` 로 간다(public/english_dictionary.html:1553 → routes/auth.js:67).
 
 =====================================================================
 ### 파일: docs/blueprint/screens/digest_reading.md
@@ -1291,7 +1298,7 @@ flows: [
 ]
 requires: [로그인, 권한:can_wordbook, 권한:perm_versus]
 navigates: [사전, 홈]
-externals: [OpenAI TTS(음성 합성), Google Fonts]
+externals: [OpenAI TTS(음성 합성), Google Fonts, Google 로그인(OAuth)]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
 last_checked: 8753b0a
 ---
@@ -1325,6 +1332,7 @@ last_checked: 8753b0a
 - [기기] localStorage `mydict_token`, `spellrun_opts`(조정값, public/js/spellrun/logic.js:205), `spellrun_mode`(기본/생존), `spellrun_preview`(미리 보기), `spellrun_view`(세로/가로), `spellrun_bgm`, `spellrun_char`(캐릭터), `spellrun_best`(최고 점수), `metis_tts_mode`(단어 발음 방식, 사전과 공용; game.js `?tts=` 처리), sessionStorage `spellrun_ids`(사전이 넘긴 단어 id, 읽기만). 점검 주소 옵션 ttsdebug·judgedebug(logic.js:174).
 - 진입: 사전의 단어장에서 단어를 고르면 /spelling_run.html로 이동(public/english_dictionary.html:3320).
 - [모듈] public/js/common/authGate.js, appHeader.js, dialog.js.
+- [외부] Google 로그인(OAuth): 토큰이 없으면 "로그인하기" 가 `/auth/google?next=/spelling_run.html` 로 간다(public/js/spellrun/game.js:2877 → routes/auth.js:67).
 
 =====================================================================
 ### 파일: docs/blueprint/screens/voice_study.md
@@ -1333,7 +1341,7 @@ last_checked: 8753b0a
 ---
 screen: 음성 학습
 file: public/voice_study.html
-engines: [음성 인식(OpenAI STT), AI 음성 노트 처리(Claude Haiku), 이미지 생성(OpenAI Images), 기기 음성(speechSynthesis)]
+engines: [음성 인식(OpenAI STT), AI 음성 노트 처리(Claude Haiku), 이미지 생성(OpenAI Images), 기기 음성(speechSynthesis), 서버 메모리 작업 상태]
 calls: [GET /api/me, GET /api/voice-notes, POST /api/voice-notes, GET /api/voice-notes/:id, PATCH /api/voice-notes/:id, DELETE /api/voice-notes/:id, POST /api/voice-notes/merge, POST /api/voice-notes/transcribe, POST /api/voice-notes/summarize, GET /api/voice-notes/wrong-answers, GET /api/voice-notes/quiz-summary, GET /api/voice-notes/:id/quiz, POST /api/voice-notes/:id/quiz, GET /api/voice-notes/:id/quiz/attempts, POST /api/voice-notes/:id/quiz/attempts, POST /api/voice-notes/:id/chat, GET /api/voice-notes/:id/links, POST /api/voice-notes/:id/links/refresh, GET /api/voice-notes/:id/image, POST /api/voice-notes/:id/image, GET /api/voice-notes/:id/image/file, PATCH /api/voice-notes/:id/image/rating, GET /api/voice-notes/map, POST /api/voice-notes/links, PATCH /api/voice-notes/links/:id, DELETE /api/voice-notes/links/:id, POST /api/voice-notes/map/build, GET /api/voice-notes/map/build-status]
 reads: [DB:users, DB:api_usage, DB:voice_notes, DB:voice_quizzes, DB:voice_quiz_attempts, DB:voice_links, DB:voice_image_sets, DB:voice_images, 기기:mydict_token, 기기:voice_tts_rate]
 writes: [DB:voice_notes, DB:voice_quizzes, DB:voice_quiz_attempts, DB:voice_links, DB:voice_image_sets, DB:voice_images, DB:api_usage, 기기:voice_tts_rate]
@@ -1363,6 +1371,7 @@ last_checked: 8753b0a
 - [엔진] AI 음성 노트 처리(Claude Haiku): 요약(:806)·퀴즈(:978)·대화(:1118)·연결(:1313)·이미지 계획 보조(:1717, :1770)가 같은 모델 SUMMARY_MODEL claude-haiku-4-5 (:705).
 - [엔진] 이미지 생성(OpenAI Images): `POST /api/voice-notes/:id/image` → OpenAI images/generations (routes/voice_study.js:1666). 모델 기본값은 환경변수 VOICE_IMAGE_MODEL(:1492).
 - [엔진] 기기 음성(speechSynthesis): 요약 읽어주기는 이 엔진만 쓴다(public/voice_study.html:2052 주석: 외부 API·비용 없음). 한국어 음성 선택(koVoiceInfo). 서버 음성(OpenAI TTS)은 쓰지 않는다. 대체 경로 없음.
+- [엔진] 서버 메모리 작업 상태: 지도 만들기 진행 상태 mapBuilds(routes/voice_study.js:336)와 같은 자료의 연결 분석 중복 방지 linkInFlight(:1173). 서버를 다시 시작하면 사라진다.
 
 ## 3 경로 (화면 →호출 API → 서버 라우트, 주요 동작)
 - [화면] 음성 학습 →호출 [API] GET /api/me — voice_study.html:786 → routes/auth.js:101. →필요 로그인·권한:perm_voice_study(routes/voice_study.js:20, 모든 voice-notes 라우트는 guard :31)

@@ -1,10 +1,10 @@
 ---
 screen: 개념 지도
 file: public/concept_map.html
-engines: [AI 개념 지도 처리(Claude Haiku), 기기 PDF 저장(캔버스)]
+engines: [AI 개념 지도 처리(Claude Haiku), 기기 PDF 저장(캔버스), 음성 인식(OpenAI STT), 서버 메모리 작업 상태]
 calls: [GET /api/me, POST /api/cmap/topics/:id/explain, GET /api/cmap/topics/:rootId/map, POST /api/cmap/maps/:id/save, POST /api/cmap/maps/:id/edges]
-reads: [DB:users, DB:api_usage, DB:cmap_topics, DB:cmap_concepts, DB:cmap_maps, DB:cmap_map_nodes, DB:cmap_edges, DB:cmap_concept_marks, 기기:mydict_token]
-writes: [DB:api_usage, DB:cmap_concepts, DB:cmap_maps, DB:cmap_edges]
+reads: [DB:users, DB:api_usage, DB:cmap_topics, DB:cmap_concepts, DB:cmap_maps, DB:cmap_map_nodes, DB:cmap_edges, DB:cmap_concept_marks, DB:cmap_narrations, DB:cmap_answer_attempts, 기기:mydict_token]
+writes: [DB:api_usage, DB:cmap_concepts, DB:cmap_maps, DB:cmap_edges, DB:cmap_topics, DB:cmap_map_nodes, DB:cmap_concept_marks, DB:cmap_narrations, DB:cmap_quiz_attempts, DB:cmap_answer_attempts]
 fallback: []
 flows: [
   개념 검색 | →필요 권한:perm_concept_map ; →호출 POST /api/cmap/topics/:id/explain ; →읽기 cmap_topics ; →읽기 cmap_concepts ; →읽기 api_usage ; →호출 AI 개념 지도 처리(Claude Haiku) ; →호출 Anthropic API(Claude Haiku) ; →쓰기 api_usage ; →쓰기 cmap_concepts,
@@ -15,7 +15,7 @@ flows: [
 ]
 requires: [로그인, 권한:perm_concept_map]
 navigates: [홈]
-externals: [Anthropic API(Claude Haiku), Google Fonts]
+externals: [Anthropic API(Claude Haiku), Google Fonts, OpenAI STT(음성 인식)]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js]
 last_checked: bf7715c
 ---

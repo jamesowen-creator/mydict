@@ -16,7 +16,7 @@ flows: [
 ]
 requires: [로그인, 권한:can_search, 권한:can_wordbook, 권한:can_tts]
 navigates: [스펠링 런, 홈]
-externals: [Anthropic API(Claude Haiku), OpenAI TTS(음성 합성), Google Fonts, jsDelivr(tesseract.js)]
+externals: [Anthropic API(Claude Haiku), OpenAI TTS(음성 합성), Google Fonts, jsDelivr(tesseract.js), Google 로그인(OAuth)]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js, public/js/ocr/ocrScanner.js]
 last_checked: 23d581c
 ---
@@ -60,3 +60,4 @@ last_checked: 23d581c
 - [기기] localStorage `mydict_token`(로그인; 쓰기는 주소 ?token= 처리 :1765), `mydict_wrong`(퀴즈 오답, :1942), `metis_tts_mode`(단어 발음 방식, 스펠링 런과 공용; :4271), `spellrun_landing_count`(스펠링 런 한 번에 풀 단어 수 10|20, :3334; 사전 쪽 키 이름이지만 이름에 spellrun이 들어 있다), sessionStorage `spellrun_ids`(스펠링 런에 넘기는 단어 id). 주소 옵션 `?tts=server|device|reset`.
 - [모듈] public/js/common/authGate.js(진입 시 /api/me 1회 확인·401이면 홈), appHeader.js(헤더·로그인 위젯), dialog.js, public/js/ocr/ocrScanner.js(카메라 글자 인식 패널).
 - [파일] ocr_word_list(public/data/ocr-word-list.txt, LEGEND 9절).
+- [외부] Google 로그인(OAuth): 로그아웃 상태의 로그인 링크가 `/auth/google?next=/english_dictionary.html` 로 간다(public/english_dictionary.html:1553 → routes/auth.js:67).

@@ -53,9 +53,10 @@
 - **기기 PDF 저장(캔버스)** — 개념 지도
 - **기기 글자 인식(Tesseract.js)** — 사전
 - **기기 음성(speechSynthesis)** — 문장 학습, 사전, 스펠링 런, 음성 학습
-- **서버 음성(OpenAI TTS)** — 사전, 스펠링 런
+- **서버 메모리 작업 상태** — 개념 지도, 관리자, 음성 학습
+- **서버 음성(OpenAI TTS)** — 관리자, 사전, 스펠링 런
 - **스펠링 런 게임 엔진(캔버스)** — 스펠링 런
-- **음성 인식(OpenAI STT)** — 음성 학습
+- **음성 인식(OpenAI STT)** — 개념 지도, 음성 학습
 - **이미지 생성(OpenAI Images)** — 음성 학습
 - **저장 음성(Speak Loop)** — Speak Loop, 관리자
 
@@ -142,12 +143,15 @@
 
 ### 저장소별 사용 화면 ([DB]·[캐시], →읽기 / →쓰기)
 - **[DB] api_usage** — 읽기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
-- **[DB] cmap_concept_marks** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_answer_attempts** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_concept_marks** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] cmap_concepts** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] cmap_edges** — 읽기: 개념 지도 / 쓰기: 개념 지도
-- **[DB] cmap_map_nodes** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_map_nodes** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] cmap_maps** — 읽기: 개념 지도 / 쓰기: 개념 지도
-- **[DB] cmap_topics** — 읽기: 개념 지도 / 쓰기: -
+- **[DB] cmap_narrations** — 읽기: 개념 지도 / 쓰기: 개념 지도
+- **[DB] cmap_quiz_attempts** — 읽기: - / 쓰기: 개념 지도
+- **[DB] cmap_topics** — 읽기: 개념 지도 / 쓰기: 개념 지도
 - **[DB] gloss_backup** — 읽기: 관리자 / 쓰기: 관리자
 - **[DB] jgrammar_saved** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **[DB] review_log** — 읽기: - / 쓰기: 사전
@@ -200,9 +204,9 @@
 ### 외부 서비스별 사용 화면 ([외부])
 - **Anthropic API(Claude Haiku)** — 개념 지도, 관리자, 문장 학습, 사전, 음성 학습
 - **Google Fonts** — Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서
-- **Google 로그인(OAuth)** — 홈
+- **Google 로그인(OAuth)** — 사전, 스펠링 런, 홈
 - **OpenAI Images(이미지 생성)** — 음성 학습
-- **OpenAI STT(음성 인식)** — 음성 학습
+- **OpenAI STT(음성 인식)** — 개념 지도, 음성 학습
 - **OpenAI TTS(음성 합성)** — 관리자, 사전, 스펠링 런
 - **jsDelivr(tesseract.js)** — 사전
 

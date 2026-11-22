@@ -1,7 +1,7 @@
 ---
 screen: 음성 학습
 file: public/voice_study.html
-engines: [음성 인식(OpenAI STT), AI 음성 노트 처리(Claude Haiku), 이미지 생성(OpenAI Images), 기기 음성(speechSynthesis)]
+engines: [음성 인식(OpenAI STT), AI 음성 노트 처리(Claude Haiku), 이미지 생성(OpenAI Images), 기기 음성(speechSynthesis), 서버 메모리 작업 상태]
 calls: [GET /api/me, GET /api/voice-notes, POST /api/voice-notes, GET /api/voice-notes/:id, PATCH /api/voice-notes/:id, DELETE /api/voice-notes/:id, POST /api/voice-notes/merge, POST /api/voice-notes/transcribe, POST /api/voice-notes/summarize, GET /api/voice-notes/wrong-answers, GET /api/voice-notes/quiz-summary, GET /api/voice-notes/:id/quiz, POST /api/voice-notes/:id/quiz, GET /api/voice-notes/:id/quiz/attempts, POST /api/voice-notes/:id/quiz/attempts, POST /api/voice-notes/:id/chat, GET /api/voice-notes/:id/links, POST /api/voice-notes/:id/links/refresh, GET /api/voice-notes/:id/image, POST /api/voice-notes/:id/image, GET /api/voice-notes/:id/image/file, PATCH /api/voice-notes/:id/image/rating, GET /api/voice-notes/map, POST /api/voice-notes/links, PATCH /api/voice-notes/links/:id, DELETE /api/voice-notes/links/:id, POST /api/voice-notes/map/build, GET /api/voice-notes/map/build-status]
 reads: [DB:users, DB:api_usage, DB:voice_notes, DB:voice_quizzes, DB:voice_quiz_attempts, DB:voice_links, DB:voice_image_sets, DB:voice_images, 기기:mydict_token, 기기:voice_tts_rate]
 writes: [DB:voice_notes, DB:voice_quizzes, DB:voice_quiz_attempts, DB:voice_links, DB:voice_image_sets, DB:voice_images, DB:api_usage, 기기:voice_tts_rate]
@@ -31,6 +31,7 @@ last_checked: 8753b0a
 - [엔진] AI 음성 노트 처리(Claude Haiku): 요약(:806)·퀴즈(:978)·대화(:1118)·연결(:1313)·이미지 계획 보조(:1717, :1770)가 같은 모델 SUMMARY_MODEL claude-haiku-4-5 (:705).
 - [엔진] 이미지 생성(OpenAI Images): `POST /api/voice-notes/:id/image` → OpenAI images/generations (routes/voice_study.js:1666). 모델 기본값은 환경변수 VOICE_IMAGE_MODEL(:1492).
 - [엔진] 기기 음성(speechSynthesis): 요약 읽어주기는 이 엔진만 쓴다(public/voice_study.html:2052 주석: 외부 API·비용 없음). 한국어 음성 선택(koVoiceInfo). 서버 음성(OpenAI TTS)은 쓰지 않는다. 대체 경로 없음.
+- [엔진] 서버 메모리 작업 상태: 지도 만들기 진행 상태 mapBuilds(routes/voice_study.js:336)와 같은 자료의 연결 분석 중복 방지 linkInFlight(:1173). 서버를 다시 시작하면 사라진다.
 
 ## 3 경로 (화면 →호출 API → 서버 라우트, 주요 동작)
 - [화면] 음성 학습 →호출 [API] GET /api/me — voice_study.html:786 → routes/auth.js:101. →필요 로그인·권한:perm_voice_study(routes/voice_study.js:20, 모든 voice-notes 라우트는 guard :31)

@@ -1090,7 +1090,7 @@ details.conn summary { cursor: pointer; font-size: 14px; font-weight: 700; color
     var panel = svView === 'func' ? (svFunc ? svFuncPanel(svFunc) : null) : (svStore ? svStorePanel(SV.targets.filter(function (t) { return t.name === svStore; })[0].id) : null);
     sec.appendChild(panel || mk('p', 'svnote', svView === 'func' ? '기능을 고르면 관문 통과 → 부르는 API 묶음 → 엔진·외부·저장소 순서로 나옵니다.' : '저장소·엔진·외부를 고르면 그것을 쓰는 API 묶음과 기능이 나옵니다.'));
     svRoot.appendChild(sec);
-    var ft = mk('p', 'foot svfoot'); ft.appendChild(document.createTextNode('데이터 출처: docs/blueprint/api.md(API ' + (SV.stat.apis + 3) + '행) · db.md · LEGEND · 화면 머리말(modules·requires·정적 파일 읽기), 기준 커밋 ' + SV.commit + '. 규칙: requireAuth 가 매 요청마다 하는 users 읽기(api.md 공통 규칙)는 목록에 넣지 않았다. 정적 파일 읽기 ' + SV.freadN + '건은 화면 머리말에서 가져왔고 api.md 에는 없다. 화면 머리말과 api.md 의 접근 차이 경고가 ' + SV.warnN + '건 있다(B-006 에서 정리 예정).'));
+    var ft = mk('p', 'foot svfoot'); ft.appendChild(document.createTextNode('데이터 출처: docs/blueprint/api.md(API ' + (SV.stat.apis + 3) + '행) · db.md · LEGEND · 화면 머리말(modules·requires·정적 파일 읽기), 기준 커밋 ' + SV.commit + '. 규칙: requireAuth 가 매 요청마다 하는 users 읽기(api.md 공통 규칙)는 목록에 넣지 않았다. GET /api/me 는 users 를 읽고 갱신한다(관리자 지정 이메일 조건, routes/auth.js:127). 정적 파일 읽기 ' + SV.freadN + '건은 화면 머리말에서 가져왔고 api.md 에는 없다. 화면 머리말과 api.md 의 접근 차이 경고가 ' + SV.warnN + '건 있다(B-006 에서 정리 예정).'));
     svRoot.appendChild(ft);
     if (tab === 'svc') svWriteHash();
   }
@@ -1245,10 +1245,12 @@ function apiWarnings(api, screens, dbItems) {
   for (const s of screens) {
     const e = by.get(s.screen);
     const rows = [...e.rows];
+    const gatedScreen = s.modules.some(m => /(^|\/)authGate\.js$/.test(m));
     const d = { reads: new Set(), writes: new Set(), engines: new Set(), externals: new Set() };
     for (const r of rows) {
       if (apiReadsUsers(r)) d.reads.add('DB:users');
-      r.reads.forEach(x => d.reads.add(x)); r.writes.forEach(x => d.writes.add(x)); r.files.forEach(x => d.reads.add('파일:' + x));
+      if (gatedScreen && r.key === 'GET /api/me') { r.files.forEach(x => d.reads.add('파일:' + x)); }   // 관문 공통 규칙(LEGEND 10절): 관문 통과 화면은 /api/me 의 users 읽기·갱신을 머리말에 적지 않는다
+      else { r.reads.forEach(x => d.reads.add(x)); r.writes.forEach(x => d.writes.add(x)); r.files.forEach(x => d.reads.add('파일:' + x)); }
       if (!e.viaCommonOnly.has(r)) { r.engines.forEach(x => d.engines.add(x)); r.externals.forEach(x => d.externals.add(x)); }
     }
     const cmp = (group, derived, header, scope) => {

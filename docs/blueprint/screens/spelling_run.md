@@ -16,7 +16,7 @@ flows: [
 ]
 requires: [로그인, 권한:can_wordbook, 권한:perm_versus]
 navigates: [사전, 홈]
-externals: [OpenAI TTS(음성 합성), Google Fonts]
+externals: [OpenAI TTS(음성 합성), Google Fonts, Google 로그인(OAuth)]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
 last_checked: 8753b0a
 ---
@@ -50,3 +50,4 @@ last_checked: 8753b0a
 - [기기] localStorage `mydict_token`, `spellrun_opts`(조정값, public/js/spellrun/logic.js:205), `spellrun_mode`(기본/생존), `spellrun_preview`(미리 보기), `spellrun_view`(세로/가로), `spellrun_bgm`, `spellrun_char`(캐릭터), `spellrun_best`(최고 점수), `metis_tts_mode`(단어 발음 방식, 사전과 공용; game.js `?tts=` 처리), sessionStorage `spellrun_ids`(사전이 넘긴 단어 id, 읽기만). 점검 주소 옵션 ttsdebug·judgedebug(logic.js:174).
 - 진입: 사전의 단어장에서 단어를 고르면 /spelling_run.html로 이동(public/english_dictionary.html:3320).
 - [모듈] public/js/common/authGate.js, appHeader.js, dialog.js.
+- [외부] Google 로그인(OAuth): 토큰이 없으면 "로그인하기" 가 `/auth/google?next=/spelling_run.html` 로 간다(public/js/spellrun/game.js:2877 → routes/auth.js:67).
