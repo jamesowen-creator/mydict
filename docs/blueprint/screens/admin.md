@@ -18,7 +18,7 @@ requires: [로그인, 관리자]
 navigates: [홈]
 externals: [Anthropic API(Claude Haiku), OpenAI TTS(음성 합성), Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js]
-last_checked: 23d581c
+last_checked: 9319dc0
 ---
 
 # 관리자 (public/admin.html)

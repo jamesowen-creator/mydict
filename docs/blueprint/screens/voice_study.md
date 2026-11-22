@@ -18,7 +18,7 @@ requires: [로그인, 권한:perm_voice_study]
 navigates: [홈]
 externals: [Anthropic API(Claude Haiku), OpenAI STT(음성 인식), OpenAI Images(이미지 생성), Google Fonts]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 8753b0a
+last_checked: 9319dc0
 ---
 
 # 음성 학습 (public/voice_study.html)

@@ -64,6 +64,10 @@
 - **서버 음성(OpenAI TTS) ⇢ 기기 음성(speechSynthesis)** — 사전, 스펠링 런
 
 ### API별 사용 화면 (→호출)
+- **DELETE /api/cmap/concepts/:id** — 개념 지도
+- **DELETE /api/cmap/edges/:id** — 개념 지도
+- **DELETE /api/cmap/maps/:id/nodes/:conceptId** — 개념 지도
+- **DELETE /api/cmap/topics/:id** — 개념 지도
 - **DELETE /api/jgrammar/saved/:id** — 문장 학습
 - **DELETE /api/tts/cache/entry** — 관리자
 - **DELETE /api/voice-notes/:id** — 음성 학습
@@ -76,6 +80,12 @@
 - **GET /api/admin/speakloop/audio/status** — 관리자
 - **GET /api/admin/stats** — 관리자
 - **GET /api/admin/users** — 관리자
+- **GET /api/cmap/answers/recent** — 개념 지도
+- **GET /api/cmap/maps/:id/answer-targets** — 개념 지도
+- **GET /api/cmap/maps/:id/narration** — 개념 지도
+- **GET /api/cmap/maps/:id/quiz/marked-info** — 개념 지도
+- **GET /api/cmap/topics** — 개념 지도
+- **GET /api/cmap/topics/:id/concepts** — 개념 지도
 - **GET /api/cmap/topics/:rootId/map** — 개념 지도
 - **GET /api/jgrammar/saved** — 문장 학습
 - **GET /api/me** — Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서, 홈
@@ -101,6 +111,10 @@
 - **GET /auth/google** — 홈
 - **GET /auth/google/callback** — 홈
 - **PATCH /api/admin/users/:id** — 관리자
+- **PATCH /api/cmap/concepts/:id** — 개념 지도
+- **PATCH /api/cmap/edges/:id** — 개념 지도
+- **PATCH /api/cmap/maps/:id/nodes/:conceptId** — 개념 지도
+- **PATCH /api/cmap/topics/:id** — 개념 지도
 - **PATCH /api/voice-notes/:id** — 음성 학습
 - **PATCH /api/voice-notes/:id/image/rating** — 음성 학습
 - **PATCH /api/voice-notes/links/:id** — 음성 학습
@@ -112,9 +126,20 @@
 - **POST /api/admin/speakloop/audio/generate** — 관리자
 - **POST /api/admin/speakloop/audio/preview** — 관리자
 - **POST /api/ai** — 사전
+- **POST /api/cmap/concepts/:id/answer/text** — 개념 지도
+- **POST /api/cmap/concepts/:id/answer/voice** — 개념 지도
+- **POST /api/cmap/concepts/:id/deepen** — 개념 지도
 - **POST /api/cmap/maps/:id/edges** — 개념 지도
+- **POST /api/cmap/maps/:id/edges/bulk** — 개념 지도
+- **POST /api/cmap/maps/:id/narrate** — 개념 지도
+- **POST /api/cmap/maps/:id/nodes** — 개념 지도
+- **POST /api/cmap/maps/:id/quiz/start** — 개념 지도
+- **POST /api/cmap/maps/:id/quiz/submit** — 개념 지도
 - **POST /api/cmap/maps/:id/save** — 개념 지도
+- **POST /api/cmap/topics** — 개념 지도
+- **POST /api/cmap/topics/:id/concepts** — 개념 지도
 - **POST /api/cmap/topics/:id/explain** — 개념 지도
+- **POST /api/cmap/topics/:id/move** — 개념 지도
 - **POST /api/jgrammar/explain** — 문장 학습
 - **POST /api/jgrammar/ocr** — 문장 학습
 - **POST /api/quiz-correct** — 사전
@@ -140,6 +165,8 @@
 - **POST /api/voice-notes/summarize** — 음성 학습
 - **POST /api/voice-notes/transcribe** — 음성 학습
 - **POST /api/wordbook** — 사전
+- **PUT /api/cmap/concepts/:id/mark** — 개념 지도
+- **PUT /api/cmap/maps/:id/positions** — 개념 지도
 
 ### 저장소별 사용 화면 ([DB]·[캐시], →읽기 / →쓰기)
 - **[DB] api_usage** — 읽기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
@@ -219,7 +246,7 @@
 ### 미작성 화면 (0개)
 (없음)
 
-화면 파일의 마지막 확인 커밋: 23d581c, 49287a8, 8753b0a, bf7715c
+화면 파일의 마지막 확인 커밋: 23d581c, 49287a8, 8753b0a, 9319dc0
 <!-- gen:end -->
 
 ## 작업 블록 규칙

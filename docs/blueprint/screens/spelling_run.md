@@ -18,7 +18,7 @@ requires: [로그인, 권한:can_wordbook, 권한:perm_versus]
 navigates: [사전, 홈]
 externals: [OpenAI TTS(음성 합성), Google Fonts, Google 로그인(OAuth)]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
-last_checked: 8753b0a
+last_checked: 9319dc0
 ---
 
 # 스펠링 런 (public/spelling_run.html) — 내부 게임 로직은 쓰지 않고 공용 엔진·API·DB 연결만

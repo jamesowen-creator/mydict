@@ -693,7 +693,7 @@ details.conn summary { cursor: pointer; font-size: 14px; font-weight: 700; color
       String(text).split('(').forEach(function (part, i) { if (i > 0) { el.appendChild(document.createTextNode('(')); el.appendChild(document.createElement('wbr')); } el.appendChild(document.createTextNode(part)); });
       return;
     }
-    String(text).split('/').forEach(function (part, i) { if (i > 0) { el.appendChild(document.createTextNode('/')); el.appendChild(document.createElement('wbr')); } el.appendChild(document.createTextNode(part)); });
+    String(text).split('/').forEach(function (part, i) { if (i > 0) { el.appendChild(document.createTextNode('/')); el.appendChild(document.createElement('wbr')); } var seg = document.createElement('span'); seg.style.whiteSpace = 'nowrap'; seg.textContent = part; el.appendChild(seg); });   // 조각(슬래시 사이)은 하이픈에서도 쪼개지지 않게 한다
   }
   function out(id, rel) { return edges.filter(function (e) { return e[0] === id && e[2] === rel; }).map(function (e) { return e[1]; }); }
   function inn(id, rel) { return edges.filter(function (e) { return e[1] === id && e[2] === rel; }).map(function (e) { return e[0]; }); }
@@ -784,7 +784,7 @@ details.conn summary { cursor: pointer; font-size: 14px; font-weight: 700; color
   function row(parent, kind, items) {
     if (!items || !items.length) return;
     var d = mk('div', 'rel-row'); d.appendChild(mk('span', 'rk', kind));
-    var ul = mk('ul'); items.forEach(function (x) { ul.appendChild(mk('li', '', x)); }); d.appendChild(ul);
+    var ul = mk('ul'); items.forEach(function (x) { var li = mk('li'); putText(li, x, x.indexOf('/') >= 0 ? 'api' : 'name'); ul.appendChild(li); }); d.appendChild(ul);   // API·경로는 슬래시 조각 단위로만 줄바꿈
     parent.appendChild(d);
   }
   function merged(a, b) {
@@ -1090,7 +1090,7 @@ details.conn summary { cursor: pointer; font-size: 14px; font-weight: 700; color
     var panel = svView === 'func' ? (svFunc ? svFuncPanel(svFunc) : null) : (svStore ? svStorePanel(SV.targets.filter(function (t) { return t.name === svStore; })[0].id) : null);
     sec.appendChild(panel || mk('p', 'svnote', svView === 'func' ? '기능을 고르면 관문 통과 → 부르는 API 묶음 → 엔진·외부·저장소 순서로 나옵니다.' : '저장소·엔진·외부를 고르면 그것을 쓰는 API 묶음과 기능이 나옵니다.'));
     svRoot.appendChild(sec);
-    var ft = mk('p', 'foot svfoot'); ft.appendChild(document.createTextNode('데이터 출처: docs/blueprint/api.md(API ' + (SV.stat.apis + 3) + '행) · db.md · LEGEND · 화면 머리말(modules·requires·정적 파일 읽기), 기준 커밋 ' + SV.commit + '. 규칙: requireAuth 가 매 요청마다 하는 users 읽기(api.md 공통 규칙)는 목록에 넣지 않았다. GET /api/me 는 users 를 읽고 갱신한다(관리자 지정 이메일 조건, routes/auth.js:127). 정적 파일 읽기 ' + SV.freadN + '건은 화면 머리말에서 가져왔고 api.md 에는 없다. 화면 머리말과 api.md 의 접근 차이 경고가 ' + SV.warnN + '건 있다(B-006 에서 정리 예정).'));
+    var ft = mk('p', 'foot svfoot'); ft.appendChild(document.createTextNode('데이터 출처: docs/blueprint/api.md(API ' + (SV.stat.apis + 3) + '행) · db.md · LEGEND · 화면 머리말(modules·requires·정적 파일 읽기), 기준 커밋 ' + SV.commit + '. 규칙: requireAuth 가 매 요청마다 하는 users 읽기(api.md 공통 규칙)는 목록에 넣지 않았다. GET /api/me 는 users 를 읽고 갱신한다(관리자 지정 이메일 조건, routes/auth.js:127). 정적 파일 읽기 ' + SV.freadN + '건은 화면 머리말에서 가져왔고 api.md 에는 없다. ' + (SV.warnN ? '화면 머리말과 api.md 의 접근 차이 경고가 ' + SV.warnN + '건 있다.' : '화면 머리말과 api.md 의 접근 차이 경고는 0건이다(B-006 에서 정리함).')));
     svRoot.appendChild(ft);
     if (tab === 'svc') svWriteHash();
   }

@@ -30,7 +30,7 @@ requires: [로그인, 권한:perm_concept_map]
 navigates: [홈]
 externals: [Anthropic API(Claude Haiku), Google Fonts, OpenAI STT(음성 인식)]
 modules: [public/js/common/authGate.js, public/js/common/appHeader.js]
-last_checked: bf7715c
+last_checked: 9319dc0
 ---
 
 # 개념 지도 (public/concept_map.html)
