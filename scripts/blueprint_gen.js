@@ -309,6 +309,29 @@ function writeBundle(screens) {
   return Buffer.byteLength(text, 'utf8');
 }
 
+// ── LEGEND 8절 화면 묶음 ──────────────────────────────────────────────────
+// "묶음 이름: 화면, 화면" 줄을 읽는다. 12개 화면이 각각 정확히 한 묶음에 있어야 하며, 어긋나면 LEGEND.md 줄 번호와 함께 오류.
+function loadGroups(L, errs) {
+  const lines = lf(fs.readFileSync(LEGEND, 'utf8')).split('\n');
+  const head = lines.findIndex(l => /^## 8 /.test(l));
+  if (head < 0) { errs.push('docs/blueprint/LEGEND.md:1: "## 8 화면 묶음" 절이 없습니다'); return []; }
+  const groups = [], seen = new Map();
+  for (let i = head + 1; i < lines.length && !/^## \d/.test(lines[i]); i++) {
+    const m = lines[i].match(/^([^\s:]+): (.+)$/);
+    if (!m) continue;
+    const at = 'docs/blueprint/LEGEND.md:' + (i + 1) + ': ';
+    const names = m[2].split(',').map(s => s.trim()).filter(Boolean);
+    groups.push({ name: m[1], screens: names });
+    for (const n of names) {
+      if (!L.screens.includes(n)) errs.push(at + '묶음 "' + m[1] + '" 의 "' + n + '" 은 LEGEND 5절 화면 이름이 아닙니다');
+      else if (seen.has(n)) errs.push(at + '화면 "' + n + '" 이 묶음 "' + seen.get(n).g + '"(' + seen.get(n).line + '줄)와 "' + m[1] + '" 에 중복됩니다');
+      else seen.set(n, { g: m[1], line: i + 1 });
+    }
+  }
+  for (const n of L.screens) if (!seen.has(n)) errs.push('docs/blueprint/LEGEND.md:' + (head + 1) + ': 화면 "' + n + '" 이 어느 묶음에도 없습니다');
+  return groups;
+}
+
 // ── db.md 대조·생성 구간 ───────────────────────────────────────────────
 // db.md 의 항목 줄("| DB:이름 |" 또는 "| 캐시:이름 |")과 lib/db.js 의 CREATE TABLE 을 서로 대조하고, 화면 머리말의 DB:·캐시: 이름이 db.md 에 있는지 본다. 어긋나면 파일:줄과 함께 오류.
 function loadDbDoc(screens, errs) {
@@ -342,14 +365,14 @@ function genDbSection(screens, items) {
 }
 
 // ── map.html ────────────────────────────────────────────────────────────────
-function mapData(screens, pages) {
+function mapData(screens, pages, groups) {
   const written = new Set(screens.map(s => s.file));
   const nodes = [], edges = [];
   const has = id => nodes.some(n => n.id === id);
   const add = (id, type, label, extra) => { if (!has(id)) nodes.push(Object.assign({ id, type, label }, extra || {})); };
   const edge = (a, b, relKind) => { if (!edges.some(e => e[0] === a && e[1] === b && e[2] === relKind)) edges.push([a, b, relKind]); };
   for (const s of screens) add('s:' + s.screen, 'screen', s.screen, {
-    file: s.file, calls: s.calls, requires: s.requires, fallback: s.fallback,
+    file: s.file, calls: s.calls, requires: s.requires, fallback: s.fallback, group: (groups.find(g => g.screens.includes(s.screen)) || {}).name || '',
     devReads: s.reads.filter(x => x.startsWith('기기:')).map(storeName), devWrites: s.writes.filter(x => x.startsWith('기기:')).map(storeName),
   });
   for (const p of pages) if (!written.has(p.file)) add('s:todo:' + p.file, 'todo', p.title, { file: p.file });
@@ -385,7 +408,7 @@ function mapData(screens, pages) {
   nodes.sort((a, b) => order[a.type] - order[b.type] || byCode(a.label, b.label));
   edges.sort((a, b) => byCode(a.join('>'), b.join('>')));
   const hashes = [...new Set(screens.map(s => s.last_checked))].sort(byCode);
-  return { nodes, edges, commit: hashes.join(', ') };
+  return { nodes, edges, commit: hashes.join(', '), groups };
 }
 
 function mapHtml(data) {
@@ -625,11 +648,12 @@ function main() {
   if (errs.length) { console.error('blueprint:gen 검증 오류 ' + errs.length + '건 — 파일을 쓰지 않고 멈춥니다\n' + errs.map(e => ' - ' + e).join('\n')); process.exit(1); }
   const pages = publicPages(L, errs);
   if (errs.length) { console.error('blueprint:gen 검증 오류 ' + errs.length + '건 — 파일을 쓰지 않고 멈춥니다\n' + errs.map(e => ' - ' + e).join('\n')); process.exit(1); }
+  const groups = loadGroups(L, errs);
   const dbItems = loadDbDoc(screens, errs);
   if (errs.length) { console.error('blueprint:gen 검증 오류 ' + errs.length + '건 — 파일을 쓰지 않고 멈춥니다\n' + errs.map(e => ' - ' + e).join('\n')); process.exit(1); }
   writeReadme(genSection(screens, pages));
   writeReadme(genDbSection(screens, dbItems), DBDOC);
-  fs.writeFileSync(MAP, mapHtml(mapData(screens, pages)));
+  fs.writeFileSync(MAP, mapHtml(mapData(screens, pages, groups)));
   const size = writeBundle(screens);
   console.log('blueprint:gen 완료 — 화면 파일 ' + screens.length + '개, 미작성 ' + pages.filter(p => !screens.some(s => s.file === p.file)).length + '개, _bundle.md ' + size + ' bytes');
   const nFlows = screens.reduce((a, s) => a + s._flows.length, 0), nSteps = screens.reduce((a, s) => a + s._flows.reduce((x, f) => x + f.steps.length, 0), 0);
