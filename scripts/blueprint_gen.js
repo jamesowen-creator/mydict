@@ -1379,6 +1379,71 @@ function genApiSection(api, dbItems) {
   return L.join('\n');
 }
 
+// ── service.html 데이터 (작업B-005) ─────────────────────────────────────────
+// 서비스 흐름도 [입구·관문] → [기능] → [API 묶음] → [엔진·외부·저장소] 의 노드와 선. 출처는 api.md(파싱 결과), db.md, LEGEND, 화면 머리말 modules·requires.
+// 선(방향은 항상 왼쪽 → 오른쪽): flow(입구·관문·기능 → API), call(API → 엔진·외부), read(API → DB·캐시·파일), write(API → DB·캐시).
+// requireAuth 가 매 요청마다 하는 users 읽기(api.md 공통 규칙)는 선으로 그리지 않는다. users 에는 관문과 API 가 직접 읽고 쓰는 선만 있다.
+function serviceData(L, screens, groups, dbItems, api, warnN) {
+  const nodes = [], edges = [];
+  const idxOf = new Map();
+  const add = n => { idxOf.set(n.id, nodes.length); nodes.push(n); return n; };
+  const edge = (a, b, kind) => { edges.push([a, b, kind]); };
+  // LEGEND 설명(엔진 표 둘째 칸), db.md 설명
+  const lg = lf(fs.readFileSync(LEGEND, 'utf8')).split('\n');
+  const engDesc = {}; for (const l of lg) { const m = l.match(/^\| ([^|]+?) \| (.+) \|$/); if (m && L.engines.includes(m[1])) engDesc[m[1]] = m[2]; }
+  const dbDesc = {}; lf(fs.readFileSync(DBDOC, 'utf8')).split('\n').forEach(l => { const m = l.match(/^\| (DB|캐시):([A-Za-z0-9_]+) \| ([^|]+?) \| ([^|]+?) \|/); if (m) dbDesc[m[1] + ':' + m[2]] = { desc: m[3], scope: m[4] }; });
+  // 입구·관문
+  add({ id: 'g:login', type: 'gate', col: 0, label: '로그인(Google OAuth)', note: 'GET /auth/google 로 Google 로그인을 시작하고 GET /auth/google/callback 이 토큰을 돌려준다. 외부: Google 로그인(OAuth).' });
+  add({ id: 'g:gate', type: 'gate', col: 0, label: '로그인 관문', note: 'authGate.js·appHeader.js 가 화면을 열 때 GET /api/me 를 부르고, 서버는 인증이 공개가 아닌 모든 요청마다 users 를 읽는다(middleware/auth.js:30). 홈은 관문을 거치지 않는다.' });
+  // 기능(화면)
+  const gated = new Set(screens.filter(s => s.modules.some(m => /(^|\/)authGate\.js$/.test(m))).map(s => s.screen));
+  for (const s of screens.slice().sort((a, b) => L.screens.indexOf(a.screen) - L.screens.indexOf(b.screen))) {
+    const g = (groups.find(x => x.screens.includes(s.screen)) || {}).name || '';
+    add({ id: 's:' + s.screen, type: 'screen', col: 1, label: s.screen, group: g, file: s.file, requires: s.requires, modules: s.modules, navigates: s.navigates, gated: gated.has(s.screen) });
+  }
+  // API 묶음·API
+  const gcount = new Map(API_GROUPS.map(n => [n, 0]));
+  api.rows.forEach(r => gcount.set(r.group, (gcount.get(r.group) || 0) + 1));
+  for (const n of API_GROUPS) add({ id: 'G:' + n, type: 'apigrp', col: 2, label: n, count: gcount.get(n) });
+  const apiId = r => 'a:' + api.rows.indexOf(r);
+  const order = api.rows.slice().sort((a, b) => API_GROUPS.indexOf(a.group) - API_GROUPS.indexOf(b.group) || a.i - b.i);
+  for (const r of order) add({ id: apiId(r), type: 'api', col: 2, label: r.key, group: r.group, def: r.def, auth: r.auth, reads: r.reads, writes: r.writes, engines: r.engines, externals: r.externals, files: r.files, screens: r.screens, basis: r.basis });
+  // 엔진·외부·저장소
+  for (const e of L.engines) add({ id: 'e:' + e, type: 'engine', col: 3, label: e, desc: engDesc[e] || '' });
+  for (const x of L.externals) add({ id: 'x:' + x, type: 'external', col: 3, label: x });
+  for (const [k, v] of [...dbItems.entries()].sort((a, b) => byCode(a[1].name, b[1].name))) add({ id: (v.kind === 'DB' ? 'd:' : 'c:') + v.name, type: v.kind === 'DB' ? 'db' : 'cache', col: 3, label: v.name, desc: (dbDesc[k] || {}).desc || '', scope: (dbDesc[k] || {}).scope || '' });
+  for (const [n, f] of [...L.files.entries()].sort((a, b) => byCode(a[0], b[0]))) add({ id: 'f:' + n, type: 'file', col: 3, label: n, path: f.path });
+  // 선
+  const cnt = { flowCells: 0, flowSkipped: 0, engine: 0, external: 0, read: 0, write: 0, file: 0 };
+  edge('g:login', 'g:gate', 'flow');
+  for (const s of screens) if (gated.has(s.screen)) edge('g:gate', 's:' + s.screen, 'flow');
+  for (const r of api.rows) {
+    const aid = apiId(r), common = r.screens.includes('공용');
+    if (r.key === 'GET /auth/google' || r.key === 'GET /auth/google/callback') edge('g:login', aid, 'flow');
+    for (const s of r.screens) {
+      cnt.flowCells++;
+      if (s === '공용') edge('g:gate', aid, 'flow');
+      else if (common && gated.has(s)) cnt.flowSkipped++;   // 공용으로 이미 관문에 연결됨: 화면마다 따로 그리지 않는다
+      else edge('s:' + s, aid, 'flow');
+    }
+    for (const e of r.engines) { edge(aid, 'e:' + e, 'call'); cnt.engine++; }
+    for (const x of r.externals) { edge(aid, 'x:' + x, 'call'); cnt.external++; }
+    for (const t of r.reads) { edge(aid, (t.startsWith('DB:') ? 'd:' : 'c:') + t.slice(t.indexOf(':') + 1), 'read'); cnt.read++; }
+    for (const t of r.writes) { edge(aid, (t.startsWith('DB:') ? 'd:' : 'c:') + t.slice(t.indexOf(':') + 1), 'write'); cnt.write++; }
+    for (const f of r.files) { edge(aid, 'f:' + f, 'read'); cnt.file++; }
+  }
+  edge('g:gate', 'd:users', 'read');   // 관문이 매 요청마다 읽는 users: 이 선 하나만 그린다(API 마다 그리지 않음)
+  const bad = edges.filter(([a, b]) => !idxOf.has(a) || !idxOf.has(b));
+  const hashes = [...new Set(screens.map(s => s.last_checked))].sort(byCode);
+  const kinds = {}; edges.forEach(e => { kinds[e[2]] = (kinds[e[2]] || 0) + 1; });
+  const stat = {
+    screens: screens.length, groups: API_GROUPS.length, apis: api.rows.length, engines: L.engines.length, externals: L.externals.length,
+    db: [...dbItems.values()].filter(v => v.kind === 'DB').length, cache: [...dbItems.values()].filter(v => v.kind === '캐시').length, files: L.files.size,
+    nodes: nodes.length, edges: edges.length, kinds, cells: cnt, badEdges: bad.length,
+  };
+  return { nodes, edges, groups: groups.map(g => ({ name: g.name, screens: g.screens })), apiGroups: API_GROUPS, commit: hashes.join(', '), warnN: warnN, stat };
+}
+
 function main() {
   const errs = [];
   const L = loadLegend();
@@ -1394,6 +1459,15 @@ function main() {
   writeReadme(genDbSection(screens, dbItems), DBDOC);
   writeReadme(genApiSection(api, dbItems), APIDOC);
   const aw = apiWarnings(api, screens, dbItems);
+  const svc = serviceData(L, screens, groups, dbItems, api, API_WARNS.filter(w => w.kind === 'screenDiff').length);
+  const sx = svc.stat, kk = sx.kinds, cc = sx.cells, gatedN = screens.filter(s => s.modules.some(m => /(^|\/)authGate\.js$/.test(m))).length;
+  const svcErr = [];
+  if (sx.badEdges) svcErr.push('끝점이 없는 선 ' + sx.badEdges + '개');
+  if (kk.call !== cc.engine + cc.external) svcErr.push('call 선 ' + kk.call + ' != 엔진·외부 칸 합 ' + (cc.engine + cc.external));
+  if (kk.read !== cc.read + cc.file + 1) svcErr.push('read 선 ' + kk.read + ' != 읽기·파일 칸 합 ' + (cc.read + cc.file) + ' + 관문 users 1');
+  if (kk.write !== cc.write) svcErr.push('write 선 ' + kk.write + ' != 쓰기 칸 합 ' + cc.write);
+  if (kk.flow !== cc.flowCells - cc.flowSkipped + 1 + gatedN + 2) svcErr.push('flow 선 ' + kk.flow + ' != 호출 화면 칸 합 ' + cc.flowCells + ' - 공용 생략 ' + cc.flowSkipped + ' + 입구 1 + 관문→화면 ' + gatedN + ' + 로그인→API 2');
+  if (svcErr.length) { console.error('blueprint:gen 서비스 흐름도 데이터 불일치:\n' + svcErr.map(e => ' - ' + e).join('\n')); process.exit(1); }
   fs.writeFileSync(MAP, mapHtml(mapData(screens, pages, groups, dbItems)));
   fs.writeFileSync(BOARD, boardHtml(boardData(mapData(screens, pages, groups, dbItems))));
   const size = writeBundle(screens);
@@ -1402,6 +1476,7 @@ function main() {
   const flowOnly = WARNS.filter(w => w.kind === 'flowOnly'), headerOnly = WARNS.filter(w => w.kind === 'headerOnly');
   console.log('흐름: 동작 ' + nFlows + '개, 단계 ' + nSteps + '개 (' + screens.map(s => s.screen + ' ' + s._flows.length).join(', ') + ')');
   console.log('경고(오류 아님): 흐름에만 있는 대상 ' + flowOnly.length + '건, 머리말에만 있고 흐름에 안 나오는 대상 ' + headerOnly.length + '건(그중 기기 저장값 ' + headerOnly.filter(w => w.device).length + '건)');
+  console.log('서비스 흐름도 데이터: 노드 ' + sx.nodes + '개(입구·관문 2, 기능 ' + sx.screens + ', API 묶음 ' + sx.groups + ', API ' + sx.apis + ', 엔진 ' + sx.engines + ', 외부 ' + sx.externals + ', DB ' + sx.db + ', 캐시 ' + sx.cache + ', 파일 ' + sx.files + '), 선 ' + sx.edges + '개(flow ' + kk.flow + ', call ' + kk.call + ', read ' + kk.read + ', write ' + kk.write + ')');
   const apiN = k => API_WARNS.filter(w => w.kind === k).length;
   console.log('api.md: API ' + api.rows.length + '개. 경고(오류 아님): 화면이 부르는데 api.md 에 없는 경로 ' + apiN('noRoute') + '건(검사한 문자열 ' + aw.literals + '개), 화면 머리말과 api.md 의 접근 차이 ' + apiN('screenDiff') + '건, 접근하는 API 가 없는 db.md 항목 ' + apiN('noApi') + '건');
   if (process.argv.includes('--warn')) for (const w of WARNS) console.log(' - [' + (w.kind === 'flowOnly' ? '흐름에만' : '머리말에만') + '] ' + w.screen + ': ' + w.text);
