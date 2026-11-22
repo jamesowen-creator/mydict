@@ -574,12 +574,64 @@ details.conn summary { cursor: pointer; font-size: 14px; font-weight: 700; color
 .usage .item small { display: block; }
 .usage .tag { color: var(--rel); font-weight: 700; }
 .nolink-note { margin: 0 0 8px; font-size: 14px; color: var(--sub); }
+/* ── 서비스 탭 (글자 15px 이상, 선 없음) ── */
+#v-svc { font-size: 15px; }
+#v-svc .svsec { margin: 0 0 24px; }
+#v-svc .svh { font-size: 16px; margin: 0 0 10px; color: var(--sub); }
+#v-svc .trow { display: flex; align-items: flex-start; gap: 12px; margin: 0 0 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+#v-svc .trow > .num { flex: none; margin-top: 3px; }
+#v-svc .tbody { flex: 1 1 0; min-width: 0; }
+#v-svc .tchips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; }
+#v-svc .tgrp { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
+#v-svc .rchip { flex: none; font-size: 15px; font-weight: 700; color: var(--sel); white-space: nowrap; }
+#v-svc .tmeta { margin-top: 4px; font-size: 15px; color: var(--sub); }
+#v-svc .ev { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 15px; color: var(--sub); }
+#v-svc .au { color: var(--sub); }
+#v-svc .nb { white-space: nowrap; }
+#v-svc .mth { font-weight: 700; }
+#v-svc .sample { display: inline-block; font-size: 15px; padding: 4px 14px; max-width: 100%; }
+#v-svc .sample.t-db, #v-svc .sample.t-cache { padding-top: 16px; }
+#v-svc .sample.t-engine { padding: 4px 24px; }
+#v-svc .sample small, #v-svc .item small { display: inline; font-size: 15px; color: var(--sub); margin-right: 6px; }
+#v-svc .sample small.tg { margin: 0 0 0 8px; color: var(--sel); font-weight: 700; }
+#v-svc .t-file { --kc: var(--c-module); border: 0; background: var(--bc); border-radius: 0; clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); position: relative; padding: 5px 20px 5px 14px; }
+#v-svc .t-file::before { content: ""; position: absolute; inset: 2px; background: var(--bg2); clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 13px, 100% 100%, 0 100%); }
+#v-svc .t-file > .lbl { position: relative; }
+#v-svc .svnote { margin: 8px 0 0; font-size: 15px; color: var(--sub); }
+#v-svc .svtoggle { display: flex; gap: 8px; margin: 0 0 12px; }
+#v-svc .svtoggle .item { width: auto; margin: 0; padding: 6px 18px; font-size: 15px; font-weight: 700; }
+#v-svc .svpick { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin: 0 0 12px; }
+#v-svc .pgrp { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+#v-svc .pgrp .glabel { font-size: 15px; font-weight: 700; color: var(--sub); margin: 0 0 8px; }
+#v-svc .pgrp .row { display: flex; flex-wrap: wrap; gap: 8px; }
+#v-svc .pgrp .row .item { display: inline-block; width: auto; margin: 0; min-height: 40px; padding: 6px 14px; font-size: 15px; }
+#v-svc .item .nm { display: block; font-weight: 700; }
+#v-svc .item.t-db, #v-svc .item.t-cache { padding-top: 18px; min-width: 0; }
+#v-svc .item.t-engine { padding: 6px 28px; }
+#v-svc .svpanel { margin: 12px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+#v-svc .svph { font-size: 17px; margin: 0 0 4px; }
+#v-svc .stage { margin: 14px 0 0; }
+#v-svc .sth { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+#v-svc .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 8px 0 0; }
+#v-svc .gcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin: 8px 0 0; align-items: start; }
+#v-svc .gcard { border: 1.5px solid var(--c-screen); border-radius: 8px; background: var(--card); padding: 0; }
+#v-svc .gcard.open { border-color: var(--sel); background: var(--selbg); }
+#v-svc .gcard .gbtn { display: block; width: 100%; margin: 0; border: 0; background: transparent; border-radius: 8px; padding: 8px 12px; text-align: left; font-size: 15px; }
+#v-svc .gcard .gname { display: block; font-weight: 700; }
+#v-svc .apilist { list-style: none; margin: 0; padding: 4px 12px 8px; border-top: 1px solid var(--line); }
+#v-svc .apilist[hidden] { display: none; }
+#v-svc .apirow { margin: 8px 0 0; }
+#v-svc .svfoot { margin-top: 8px; font-size: 15px; }
+#v-svc .num { font-size: 15px; }
+#v-svc .sbtn small { margin: 0 0 0 8px; }
+#v-svc .apirow .ah, #v-svc .apirow .tmeta { display: block; }
+#v-svc .cbtn { width: auto; margin: 0; min-height: 40px; padding: 6px 14px; }
 </style>
 </head>
 <body>
 <div class="wrap">
 <h1>METIS-3 도면</h1>
-<p class="hint">탭 3개: 계층(화면을 묶음별로) · 흐름(동작 하나를 경로·엔진·저장소까지) · 연결(부품을 쓰는 화면). 탭을 바꿔도 고른 화면은 유지됩니다. 항목을 누르면 연결된 항목이 강조되고 나머지는 흐려지며, 같은 항목을 다시 누르면 해제됩니다. 화면을 누르면 동작별 흐름이 오른쪽 상세 상자에 나오고, 동작 카드를 누르면 연결 보기 목록에 순서 번호가 붙습니다. (PC 화면 기준)</p>
+<p class="hint">탭 4개: 계층(화면을 묶음별로) · 흐름(동작 하나를 경로·엔진·저장소까지) · 연결(부품을 쓰는 화면) · 서비스(로그인 줄기와 기능 → API 묶음 → 저장소 목록). 탭을 바꿔도 고른 화면은 유지됩니다. 항목을 누르면 연결된 항목이 강조되고 나머지는 흐려지며, 같은 항목을 다시 누르면 해제됩니다. 화면을 누르면 동작별 흐름이 오른쪽 상세 상자에 나오고, 동작 카드를 누르면 연결 보기 목록에 순서 번호가 붙습니다. (PC 화면 기준)</p>
 <div class="legend" aria-label="범례">
   <span class="lg"><span class="sample t-screen"><span class="lbl">화면</span></span></span>
   <span class="lg"><span class="sample t-engine"><span class="lbl">엔진</span></span></span>
@@ -597,6 +649,7 @@ details.conn summary { cursor: pointer; font-size: 14px; font-weight: 700; color
   <button type="button" role="tab" data-tab="tree" aria-selected="true">계층</button>
   <button type="button" role="tab" data-tab="flow" aria-selected="false">흐름</button>
   <button type="button" role="tab" data-tab="conn" aria-selected="false">연결</button>
+  <button type="button" role="tab" data-tab="svc" aria-selected="false">서비스</button>
   <span class="sp" id="tabnote"></span>
 </div>
 <div class="layout" id="layout">
@@ -621,6 +674,7 @@ details.conn summary { cursor: pointer; font-size: 14px; font-weight: 700; color
   <div class="fsel"><div id="fscreens"></div><div class="acts" id="factions"></div></div>
   <div class="fig" id="fig"></div>
 </section>
+<section id="v-svc" aria-label="서비스 보기" hidden></section>
 <p class="foot">이 파일은 <code>npm run blueprint:gen</code> 이 docs/blueprint/screens 의 머리말에서 만든다(직접 고치지 않는다). 화면 파일 마지막 확인 커밋: <span id="commit"></span></p>
 </div>
 <script id="data" type="application/json">${json}</script>
@@ -902,16 +956,167 @@ details.conn summary { cursor: pointer; font-size: 14px; font-weight: 700; color
   }
   window.addEventListener('resize', function () { if (tab === 'flow' && fig._draw) fig._draw(); });
 
+  /* ── 서비스 탭: 로그인 줄기 + 기능 → API 묶음 → 저장소 목록 (선 없음, 번호 단계와 목록) ── */
+  var SV = data.svc, svView = 'func', svFunc = null, svStore = null, svOpen = {}, svRoot = document.getElementById('v-svc');
+  var SVKIND = { user: 't-device', login: 't-need', api: 't-api', ext: 't-external', db: 't-db', gate: 't-need' };
+  var TYPE_CLS = { engine: 't-engine', external: 't-external', db: 't-db', cache: 't-cache', file: 't-file' };
+  function svPath(el, text, type) { if (type === 'api') { var sp = text.indexOf(' '); var m = mk('span', 'nb mth', text.slice(0, sp)); el.appendChild(m); el.appendChild(document.createTextNode(' ')); putPathNb(el, text.slice(sp + 1)); } else putNameNb(el, text); }
+  function nbs(text) { var s = mk('span', 'nb'); s.textContent = text; return s; }
+  function putPathNb(el, path) { String(path).split('/').forEach(function (p, i) { if (i === 0) return; if (i > 1) el.appendChild(document.createElement('wbr')); el.appendChild(nbs('/' + p)); }); }
+  function putNameNb(el, text) { String(text).split('(').forEach(function (p, i) { if (i > 0) { el.appendChild(document.createElement('wbr')); el.appendChild(nbs('(' + p)); } else el.appendChild(nbs(p)); }); }
+  function svChip(cls, label, type, small, tag) {
+    var c = mk('span', 'sample ' + cls); var l = mk('span', 'lbl');
+    if (small) l.appendChild(mk('small', 'nb', small));
+    svPath(l, label, type); if (tag) l.appendChild(mk('small', 'tg nb', tag)); c.appendChild(l); return c;
+  }
+  function svRel(text) { return mk('span', 'rchip nb', '→ ' + text); }
+  function svEv(list) { var s = mk('span', 'ev'); list.forEach(function (x, i) { if (i) s.appendChild(document.createTextNode(' · ')); var p = x.lastIndexOf('/'); var e = mk('span', 'nb'); e.textContent = x; s.appendChild(e); }); return s; }
+  function svWriteHash() {
+    var h = '#t=svc'; if (svView === 'func' && svFunc) h += '&f=' + encodeURIComponent(svFunc); else if (svView === 'store' && svStore) h += '&s=' + encodeURIComponent(svStore);
+    try { history.replaceState(null, '', h); } catch (e) { location.hash = h; }
+  }
+  function svApi(i) { return SV.apis[i]; }
+  function svTrunk() {
+    var box = mk('div', 'svsec'); box.appendChild(mk('h2', 'svh', '로그인 줄기 — 사용자가 로그인해서 화면에 들어오기까지(순서대로)'));
+    SV.trunk.forEach(function (st) {
+      var r = mk('div', 'trow'); r.dataset.n = String(st.n); r.appendChild(mk('span', 'num', numLabel(String(st.n))));
+      var body = mk('div', 'tbody');
+      var chips = mk('div', 'tchips');
+      st.items.forEach(function (it) { var g = mk('span', 'tgrp'); g.appendChild(svRel(it.rel)); g.appendChild(svChip(SVKIND[it.kind], it.label, it.kind === 'api' ? 'api' : 'name', it.sub || '', it.tag || '')); chips.appendChild(g); });
+      body.appendChild(chips);
+      var meta = mk('div', 'tmeta'); meta.appendChild(mk('span', 'tnote', st.note + ' — ')); meta.appendChild(svEv(st.ev)); body.appendChild(meta);
+      r.appendChild(body); box.appendChild(r);
+    });
+    var g = SV.gate; box.appendChild(mk('p', 'svnote', '⑥ 로그인 관문: 거치는 기능 ' + g.screens + '개 · API 묶음 ' + g.groups + '(인증·계정) · API ' + g.apis + '개(GET /api/me) · 저장소 ' + g.stores + '개(users). 홈은 관문 앞(로그인 없이 열림).'));
+    return box;
+  }
+  function svApiList(idxs, tagFn) {
+    var ul = mk('ul', 'apilist');
+    idxs.forEach(function (x) {
+      var i = typeof x === 'number' ? x : x.i, a = svApi(i), li = mk('li', 'apirow');
+      var head = mk('span', 'ah'); head.appendChild(svChip('t-api', a.key, 'api', '', typeof x === 'number' ? '' : x.rel)); li.appendChild(head);
+      var m = mk('span', 'tmeta'); m.appendChild(mk('span', 'au nb', '인증 ' + a.auth)); m.appendChild(document.createTextNode(' · ')); m.appendChild(svEv([a.def])); li.appendChild(m);
+      ul.appendChild(li);
+    });
+    return ul;
+  }
+  function svGroupCard(key, name, head, idxs) {
+    var card = mk('div', 'gcard' + (svOpen[key] ? ' open' : '')); card.dataset.key = key;
+    var b = mk('button', 'item gbtn'); b.type = 'button'; b.setAttribute('aria-expanded', svOpen[key] ? 'true' : 'false');
+    var l = mk('span', 'lbl'); l.appendChild(mk('span', 'gname', name)); l.appendChild(mk('small', 'nb', head)); b.appendChild(l);
+    var list = svApiList(idxs); list.hidden = !svOpen[key];
+    b.addEventListener('click', function () { svOpen[key] = !svOpen[key]; card.classList.toggle('open', !!svOpen[key]); b.setAttribute('aria-expanded', svOpen[key] ? 'true' : 'false'); list.hidden = !svOpen[key]; });
+    card.appendChild(b); card.appendChild(list); return card;
+  }
+  function svStage(n, title) { var s = mk('div', 'stage'); var h = mk('div', 'sth'); h.appendChild(mk('span', 'num', numLabel(String(n)))); h.appendChild(mk('span', 'stt', title)); s.appendChild(h); return s; }
+  function svFuncPanel(name) {
+    var s = SV.screens.filter(function (x) { return x.name === name; })[0], p = mk('div', 'svpanel'); p.id = 'svpanel';
+    p.appendChild(mk('h3', 'svph', s.name + ' — ' + s.group + ' 묶음 · ' + s.file));
+    var s1 = svStage(1, s.gated ? '관문 통과' : '로그인 없이 열림 (관문 앞)'), c1 = mk('div', 'chips');
+    if (s.gated) { c1.appendChild(svChip('t-need', '로그인 관문', 'name', '통과')); s.requires.forEach(function (q) { c1.appendChild(svChip('t-need', q, 'name', '조건')); }); }
+    else { c1.appendChild(svChip('t-todo', '로그인 없이 열림', 'name', '홈은 관문 앞')); c1.appendChild(mk('span', 'tmeta', '로그인은 이 화면에서 시작한다(위 로그인 줄기 ①②)')); }
+    s1.appendChild(c1); p.appendChild(s1);
+    if (s.name === '홈') {
+      var sh = svStage(2, '이동 가능한 화면 ' + s.navigates.length + '개'), ch = mk('div', 'chips'); s.navigates.forEach(function (n) { ch.appendChild(svChip('t-screen', n, 'name')); }); sh.appendChild(ch); p.appendChild(sh);
+      p.appendChild(mk('p', 'svnote', '홈은 API 묶음을 직접 부르지 않는다(로그인 시작만 줄기 ③).')); return p;
+    }
+    if (s.gateOnly) {
+      var s2 = svStage(2, '관문(/api/me)만 거침 + 정적 파일 읽기'), c2 = mk('div', 'chips');
+      s.fread.forEach(function (f) { c2.appendChild(svChip('t-file', f, 'name', '읽기', '정적 파일')); });
+      s2.appendChild(c2); s2.appendChild(mk('p', 'svnote', 'API 묶음을 직접 부르지 않는다. 데이터는 화면이 정적 파일을 직접 읽는다(화면 머리말에서 가져온 연결, api.md 에는 없음).')); p.appendChild(s2); return p;
+    }
+    var nApi = s.apiGroups.reduce(function (a, g) { return a + g.apis.length; }, 0);
+    var s2b = svStage(2, '부르는 API 묶음 ' + s.apiGroups.length + '개 · API ' + nApi + '개 (묶음을 누르면 개별 API)'), gl = mk('div', 'gcards');
+    s.apiGroups.forEach(function (g) { gl.appendChild(svGroupCard('f:' + g.group, g.group, '이 기능이 부르는 API ' + g.apis.length + '개 (묶음 전체 ' + g.total + '개)', g.apis)); });
+    s2b.appendChild(gl); p.appendChild(s2b);
+    var s3 = svStage(3, '닿는 엔진·외부·저장소 ' + s.targets.length + '개'), c3 = mk('div', 'chips');
+    s.targets.forEach(function (t) { c3.appendChild(svChip(TYPE_CLS[t.type], t.name, 'name', t.rel, t.src === 'header' ? '화면 머리말' : '')); });
+    s3.appendChild(c3); p.appendChild(s3);
+    return p;
+  }
+  function svStorePanel(id) {
+    var t = SV.targets.filter(function (x) { return x.id === id; })[0], p = mk('div', 'svpanel'); p.id = 'svpanel';
+    p.appendChild(mk('h3', 'svph', t.name));
+    var kind = { engine: '엔진', external: '외부', db: 'DB 테이블', cache: '서버 캐시', file: '파일' }[t.type];
+    var sum = t.type === 'engine' || t.type === 'external' ? '쓰는 API ' + t.apiN + '개 (호출)' : '읽는 API ' + t.readN + '개 · 쓰는 API ' + t.writeN + '개';
+    p.appendChild(mk('p', 'svnote', kind + (t.desc ? ' — ' + t.desc : '') + ' · ' + sum + ' · API 묶음 ' + t.groups.length + '개 · 이어지는 기능 ' + t.callers.length + '개'));
+    var s1 = svStage(1, 'API 묶음 ' + t.groups.length + '개 (묶음을 누르면 개별 API, 태그는 이 대상에 닿는 방식)'), gl = mk('div', 'gcards');
+    t.groups.forEach(function (g) { gl.appendChild(svGroupCard('s:' + t.id + ':' + g.group, g.group, '이 대상에 닿는 API ' + g.apis.length + '개', g.apis)); });
+    if (!t.groups.length) gl.appendChild(mk('p', 'svnote', '묶음 3열에 이 대상에 닿는 API 가 없다.'));
+    s1.appendChild(gl);
+    if (t.trunk.length) s1.appendChild(mk('p', 'svnote', '로그인 줄기에서: ' + t.trunk.join(', ') + ' (인증·계정 묶음은 줄기에만 둔다)'));
+    p.appendChild(s1);
+    var s2 = svStage(2, '이 API 를 부르는 기능 ' + t.callers.length + '개'), c2 = mk('div', 'chips');
+    t.callers.forEach(function (n) { var b = mk('button', 'item t-screen cbtn'); b.type = 'button'; b.textContent = n; b.addEventListener('click', function () { svView = 'func'; svFunc = n; svStore = null; renderSvc(); }); c2.appendChild(b); });
+    if (!t.callers.length && !t.freadScreens.length) c2.appendChild(mk('span', 'tmeta', '(없음)'));
+    s2.appendChild(c2);
+    if (t.freadScreens.length) { var c3 = mk('div', 'chips'); t.freadScreens.forEach(function (n) { c3.appendChild(svChip('t-screen', n, 'name', '직접 읽음', '화면 머리말')); }); s2.appendChild(mk('p', 'svnote', '화면이 정적 파일을 직접 읽는다(화면 머리말에서 가져온 연결, api.md 에는 없음):')); s2.appendChild(c3); }
+    p.appendChild(s2);
+    return p;
+  }
+  function renderSvc() {
+    svRoot.textContent = '';
+    svRoot.appendChild(svTrunk());
+    var sec = mk('div', 'svsec'); sec.appendChild(mk('h2', 'svh', '기능에서 따라가기 / 저장소·엔진·외부에서 거꾸로 보기'));
+    var tg = mk('div', 'svtoggle'); [['func', '기능에서'], ['store', '저장소·엔진·외부에서']].forEach(function (v) {
+      var b = mk('button', 'item vbtn' + (svView === v[0] ? ' sel' : ''), v[1]); b.type = 'button'; b.dataset.view = v[0]; b.setAttribute('aria-pressed', svView === v[0] ? 'true' : 'false');
+      b.addEventListener('click', function () { svView = v[0]; renderSvc(); }); tg.appendChild(b);
+    });
+    sec.appendChild(tg);
+    var pick = mk('div', 'svpick');
+    if (svView === 'func') {
+      SV.groups.forEach(function (g) {
+        var box = mk('div', 'pgrp'); box.appendChild(mk('div', 'glabel', g.name));
+        var row = mk('div', 'row'); g.screens.forEach(function (n) {
+          var s = SV.screens.filter(function (x) { return x.name === n; })[0]; if (!s) return;
+          var b = mk('button', 'item t-screen fbtn' + (svFunc === n ? ' sel' : '')); b.type = 'button'; b.dataset.name = n; b.setAttribute('aria-pressed', svFunc === n ? 'true' : 'false');
+          b.appendChild(mk('span', 'nm', n)); b.appendChild(mk('small', 'nb', s.gated ? (s.gateOnly ? '관문만 거침' : 'API 묶음 ' + s.apiGroups.length + '개') : '관문 앞'));
+          b.addEventListener('click', function () { svFunc = svFunc === n ? null : n; svOpen = {}; renderSvc(); }); row.appendChild(b);
+        });
+        box.appendChild(row); pick.appendChild(box);
+      });
+    } else {
+      [['engine', '엔진'], ['external', '외부'], ['db', 'DB'], ['cache', '캐시'], ['file', '파일']].forEach(function (bk) {
+        var list = SV.targets.filter(function (t) { return t.type === bk[0]; }); if (!list.length) return;
+        var box = mk('div', 'pgrp'); box.appendChild(mk('div', 'glabel', bk[1] + ' (' + list.length + ')'));
+        var row = mk('div', 'row'); list.forEach(function (t) {
+          var b = mk('button', 'item ' + TYPE_CLS[t.type] + ' sbtn' + (svStore === t.name ? ' sel' : '')); b.type = 'button'; b.dataset.name = t.name; b.setAttribute('aria-pressed', svStore === t.name ? 'true' : 'false');
+          var l = mk('span', 'lbl'); putNameNb(l, t.name); l.appendChild(mk('small', 'nb', 'API ' + t.apiN + '개' + (t.freadScreens.length ? ' · 화면 ' + t.freadScreens.length : ''))); b.appendChild(l);
+          b.addEventListener('click', function () { svStore = svStore === t.name ? null : t.name; svOpen = {}; renderSvc(); }); row.appendChild(b);
+        });
+        box.appendChild(row); pick.appendChild(box);
+      });
+    }
+    sec.appendChild(pick);
+    var panel = svView === 'func' ? (svFunc ? svFuncPanel(svFunc) : null) : (svStore ? svStorePanel(SV.targets.filter(function (t) { return t.name === svStore; })[0].id) : null);
+    sec.appendChild(panel || mk('p', 'svnote', svView === 'func' ? '기능을 고르면 관문 통과 → 부르는 API 묶음 → 엔진·외부·저장소 순서로 나옵니다.' : '저장소·엔진·외부를 고르면 그것을 쓰는 API 묶음과 기능이 나옵니다.'));
+    svRoot.appendChild(sec);
+    var ft = mk('p', 'foot svfoot'); ft.appendChild(document.createTextNode('데이터 출처: docs/blueprint/api.md(API ' + (SV.stat.apis + 3) + '행) · db.md · LEGEND · 화면 머리말(modules·requires·정적 파일 읽기), 기준 커밋 ' + SV.commit + '. 규칙: requireAuth 가 매 요청마다 하는 users 읽기(api.md 공통 규칙)는 목록에 넣지 않았다. 정적 파일 읽기 ' + SV.freadN + '건은 화면 머리말에서 가져왔고 api.md 에는 없다. 화면 머리말과 api.md 의 접근 차이 경고가 ' + SV.warnN + '건 있다(B-006 에서 정리 예정).'));
+    svRoot.appendChild(ft);
+    if (tab === 'svc') svWriteHash();
+  }
+  function svReadHash() {
+    var p = new URLSearchParams(location.hash.replace(/^#/, '')); if (p.get('t') !== 'svc') return false;
+    var f = p.get('f'), s = p.get('s');
+    if (f && SV.screens.some(function (x) { return x.name === f; })) { svView = 'func'; svFunc = f; svStore = null; }
+    else if (s && SV.targets.some(function (x) { return x.name === s; })) { svView = 'store'; svStore = s; svFunc = null; }
+    return true;
+  }
+  window.__svcTab = { render: function () { renderSvc(); }, func: function (n) { svView = 'func'; svFunc = n; svStore = null; svOpen = {}; renderSvc(); }, store: function (n) { svView = 'store'; svStore = n; svFunc = null; svOpen = {}; renderSvc(); }, data: SV };
+
   /* ── 탭 ── */
   var tabBtns = document.querySelectorAll('.tabs button');
   function show(t) {
     tab = t;
     Array.prototype.forEach.call(tabBtns, function (b) { b.setAttribute('aria-selected', b.dataset.tab === t ? 'true' : 'false'); });
-    document.getElementById('layout').hidden = (t === 'flow');
+    document.getElementById('layout').hidden = (t === 'flow' || t === 'svc');
     document.getElementById('v-tree').hidden = (t !== 'tree');
     document.getElementById('v-conn').hidden = (t !== 'conn');
     document.getElementById('v-flow').hidden = (t !== 'flow');
+    document.getElementById('v-svc').hidden = (t !== 'svc');
     document.getElementById('tabnote').textContent = selScreen ? '선택한 화면: ' + byId[selScreen].label : '';
+    if (t !== 'svc' && location.hash.indexOf('t=svc') >= 0) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* 주소 기억 실패는 무시 */ } }
+    if (t === 'svc') { document.getElementById('tabnote').textContent = ''; renderSvc(); return; }
     if (t === 'flow') { renderFlowTab(); return; }
     if (t === 'tree' && selScreen && selected !== selScreen) { var keep = flowPick; select(selScreen); flowPick = keep; applyFlow(); }
     else if (t === 'tree' && !selScreen && selected) select(null);
@@ -922,6 +1127,8 @@ details.conn summary { cursor: pointer; font-size: 14px; font-weight: 700; color
   select = function (id) { oldSelect(id); document.getElementById('tabnote').textContent = selScreen ? '선택한 화면: ' + byId[selScreen].label : ''; };
   window.__map = { show: show, select: function (id) { select(id); }, selectFlow: function (name) { var c = detail.querySelector('.flow-card[data-flow="' + name + '"]'); if (c) c.click(); }, state: function () { return { tab: tab, selected: selected, selScreen: selScreen, flowPick: flowPick }; }, redraw: function () { if (fig._draw) fig._draw(); } };
   detail.textContent = EMPTY_MSG;
+  if (svReadHash()) show('svc');
+  window.addEventListener('hashchange', function () { if (svReadHash()) show('svc'); });
 })();
 </script>
 </body>
@@ -1490,7 +1697,7 @@ function serviceTabData(L, screens, groups, dbItems, api, warnN) {
     { n: 3, items: [{ rel: '호출', kind: 'api', label: rAuth.key }, { rel: '나감', kind: 'ext', label: SVC_GOOGLE }], ev: ['routes/auth.js:67', 'routes/auth.js:72'], note: '인증 ' + rAuth.auth },
     { n: 4, items: [{ rel: '인증', kind: 'ext', label: SVC_GOOGLE }], ev: ['routes/auth.js:28'], note: 'Google 이 사용자를 확인하고 콜백 주소로 되돌려 보낸다' },
     { n: 5, items: [{ rel: '돌아옴', kind: 'api', label: rCb.key }, { rel: '저장', kind: 'db', label: 'users', tag: '읽기·쓰기' }], ev: ['routes/auth.js:75', 'routes/auth.js:38'], note: '사용자 행을 만들거나 갱신하고 JWT 를 돌려준다. 차단·미승인이면 토큰 없이 안내만' },
-    { n: 6, items: [{ rel: '확인', kind: 'gate', label: '로그인 관문', sub: 'authGate.js + ' + rMe.key }, { rel: '읽기·쓰기', kind: 'db', label: 'users', tag: '읽기·쓰기' }], ev: ['public/js/common/authGate.js:154', 'routes/auth.js:101', 'middleware/auth.js:30'], note: '관문을 거치는 기능 ' + gated.size + '개(홈 제외). 서버는 인증이 공개가 아닌 모든 요청마다 users 를 읽는다' },
+    { n: 6, items: [{ rel: '확인', kind: 'gate', label: '로그인 관문' }, { rel: '읽기·쓰기', kind: 'db', label: 'users', tag: '읽기·쓰기' }], ev: ['public/js/common/authGate.js:154', 'routes/auth.js:101', 'middleware/auth.js:30'], note: 'authGate.js 가 화면을 열 때 ' + rMe.key + ' 를 부른다. 관문을 거치는 기능 ' + gated.size + '개(홈 제외). 서버는 인증이 공개가 아닌 모든 요청마다 users 를 읽는다' },
   ];
   const gateSummary = { screens: gated.size, groups: 1, apis: gateApis.length, stores: new Set(gateApis.flatMap(r => r.reads.concat(r.writes))).size };
   const hashes = [...new Set(screens.map(s => s.last_checked))].sort(byCode);
@@ -2085,7 +2292,7 @@ function main() {
   const stab = serviceTabData(L, screens, groups, dbItems, api, API_WARNS.filter(w => w.kind === 'screenDiff').length);
   if (stab.errs && stab.errs.length) { console.error('blueprint:gen 서비스 탭 데이터 오류:' + String.fromCharCode(10) + stab.errs.map(e => ' - ' + e).join(String.fromCharCode(10))); process.exit(1); }
   const tabStat = stab.stat; delete stab.errs;
-  fs.writeFileSync(MAP, mapHtml(mapData(screens, pages, groups, dbItems)));
+  fs.writeFileSync(MAP, mapHtml(Object.assign(mapData(screens, pages, groups, dbItems), { svc: stab })));
   fs.writeFileSync(BOARD, boardHtml(boardData(mapData(screens, pages, groups, dbItems))));
   const size = writeBundle(screens);
   console.log('blueprint:gen 완료 — 화면 파일 ' + screens.length + '개, 미작성 ' + pages.filter(p => !screens.some(s => s.file === p.file)).length + '개, _bundle.md ' + size + ' bytes');
