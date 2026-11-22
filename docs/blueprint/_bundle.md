@@ -1,8 +1,8 @@
 # METIS-3 도면 묶음 (_bundle.md)
 
 이 파일은 `npm run blueprint:gen` 이 만든다(직접 고치지 않는다). 용도: 이 한 파일을 웹 Claude 에 첨부해 프로젝트 문서로 복사한다.
-순서: README → LEGEND → screens(파일 이름 순). 기준 커밋(화면 파일의 last_checked): 8753b0a, bf7715c
-화면 파일 7개.
+순서: README → LEGEND → screens(파일 이름 순). 기준 커밋(화면 파일의 last_checked): 49287a8, 8753b0a, bf7715c
+화면 파일 12개.
 
 =====================================================================
 ### 파일: docs/blueprint/README.md
@@ -26,17 +26,17 @@
 ## 화면 목록 (public/ 아래 사용자 접근 화면 12개)
 | 화면 | 파일 | 한 줄 설명 | 도면 |
 |---|---|---|---|
-| 홈 | public/home/index.html | 로그인·메뉴 진입 화면(빌드된 번들 public/home/assets). 상세 [미확인] | 미작성 |
+| 홈 | public/home/index.html | 로그인·메뉴 진입 화면(React 번들 public/home, 소스 home-wheel/) | 작성 |
 | 사전 | public/english_dictionary.html | 영·한·일·중 검색, 단어장(#wordbook), 발음, 팟캐스트, 퀴즈·복습, 카메라 글자 인식 | 작성 |
 | 스펠링 런 | public/spelling_run.html | 단어장 단어로 하는 철자 게임(혼자·2인 대결) | 작성 |
 | 문장 학습 | public/jgrammar.html | 일본어·영어·중국어 문장 해설·사진 인식·저장·읽어주기(파일명 jgrammar) | 작성 |
 | 음성 학습 | public/voice_study.html | 음성 노트(녹음 변환·요약·퀴즈·대화·연결 지도·이미지)와 요약 읽어주기 | 작성 |
 | 개념 지도 | public/concept_map.html | 개념 지도·복습·서술 답변(/api/cmap…) | 작성 |
 | Speak Loop | public/speakloop.html | 영어 말하기 연습(저장 음성, 이디엄 포함; /api/speakloop…) | 작성 |
-| 문학 나침반 | public/literature_compass.html | 정적 콘텐츠(literature_db.json) 읽기 | 미작성 |
-| 한입 독서 | public/digest_reading.html | 정적 콘텐츠(digest_db.json) 읽기 | 미작성 |
-| 과학 | public/science_reading.html | 정적 콘텐츠(science_db.json) 읽기 | 미작성 |
-| 작가 노트 | public/artist_notes.html | 정적 콘텐츠(artist_notes_db.json) 읽기 | 미작성 |
+| 문학 나침반 | public/literature_compass.html | 정적 콘텐츠(literature_db.json) 읽기 | 작성 |
+| 한입 독서 | public/digest_reading.html | 정적 콘텐츠(digest_db.json) 읽기 | 작성 |
+| 과학 | public/science_reading.html | 정적 콘텐츠(science_db.json) 읽기 | 작성 |
+| 작가 노트 | public/artist_notes.html | 정적 콘텐츠(artist_notes_db.json) 읽기 | 작성 |
 | 관리자 | public/admin.html | 사용자·권한·사용량, Speak Loop 음성, 단어 뜻 변환, 발음 캐시 지우기 | 작성 |
 - 단어장·팟캐스트·IT 용어는 별도 파일이 아니라 사전 화면(english_dictionary.html) 안의 기능이다. 대결은 스펠링 런 안의 기능, 이디엄은 Speak Loop 안의 기능이다.
 - 이 표의 "도면" 열은 손으로 관리한다. 정확한 미작성 목록은 아래 생성 구간이 보여 준다.
@@ -47,7 +47,7 @@
 ## 생성 구간 (npm run blueprint:gen 이 만든다. 이 안은 손으로 고치지 않는다)
 <!-- gen:start -->
 > 이 구간은 `npm run blueprint:gen` 이 화면 파일(docs/blueprint/screens)의 머리말에서 만든다. 손으로 고치지 않는다.
-> **도면이 작성된 화면(7개)만 반영한다.** 미작성 화면이 같은 엔진·API·저장소를 쓰는지는 이 목록에 나오지 않으므로 코드로 직접 확인한다.
+> 모든 화면(12개)의 도면이 작성돼 있다. 미작성 화면은 0개다.
 
 ### 엔진별 사용 화면 (→호출)
 - **2인 대결 방(서버 메모리)** — 스펠링 런
@@ -85,7 +85,7 @@
 - **GET /api/admin/users** — 관리자
 - **GET /api/cmap/topics/:rootId/map** — 개념 지도
 - **GET /api/jgrammar/saved** — 문장 학습
-- **GET /api/me** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **GET /api/me** — Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서, 홈
 - **GET /api/review-due** — 사전
 - **GET /api/speakloop/audio-index** — Speak Loop
 - **GET /api/speakloop/audio/:clipKey** — Speak Loop, 관리자
@@ -105,6 +105,8 @@
 - **GET /api/voice-notes/quiz-summary** — 음성 학습
 - **GET /api/voice-notes/wrong-answers** — 음성 학습
 - **GET /api/wordbook** — 사전, 스펠링 런
+- **GET /auth/google** — 홈
+- **GET /auth/google/callback** — 홈
 - **PATCH /api/admin/users/:id** — 관리자
 - **PATCH /api/voice-notes/:id** — 음성 학습
 - **PATCH /api/voice-notes/:id/image/rating** — 음성 학습
@@ -159,7 +161,7 @@
 - **[DB] review_log** — 읽기: - / 쓰기: 사전
 - **[DB] speakloop_audio** — 읽기: Speak Loop, 관리자 / 쓰기: 관리자
 - **[DB] speakloop_progress** — 읽기: Speak Loop / 쓰기: Speak Loop
-- **[DB] users** — 읽기: Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 관리자
+- **[DB] users** — 읽기: Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서, 홈 / 쓰기: 관리자, 홈
 - **[DB] voice_image_sets** — 읽기: 음성 학습 / 쓰기: 음성 학습
 - **[DB] voice_images** — 읽기: 음성 학습 / 쓰기: 음성 학습
 - **[DB] voice_links** — 읽기: 음성 학습 / 쓰기: 음성 학습
@@ -171,14 +173,19 @@
 - **[캐시] tts_cache** — 읽기: 사전, 스펠링 런 / 쓰기: 관리자, 사전, 스펠링 런
 
 ### 기기 저장값별 사용 화면 ([기기] localStorage·sessionStorage 키, 두 화면 이상이 쓰는 키는 공유 키)
+- **artist_notes_conquest_** — 읽기: 작가 노트 / 쓰기: 작가 노트
+- **artist_notes_field_filter** — 읽기: 작가 노트 / 쓰기: 작가 노트
+- **digest_conquest_** — 읽기: 한입 독서 / 쓰기: 한입 독서
+- **digest_genre_filter** — 읽기: 한입 독서 / 쓰기: 한입 독서
 - **gl_last_run** — 읽기: 관리자 / 쓰기: 관리자
 - **jgrammar_furigana** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **jgrammar_lang** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **jgrammar_pinyin** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **jgrammar_zh** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **metis_tts_mode** — 읽기: 사전, 스펠링 런 / 쓰기: 사전, 스펠링 런
-- **mydict_token** — 읽기: Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 사전
+- **mydict_token** — 읽기: Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서, 홈 / 쓰기: 사전, 홈
 - **mydict_wrong** — 읽기: 사전 / 쓰기: 사전
+- **science_conquest_** — 읽기: 과학 / 쓰기: 과학
 - **spellrun_best** — 읽기: 스펠링 런 / 쓰기: 스펠링 런
 - **spellrun_bgm** — 읽기: 스펠링 런 / 쓰기: 스펠링 런
 - **spellrun_char** — 읽기: 스펠링 런 / 쓰기: 스펠링 런
@@ -192,22 +199,23 @@
 
 ### 외부 서비스별 사용 화면 ([외부])
 - **Anthropic API(Claude Haiku)** — 개념 지도, 관리자, 문장 학습, 사전, 음성 학습
-- **Google Fonts** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **Google Fonts** — Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서
+- **Google 로그인(OAuth)** — 홈
 - **OpenAI Images(이미지 생성)** — 음성 학습
 - **OpenAI STT(음성 인식)** — 음성 학습
 - **OpenAI TTS(음성 합성)** — 관리자, 사전, 스펠링 런
 - **jsDelivr(tesseract.js)** — 사전
 
 ### 모듈별 사용 화면 ([모듈])
-- **public/js/common/appHeader.js** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
-- **public/js/common/authGate.js** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
-- **public/js/common/dialog.js** — 문장 학습, 사전, 스펠링 런, 음성 학습
+- **public/js/common/appHeader.js** — Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서
+- **public/js/common/authGate.js** — Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서
+- **public/js/common/dialog.js** — 과학, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서
 - **public/js/ocr/ocrScanner.js** — 사전
 
-### 미작성 화면 (5개)
-홈(public/home/index.html), 문학 나침반(public/literature_compass.html), 한입 독서(public/digest_reading.html), 과학(public/science_reading.html), 작가 노트(public/artist_notes.html)
+### 미작성 화면 (0개)
+(없음)
 
-화면 파일의 마지막 확인 커밋: 8753b0a, bf7715c
+화면 파일의 마지막 확인 커밋: 49287a8, 8753b0a, bf7715c
 <!-- gen:end -->
 
 ## 작업 블록 규칙
@@ -278,7 +286,7 @@
 **이름 추가 절차**: 새 엔진이 필요하면 이 표에 먼저 한 줄(이름·설명) 추가한다. 화면 파일에서 표에 없는 엔진 이름을 쓰면 `blueprint:gen`이 멈춘다. 이름을 바꾸면 모든 화면 파일에서 같이 바꾼다.
 
 ## 4 외부 서비스 이름 고정 목록
-Anthropic API(Claude Haiku) / OpenAI TTS(음성 합성) / OpenAI STT(음성 인식) / OpenAI Images(이미지 생성) / Google Fonts / jsDelivr(tesseract.js)
+Anthropic API(Claude Haiku) / OpenAI TTS(음성 합성) / OpenAI STT(음성 인식) / OpenAI Images(이미지 생성) / Google Fonts / jsDelivr(tesseract.js) / Google 로그인(OAuth)
 (추가 절차는 엔진과 같다: 여기에 먼저 추가.)
 
 ## 5 화면 이름 고정 목록 (12개)
@@ -352,6 +360,63 @@ last_checked: 8753b0a
 - [기기] localStorage `mydict_token`(:374), `gl_last_run`(마지막 변환 실행 번호, 읽기 :933, 쓰기 :793).
 - [모듈] public/js/common/authGate.js, appHeader.js(관리자일 때만 헤더에 '관리자' 링크, appHeader.js:110).
 - 특이점: 발음 캐시 지우기는 tts_cache(서버 음성)만 지운다. Speak Loop 저장 음성(speakloop_audio)은 이 경로로 지워지지 않는다(별도 저장소).
+
+=====================================================================
+### 파일: docs/blueprint/screens/artist_notes.md
+=====================================================================
+
+---
+screen: 작가 노트
+file: public/artist_notes.html
+engines: []
+calls: [GET /api/me]
+reads: [DB:users, 기기:mydict_token, 기기:artist_notes_field_filter, 기기:artist_notes_conquest_]
+writes: [기기:artist_notes_field_filter, 기기:artist_notes_conquest_]
+fallback: []
+flows: [
+  화면 열기 | →필요 로그인 ; →호출 GET /api/me ; →읽기 users ; →읽기 mydict_token ; →읽기 artist_notes_field_filter,
+  분야 필터 | →쓰기 artist_notes_field_filter,
+  정복 토글 | →쓰기 artist_notes_conquest_,
+  정복 탭 | →읽기 artist_notes_conquest_,
+  퀴즈 시작 | →읽기 artist_notes_conquest_,
+  홈으로 이동 | →이동 홈
+]
+requires: [로그인]
+navigates: [홈]
+externals: [Google Fonts]
+modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
+last_checked: 49287a8
+---
+
+# 작가 노트 (public/artist_notes.html)
+
+## 1 기능
+- 음악·미술 작가 목록(분야 범례로 거름, 캐러셀) → 작가 상세(삶·대표작, 정복하기) → 정복 탭(정복한 작가를 분야별로) → 퀴즈(정복한 작가의 문항). 하단 내비는 홈·정복·퀴즈(:434-437). 한입 독서·과학과 코드·데이터·localStorage 를 공유하지 않는다(키 접두사 `artist_notes_`, :17).
+- 접근: 로그인(authGate)만이다. 이 화면에는 기능 권한(perm_*) 확인이 없다(html 안에 `perm_`·권한 fetch 없음; DB 열도 없음 — [확인함] grep).
+- 정복·분야 필터 기록은 브라우저 localStorage 에만 저장한다.
+
+## 2 엔진
+- 없음. 퀴즈 문항은 데이터 파일의 quiz 배열에서 읽어 정복한 작가 것만 골라 쓴다(quizData :1030, buildQuestions :1058, 문항 설명 :416·:1028). 문항이 비어 있으면 "준비 중"(renderQuiz :1067). 서버·AI 호출 없음.
+
+## 3 경로 (동작 → 화면 코드 → 서버 라우트)
+- 화면 열기 →필요 로그인 →호출 [API] GET /api/me — 이 화면의 스크립트는 직접 부르지 않고, 공통 게이트 authGate.js(:6)와 헤더 appHeader.js(:375, fetchMe :27)가 부른다 → routes/auth.js:101 →읽기 [DB] users(middleware/auth.js:30 인증, routes/auth.js:120) →읽기 [기기] mydict_token, artist_notes_field_filter(:448, 초기 분야 필터 읽기). 데이터는 로그인 확인과 별개로 loadDB(:529)가 바로 읽는다(권한 대기 없음).
+- 분야 필터 →쓰기 [기기] artist_notes_field_filter — 범례를 누르면 setFieldFilter(:563)가 저장하고 같은 분야를 다시 누르면 지운다(lsSet :450).
+- 정복 토글 →쓰기 [기기] artist_notes_conquest_<작가 id>(:470) — 상세의 정복 버튼 toggleConquest(:987) → setConquered(:470). 서버 호출 없음.
+- 정복 탭 →읽기 [기기] artist_notes_conquest_ — onTab('conq')(:997) → renderAndShowConq(:1025) → renderConq(:1012, getConqueredArtists :471).
+- 퀴즈 시작 →읽기 [기기] artist_notes_conquest_ — 퀴즈 탭 → startQuizFlow(:1072)가 정복 작가를 읽어 문항을 고른다. 정복이 0명이면 안내만 한다(:1076-1079). 점수는 저장하지 않는다.
+- 홈으로 이동 →이동 [화면] 홈 — 상단 공통 헤더의 METIS 로고(appHeader.js:129). 하단 내비의 "홈" 탭은 이 화면의 작가 목록이다(onTab :997 → showListView :497).
+
+## 4 DB
+- →읽기: [DB] users(로그인·승인 확인용 /api/me).
+- →쓰기: 없음(DB).
+- 기기 저장값: localStorage `mydict_token`(읽기), `artist_notes_field_filter`(:448), `artist_notes_conquest_<id>`(:468-470, 값 'true'/'false'). 읽기·쓰기는 try/catch 로 감싸 저장소를 못 쓰는 환경에서도 멈추지 않는다(lsGet/lsSet :449-450).
+- 정적 파일(DB 아님): `GET /artist_notes_db.json`(fetch 'artist_notes_db.json', :531)을 express.static 이 보낸다(server.js:57). 최상위 키 version·last_updated·artists(12명)·quiz(42문항). 파일 저장소 후보: 작가 노트 → public/artist_notes_db.json.
+
+## 5 연결
+- [API] GET /api/me(게이트·헤더 경유). [외부] Google Fonts(:11).
+- [모듈] authGate.js(:6), appHeader.js(:375), dialog.js(:377).
+- [이동] 작가 노트 →이동 홈.
+- [미확인] 작가 상세·캐러셀 표시 규칙(:929 이후)과 문항 선택 세부(pickBalanced :1044).
 
 =====================================================================
 ### 파일: docs/blueprint/screens/concept_map.md
@@ -478,6 +543,122 @@ last_checked: 8753b0a
 - [모듈] public/js/common/authGate.js(진입 시 /api/me 1회 확인·401이면 홈), appHeader.js(헤더·로그인 위젯), dialog.js, public/js/ocr/ocrScanner.js(카메라 글자 인식 패널).
 
 =====================================================================
+### 파일: docs/blueprint/screens/digest_reading.md
+=====================================================================
+
+---
+screen: 한입 독서
+file: public/digest_reading.html
+engines: []
+calls: [GET /api/me]
+reads: [DB:users, 기기:mydict_token, 기기:digest_genre_filter, 기기:digest_conquest_]
+writes: [기기:digest_genre_filter, 기기:digest_conquest_]
+fallback: []
+flows: [
+  화면 열기 | →필요 로그인 ; →필요 권한:perm_digest_reading ; →호출 GET /api/me ; →읽기 users ; →읽기 mydict_token ; →읽기 digest_genre_filter,
+  장르 필터 | →쓰기 digest_genre_filter,
+  정복 토글 | →쓰기 digest_conquest_,
+  정복 탭 | →읽기 digest_conquest_,
+  퀴즈 시작 | →읽기 digest_conquest_,
+  홈으로 이동 | →이동 홈
+]
+requires: [로그인, 권한:perm_digest_reading]
+navigates: [홈]
+externals: [Google Fonts]
+modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
+last_checked: 49287a8
+---
+
+# 한입 독서 (public/digest_reading.html)
+
+## 1 기능
+- 작품 목록(장르 범례로 거름, 3D 캐러셀) → 작품 상세(요약, 정복하기) → 정복 탭(정복한 작품을 장르별로) → 퀴즈(정복한 작품에서 객관식·O/X를 만든다). 하단 내비는 홈·정복·퀴즈(:553-556).
+- 접근: 로그인(authGate) + `users.perm_digest_reading`. 이 화면의 확인은 명시적 false 일 때만 막는다(:667).
+- "정복" 기록은 서버가 아니라 브라우저 localStorage 에만 쌓인다(:582-588).
+
+## 2 엔진
+- 없음. 퀴즈 문항은 정복한 작품의 데이터로 브라우저가 만든다(buildQuestions :1308). 서버·AI 호출 없음.
+
+## 3 경로 (동작 → 화면 코드 → 서버 라우트)
+- 화면 열기 →필요 로그인·권한:perm_digest_reading →호출 [API] GET /api/me — loadDB(:672)가 checkPermission(:660, fetch :664 → routes/auth.js:101)을 먼저 부른다 →읽기 [DB] users(routes/auth.js:120) →읽기 [기기] mydict_token(:661), digest_genre_filter(:569). 권한 false 면 데이터 파일을 요청하지 않고 안내(:674-678, :499).
+- 장르 필터 →쓰기 [기기] digest_genre_filter — 범례의 장르를 누르면 setGenreFilter(:735)가 같은 장르를 다시 누를 때까지 저장하고 해제하면 지운다(:737-738).
+- 정복 토글 →쓰기 [기기] digest_conquest_<작품 id>(키 앞부분 `digest_conquest_`, :587) — 상세의 정복 버튼 toggleConquest(:1282) → setConquered(:586). 서버 호출 없음.
+- 정복 탭 →읽기 [기기] digest_conquest_ — onTab('conq')(:1131) → renderAndShowConq(:1159) → renderConq(:1147, getConqueredWorks :590 → isConquered :582).
+- 퀴즈 시작 →읽기 [기기] digest_conquest_ — 퀴즈 탭 → startQuizFlow(:1290)가 정복 작품을 읽어 문항을 만든다(buildQuestions :1308). 정복이 0개면 안내만 하고 시작하지 않는다(:1292-1295). 점수는 저장하지 않는다.
+- 홈으로 이동 →이동 [화면] 홈 — 상단 공통 헤더의 METIS 로고(appHeader.js:129)와 권한 없음 안내의 "METIS 홈으로"(:499). 하단 내비의 "홈" 탭은 이 화면의 작품 목록이다(onTab :1131 → showListView :629).
+
+## 4 DB
+- →읽기: [DB] users(권한 확인용 /api/me).
+- →쓰기: 없음(DB). 기기 저장값은 위 3절.
+- 기기 저장값: localStorage `mydict_token`(읽기), `digest_genre_filter`(:568, 읽기·쓰기·삭제), `digest_conquest_<id>`(:582-588, 작품마다 한 키, 값 'true'/'false').
+- 정적 파일(DB 아님): `GET /digest_db.json`(fetch 'digest_db.json', :680)을 express.static 이 보낸다(server.js:57). 최상위 키 version·last_updated·authors·works(132개 작품). 파일 저장소 후보: 한입 독서 → public/digest_db.json.
+
+## 5 연결
+- [API] GET /api/me. [외부] Google Fonts(:11).
+- [기기] 위 4절. 다른 읽기 화면과 키 접두사가 다르다(digest_·science_·artist_notes_).
+- [모듈] authGate.js(:6), appHeader.js(:483), dialog.js(:485).
+- [이동] 한입 독서 →이동 홈.
+- [미확인] 상세 화면·캐러셀의 표시 규칙(:1177-1260 이후 렌더링)과 퀴즈 문항 구성 세부.
+
+=====================================================================
+### 파일: docs/blueprint/screens/home.md
+=====================================================================
+
+---
+screen: 홈
+file: public/home/index.html
+engines: []
+calls: [GET /api/me, GET /auth/google, GET /auth/google/callback]
+reads: [DB:users, 기기:mydict_token]
+writes: [DB:users, 기기:mydict_token]
+fallback: []
+flows: [
+  로그인 시작 | →호출 GET /auth/google ; →호출 Google 로그인(OAuth) ; →호출 GET /auth/google/callback ; →쓰기 users ; →쓰기 mydict_token,
+  메뉴 선택 | →이동 사전,
+  승인 대기 표시 | →호출 GET /api/me ; →읽기 users ; →읽기 mydict_token,
+  다시 확인 | →호출 GET /api/me ; →읽기 users,
+  로그아웃 | →쓰기 mydict_token,
+  관리자 링크 | →호출 GET /api/me ; →이동 관리자
+]
+requires: []
+navigates: [사전, 문학 나침반, 한입 독서, 과학, 음성 학습, 작가 노트, 문장 학습, 개념 지도, Speak Loop, 관리자]
+externals: [Google 로그인(OAuth)]
+modules: []
+last_checked: 49287a8
+---
+
+# 홈 (public/home/index.html)
+
+## 1 기능
+- 휠(3D 선택기)에서 항목을 고르고 가운데 항목을 누르면 그 화면으로 이동한다. 로그인 상태에 따라 항목이 달라진다: 기본 6개(언어 사전·문학 나침반·한입 독서·과학·음성 학습·작가 노트, home-wheel/src/HomeWheelApp.jsx:8) + 권한자에게만 문장 학습(:23, perm_jgrammar 또는 관리자)·개념 지도(:19, perm_concept_map)·Speak Loop(:26, perm_speakloop 또는 관리자). 로그인 전에는 9개를 모두 보인다(buildOptions :30).
+- 로그인 전 화면 아래에 "Google로 로그인", 로그인 후에는 "로그아웃"(관리자는 "관리자" 링크 추가)(:212, :195). 이 화면만 공통 게이트(authGate.js)를 쓰지 않는다(public/home/index.html에 없음).
+- 승인 대기·차단 안내: 로그인 콜백이 붙인 `?approval=pending|blocked`(:56) 또는 /api/me 의 403 응답(:68)이면 휠 대신 안내 문구를 보인다(:129).
+- 접근: 로그인 없이 열 수 있다. 서버가 `/` 에서 이 파일을 보낸다(server.js:49-51).
+
+## 2 엔진
+- 없음. 휠 화면은 서버 호출 없이 브라우저에서 돈다(home-wheel/src/ThreeDWheelPicker.jsx). 소리·글자·AI 엔진을 쓰지 않는다.
+
+## 3 경로 (동작 → 화면 코드 → 서버 라우트)
+- 로그인 시작 →호출 [API] GET /auth/google — 로그인 버튼(HomeWheelApp.jsx:212) 또는 로그아웃 상태에서 휠 항목을 누를 때(goTo :86 `/auth/google`) → routes/auth.js:67(passport Google 시작, 비밀값은 환경변수 GOOGLE_CLIENT_ID·GOOGLE_CLIENT_SECRET·GOOGLE_CALLBACK_URL 이름만) →호출 [외부] Google 로그인(OAuth) → [API] GET /auth/google/callback(routes/auth.js:75) →쓰기 [DB] users(INSERT … ON CONFLICT (google_id) DO UPDATE, routes/auth.js:39: 첫 로그인이면 행을 만들고 is_approved 는 ADMIN_EMAILS 계정만 true, 재로그인이면 email·name 갱신·관리자 이메일이면 role=admin). 콜백은 차단 계정이면 `?approval=blocked`(:83), 미승인이면 `?approval=pending`(:86), 그 밖에는 JWT(비밀값 변수 이름 JWT_SECRET, 7일)를 `?token=` 으로 붙여 `/` 로 되돌린다(:89-93). 홈이 그 토큰을 localStorage 에 저장한다(→쓰기 [기기] mydict_token, auth.js:15-20).
+- 메뉴 선택 →이동 [화면] 사전 외 — 로그인 상태에서 가운데 항목을 누르면 `window.location.href = target.url`(HomeWheelApp.jsx:86). 이동 대상은 휠에 있는 항목 하나다(도면 머리말 navigates 의 10개 중 하나, 위 1절). 흐름은 대표로 사전만 적었다.
+- 승인 대기 표시 →호출 [API] GET /api/me — 열 때 토큰이 있으면 fetchMeResult(auth.js:29)가 부른다(HomeWheelApp.jsx:68 checkMe) → routes/auth.js:101 → requireAuth(middleware/auth.js:30 →읽기 [DB] users: is_approved·is_blocked·role). 403 approval_pending/blocked 면 안내를 보이고, 401 이면 토큰을 지운다(:72). 같은 안내가 `?approval=` 로도 보인다(:56).
+- 다시 확인 →호출 [API] GET /api/me — 안내 화면의 [다시 확인](승인 대기이고 토큰이 있을 때만, :75 recheck → :68 checkMe).
+- 로그아웃 →쓰기 [기기] mydict_token(삭제) — clearToken(auth.js:24)을 handleLogout(HomeWheelApp.jsx:89)이 부른다. 서버 호출 없음.
+- 관리자 링크 →이동 [화면] 관리자 — /api/me 응답의 role 이 admin 일 때만 보이는 링크 `/admin`(HomeWheelApp.jsx:195).
+
+## 4 DB
+- →읽기: [DB] users — /api/me 와 requireAuth 가 읽는다(routes/auth.js:120, middleware/auth.js:30).
+- →쓰기: [DB] users — 이 화면의 동작이 부르는 서버 쓰기는 두 곳이다. (1) 로그인 콜백의 INSERT/UPSERT(routes/auth.js:39), (2) /api/me 의 관리자 자동 승격 UPDATE(routes/auth.js:127: ADMIN_EMAILS 에 있는데 DB role 이 admin 이 아닐 때만 role='admin'). /api/me 는 모든 화면이 부르므로 (2)는 다른 화면에도 적용되나 도면에는 홈에만 적었다.
+- 기기 저장값: localStorage `mydict_token` 읽기·쓰기·삭제(home-wheel/src/auth.js:9-26).
+- 홈은 정적 JSON 을 읽지 않는다.
+
+## 5 연결
+- [API] 위 3절. [외부] Google 로그인(OAuth).
+- 빌드와 소스: 화면은 React + Vite 번들이다. 소스는 저장소의 `home-wheel/`(src/HomeWheelApp.jsx 메뉴·로그인·안내, src/auth.js 토큰·/api/me, src/ThreeDWheelPicker.jsx 휠, src/main.jsx, vite.config.js)이고, 빌드 결과가 `public/home/`(index.html + assets/index-CPcsUBip.js·index-CKBOXxqI.css)다(vite.config.js: base '/home/', outDir '../public/home', emptyOutDir). 번들에 소스와 같은 경로 문자열이 들어 있음을 grep 으로 확인했다(/auth/google·/api/me·approval_pending·mydict_token·/concept_map.html·/admin·"승인 대기중"). 번들 안 코드를 줄 단위로 읽지는 않았다.
+- [이동] 홈 →이동 사전·문학 나침반·한입 독서·과학·음성 학습·작가 노트(기본 6개, :8-15), 문장 학습·개념 지도·Speak Loop(권한자·로그인 전, :19-26), 관리자(관리자만, :195).
+- [미확인] 휠 조작(드래그·관성) 세부(ThreeDWheelPicker.jsx 525줄은 읽지 않음). 번들이 현재 소스에서 빌드된 것인지(해시 비교 불가; tests/home_bundle.test.js 는 번들 주소 문자열만 확인).
+
+=====================================================================
 ### 파일: docs/blueprint/screens/jgrammar.md
 =====================================================================
 
@@ -532,6 +713,112 @@ last_checked: 8753b0a
 - →필요: users.perm_jgrammar 가 true인 계정 또는 관리자(routes/jgrammar.js:11-25). 하루 한도 환경변수 JGRAMMAR_DAILY_CAP(lib/jgrammar.js:309).
 - [기기] localStorage `mydict_token`, `jgrammar_lang`(언어, :166), `jgrammar_furigana`·`jgrammar_pinyin`(후리가나·병음 표시, :316), `jgrammar_zh`(마지막 간체/번체, :169). 예전 `jgrammar_structure`는 작업318에서 쓰지 않게 됨(:316 주석). 읽어주기 속도는 코드 상수 SPEAK_RATE(:396)이고 저장값은 없다.
 - [모듈] public/js/common/authGate.js, appHeader.js, dialog.js.
+
+=====================================================================
+### 파일: docs/blueprint/screens/literature_compass.md
+=====================================================================
+
+---
+screen: 문학 나침반
+file: public/literature_compass.html
+engines: []
+calls: [GET /api/me]
+reads: [DB:users, 기기:mydict_token]
+writes: []
+fallback: []
+flows: [
+  화면 열기 | →필요 로그인 ; →필요 권한:perm_literature_compass ; →호출 GET /api/me ; →읽기 users ; →읽기 mydict_token,
+  어휘 사전 이동 | →이동 사전,
+  홈으로 이동 | →이동 홈
+]
+requires: [로그인, 권한:perm_literature_compass]
+navigates: [홈, 사전]
+externals: [Google Fonts]
+modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
+last_checked: 49287a8
+---
+
+# 문학 나침반 (public/literature_compass.html)
+
+## 1 기능
+- 시대별 문학 사조 타임라인에서 사조를 골라 브리핑 → 카드(뒤집기) → 퀴즈(짝짓기·O/X·객관식)로 학습한다. 장르 탭(전체·시·소설·수필·희곡, :832)으로 목록을 거른다. 하단 내비는 홈·퀴즈·사전(:690-697).
+- 접근: 로그인(authGate) + `users.perm_literature_compass`. 이 화면의 권한 확인은 명시적 false 일 때만 막는다(:805, 토큰 없음·응답 오류는 통과) — 공통 게이트가 로그인을 따로 막는다.
+- 읽기 전용 화면이다. 학습 결과·퀴즈 점수는 어디에도 저장하지 않는다(localStorage 키는 mydict_token 읽기뿐, 파일 안 localStorage 호출 :799 한 곳).
+
+## 2 엔진
+- 없음. 퀴즈 문항은 데이터에서 매번 브라우저가 만든다(buildQuizData :1173). 서버·AI 호출 없음.
+
+## 3 경로 (동작 → 화면 코드 → 서버 라우트)
+- 화면 열기 →필요 로그인(authGate.js, 토큰 없으면 홈으로) →필요 권한:perm_literature_compass →호출 [API] GET /api/me — loadDB(:810)가 checkPermission(:798)을 먼저 부른다(fetch :802 → routes/auth.js:101) →읽기 [DB] users(routes/auth.js:120 의 perm 열, 인증은 middleware/auth.js:30). 권한이 false 면 데이터 파일을 요청하지 않고 "이용 권한이 없습니다" 안내(:812-816, :590)를 보인다. →읽기 [기기] mydict_token(:799). 정적 파일 읽기는 4절.
+- 어휘 사전 이동 →이동 [화면] 사전 — 하단 내비 "사전"(:695) 및 홈 화면의 "어휘 사전 →" 링크(:937)는 `/english_dictionary.html` 로 간다. 서버 호출 없음.
+- 홈으로 이동 →이동 [화면] 홈 — 상단 공통 헤더의 METIS 로고 `/`(appHeader.js:129)와 권한 없음 안내의 "METIS 홈으로"(:594). 하단 내비의 "홈" 탭(:692)은 이 화면 안의 사조 목록(goHome :960)이지 [화면] 홈이 아니다.
+- 사조 브리핑·카드·퀴즈 — 화면 안에서만 전환한다(showBriefing :966, showCards :1012, startQuiz :1259, 퀴즈 목록 :779). 서버·저장소 접근이 없어 흐름에 넣지 않았다(의도적 제외).
+
+## 4 DB
+- →읽기: [DB] users(권한 확인용 /api/me, perm_literature_compass).
+- →쓰기: 없음.
+- 정적 파일(DB 아님): `GET /literature_db.json`(fetch 'literature_db.json', :818)을 express.static 이 public/ 에서 보낸다(server.js:57). 최상위 키 version·last_updated·eras. 파일 저장소 후보: 문학 나침반 → public/literature_db.json.
+
+## 5 연결
+- [API] GET /api/me(위 3절). [외부] Google Fonts(:11).
+- [모듈] public/js/common/authGate.js(:6), appHeader.js(:578), dialog.js(:580, 퀴즈 중단 확인 metisConfirm).
+- [이동] 문학 나침반 →이동 홈·사전.
+- [미확인] 카드 뒤집기·퀴즈 채점의 세부 규칙(1173-1560)은 줄 단위로 읽지 않았다.
+
+=====================================================================
+### 파일: docs/blueprint/screens/science.md
+=====================================================================
+
+---
+screen: 과학
+file: public/science_reading.html
+engines: []
+calls: [GET /api/me]
+reads: [DB:users, 기기:mydict_token, 기기:science_conquest_]
+writes: [기기:science_conquest_]
+fallback: []
+flows: [
+  화면 열기 | →필요 로그인 ; →필요 권한:perm_science_reading ; →호출 GET /api/me ; →읽기 users ; →읽기 mydict_token,
+  정복 토글 | →쓰기 science_conquest_,
+  정복 탭 | →읽기 science_conquest_,
+  퀴즈 시작 | →읽기 science_conquest_,
+  홈으로 이동 | →이동 홈
+]
+requires: [로그인, 권한:perm_science_reading]
+navigates: [홈]
+externals: [Google Fonts]
+modules: [public/js/common/authGate.js, public/js/common/appHeader.js, public/js/common/dialog.js]
+last_checked: 49287a8
+---
+
+# 과학 (public/science_reading.html)
+
+## 1 기능
+- 과목 선택(과목별 개념 수, :1093) → 과목별 캐러셀(:1274) → 개념 상세(:1594, 정복하기) → 정복 탭(정복한 개념을 과목별로) → 퀴즈. 하단 내비는 홈·정복·퀴즈(:556-559). 한입 독서를 복제한 독립 파일이며 코드·데이터·저장 키를 공유하지 않는다(:17).
+- 접근: 로그인(authGate) + `users.perm_science_reading`. 확인은 명시적 false 일 때만 막는다(:1196). localStorage 접근 자체가 막힌 환경이면 토큰 없음으로 보고 통과한다(:1190).
+- 정복 기록은 브라우저 localStorage 에만 저장한다(서버·DB 없음, :593).
+
+## 2 엔진
+- 없음. 퀴즈는 정복한 개념의 데이터(title·one_line·key_points)를 고정 문구와 조합해 브라우저가 만든다(:819, "API·비용 없음" 주석 :642). 서버·AI 호출 없음.
+
+## 3 경로 (동작 → 화면 코드 → 서버 라우트)
+- 화면 열기 →필요 로그인·권한:perm_science_reading →호출 [API] GET /api/me — loadDB(:1201)가 checkPermission(:1186, fetch :1193 → routes/auth.js:101)을 먼저 부른다 →읽기 [DB] users(routes/auth.js:120) →읽기 [기기] mydict_token(:1190). 권한 false 면 데이터 파일을 요청하지 않고 안내(:1203-1207, :485).
+- 정복 토글 →쓰기 [기기] science_conquest_<개념 id>(키 앞부분 `science_conquest_`, :597) — 상세의 정복 버튼 toggleConquest(:628) → setConquered(:605). 서버 호출 없음.
+- 정복 탭 →읽기 [기기] science_conquest_ — onTab('conq')(:836) → goConq(:862) → renderConq(:846, getConqueredConcepts :614 → isConquered :600).
+- 퀴즈 시작 →읽기 [기기] science_conquest_ — 퀴즈 탭 onQuizTab(:879) → startQuizFlow(:891)가 정복 개념을 읽어 문항을 만든다(buildQuestions :819). 정복이 0개면 안내만 한다(:893-896). 점수는 저장하지 않는다.
+- 홈으로 이동 →이동 [화면] 홈 — 상단 공통 헤더의 METIS 로고(appHeader.js:129)와 권한 없음 안내의 "METIS 홈으로"(:485). 하단 내비의 "홈" 탭은 이 화면의 과목 선택이다(onTab :836 → goConceptsTab :1082).
+
+## 4 DB
+- →읽기: [DB] users(권한 확인용 /api/me).
+- →쓰기: 없음(DB).
+- 기기 저장값: localStorage `mydict_token`(읽기), `science_conquest_<id>`(:597-612, 개념마다 한 키, 값 'true'/'false'). 필터 키는 없다(localStorage 호출은 이 두 종류뿐).
+- 정적 파일(DB 아님): `GET /science_db.json`(fetch 'science_db.json', :1209)을 express.static 이 보낸다(server.js:57). 최상위 키 version·last_updated·concepts(32개 개념). 파일 저장소 후보: 과학 → public/science_db.json.
+
+## 5 연결
+- [API] GET /api/me. [외부] Google Fonts(:11).
+- [모듈] authGate.js(:6), appHeader.js(:469), dialog.js(:471).
+- [이동] 과학 →이동 홈. 주소 `?field=`·`?tab=conq` 로 같은 화면 안의 보기를 가리키는 history 이동이 있으나(:832, :1091) 다른 화면으로 가지 않는다.
+- [미확인] 캐러셀 표시·관련 개념(related) 규칙의 세부(:664-725, :1274 이후).
 
 =====================================================================
 ### 파일: docs/blueprint/screens/speak_loop.md

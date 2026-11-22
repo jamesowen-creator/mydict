@@ -16,17 +16,17 @@
 ## 화면 목록 (public/ 아래 사용자 접근 화면 12개)
 | 화면 | 파일 | 한 줄 설명 | 도면 |
 |---|---|---|---|
-| 홈 | public/home/index.html | 로그인·메뉴 진입 화면(빌드된 번들 public/home/assets). 상세 [미확인] | 미작성 |
+| 홈 | public/home/index.html | 로그인·메뉴 진입 화면(React 번들 public/home, 소스 home-wheel/) | 작성 |
 | 사전 | public/english_dictionary.html | 영·한·일·중 검색, 단어장(#wordbook), 발음, 팟캐스트, 퀴즈·복습, 카메라 글자 인식 | 작성 |
 | 스펠링 런 | public/spelling_run.html | 단어장 단어로 하는 철자 게임(혼자·2인 대결) | 작성 |
 | 문장 학습 | public/jgrammar.html | 일본어·영어·중국어 문장 해설·사진 인식·저장·읽어주기(파일명 jgrammar) | 작성 |
 | 음성 학습 | public/voice_study.html | 음성 노트(녹음 변환·요약·퀴즈·대화·연결 지도·이미지)와 요약 읽어주기 | 작성 |
 | 개념 지도 | public/concept_map.html | 개념 지도·복습·서술 답변(/api/cmap…) | 작성 |
 | Speak Loop | public/speakloop.html | 영어 말하기 연습(저장 음성, 이디엄 포함; /api/speakloop…) | 작성 |
-| 문학 나침반 | public/literature_compass.html | 정적 콘텐츠(literature_db.json) 읽기 | 미작성 |
-| 한입 독서 | public/digest_reading.html | 정적 콘텐츠(digest_db.json) 읽기 | 미작성 |
-| 과학 | public/science_reading.html | 정적 콘텐츠(science_db.json) 읽기 | 미작성 |
-| 작가 노트 | public/artist_notes.html | 정적 콘텐츠(artist_notes_db.json) 읽기 | 미작성 |
+| 문학 나침반 | public/literature_compass.html | 정적 콘텐츠(literature_db.json) 읽기 | 작성 |
+| 한입 독서 | public/digest_reading.html | 정적 콘텐츠(digest_db.json) 읽기 | 작성 |
+| 과학 | public/science_reading.html | 정적 콘텐츠(science_db.json) 읽기 | 작성 |
+| 작가 노트 | public/artist_notes.html | 정적 콘텐츠(artist_notes_db.json) 읽기 | 작성 |
 | 관리자 | public/admin.html | 사용자·권한·사용량, Speak Loop 음성, 단어 뜻 변환, 발음 캐시 지우기 | 작성 |
 - 단어장·팟캐스트·IT 용어는 별도 파일이 아니라 사전 화면(english_dictionary.html) 안의 기능이다. 대결은 스펠링 런 안의 기능, 이디엄은 Speak Loop 안의 기능이다.
 - 이 표의 "도면" 열은 손으로 관리한다. 정확한 미작성 목록은 아래 생성 구간이 보여 준다.
@@ -37,7 +37,7 @@
 ## 생성 구간 (npm run blueprint:gen 이 만든다. 이 안은 손으로 고치지 않는다)
 <!-- gen:start -->
 > 이 구간은 `npm run blueprint:gen` 이 화면 파일(docs/blueprint/screens)의 머리말에서 만든다. 손으로 고치지 않는다.
-> **도면이 작성된 화면(7개)만 반영한다.** 미작성 화면이 같은 엔진·API·저장소를 쓰는지는 이 목록에 나오지 않으므로 코드로 직접 확인한다.
+> 모든 화면(12개)의 도면이 작성돼 있다. 미작성 화면은 0개다.
 
 ### 엔진별 사용 화면 (→호출)
 - **2인 대결 방(서버 메모리)** — 스펠링 런
@@ -75,7 +75,7 @@
 - **GET /api/admin/users** — 관리자
 - **GET /api/cmap/topics/:rootId/map** — 개념 지도
 - **GET /api/jgrammar/saved** — 문장 학습
-- **GET /api/me** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **GET /api/me** — Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서, 홈
 - **GET /api/review-due** — 사전
 - **GET /api/speakloop/audio-index** — Speak Loop
 - **GET /api/speakloop/audio/:clipKey** — Speak Loop, 관리자
@@ -95,6 +95,8 @@
 - **GET /api/voice-notes/quiz-summary** — 음성 학습
 - **GET /api/voice-notes/wrong-answers** — 음성 학습
 - **GET /api/wordbook** — 사전, 스펠링 런
+- **GET /auth/google** — 홈
+- **GET /auth/google/callback** — 홈
 - **PATCH /api/admin/users/:id** — 관리자
 - **PATCH /api/voice-notes/:id** — 음성 학습
 - **PATCH /api/voice-notes/:id/image/rating** — 음성 학습
@@ -149,7 +151,7 @@
 - **[DB] review_log** — 읽기: - / 쓰기: 사전
 - **[DB] speakloop_audio** — 읽기: Speak Loop, 관리자 / 쓰기: 관리자
 - **[DB] speakloop_progress** — 읽기: Speak Loop / 쓰기: Speak Loop
-- **[DB] users** — 읽기: Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 관리자
+- **[DB] users** — 읽기: Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서, 홈 / 쓰기: 관리자, 홈
 - **[DB] voice_image_sets** — 읽기: 음성 학습 / 쓰기: 음성 학습
 - **[DB] voice_images** — 읽기: 음성 학습 / 쓰기: 음성 학습
 - **[DB] voice_links** — 읽기: 음성 학습 / 쓰기: 음성 학습
@@ -161,14 +163,19 @@
 - **[캐시] tts_cache** — 읽기: 사전, 스펠링 런 / 쓰기: 관리자, 사전, 스펠링 런
 
 ### 기기 저장값별 사용 화면 ([기기] localStorage·sessionStorage 키, 두 화면 이상이 쓰는 키는 공유 키)
+- **artist_notes_conquest_** — 읽기: 작가 노트 / 쓰기: 작가 노트
+- **artist_notes_field_filter** — 읽기: 작가 노트 / 쓰기: 작가 노트
+- **digest_conquest_** — 읽기: 한입 독서 / 쓰기: 한입 독서
+- **digest_genre_filter** — 읽기: 한입 독서 / 쓰기: 한입 독서
 - **gl_last_run** — 읽기: 관리자 / 쓰기: 관리자
 - **jgrammar_furigana** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **jgrammar_lang** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **jgrammar_pinyin** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **jgrammar_zh** — 읽기: 문장 학습 / 쓰기: 문장 학습
 - **metis_tts_mode** — 읽기: 사전, 스펠링 런 / 쓰기: 사전, 스펠링 런
-- **mydict_token** — 읽기: Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습 / 쓰기: 사전
+- **mydict_token** — 읽기: Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서, 홈 / 쓰기: 사전, 홈
 - **mydict_wrong** — 읽기: 사전 / 쓰기: 사전
+- **science_conquest_** — 읽기: 과학 / 쓰기: 과학
 - **spellrun_best** — 읽기: 스펠링 런 / 쓰기: 스펠링 런
 - **spellrun_bgm** — 읽기: 스펠링 런 / 쓰기: 스펠링 런
 - **spellrun_char** — 읽기: 스펠링 런 / 쓰기: 스펠링 런
@@ -182,22 +189,23 @@
 
 ### 외부 서비스별 사용 화면 ([외부])
 - **Anthropic API(Claude Haiku)** — 개념 지도, 관리자, 문장 학습, 사전, 음성 학습
-- **Google Fonts** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
+- **Google Fonts** — Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서
+- **Google 로그인(OAuth)** — 홈
 - **OpenAI Images(이미지 생성)** — 음성 학습
 - **OpenAI STT(음성 인식)** — 음성 학습
 - **OpenAI TTS(음성 합성)** — 관리자, 사전, 스펠링 런
 - **jsDelivr(tesseract.js)** — 사전
 
 ### 모듈별 사용 화면 ([모듈])
-- **public/js/common/appHeader.js** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
-- **public/js/common/authGate.js** — Speak Loop, 개념 지도, 관리자, 문장 학습, 사전, 스펠링 런, 음성 학습
-- **public/js/common/dialog.js** — 문장 학습, 사전, 스펠링 런, 음성 학습
+- **public/js/common/appHeader.js** — Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서
+- **public/js/common/authGate.js** — Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서
+- **public/js/common/dialog.js** — 과학, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서
 - **public/js/ocr/ocrScanner.js** — 사전
 
-### 미작성 화면 (5개)
-홈(public/home/index.html), 문학 나침반(public/literature_compass.html), 한입 독서(public/digest_reading.html), 과학(public/science_reading.html), 작가 노트(public/artist_notes.html)
+### 미작성 화면 (0개)
+(없음)
 
-화면 파일의 마지막 확인 커밋: 8753b0a, bf7715c
+화면 파일의 마지막 확인 커밋: 49287a8, 8753b0a, bf7715c
 <!-- gen:end -->
 
 ## 작업 블록 규칙
