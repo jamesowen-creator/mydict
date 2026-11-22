@@ -365,7 +365,7 @@ function genDbSection(screens, items) {
 }
 
 // ── map.html ────────────────────────────────────────────────────────────────
-function mapData(screens, pages, groups) {
+function mapData(screens, pages, groups, dbItems) {
   const written = new Set(screens.map(s => s.file));
   const nodes = [], edges = [];
   const has = id => nodes.some(n => n.id === id);
@@ -390,6 +390,7 @@ function mapData(screens, pages, groups) {
     for (const t of s.navigates) { const tgt = nodes.find(n => n.type === 'screen' && n.label === t); if (tgt) edge(me, tgt.id, 'move'); else { const todo = pages.find(p => p.title === t); if (todo) edge(me, 's:todo:' + todo.file, 'move'); } }
     for (const f of s.fallback) { const [a, b] = f.split(' ⇢ ').map(x => x.trim()); add('e:' + a, 'engine', a); add('e:' + b, 'engine', b); edge('e:' + a, 'e:' + b, 'fallback'); }
   }
+  for (const [, v] of dbItems) { const id = (v.kind === 'DB' ? 'd:' : 'c:') + v.name; if (!has(id)) add(id, v.kind === 'DB' ? 'db' : 'cache', v.name, { unlinked: true }); }   // db.md 에는 있으나 어느 화면과도 연결되지 않은 저장소
   // 동작별 흐름: 각 단계를 목록의 항목(node)과 연결한다. 목록에 항목이 없는 단계(API·기기 저장값·필요)는 node 없이 칩으로만 보인다
   const nodeFor = (st) => {
     if (st.type === 'engine') return 'e:' + st.label;
@@ -430,13 +431,18 @@ h1 { font-size: 20px; margin: 0 0 4px; }
 .legend .lg { display: inline-flex; align-items: center; gap: 8px; }
 .legend .rels { flex-basis: 100%; color: var(--sub); }
 .wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
+.tabs { display: flex; gap: 4px; margin: 0 0 16px; border-bottom: 1px solid var(--line); }
+.tabs button { min-height: 44px; padding: 8px 22px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--sub); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.tabs button[aria-selected="true"] { color: var(--sel); border-bottom-color: var(--sel); }
+.tabs .sp { flex: 1; align-self: center; font-size: 14px; color: var(--sub); text-align: right; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-.lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; }
+.lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
 @media (min-width: 720px) {
   .layout { grid-template-columns: minmax(0, 65fr) minmax(0, 35fr); gap: 24px; align-items: start; }
   #detail { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
 }
-.col h2 { font-size: 14px; margin: 0 0 8px; color: var(--sub); font-weight: 700; }
+[hidden] { display: none !important; }
+.col h2, .sec-title { font-size: 14px; margin: 0 0 8px; color: var(--sub); font-weight: 700; }
 .col .group { font-size: 14px; color: var(--sub); margin: 12px 0 4px; }
 .item, .sample { --bc: var(--kc, var(--line)); --bg2: var(--card); position: relative; display: block; width: 100%; text-align: left; margin: 0 0 8px; padding: 10px 14px; min-height: 44px; border: 1.5px solid var(--bc); background: var(--bg2); color: var(--text); font: inherit; font-size: 16px; overflow-wrap: break-word; word-break: keep-all; }
 .item { cursor: pointer; }
@@ -466,7 +472,7 @@ h1 { font-size: 20px; margin: 0 0 4px; }
 .item.flow .badge { left: 14px; }
 .item.t-engine.flow .badge { left: 20px; }
 #detail { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); font-size: 15px; overflow-wrap: break-word; word-break: keep-all; }
-@media (max-width: 719px) { #detail { max-height: 1000px; overflow: auto; } }   /* 좁은 화면: 목록 아래에 놓이는 패널도 1000px 을 넘지 않고 패널 안에서 스크롤 */
+@media (max-width: 719px) { #detail { max-height: 1000px; overflow: auto; } }
 #detail .head { font-weight: 700; margin-bottom: 6px; }
 #detail .sec { font-size: 14px; font-weight: 700; color: var(--sub); margin: 12px 0 6px; }
 #detail .rel-row { margin: 6px 0; }
@@ -481,23 +487,80 @@ h1 { font-size: 20px; margin: 0 0 4px; }
 .flow-card .srow .num { flex: none; margin-top: 2px; }
 .flow-card .srow .sample { flex: 0 1 auto; min-width: 0; max-width: 100%; }
 .flow-card .fail { flex: none; margin-top: 3px; font-size: 14px; font-weight: 700; color: var(--sel); }
-.flow-card .num { display: inline-block; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 12px; background: var(--sel); color: #fff; font-size: 14px; font-weight: 700; line-height: 24px; text-align: center; white-space: nowrap; }
+.num { display: inline-block; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 12px; background: var(--sel); color: #fff; font-size: 14px; font-weight: 700; line-height: 24px; text-align: center; white-space: nowrap; }
 .flow-card .sample { margin: 0; padding: 2px 10px; font-size: 14px; }
 .flow-card .sample.t-db, .flow-card .sample.t-cache { padding-top: 14px; min-width: 0; }
 .flow-card .sample.t-engine { padding: 2px 20px; min-width: 0; }
-.flow-card .sample small { display: inline; margin-right: 6px; font-size: 14px; color: var(--sub); line-height: 1.2; }
+.flow-card .sample small, .fchip small { display: inline; margin-right: 6px; font-size: 14px; color: var(--sub); line-height: 1.2; }
 details.conn { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
 details.conn summary { cursor: pointer; font-size: 14px; font-weight: 700; color: var(--sub); min-height: 32px; }
 .conn-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; margin-top: 8px; }
 .conn-grid .rel-row { margin: 4px 0; }
-@media (max-width: 420px) { .conn-grid { grid-template-columns: minmax(0, 1fr); } }
 .foot { margin-top: 12px; font-size: 14px; color: var(--sub); }
+/* ── 계층 보기 ── */
+.tree { display: flex; flex-direction: column; align-items: center; }
+.root { padding: 8px 40px; border: 2px solid var(--c-screen); border-radius: 12px; background: var(--card); font-size: 18px; font-weight: 700; color: var(--c-screen); }
+.stem { width: 0; height: 20px; border-left: 1.5px solid var(--line); }
+.groups { display: flex; gap: 14px; width: 100%; align-items: stretch; }
+.grp { position: relative; flex: 1 1 0; min-width: 170px; padding: 10px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--card); }
+.grp.g-wide6 { flex-grow: 6; } .grp.g-wide4 { flex-grow: 4; } .grp.g-wide1 { flex-grow: 1.4; }
+.grp::before { content: ""; position: absolute; top: -21px; left: 50%; height: 20px; border-left: 1.5px solid var(--line); }
+.grp::after { content: ""; position: absolute; top: -21px; left: -8px; right: -8px; border-top: 1.5px solid var(--line); }
+.grp:first-child::after { left: 50%; } .grp:last-child::after { right: 50%; }
+.grp h3 { margin: 0 0 8px; font-size: 16px; }
+.grp h3 small { font-size: 14px; font-weight: 400; color: var(--sub); margin-left: 6px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.cards .item { margin: 0; padding: 8px 10px; }
+.cards .item .nm { display: block; font-weight: 700; font-size: 15px; }
+.cards .item small { font-size: 14px; }
+/* ── 흐름 보기 ── */
+.fsel { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; margin: 0 0 16px; }
+.fsel > div { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+.fsel .glabel { font-size: 14px; font-weight: 700; color: var(--sub); margin: 8px 0 4px; }
+.fsel .glabel:first-child { margin-top: 0; }
+.fsel .row { display: flex; flex-wrap: wrap; gap: 6px; }
+.fsel .row .item { width: auto; margin: 0; min-height: 36px; padding: 4px 12px; font-size: 15px; }
+.fsel .acts .item { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0 0 6px; min-height: 40px; padding: 6px 12px; }
+.fsel .acts .item small { display: inline; }
+.fig { position: relative; padding: 8px 0 16px; }
+.fgrid { display: grid; grid-template-columns: 240px minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1.15fr); column-gap: 32px; row-gap: 44px; align-items: start; }
+.fhead { font-size: 14px; font-weight: 700; color: var(--sub); text-align: center; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.fstart { margin: 0; align-self: start; }
+.fstart .nm { display: block; font-weight: 700; font-size: 17px; }
+.fstart .act { display: block; margin-top: 6px; font-size: 15px; }
+.fcell { display: flex; gap: 44px; justify-content: center; min-width: 0; }
+.fcell.stack { flex-direction: column; align-items: center; }
+.fchip { display: flex; align-items: flex-start; gap: 8px; width: fit-content; max-width: 100%; margin: 0; padding: 6px 12px; font-size: 15px; min-width: 0; }
+.fchip.t-db, .fchip.t-cache { padding-top: 16px; min-width: 0; }
+.fchip.t-engine { padding: 6px 24px; min-width: 0; }
+.fchip .num { flex: none; position: relative; margin-top: 1px; }
+.fchip .lbl { min-width: 0; }
+.farrows { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.farrows path { fill: none; stroke: var(--sub); stroke-width: 1.6; }
+.farrows path.dash { stroke-dasharray: 6 5; stroke: var(--sel); }
+.farrows marker path { fill: var(--sub); stroke: none; }
+.farrows marker.mdash path { fill: var(--sel); }
+.fempty { padding: 24px; color: var(--sub); }
+/* ── 연결 보기 ── */
+.shared { display: flex; flex-wrap: wrap; gap: 0; margin: 0 0 16px; }
+.shared .item { display: inline-block; width: auto; margin: 0 8px 8px 0; min-height: 36px; padding: 6px 12px; font-size: 15px; }
+.shared .item.t-engine { padding: 6px 26px; }
+.shared .item.t-db, .shared .item.t-cache { padding-top: 18px; min-width: 0; }
+.shared .item b { color: var(--sel); margin-left: 6px; }
+.usage { display: flex; gap: 12px; margin: 0 0 16px; align-items: stretch; }
+.usage .grp { padding: 8px; }
+.usage .grp::before, .usage .grp::after { display: none; }
+.usage .grp.g-wide6 { flex-grow: 6; } .usage .grp.g-wide4 { flex-grow: 4; } .usage .grp.g-wide1 { flex-grow: 1.4; }
+.usage .cards { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.usage .item small { display: block; }
+.usage .tag { color: var(--rel); font-weight: 700; }
+.nolink-note { margin: 0 0 8px; font-size: 14px; color: var(--sub); }
 </style>
 </head>
 <body>
 <div class="wrap">
 <h1>METIS-3 도면</h1>
-<p class="hint">항목을 누르면 연결된 항목이 강조되고 나머지는 흐려집니다. 같은 항목을 다시 누르면 해제됩니다. 화면을 누르면 동작별 흐름이 상세 상자(넓은 화면은 오른쪽, 좁은 화면은 목록 아래)에 나오고, 동작 카드를 누르면 왼쪽 목록에 순서 번호가 붙습니다.</p>
+<p class="hint">탭 3개: 계층(화면을 묶음별로) · 흐름(동작 하나를 경로·엔진·저장소까지) · 연결(부품을 쓰는 화면). 탭을 바꿔도 고른 화면은 유지됩니다. 항목을 누르면 연결된 항목이 강조되고 나머지는 흐려지며, 같은 항목을 다시 누르면 해제됩니다. 화면을 누르면 동작별 흐름이 오른쪽 상세 상자에 나오고, 동작 카드를 누르면 연결 보기 목록에 순서 번호가 붙습니다. (PC 화면 기준)</p>
 <div class="legend" aria-label="범례">
   <span class="lg"><span class="sample t-screen"><span class="lbl">화면</span></span></span>
   <span class="lg"><span class="sample t-engine"><span class="lbl">엔진</span></span></span>
@@ -511,66 +574,158 @@ details.conn summary { cursor: pointer; font-size: 14px; font-weight: 700; color
   <span class="lg"><span class="sample t-todo"><span class="lbl">미작성</span></span></span>
   <span class="rels">관계: →호출 · →읽기 · →쓰기 · →이동(화면→화면) · ⇢대체(앞이 실패하면 뒤, 같은 번호의 a·b 가지) · →필요(로그인·권한). 모양: 화면=둥근 사각, 엔진=육각형, DB=원통, 캐시=점선 윗면 원통, 기기=점선 알약, API=가는 사각, 외부=점선 사각, 모듈=직각 사각, 필요=파선 알약, 미작성=회색 점선. 동작 카드·번호 배지는 ①②③ 순서입니다.</span>
 </div>
-<div class="layout">
-  <div class="lists" id="grid">
-    <div class="col" id="col-1"><h2>화면</h2></div>
-    <div class="col" id="col-2"><h2>엔진 · 모듈</h2></div>
-    <div class="col" id="col-3"><h2>저장소 · 외부</h2></div>
+<div class="tabs" role="tablist" aria-label="보기 선택">
+  <button type="button" role="tab" data-tab="tree" aria-selected="true">계층</button>
+  <button type="button" role="tab" data-tab="flow" aria-selected="false">흐름</button>
+  <button type="button" role="tab" data-tab="conn" aria-selected="false">연결</button>
+  <span class="sp" id="tabnote"></span>
+</div>
+<div class="layout" id="layout">
+  <div class="main" id="main">
+    <section id="v-tree" aria-label="계층 보기">
+      <div class="tree"><div class="root">METIS-3</div><div class="stem"></div><div class="groups" id="groups"></div></div>
+    </section>
+    <section id="v-conn" aria-label="연결 보기" hidden>
+      <div class="sec-title" id="shared-title">여러 화면이 같이 쓰는 부품 (사용 화면 2개 이상, 개수 순)</div>
+      <div class="shared" id="shared"></div>
+      <div class="sec-title">쓰는 화면 (묶음별) — 부품을 고르면 쓰는 화면이 강조되고 호출·읽기·쓰기가 적힙니다</div>
+      <div class="usage" id="usage"></div>
+      <div class="lists" id="grid">
+        <div class="col" id="col-2"><h2>엔진 · 모듈</h2></div>
+        <div class="col" id="col-3"><h2>저장소 · 외부</h2></div>
+      </div>
+    </section>
   </div>
   <aside id="detail" aria-live="polite">항목을 누르면 연결이 여기에 표시됩니다.</aside>
 </div>
+<section id="v-flow" aria-label="흐름 보기" hidden>
+  <div class="fsel"><div id="fscreens"></div><div class="acts" id="factions"></div></div>
+  <div class="fig" id="fig"></div>
+</section>
 <p class="foot">이 파일은 <code>npm run blueprint:gen</code> 이 docs/blueprint/screens 의 머리말에서 만든다(직접 고치지 않는다). 화면 파일 마지막 확인 커밋: <span id="commit"></span></p>
 </div>
 <script id="data" type="application/json">${json}</script>
 <script>
 (function () {
   var data = JSON.parse(document.getElementById('data').textContent);
-  var nodes = data.nodes, byId = {}, edges = data.edges;
+  var nodes = data.nodes, byId = {}, edges = data.edges, groups = data.groups || [];
   nodes.forEach(function (n) { byId[n.id] = n; });
   document.getElementById('commit').textContent = data.commit || '(없음)';
-  var colOf = { screen: 1, todo: 1, engine: 2, module: 2, db: 3, cache: 3, external: 3 };
-  var groupName = { screen: '', todo: '도면 미작성 화면', engine: '엔진', module: '모듈', db: 'DB 테이블', cache: '서버 캐시', external: '외부 서비스' };
-  var cols = { 1: document.getElementById('col-1'), 2: document.getElementById('col-2'), 3: document.getElementById('col-3') };
-  var lastGroup = {};
-  nodes.forEach(function (n) {
-    var c = colOf[n.type];
-    if (groupName[n.type] && lastGroup[c] !== n.type) { var g = document.createElement('div'); g.className = 'group'; g.textContent = groupName[n.type]; cols[c].appendChild(g); }
-    lastGroup[c] = n.type;
-    var b = document.createElement('button'); b.type = 'button'; b.className = 'item t-' + n.type; b.setAttribute('aria-pressed', 'false'); b.dataset.id = n.id;
-    var l = document.createElement('span'); l.className = 'lbl'; putText(l, n.label, n.type); b.appendChild(l);
-    b.addEventListener('click', function () { select(selected === n.id ? null : n.id); });
-    n.el = b; cols[c].appendChild(b);
-  });
-  var EMPTY_MSG = '항목을 누르면 연결이 여기에 표시됩니다.';
-  var selected = null, flowOn = null, grid = document.getElementById('grid'), detail = document.getElementById('detail');
+  var PART = { engine: 1, module: 1, db: 1, cache: 1, external: 1 };
   var CIRC = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩', '⑪', '⑫', '⑬', '⑭', '⑮', '⑯', '⑰', '⑱', '⑲', '⑳'];
+  var RELWORD = { call: '호출', read: '읽기', write: '쓰기' };
   function numLabel(n) { var d = parseInt(n, 10), rest = String(n).replace(/^\\d+/, ''); return (CIRC[d - 1] || String(d)) + rest; }
+  function mk(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function putText(el, text, type) {   // 경로(모듈·API)는 단어 중간이 아니라 슬래시 뒤에서만 줄바꿈한다
+    if (type !== 'module' && type !== 'api') {   // 그 밖의 이름은 여는 괄호 뒤에서만 줄바꿈할 수 있게 한다(영문 단어가 중간에서 쪼개지지 않게)
+      String(text).split('(').forEach(function (part, i) { if (i > 0) { el.appendChild(document.createTextNode('(')); el.appendChild(document.createElement('wbr')); } el.appendChild(document.createTextNode(part)); });
+      return;
+    }
+    String(text).split('/').forEach(function (part, i) { if (i > 0) { el.appendChild(document.createTextNode('/')); el.appendChild(document.createElement('wbr')); } el.appendChild(document.createTextNode(part)); });
+  }
   function out(id, rel) { return edges.filter(function (e) { return e[0] === id && e[2] === rel; }).map(function (e) { return e[1]; }); }
   function inn(id, rel) { return edges.filter(function (e) { return e[1] === id && e[2] === rel; }).map(function (e) { return e[0]; }); }
   function nameOf(id) { return byId[id].label; }
   function typed(ids, t) { return ids.filter(function (i) { return t.indexOf(byId[i].type) >= 0; }); }
-  function putText(el, text, type) {   // 경로(모듈·API)는 단어 중간이 아니라 슬래시 뒤에서만 줄바꿈한다
-    if (type !== 'module' && type !== 'api') { el.appendChild(document.createTextNode(text)); return; }
-    String(text).split('/').forEach(function (part, i) { if (i > 0) { el.appendChild(document.createTextNode('/')); el.appendChild(document.createElement('wbr')); } el.appendChild(document.createTextNode(part)); });
+  function usersOf(id) { var m = {}; edges.forEach(function (e) { if (e[1] === id && RELWORD[e[2]] && byId[e[0]].type === 'screen') { (m[e[0]] = m[e[0]] || {})[e[2]] = 1; } }); return m; }
+  function relText(r) { var k = ['call', 'read', 'write'].filter(function (x) { return r[x]; }); if (r.read && r.write) return '읽기·쓰기'; return k.map(function (x) { return RELWORD[x]; }).join('·'); }
+  var screens = [];
+  groups.forEach(function (g) { g.screens.forEach(function (s) { var n = byId['s:' + s]; if (n) screens.push(n); }); });
+  nodes.filter(function (n) { return n.type === 'todo'; }).forEach(function (n) { screens.push(n); });
+  function storeCount(sid) { var set = {}; ['read', 'write'].forEach(function (r) { out(sid, r).forEach(function (t) { if (byId[t].type === 'db' || byId[t].type === 'cache') set[t] = 1; }); }); return Object.keys(set).length; }
+  function groupClass(g) { var c = g.screens.length; return c >= 6 ? 'g-wide6' : c >= 4 ? 'g-wide4' : 'g-wide1'; }
+
+  /* ── 상태 ── */
+  var selected = null, selScreen = null, flowOn = null, flowPick = null, tab = 'tree';
+  var main = document.getElementById('main'), detail = document.getElementById('detail');
+  var EMPTY_MSG = '항목을 누르면 연결이 여기에 표시됩니다.';
+  function els(n) { return [n.el, n.card].filter(Boolean); }
+
+  /* ── 계층 보기 ── */
+  var gbox = document.getElementById('groups');
+  groups.forEach(function (g) {
+    var box = mk('div', 'grp ' + groupClass(g)); var h = mk('h3', '', g.name); h.appendChild(mk('small', '', g.screens.length + '개 화면')); box.appendChild(h);
+    var cards = mk('div', 'cards');
+    g.screens.forEach(function (s) {
+      var n = byId['s:' + s]; if (!n) return;
+      var b = mk('button', 'item t-screen'); b.type = 'button'; b.setAttribute('aria-pressed', 'false'); b.dataset.id = n.id;
+      b.appendChild(mk('span', 'nm', n.label));
+      b.appendChild(mk('small', '', '동작 ' + (n.flows ? n.flows.length : 0) + ' · DB·캐시 ' + storeCount(n.id)));
+      b.addEventListener('click', function () { select(selected === n.id ? null : n.id); });
+      n.card = b; cards.appendChild(b);
+    });
+    box.appendChild(cards); gbox.appendChild(box);
+  });
+
+  /* ── 연결 보기: 공유 부품, 묶음별 사용 화면, 부품 목록 ── */
+  var parts = nodes.filter(function (n) { return PART[n.type]; });
+  var shared = document.getElementById('shared'), sharedBtn = {};
+  parts.forEach(function (n) { n.users = Object.keys(usersOf(n.id)); });
+  parts.filter(function (n) { return n.users.length >= 2; }).sort(function (a, b) { return b.users.length - a.users.length || (a.label < b.label ? -1 : 1); }).forEach(function (n) {
+    var b = mk('button', 'item t-' + n.type); b.type = 'button'; b.setAttribute('aria-pressed', 'false');
+    var l = mk('span', 'lbl'); putText(l, n.label, n.type); l.appendChild(mk('b', '', '×' + n.users.length)); b.appendChild(l);
+    b.addEventListener('click', function () { select(selected === n.id ? null : n.id); });
+    sharedBtn[n.id] = b; shared.appendChild(b);
+  });
+  var usage = document.getElementById('usage');
+  groups.forEach(function (g) {
+    var box = mk('div', 'grp ' + groupClass(g)); box.appendChild(mk('h3', '', g.name));
+    var cards = mk('div', 'cards');
+    g.screens.forEach(function (s) {
+      var n = byId['s:' + s]; if (!n) return;
+      var b = mk('button', 'item t-screen'); b.type = 'button'; b.setAttribute('aria-pressed', 'false'); b.dataset.id = n.id;
+      var l = mk('span', 'lbl'); l.appendChild(document.createTextNode(n.label)); l.appendChild(mk('small', 'utag', '')); b.appendChild(l);
+      b.addEventListener('click', function () { select(selected === n.id ? null : n.id); });
+      n.el = b; cards.appendChild(b);
+    });
+    box.appendChild(cards); usage.appendChild(box);
+  });
+  var cols = { 2: document.getElementById('col-2'), 3: document.getElementById('col-3') };
+  var lastGroup = {};
+  var BUCKET = [['engine', 2, '엔진'], ['module', 2, '모듈'], ['db', 3, 'DB 테이블'], ['cache', 3, '서버 캐시'], ['external', 3, '외부 서비스']];
+  function partItem(n) {
+    var b = mk('button', 'item t-' + n.type); b.type = 'button'; b.setAttribute('aria-pressed', 'false'); b.dataset.id = n.id;
+    var l = mk('span', 'lbl'); putText(l, n.label, n.type); b.appendChild(l);
+    b.addEventListener('click', function () { select(selected === n.id ? null : n.id); });
+    n.el = b; return b;
   }
-  function mk(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  BUCKET.forEach(function (bk) {
+    var list = parts.filter(function (n) { return n.type === bk[0] && !n.unlinked; });
+    if (!list.length) return;
+    cols[bk[1]].appendChild(mk('div', 'group', bk[2]));
+    list.forEach(function (n) { cols[bk[1]].appendChild(partItem(n)); });
+  });
+  var unl = parts.filter(function (n) { return n.unlinked; });
+  if (unl.length) {
+    cols[3].appendChild(mk('div', 'group', '연결 없음 (db.md 에는 있으나 어느 화면 도면과도 연결되지 않음)'));
+    unl.forEach(function (n) { var b = partItem(n); b.appendChild(mk('small', '', (n.type === 'cache' ? '캐시' : 'DB') + ' · 연결 없음')); cols[3].appendChild(b); });
+  }
+
+  /* ── 선택·강조 ── */
+  function clearMarks() {
+    nodes.forEach(function (n) { els(n).forEach(function (e) { e.classList.remove('sel', 'rel', 'flow'); e.setAttribute('aria-pressed', 'false'); }); if (n.el) { var b = n.el.querySelector('.badge'); if (b) b.remove(); var lb = n.el.querySelector('.lbl'); if (lb) lb.style.paddingLeft = ''; } });
+    Object.keys(sharedBtn).forEach(function (k) { sharedBtn[k].classList.remove('sel'); sharedBtn[k].setAttribute('aria-pressed', 'false'); });
+    nodes.forEach(function (n) { if (n.type === 'screen' && n.el) { var u = n.el.querySelector('.utag'); if (u) u.textContent = ''; } });
+  }
+  function addCls(n, c) { els(n).forEach(function (e) { e.classList.add(c); if (c === 'sel') e.setAttribute('aria-pressed', 'true'); }); }
+  function markRelated(id) { edges.forEach(function (e) { if (e[0] === id) addCls(byId[e[1]], 'rel'); if (e[1] === id) addCls(byId[e[0]], 'rel'); }); }
   function row(parent, kind, items) {
     if (!items || !items.length) return;
     var d = mk('div', 'rel-row'); d.appendChild(mk('span', 'rk', kind));
     var ul = mk('ul'); items.forEach(function (x) { ul.appendChild(mk('li', '', x)); }); d.appendChild(ul);
     parent.appendChild(d);
   }
-  function clearMarks() {
-    nodes.forEach(function (n) { n.el.classList.remove('sel', 'rel', 'flow'); n.el.setAttribute('aria-pressed', 'false'); var b = n.el.querySelector('.badge'); if (b) b.remove(); var lb = n.el.querySelector('.lbl'); if (lb) lb.style.paddingLeft = ''; });
+  function merged(a, b) {
+    var both = a.filter(function (x) { return b.indexOf(x) >= 0; });
+    return { both: both, onlyA: a.filter(function (x) { return both.indexOf(x) < 0; }), onlyB: b.filter(function (x) { return both.indexOf(x) < 0; }) };
   }
-  function markRelated(id) { edges.forEach(function (e) { if (e[0] === id) byId[e[1]].el.classList.add('rel'); if (e[1] === id) byId[e[0]].el.classList.add('rel'); }); }
   function stepChip(st) {
     var s = mk('span', 'sample t-' + st.type); var l = mk('span', 'lbl'); l.appendChild(mk('small', '', st.rl)); putText(l, st.label, st.type); s.appendChild(l); return s;
   }
   function flowCard(screenId, f) {
     var card = mk('button', 'flow-card'); card.type = 'button'; card.setAttribute('aria-pressed', 'false'); card.dataset.flow = f.name;
     card.appendChild(mk('span', 'fname', f.name));
-    var steps = mk('span', 'steps');   // 한 단계 = 한 줄: [번호 배지] [관계+대상 칩]. 줄 사이 화살표는 없다(번호가 순서). ⇢대체 는 같은 번호의 a 줄 바로 아래에 들여써서 "실패하면" 을 단다
+    var steps = mk('span', 'steps');
     f.steps.forEach(function (st) {
       var r = mk('span', 'srow' + (st.rel === 'fallback' ? ' branch' : ''));
       r.appendChild(mk('span', 'num', numLabel(st.n)));
@@ -583,36 +738,42 @@ details.conn summary { cursor: pointer; font-size: 14px; font-weight: 700; color
     return card;
   }
   function selectFlow(screenId, name, card) {
-    flowOn = name;
+    flowOn = name; flowPick = name;
     detail.querySelectorAll('.flow-card').forEach(function (c) { c.classList.remove('on'); c.setAttribute('aria-pressed', 'false'); });
     clearMarks();
-    var sn = byId[screenId]; sn.el.classList.add('sel'); sn.el.setAttribute('aria-pressed', 'true');
+    var sn = byId[screenId]; addCls(sn, 'sel');
     if (!name) { markRelated(screenId); return; }
-    card.classList.add('on'); card.setAttribute('aria-pressed', 'true');
+    if (card) { card.classList.add('on'); card.setAttribute('aria-pressed', 'true'); }
     var f = sn.flows.filter(function (x) { return x.name === name; })[0], marks = {};
     f.steps.forEach(function (st) { if (st.node) { (marks[st.node] = marks[st.node] || []).push(numLabel(st.n)); } });
     Object.keys(marks).forEach(function (id) {
-      var el = byId[id].el; el.classList.add('flow');
+      var n = byId[id]; if (!n.el) return;
+      var el = n.el; el.classList.add('flow');
       var b = mk('span', 'badge', marks[id].join('')); el.insertBefore(b, el.firstChild);
-      var lb = el.querySelector('.lbl'); lb.style.paddingLeft = (b.offsetWidth + (el.classList.contains('t-engine') ? 28 : 22)) + 'px';   // 번호가 여러 개여도 글자와 겹치지 않게
+      var lb = el.querySelector('.lbl'); lb.style.paddingLeft = (b.offsetWidth + (el.classList.contains('t-engine') ? 28 : 22)) + 'px';
     });
   }
-  function merged(a, b) {   // 읽기·쓰기 양쪽에 있는 항목은 한 그룹에 한 번만
-    var both = a.filter(function (x) { return b.indexOf(x) >= 0; });
-    return { both: both, onlyA: a.filter(function (x) { return both.indexOf(x) < 0; }), onlyB: b.filter(function (x) { return both.indexOf(x) < 0; }) };
+  function usersByGroup(id) {
+    var u = usersOf(id), res = [];
+    groups.forEach(function (g) { var l = g.screens.filter(function (s) { return u['s:' + s]; }); if (l.length) res.push({ g: g.name, list: l.map(function (s) { return { name: s, rel: u['s:' + s] }; }) }); });
+    return res;
   }
   function select(id) {
-    selected = id; flowOn = null;
+    selected = id; flowOn = null; flowPick = null;
     clearMarks(); detail.textContent = '';
-    if (!id) { grid.classList.remove('dim'); detail.textContent = EMPTY_MSG; return; }
-    var n = byId[id]; grid.classList.add('dim');
-    n.el.classList.add('sel'); n.el.setAttribute('aria-pressed', 'true');
+    main.classList.toggle('dim', !!id);
+    if (!id) { selScreen = null; detail.textContent = EMPTY_MSG; return; }
+    var n = byId[id];
+    if (n.type === 'screen' || n.type === 'todo') selScreen = id;
+    addCls(n, 'sel');
+    if (sharedBtn[id]) { sharedBtn[id].classList.add('sel'); sharedBtn[id].setAttribute('aria-pressed', 'true'); }
     markRelated(id);
     detail.appendChild(mk('div', 'head', n.label + (n.file ? '  (' + n.file + ')' : '')));
     if (n.type === 'todo') { detail.appendChild(mk('div', '', '이 화면은 도면이 아직 없습니다(연결 정보 없음). →이동해 오는 화면: ' + (inn(id, 'move').map(nameOf).join(', ') || '(없음)'))); return; }
     if (n.type === 'screen') {
+      if (n.group) detail.appendChild(mk('div', '', '묶음: ' + n.group));
       if (n.flows && n.flows.length) {
-        detail.appendChild(mk('div', 'sec', '동작별 흐름 (' + n.flows.length + '개) — 동작을 누르면 왼쪽 목록에 순서 번호가 붙습니다'));
+        detail.appendChild(mk('div', 'sec', '동작별 흐름 (' + n.flows.length + '개) — 동작을 누르면 연결 보기 목록에 순서 번호가 붙습니다'));
         n.flows.forEach(function (f) { detail.appendChild(flowCard(id, f)); });
       } else detail.appendChild(mk('div', 'sec', '이 화면에는 동작별 흐름이 아직 없습니다.'));
       var det = mk('details', 'conn'); det.appendChild(mk('summary', '', '종류별 연결 목록 (펼치기)'));
@@ -625,15 +786,123 @@ details.conn summary { cursor: pointer; font-size: 14px; font-weight: 700; color
       row(g, '→읽기·쓰기 기기', dv.both); row(g, '→읽기 기기', dv.onlyA); row(g, '→쓰기 기기', dv.onlyB);
       row(g, '⇢대체', n.fallback); row(g, '→이동', out(id, 'move').map(nameOf));
       det.appendChild(g); detail.appendChild(det);
-    } else if (n.type === 'engine') {
-      row(detail, '→호출하는 화면', inn(id, 'call').map(nameOf));
-      row(detail, '⇢대체(이 엔진이 실패하면)', out(id, 'fallback').map(nameOf)); row(detail, '⇢대체(이 엔진으로 대신함)', inn(id, 'fallback').map(nameOf));
-    } else if (n.type === 'db' || n.type === 'cache') {
-      var rs = merged(inn(id, 'read').map(nameOf), inn(id, 'write').map(nameOf));
-      row(detail, '→읽기·쓰기하는 화면', rs.both); row(detail, '→읽는 화면', rs.onlyA); row(detail, '→쓰는 화면', rs.onlyB);
-    } else row(detail, '→호출하는 화면', inn(id, 'call').map(nameOf));
+    } else {
+      var ug = usersByGroup(id), total = 0; ug.forEach(function (x) { total += x.list.length; });
+      if (n.unlinked) detail.appendChild(mk('div', '', '어느 화면 도면과도 연결되지 않은 ' + (n.type === 'cache' ? '캐시' : 'DB') + '입니다(db.md 에는 있음).'));
+      else detail.appendChild(mk('div', '', '쓰는 화면 ' + total + '개'));
+      ug.forEach(function (x) {
+        detail.appendChild(mk('div', 'sec', x.g + ' (' + x.list.length + ')'));
+        var ul = mk('ul'); x.list.forEach(function (s) { ul.appendChild(mk('li', '', s.name + ' — ' + relText(s.rel))); }); detail.appendChild(ul);
+        x.list.forEach(function (s) { var sn = byId['s:' + s.name]; if (sn && sn.el) { var u = sn.el.querySelector('.utag'); if (u) { u.textContent = relText(s.rel); u.classList.add('tag'); } } });
+      });
+      if (n.type === 'engine') { row(detail, '⇢대체(이 엔진이 실패하면)', out(id, 'fallback').map(nameOf)); row(detail, '⇢대체(이 엔진으로 대신함)', inn(id, 'fallback').map(nameOf)); }
+    }
     detail.appendChild(mk('div', 'foot', '도면이 있는 화면만 표시됩니다(미작성 화면은 코드로 확인).'));
   }
+  function applyFlow() {   // 탭을 옮긴 뒤에도 고른 동작을 상세 카드·번호 배지에 되살린다
+    if (!selScreen || !flowPick) return;
+    var cards = detail.querySelectorAll('.flow-card'), hit = null;
+    for (var i = 0; i < cards.length; i++) if (cards[i].dataset.flow === flowPick) hit = cards[i];
+    if (hit) selectFlow(selScreen, flowPick, hit);
+  }
+
+  /* ── 흐름 보기 ── */
+  var fscreens = document.getElementById('fscreens'), factions = document.getElementById('factions'), fig = document.getElementById('fig');
+  var COLOF = { need: 1, api: 1, engine: 2, module: 2, db: 3, cache: 3, device: 3, external: 3, screen: 3 };
+  var HEADS = ['화면 · 동작', '경로 (필요 · API)', '엔진 · 모듈', '저장소 · 외부'];
+  window.__segs = []; window.__chips = [];
+  function fpick() { var sn = byId[selScreen]; if (!sn || !sn.flows || !sn.flows.length) return null; var f = sn.flows.filter(function (x) { return x.name === flowPick; })[0]; return f || sn.flows[0]; }
+  function renderFlowTab() {
+    if (!selScreen) selScreen = screens[0].id;
+    fscreens.textContent = ''; factions.textContent = '';
+    groups.forEach(function (g) {
+      fscreens.appendChild(mk('div', 'glabel', g.name));
+      var r = mk('div', 'row');
+      g.screens.forEach(function (s) {
+        var n = byId['s:' + s]; if (!n) return;
+        var b = mk('button', 'item t-screen' + (n.id === selScreen ? ' sel' : '')); b.type = 'button'; b.textContent = n.label; b.setAttribute('aria-pressed', n.id === selScreen ? 'true' : 'false');
+        b.addEventListener('click', function () { if (selScreen !== n.id) { selScreen = n.id; flowPick = null; selected = null; renderFlowTab(); } });
+        r.appendChild(b);
+      });
+      fscreens.appendChild(r);
+    });
+    var sn = byId[selScreen], cur = fpick();
+    factions.appendChild(mk('div', 'glabel', sn.label + ' 의 동작 (' + (sn.flows ? sn.flows.length : 0) + '개)'));
+    (sn.flows || []).forEach(function (f, i) {
+      var b = mk('button', 'item' + (cur && f.name === cur.name ? ' sel' : '')); b.type = 'button'; b.setAttribute('aria-pressed', cur && f.name === cur.name ? 'true' : 'false');
+      b.appendChild(mk('span', 'num', String(i + 1))); b.appendChild(document.createTextNode(f.name)); b.appendChild(mk('small', '', f.steps.length + '단계'));
+      b.addEventListener('click', function () { flowPick = f.name; renderFlowTab(); });
+      factions.appendChild(b);
+    });
+    drawFlow(sn, cur);
+  }
+  function drawFlow(sn, f) {
+    fig.textContent = ''; window.__segs = []; window.__chips = [];
+    if (!f) { fig.appendChild(mk('div', 'fempty', '이 화면에는 동작별 흐름이 없습니다.')); return; }
+    var grid = mk('div', 'fgrid');
+    HEADS.forEach(function (h, i) { var e = mk('div', 'fhead', h); e.style.gridColumn = String(i + 1); e.style.gridRow = '1'; grid.appendChild(e); });
+    var gs = []; f.steps.forEach(function (st) { var gi = parseInt(st.n, 10) - 1; (gs[gi] = gs[gi] || []).push(st); });
+    var start = mk('div', 'item t-screen fstart'); start.style.gridColumn = '1'; start.style.gridRow = '2 / span ' + gs.length;
+    start.appendChild(mk('span', 'nm', sn.label)); start.appendChild(mk('small', '', (sn.group || '') + ' 묶음')); start.appendChild(mk('span', 'act', f.name)); grid.appendChild(start);
+    var chipsByGroup = [];
+    gs.forEach(function (g, gi) {
+      var cell = mk('div', 'fcell' + (g.length > 1 ? ' stack' : '')); cell.style.gridColumn = String(COLOF[g[0].type] + 1); cell.style.gridRow = String(gi + 2);
+      chipsByGroup[gi] = g.map(function (st) {
+        var c = mk('div', 'sample t-' + st.type + ' fchip'); c.appendChild(mk('span', 'num', numLabel(st.n)));
+        var l = mk('span', 'lbl'); l.appendChild(mk('small', '', st.rl)); putText(l, st.label, st.type); c.appendChild(l);
+        cell.appendChild(c); return c;
+      });
+      grid.appendChild(cell);
+    });
+    fig.appendChild(grid);
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'farrows'); svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = '<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z"/></marker><marker id="ahd" class="mdash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z"/></marker></defs>';
+    fig.appendChild(svg);
+    fig._draw = function () {
+      Array.prototype.slice.call(svg.querySelectorAll('path.ln')).forEach(function (p) { p.remove(); });
+      var o = fig.getBoundingClientRect(); window.__segs = []; window.__chips = [];
+      function R(el) { var r = el.getBoundingClientRect(); return { l: r.left - o.left, r: r.right - o.left, t: r.top - o.top, b: r.bottom - o.top, cx: (r.left + r.right) / 2 - o.left, cy: (r.top + r.bottom) / 2 - o.top }; }
+      function add(d, dash, segs, tag) { var p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('class', 'ln' + (dash ? ' dash' : '')); p.setAttribute('d', d); p.setAttribute('marker-end', dash ? 'url(#ahd)' : 'url(#ah)'); svg.appendChild(p); segs.forEach(function (s) { s.tag = tag; window.__segs.push(s); }); }
+      svg.setAttribute('width', o.width); svg.setAttribute('height', o.height);
+      var rs = R(start); window.__chips.push({ name: 'start', r: rs });
+      chipsByGroup.forEach(function (cs, gi) { cs.forEach(function (c, bi) { window.__chips.push({ name: gi + ':' + bi, r: R(c) }); }); });
+      var r0 = R(chipsByGroup[0][0]);
+      var y0 = r0.cy; add('M' + rs.r + ',' + y0 + ' H' + (r0.l - 2), false, [{ x1: rs.r, y1: y0, x2: r0.l, y2: y0, from: 'start', to: '0:0' }], 'start');
+      function elbow(a, b, aName, bName, dash, tag) {   // a 아래 → 두 칩 사이 틈의 가운데 → b 위. 선은 칩 사이 틈에만 놓여 글자를 지나지 않는다
+        var ym = (a.b + b.t) / 2;
+        add('M' + a.cx + ',' + a.b + ' V' + ym + ' H' + b.cx + ' V' + (b.t - 2), dash, [
+          { x1: a.cx, y1: a.b, x2: a.cx, y2: ym, from: aName, to: bName }, { x1: a.cx, y1: ym, x2: b.cx, y2: ym, from: aName, to: bName }, { x1: b.cx, y1: ym, x2: b.cx, y2: b.t, from: aName, to: bName }], tag);
+      }
+      for (var gi = 0; gi < chipsByGroup.length; gi++) {
+        var cs = chipsByGroup[gi];
+        for (var k = 1; k < cs.length; k++) elbow(R(cs[k - 1]), R(cs[k]), gi + ':' + (k - 1), gi + ':' + k, true, 'fallback');   // ⇢대체: 같은 번호의 a→b, 점선
+        if (gi > 0) { var pc = chipsByGroup[gi - 1]; elbow(R(pc[pc.length - 1]), R(cs[0]), (gi - 1) + ':' + (pc.length - 1), gi + ':0', false, 'step'); }   // 대체 가지가 있으면 마지막(b)에서 다음 단계로
+      }
+    };
+    requestAnimationFrame(function () { fig._draw(); });
+  }
+  window.addEventListener('resize', function () { if (tab === 'flow' && fig._draw) fig._draw(); });
+
+  /* ── 탭 ── */
+  var tabBtns = document.querySelectorAll('.tabs button');
+  function show(t) {
+    tab = t;
+    Array.prototype.forEach.call(tabBtns, function (b) { b.setAttribute('aria-selected', b.dataset.tab === t ? 'true' : 'false'); });
+    document.getElementById('layout').hidden = (t === 'flow');
+    document.getElementById('v-tree').hidden = (t !== 'tree');
+    document.getElementById('v-conn').hidden = (t !== 'conn');
+    document.getElementById('v-flow').hidden = (t !== 'flow');
+    document.getElementById('tabnote').textContent = selScreen ? '선택한 화면: ' + byId[selScreen].label : '';
+    if (t === 'flow') { renderFlowTab(); return; }
+    if (t === 'tree' && selScreen && selected !== selScreen) { var keep = flowPick; select(selScreen); flowPick = keep; applyFlow(); }
+    else if (t === 'tree' && !selScreen && selected) select(null);
+    else if (t === 'conn' && selScreen && !selected) { var k2 = flowPick; select(selScreen); flowPick = k2; applyFlow(); }
+  }
+  Array.prototype.forEach.call(tabBtns, function (b) { b.addEventListener('click', function () { show(b.dataset.tab); }); });
+  var oldSelect = select;
+  select = function (id) { oldSelect(id); document.getElementById('tabnote').textContent = selScreen ? '선택한 화면: ' + byId[selScreen].label : ''; };
+  window.__map = { show: show, select: function (id) { select(id); }, selectFlow: function (name) { var c = detail.querySelector('.flow-card[data-flow="' + name + '"]'); if (c) c.click(); }, state: function () { return { tab: tab, selected: selected, selScreen: selScreen, flowPick: flowPick }; }, redraw: function () { if (fig._draw) fig._draw(); } };
+  detail.textContent = EMPTY_MSG;
 })();
 </script>
 </body>
@@ -653,7 +922,7 @@ function main() {
   if (errs.length) { console.error('blueprint:gen 검증 오류 ' + errs.length + '건 — 파일을 쓰지 않고 멈춥니다\n' + errs.map(e => ' - ' + e).join('\n')); process.exit(1); }
   writeReadme(genSection(screens, pages));
   writeReadme(genDbSection(screens, dbItems), DBDOC);
-  fs.writeFileSync(MAP, mapHtml(mapData(screens, pages, groups)));
+  fs.writeFileSync(MAP, mapHtml(mapData(screens, pages, groups, dbItems)));
   const size = writeBundle(screens);
   console.log('blueprint:gen 완료 — 화면 파일 ' + screens.length + '개, 미작성 ' + pages.filter(p => !screens.some(s => s.file === p.file)).length + '개, _bundle.md ' + size + ' bytes');
   const nFlows = screens.reduce((a, s) => a + s._flows.length, 0), nSteps = screens.reduce((a, s) => a + s._flows.reduce((x, f) => x + f.steps.length, 0), 0);
