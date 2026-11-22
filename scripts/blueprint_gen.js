@@ -1379,6 +1379,126 @@ function genApiSection(api, dbItems) {
   return L.join('\n');
 }
 
+// ── map.html "서비스" 탭 데이터 (작업B-005c) ─────────────────────────────────────
+// 로그인 줄기(번호 단계 6개)와 기능 → API 묶음 → 엔진·외부·저장소 목록, 그리고 거꾸로 보기(저장소·엔진·외부 → API 묶음·API → 기능).
+// 출처는 api.md(파싱 결과), db.md, LEGEND, 화면 머리말 requires·modules·navigates·reads(정적 파일). 선은 그리지 않는다.
+// 인증·계정 묶음 3행은 줄기에만 둔다. requireAuth 의 users 읽기(api.md 공통 규칙)는 목록에 넣지 않는다.
+const SVC_TRUNK_KEYS = ['GET /auth/google', 'GET /auth/google/callback', 'GET /api/me'];
+const SVC_GOOGLE = 'Google 로그인(OAuth)';
+const SVC_EVIDENCE = [   // [파일:줄, 그 줄에 있어야 하는 문자열]
+  ['home-wheel/src/HomeWheelApp.jsx:86', '/auth/google'], ['home-wheel/src/HomeWheelApp.jsx:212', '/auth/google'], ['routes/auth.js:67', '/auth/google'], ['routes/auth.js:28', 'GoogleStrategy'],
+  ['routes/auth.js:72', 'authenticate'], ['routes/auth.js:75', '/auth/google/callback'], ['routes/auth.js:38', 'pool.query'], ['public/js/common/authGate.js:154', '/api/me'],
+  ['routes/auth.js:101', '/api/me'], ['middleware/auth.js:30', 'users'],
+];
+function serviceTabData(L, screens, groups, dbItems, api, warnN) {
+  const errs = [];
+  const authRows = api.rows.filter(r => r.group === '인증·계정');
+  if (authRows.map(r => r.key).join(' | ') !== SVC_TRUNK_KEYS.join(' | ')) errs.push('api.md 인증·계정 행이 줄기 순서(' + SVC_TRUNK_KEYS.join(', ') + ')와 다릅니다: ' + authRows.map(r => r.key).join(', '));
+  const rowOf = k => api.rows.find(r => r.key === k);
+  const rAuth = rowOf(SVC_TRUNK_KEYS[0]), rCb = rowOf(SVC_TRUNK_KEYS[1]), rMe = rowOf(SVC_TRUNK_KEYS[2]);
+  if (!rAuth || !rCb || !rMe) return { errs: errs.concat(['줄기 API 행이 api.md 에 없습니다']) };
+  if (!rAuth.externals.includes(SVC_GOOGLE) || !rCb.externals.includes(SVC_GOOGLE)) errs.push('줄기 ③⑤ 행의 외부가 ' + SVC_GOOGLE + ' 이어야 합니다');
+  for (const r of [rCb, rMe]) if (!r.reads.includes('DB:users') || !r.writes.includes('DB:users')) errs.push('줄기 ⑤⑥ 행(' + r.key + ')이 users 읽기·쓰기를 가져야 합니다');
+  for (const [loc, needle] of SVC_EVIDENCE) {   // 줄기 근거(파일:줄)가 실제 코드와 맞는지
+    const [f, n] = [loc.slice(0, loc.lastIndexOf(':')), +loc.slice(loc.lastIndexOf(':') + 1)];
+    const p = path.join(ROOT, f);
+    const ls = fs.existsSync(p) ? lf(fs.readFileSync(p, 'utf8')).split('\n') : null;
+    if (!ls || !(ls[n - 1] || '').includes(needle)) errs.push('줄기 근거 ' + loc + ' 에 "' + needle + '" 가 없습니다');
+  }
+  const gated = new Set(screens.filter(s => s.modules.some(m => /(^|\/)authGate\.js$/.test(m))).map(s => s.screen));
+  // 관문에 연결되는 API: "공용" 행 중 GET /api/me 하나뿐이어야 한다(GET /auth/google 는 로그인 쪽이다). 공용 행은 인증·계정 묶음 안에만 있어야 한다
+  const commonRows = api.rows.filter(r => r.screens.includes('공용'));
+  commonRows.forEach(r => { if (r.group !== '인증·계정') errs.push('공용 행 ' + r.key + ' 가 인증·계정 묶음 밖에 있습니다'); });
+  const gateApis = [rMe];
+  if (gateApis.some(r => authRows.slice(0, 2).includes(r))) errs.push('잘못된 연결: 로그인 관문 → ' + SVC_TRUNK_KEYS[0] + ' / callback');
+  const NOUN = { engine: '엔진', external: '외부', db: 'DB', cache: '캐시', file: '파일' };
+  const apis = api.rows.map((r, i) => ({ i, key: r.key, group: r.group, def: r.def, auth: r.auth, reads: r.reads, writes: r.writes, engines: r.engines, externals: r.externals, files: r.files, screens: r.screens, basis: r.basis, trunk: authRows.includes(r) }));
+  const tid = (kind, name) => kind + ':' + name;
+  const tlabel = t => t.slice(t.indexOf(':') + 1);
+  const dbKind = t => (dbItems.get(t) || { kind: 'DB' }).kind === 'DB' ? 'db' : 'cache';
+  // API 마다 닿는 대상(종류별): [{ id, type, name, rel }] rel = 호출 | 읽기 | 쓰기 | 읽기·쓰기
+  const touch = a => {
+    const m = new Map(), put = (id, type, name, r) => { const o = m.get(id) || { id, type, name, r: {} }; o.r[r] = 1; m.set(id, o); };
+    a.engines.forEach(e => put(tid('e', e), 'engine', e, '호출')); a.externals.forEach(x => put(tid('x', x), 'external', x, '호출'));
+    a.reads.forEach(t => put(tid(dbKind(t) === 'db' ? 'd' : 'c', tlabel(t)), dbKind(t), tlabel(t), '읽기')); a.writes.forEach(t => put(tid(dbKind(t) === 'db' ? 'd' : 'c', tlabel(t)), dbKind(t), tlabel(t), '쓰기'));
+    a.files.forEach(f => put(tid('f', f), 'file', f, '읽기'));
+    return [...m.values()].map(o => ({ id: o.id, type: o.type, name: o.name, rel: o.r['읽기'] && o.r['쓰기'] ? '읽기·쓰기' : Object.keys(o.r)[0] }));
+  };
+  apis.forEach(a => { a.touch = touch(a); });
+  // 기능
+  const sorted = screens.slice().sort((a, b) => L.screens.indexOf(a.screen) - L.screens.indexOf(b.screen));
+  const apiFilesAny = new Set(); api.rows.forEach(r => r.files.forEach(f => apiFilesAny.add(f)));
+  const scrOut = sorted.map(s => {
+    const g = (groups.find(x => x.screens.includes(s.screen)) || {}).name || '';
+    const common = r => r.screens.includes('공용');
+    // 이 기능이 직접 부르는 API(관문의 공용 /api/me·/auth/google 는 제외 = 인증·계정 묶음은 줄기에만 둔다)
+    const called = apis.filter(a => !a.trunk && a.screens.includes(s.screen));
+    const byGroup = new Map(); called.forEach(a => { if (!byGroup.has(a.group)) byGroup.set(a.group, []); byGroup.get(a.group).push(a.i); });
+    const tm = new Map();
+    called.forEach(a => a.touch.forEach(t => { const o = tm.get(t.id) || { id: t.id, type: t.type, name: t.name, r: {}, src: 'api' }; o.r[t.rel] = 1; if (t.rel === '읽기·쓰기') { o.r['읽기'] = 1; o.r['쓰기'] = 1; } tm.set(t.id, o); }));
+    const fread = s.reads.filter(x => x.startsWith('파일:') && !apiFilesAny.has(x.slice(3))).map(x => x.slice(3));
+    fread.forEach(n => tm.set('f:' + n, { id: 'f:' + n, type: 'file', name: n, r: { 읽기: 1 }, src: 'header' }));
+    const targets = [...tm.values()].map(o => ({ id: o.id, type: o.type, name: o.name, rel: o.r['읽기'] && o.r['쓰기'] ? '읽기·쓰기' : Object.keys(o.r)[0], src: o.src })).sort((a, b) => (['engine', 'external', 'db', 'cache', 'file'].indexOf(a.type) - ['engine', 'external', 'db', 'cache', 'file'].indexOf(b.type)) || byCode(a.name, b.name));
+    return { name: s.screen, group: g, file: s.file, gated: gated.has(s.screen), requires: s.requires, navigates: s.navigates, gateOnly: gated.has(s.screen) && !called.length,
+      apiGroups: [...byGroup.entries()].map(([gn, idx]) => ({ group: gn, total: gcountOf(gn), apis: idx })), targets, fread };
+  });
+  function gcountOf(gn) { return api.rows.filter(r => r.group === gn).length; }
+  // 거꾸로 보기: 엔진·외부·DB·캐시·파일마다 그것을 쓰는 API(묶음별)와 그 API 를 부르는 기능
+  const targetList = [];
+  const order = ['engine', 'external', 'db', 'cache', 'file'];
+  for (const e of L.engines) targetList.push({ id: 'e:' + e, type: 'engine', name: e });
+  for (const x of L.externals) targetList.push({ id: 'x:' + x, type: 'external', name: x });
+  for (const [k, v] of [...dbItems.entries()].sort((a, b) => byCode(a[1].name, b[1].name))) targetList.push({ id: (v.kind === 'DB' ? 'd:' : 'c:') + v.name, type: v.kind === 'DB' ? 'db' : 'cache', name: v.name });
+  for (const [n] of [...L.files.entries()].sort((a, b) => byCode(a[0], b[0]))) targetList.push({ id: 'f:' + n, type: 'file', name: n });
+  const lgd = lf(fs.readFileSync(LEGEND, 'utf8')).split('\n'), engDesc = {};
+  lgd.forEach(l => { const m = l.match(/^\| ([^|]+?) \| (.+) \|$/); if (m && L.engines.includes(m[1])) engDesc[m[1]] = m[2]; });
+  const dbd = {}; lf(fs.readFileSync(DBDOC, 'utf8')).split('\n').forEach(l => { const m = l.match(/^\| (DB|캐시):([A-Za-z0-9_]+) \| ([^|]+?) \| ([^|]+?) \|/); if (m) dbd[m[2]] = m[3] + ' (' + m[4] + ')'; });
+  const callersOf = idxs => { const set = new Set(); idxs.forEach(i => apis[i].screens.forEach(s => { if (s !== '공용') set.add(s); })); return [...set].sort((a, b) => L.screens.indexOf(a) - L.screens.indexOf(b)); };
+  targetList.forEach(t => {
+    const hits = apis.filter(a => a.touch.some(x => x.id === t.id));
+    const byG = new Map(); hits.filter(a => !a.trunk).forEach(a => { if (!byG.has(a.group)) byG.set(a.group, []); byG.get(a.group).push({ i: a.i, rel: a.touch.find(x => x.id === t.id).rel }); });
+    t.groups = [...byG.entries()].map(([gn, list]) => ({ group: gn, apis: list }));
+    t.trunk = hits.filter(a => a.trunk).map(a => a.key);   // 줄기 안 API(콜백·관문): 목록에는 줄기로만 표시
+    const flat = hits.filter(a => !a.trunk);
+    t.readN = hits.filter(a => a.touch.find(x => x.id === t.id).rel.includes('읽기')).length;
+    t.writeN = hits.filter(a => a.touch.find(x => x.id === t.id).rel.includes('쓰기')).length;
+    t.callN = hits.filter(a => a.touch.find(x => x.id === t.id).rel === '호출').length;
+    t.apiN = flat.length;
+    t.callers = callersOf(flat.map(a => a.i));
+    t.freadScreens = scrOut.filter(s => s.fread.includes(t.name) && t.type === 'file').map(s => s.name);
+    t.desc = t.type === 'engine' ? (engDesc[t.name] || '') : (dbd[t.name] || '');
+  });
+  // ── 검사: 묶음 단위 개수를 api.md 에서 따로 센 값과 대조 ──
+  const tIds = new Set(targetList.map(t => t.id));
+  scrOut.forEach(s => {
+    const rows = api.rows.filter(r => r.group !== '인증·계정' && r.screens.includes(s.name));
+    const groupsSeen = new Set(rows.map(r => r.group)), stores = new Set(), ee = new Set();
+    rows.forEach(r => { r.reads.concat(r.writes).forEach(t => stores.add(t)); r.files.forEach(f => stores.add('파일:' + f)); r.engines.forEach(e => ee.add(e)); r.externals.forEach(x => ee.add(x)); });
+    s.fread.forEach(f => stores.add('파일:' + f));
+    const mine = s.targets.filter(t => t.type === 'db' || t.type === 'cache' || t.type === 'file').length, mineEE = s.targets.filter(t => t.type === 'engine' || t.type === 'external').length;
+    if (s.apiGroups.length !== groupsSeen.size || s.apiGroups.reduce((a, g) => a + g.apis.length, 0) !== rows.length || mine !== stores.size || mineEE !== ee.size)
+      errs.push('기능 "' + s.name + '" 의 묶음·API·대상 개수가 api.md 에서 따로 센 값과 다릅니다');
+    s.targets.forEach(t => { if (!tIds.has(t.id)) errs.push('기능 "' + s.name + '" 의 대상 ' + t.id + ' 가 LEGEND·db.md 에 없습니다'); });
+  });
+  targetList.forEach(t => {
+    const rows = api.rows.filter(r => r.group !== '인증·계정' && (r.engines.includes(t.name) && t.type === 'engine' || r.externals.includes(t.name) && t.type === 'external' || r.reads.concat(r.writes).some(x => x === (t.type === 'db' ? 'DB:' : '캐시:') + t.name) && (t.type === 'db' || t.type === 'cache') || r.files.includes(t.name) && t.type === 'file'));
+    if (t.apiN !== rows.length || t.groups.length !== new Set(rows.map(r => r.group)).size) errs.push('대상 "' + t.name + '" 의 API·묶음 개수가 api.md 에서 따로 센 값과 다릅니다');
+  });
+  const trunk = [
+    { n: 1, items: [{ rel: '시작', kind: 'user', label: '사용자' }], ev: ['home-wheel/src/HomeWheelApp.jsx:86'], note: '홈에서 로그인 전 메뉴를 누르면 로그인으로 보낸다' },
+    { n: 2, items: [{ rel: '누름', kind: 'login', label: '로그인(Google OAuth)' }], ev: ['home-wheel/src/HomeWheelApp.jsx:212'], note: '"Google로 로그인" 링크(홈). 사전·스펠링 런에도 같은 로그인 링크가 있다' },
+    { n: 3, items: [{ rel: '호출', kind: 'api', label: rAuth.key }, { rel: '나감', kind: 'ext', label: SVC_GOOGLE }], ev: ['routes/auth.js:67', 'routes/auth.js:72'], note: '인증 ' + rAuth.auth },
+    { n: 4, items: [{ rel: '인증', kind: 'ext', label: SVC_GOOGLE }], ev: ['routes/auth.js:28'], note: 'Google 이 사용자를 확인하고 콜백 주소로 되돌려 보낸다' },
+    { n: 5, items: [{ rel: '돌아옴', kind: 'api', label: rCb.key }, { rel: '저장', kind: 'db', label: 'users', tag: '읽기·쓰기' }], ev: ['routes/auth.js:75', 'routes/auth.js:38'], note: '사용자 행을 만들거나 갱신하고 JWT 를 돌려준다. 차단·미승인이면 토큰 없이 안내만' },
+    { n: 6, items: [{ rel: '확인', kind: 'gate', label: '로그인 관문', sub: 'authGate.js + ' + rMe.key }, { rel: '읽기·쓰기', kind: 'db', label: 'users', tag: '읽기·쓰기' }], ev: ['public/js/common/authGate.js:154', 'routes/auth.js:101', 'middleware/auth.js:30'], note: '관문을 거치는 기능 ' + gated.size + '개(홈 제외). 서버는 인증이 공개가 아닌 모든 요청마다 users 를 읽는다' },
+  ];
+  const gateSummary = { screens: gated.size, groups: 1, apis: gateApis.length, stores: new Set(gateApis.flatMap(r => r.reads.concat(r.writes))).size };
+  const hashes = [...new Set(screens.map(s => s.last_checked))].sort(byCode);
+  const freadN = scrOut.reduce((a, s) => a + s.fread.length, 0);
+  const stat = { trunk: trunk.length, screens: scrOut.length, groups: API_GROUPS.length - 1, apis: apis.filter(a => !a.trunk).length, targets: targetList.length, freadN, gate: gateSummary, gateOnly: scrOut.filter(s => s.gateOnly).map(s => s.name), screenGroupPairs: scrOut.reduce((a, s) => a + s.apiGroups.length, 0), targetGroupPairs: targetList.reduce((a, t) => a + t.groups.length, 0) };
+  return { errs, trunk, gate: gateSummary, screens: scrOut, groups: groups.map(g => ({ name: g.name, screens: g.screens })), apis: apis.map(a => ({ i: a.i, key: a.key, group: a.group, def: a.def, auth: a.auth, trunk: a.trunk })), targets: targetList, commit: hashes.join(', '), warnN, freadN, stat };
+}
+
 // ── service.html 데이터 (작업B-005) ─────────────────────────────────────────
 // 서비스 흐름도 [입구·관문] → [기능] → [API 묶음] → [엔진·외부·저장소] 의 노드와 선. 출처는 api.md(파싱 결과), db.md, LEGEND, 화면 머리말 modules·requires.
 // 선(방향은 항상 왼쪽 → 오른쪽): flow(입구·관문·기능 → API), call(API → 엔진·외부), read(API → DB·캐시·파일), write(API → DB·캐시).
@@ -1962,6 +2082,9 @@ function main() {
   if (kk.write !== cc.write) svcErr.push('write 선 ' + kk.write + ' != 쓰기 칸 합 ' + cc.write);
   if (kk.flow !== cc.flowCells - cc.flowSkipped + 1 + gatedN + 2) svcErr.push('flow 선 ' + kk.flow + ' != 호출 화면 칸 합 ' + cc.flowCells + ' - 공용 생략 ' + cc.flowSkipped + ' + 입구 1 + 관문→화면 ' + gatedN + ' + 로그인→API 2');
   if (svcErr.length) { console.error('blueprint:gen 서비스 흐름도 데이터 불일치:\n' + svcErr.map(e => ' - ' + e).join('\n')); process.exit(1); }
+  const stab = serviceTabData(L, screens, groups, dbItems, api, API_WARNS.filter(w => w.kind === 'screenDiff').length);
+  if (stab.errs && stab.errs.length) { console.error('blueprint:gen 서비스 탭 데이터 오류:' + String.fromCharCode(10) + stab.errs.map(e => ' - ' + e).join(String.fromCharCode(10))); process.exit(1); }
+  const tabStat = stab.stat; delete stab.errs;
   fs.writeFileSync(MAP, mapHtml(mapData(screens, pages, groups, dbItems)));
   fs.writeFileSync(BOARD, boardHtml(boardData(mapData(screens, pages, groups, dbItems))));
   const size = writeBundle(screens);
@@ -1971,6 +2094,7 @@ function main() {
   console.log('흐름: 동작 ' + nFlows + '개, 단계 ' + nSteps + '개 (' + screens.map(s => s.screen + ' ' + s._flows.length).join(', ') + ')');
   console.log('경고(오류 아님): 흐름에만 있는 대상 ' + flowOnly.length + '건, 머리말에만 있고 흐름에 안 나오는 대상 ' + headerOnly.length + '건(그중 기기 저장값 ' + headerOnly.filter(w => w.device).length + '건)');
   fs.writeFileSync(SERVICE, serviceHtml(svc));
+  console.log('서비스 탭 데이터: 줄기 ' + tabStat.trunk + '단계, 기능 ' + tabStat.screens + '개, API 묶음 ' + tabStat.groups + '개(인증·계정은 줄기에만), API ' + tabStat.apis + '개, 거꾸로 보기 대상 ' + tabStat.targets + '개(엔진 ' + L.engines.length + ', 외부 ' + L.externals.length + ', DB·캐시 ' + dbItems.size + ', 파일 ' + L.files.size + '); 기능→묶음 ' + tabStat.screenGroupPairs + '쌍, 대상→묶음 ' + tabStat.targetGroupPairs + '쌍, 정적 파일 읽기 ' + tabStat.freadN + '건; 관문 통과 기능 ' + tabStat.gate.screens + '개, 관문만 거치는 기능 ' + tabStat.gateOnly.join('·'));
   console.log('서비스 흐름도 데이터: 노드 ' + sx.nodes + '개(입구·관문 2, 기능 ' + sx.screens + ', API 묶음 ' + sx.groups + ', API ' + sx.apis + ', 엔진 ' + sx.engines + ', 외부 ' + sx.externals + ', DB ' + sx.db + ', 캐시 ' + sx.cache + ', 파일 ' + sx.files + '), 선 ' + sx.edges + '개(flow ' + kk.flow + ', call ' + kk.call + ', read ' + kk.read + ', write ' + kk.write + ', fread ' + (kk.fread || 0) + ')');
   const apiN = k => API_WARNS.filter(w => w.kind === k).length;
   console.log('api.md: API ' + api.rows.length + '개. 경고(오류 아님): 화면이 부르는데 api.md 에 없는 경로 ' + apiN('noRoute') + '건(검사한 문자열 ' + aw.literals + '개), 화면 머리말과 api.md 의 접근 차이 ' + apiN('screenDiff') + '건, 접근하는 API 가 없는 db.md 항목 ' + apiN('noApi') + '건');
