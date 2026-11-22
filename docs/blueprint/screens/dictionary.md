@@ -3,7 +3,7 @@ screen: 사전
 file: public/english_dictionary.html
 engines: [AI 사전·단어 질의(Claude Haiku), 서버 음성(OpenAI TTS), 기기 음성(speechSynthesis), 기기 글자 인식(Tesseract.js), 간격 반복 복습(SM-2)]
 calls: [GET /api/me, POST /api/ai, GET /api/wordbook, POST /api/wordbook, DELETE /api/wordbook/:id, PATCH /api/wordbook/:id/example, PATCH /api/wordbook/:id/it, DELETE /api/wordbook/:id/it, POST /api/quiz-correct, GET /api/review-due, POST /api/review-result, POST /api/tts]
-reads: [DB:users, DB:wordbook, DB:api_usage, 캐시:tts_cache, 기기:mydict_token, 기기:mydict_wrong, 기기:metis_tts_mode, 기기:spellrun_landing_count]
+reads: [DB:users, DB:wordbook, DB:api_usage, 캐시:tts_cache, 파일:ocr_word_list, 기기:mydict_token, 기기:mydict_wrong, 기기:metis_tts_mode, 기기:spellrun_landing_count]
 writes: [DB:wordbook, DB:review_log, DB:api_usage, 캐시:tts_cache, 기기:mydict_token, 기기:mydict_wrong, 기기:metis_tts_mode, 기기:spellrun_landing_count, 기기:spellrun_ids]
 fallback: [서버 음성(OpenAI TTS) ⇢ 기기 음성(speechSynthesis)]
 flows: [
@@ -53,8 +53,10 @@ last_checked: 8753b0a
 - →읽기: [DB] users(`/api/me`·권한 can_search·can_wordbook·can_tts), [DB] wordbook(단어장·복습 대상), [DB] api_usage(하루 한도 계산: ai·tts), [캐시] tts_cache(발음 캐시 적중).
 - →쓰기: [DB] wordbook(저장·삭제·예문·IT 설명·복습값), [DB] review_log(복습 점수), [DB] api_usage(ai·tts 사용 기록, tts는 캐시 미스만, routes/tts.js:150), [캐시] tts_cache(발음 미스 저장).
 - 결과가 쌓이는 곳: 단어장은 wordbook(사용자별). 검색 결과 자체는 단어장에 저장할 때만 wordbook.data 열에 들어간다. [미확인] 검색 결과의 서버 쪽 별도 캐시는 routes/dictionary.js에서 보이지 않음(없는 것으로 보이나 전체 확인은 안 함).
+- [파일] →읽기: ocr_word_list(public/data/ocr-word-list.txt, 카메라 글자 인식이 영어 단어 목록으로 fetch 한다: public/js/ocr/extractEnglishCandidates.js:195). 정적 파일이다(server.js:57).
 
 ## 5 연결
 - [API] 위 3절. [외부] Anthropic(/api/ai), OpenAI TTS(/api/tts 캐시 미스일 때만), Google Fonts(:23), jsDelivr tesseract.js 5.1.1(:4812).
 - [기기] localStorage `mydict_token`(로그인; 쓰기는 주소 ?token= 처리 :1765), `mydict_wrong`(퀴즈 오답, :1942), `metis_tts_mode`(단어 발음 방식, 스펠링 런과 공용; :4271), `spellrun_landing_count`(스펠링 런 한 번에 풀 단어 수 10|20, :3334; 사전 쪽 키 이름이지만 이름에 spellrun이 들어 있다), sessionStorage `spellrun_ids`(스펠링 런에 넘기는 단어 id). 주소 옵션 `?tts=server|device|reset`.
 - [모듈] public/js/common/authGate.js(진입 시 /api/me 1회 확인·401이면 홈), appHeader.js(헤더·로그인 위젯), dialog.js, public/js/ocr/ocrScanner.js(카메라 글자 인식 패널).
+- [파일] ocr_word_list(public/data/ocr-word-list.txt, LEGEND 9절).

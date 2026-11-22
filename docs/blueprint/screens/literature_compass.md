@@ -3,7 +3,7 @@ screen: 문학 나침반
 file: public/literature_compass.html
 engines: []
 calls: [GET /api/me]
-reads: [DB:users, 기기:mydict_token]
+reads: [DB:users, 파일:literature_db, 기기:mydict_token]
 writes: []
 fallback: []
 flows: [
@@ -38,9 +38,11 @@ last_checked: 49287a8
 - →읽기: [DB] users(권한 확인용 /api/me, perm_literature_compass).
 - →쓰기: 없음.
 - 정적 파일(DB 아님): `GET /literature_db.json`(fetch 'literature_db.json', :818)을 express.static 이 public/ 에서 보낸다(server.js:57). 최상위 키 version·last_updated·eras. 파일 저장소 후보: 문학 나침반 → public/literature_db.json.
+- [파일] →읽기: literature_db(public/literature_db.json, 화면이 fetch 한다 :818). 정적 파일이라 서버 라우트 없이 express.static 이 보낸다(server.js:57).
 
 ## 5 연결
 - [API] GET /api/me(위 3절). [외부] Google Fonts(:11).
 - [모듈] public/js/common/authGate.js(:6), appHeader.js(:578), dialog.js(:580, 퀴즈 중단 확인 metisConfirm).
 - [이동] 문학 나침반 →이동 홈·사전.
 - [미확인] 카드 뒤집기·퀴즈 채점의 세부 규칙(1173-1560)은 줄 단위로 읽지 않았다.
+- [파일] literature_db(public/literature_db.json, LEGEND 9절).

@@ -3,7 +3,7 @@ screen: Speak Loop
 file: public/speakloop.html
 engines: [저장 음성(Speak Loop)]
 calls: [GET /api/me, GET /api/speakloop/content, GET /api/speakloop/audio-index, GET /api/speakloop/audio/:clipKey, GET /api/speakloop/progress, POST /api/speakloop/progress]
-reads: [DB:users, DB:speakloop_audio, DB:speakloop_progress, 기기:mydict_token]
+reads: [DB:users, DB:speakloop_audio, DB:speakloop_progress, 파일:speakloop_content, 기기:mydict_token]
 writes: [DB:speakloop_progress]
 fallback: []
 flows: [
@@ -40,9 +40,11 @@ last_checked: 8753b0a
 - →읽기: [DB] users(권한 perm_speakloop, routes/speakloop.js:18), [DB] speakloop_audio(음성 목록·재생), [DB] speakloop_progress(진행).
 - →쓰기: [DB] speakloop_progress(사용자별 항목 횟수·마지막 평가). 이 화면은 speakloop_audio에 쓰지 않는다(쓰기는 관리자 화면, screens/admin.md 참고).
 - 결과가 쌓이는 곳: 진행은 speakloop_progress. 내 소리 녹음은 저장되지 않는다.
+- [파일] →읽기: speakloop_content(data/speakloop/content.json). 화면이 직접 여는 파일이 아니라 서버가 읽어 GET /api/speakloop/content 로 내려준다(lib/speakloop_content.js:88). data/ 는 정적 폴더 밖이다.
 
 ## 5 연결
 - [API] 위 3절(전부 requireAuth + requireSpeakloopPerm, routes/speakloop.js:28). [외부] Google Fonts(speakloop.html:9-11).
 - [기기] localStorage `mydict_token`(app.js:10). 그 밖의 저장값 없음(speakloop 화면 파일에서 localStorage·sessionStorage 사용은 이 1건만 확인).
 - [모듈] public/js/common/authGate.js, appHeader.js. 화면 전용 스크립트: public/js/speakloop/{core,player,rec,app,idiom}.js.
 - [미확인] 독백 연습 4개 모드 각각의 서버 호출 차이(app.js 전체는 읽지 않음, 호출은 위 6개 API만 grep으로 확인).
+- [파일] speakloop_content(data/speakloop/content.json, LEGEND 9절).

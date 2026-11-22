@@ -188,6 +188,14 @@
 - **spellrun_view** — 읽기: 스펠링 런 / 쓰기: 스펠링 런
 - **voice_tts_rate** — 읽기: 음성 학습 / 쓰기: 음성 학습
 
+### 파일별 사용 화면 ([파일] LEGEND 9절 고정 목록, →읽기 / →쓰기)
+- **artist_notes_db** — 읽기: 작가 노트 / 쓰기: -
+- **digest_db** — 읽기: 한입 독서 / 쓰기: -
+- **literature_db** — 읽기: 문학 나침반 / 쓰기: -
+- **ocr_word_list** — 읽기: 사전 / 쓰기: -
+- **science_db** — 읽기: 과학 / 쓰기: -
+- **speakloop_content** — 읽기: Speak Loop, 관리자 / 쓰기: -
+
 ### 외부 서비스별 사용 화면 ([외부])
 - **Anthropic API(Claude Haiku)** — 개념 지도, 관리자, 문장 학습, 사전, 음성 학습
 - **Google Fonts** — Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서

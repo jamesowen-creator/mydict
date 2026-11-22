@@ -3,7 +3,7 @@ screen: 과학
 file: public/science_reading.html
 engines: []
 calls: [GET /api/me]
-reads: [DB:users, 기기:mydict_token, 기기:science_conquest_]
+reads: [DB:users, 파일:science_db, 기기:mydict_token, 기기:science_conquest_]
 writes: [기기:science_conquest_]
 fallback: []
 flows: [
@@ -42,9 +42,11 @@ last_checked: 49287a8
 - →쓰기: 없음(DB).
 - 기기 저장값: localStorage `mydict_token`(읽기), `science_conquest_<id>`(:597-612, 개념마다 한 키, 값 'true'/'false'). 필터 키는 없다(localStorage 호출은 이 두 종류뿐).
 - 정적 파일(DB 아님): `GET /science_db.json`(fetch 'science_db.json', :1209)을 express.static 이 보낸다(server.js:57). 최상위 키 version·last_updated·concepts(32개 개념). 파일 저장소 후보: 과학 → public/science_db.json.
+- [파일] →읽기: science_db(public/science_db.json, 화면이 fetch 한다 :1209). 정적 파일이라 서버 라우트 없이 express.static 이 보낸다(server.js:57).
 
 ## 5 연결
 - [API] GET /api/me. [외부] Google Fonts(:11).
 - [모듈] authGate.js(:6), appHeader.js(:469), dialog.js(:471).
 - [이동] 과학 →이동 홈. 주소 `?field=`·`?tab=conq` 로 같은 화면 안의 보기를 가리키는 history 이동이 있으나(:832, :1091) 다른 화면으로 가지 않는다.
 - [미확인] 캐러셀 표시·관련 개념(related) 규칙의 세부(:664-725, :1274 이후).
+- [파일] science_db(public/science_db.json, LEGEND 9절).

@@ -12,6 +12,7 @@
 | [DB] | 저장소(DB 테이블) | PostgreSQL 테이블 | `reads`·`writes` 의 `DB:이름` |
 | [캐시] | 저장소(서버 캐시) | 같은 결과를 다시 만들지 않으려고 서버가 저장하는 테이블 | `reads`·`writes` 의 `캐시:이름` |
 | [기기] | 저장소(기기 저장값) | 브라우저 localStorage·sessionStorage 키 | `reads`·`writes` 의 `기기:키` |
+| [파일] | 저장소(파일) | DB 가 아닌 데이터 파일. 서버가 읽는 파일(data/ 아래)과 정적으로 내려주는 파일(public/ 아래 JSON·텍스트). 아래 9절 고정 목록의 이름만 쓴다 | `reads`·`writes` 의 `파일:이름` |
 | [외부] | 외부 | 앱 밖의 서비스(아래 4절 고정 목록) | `externals` |
 | [모듈] | 모듈 | 여러 화면이 같이 쓰는 파일(저장소 안 경로, 존재하는 파일이어야 함) | `modules` |
 | [미작성] | 미작성 | 도면이 아직 없는 화면(README 화면 목록·map.html 점선) | (화면 파일 없음) |
@@ -43,14 +44,15 @@
 | AI 사진 문장 인식(Claude Haiku) | `POST /api/jgrammar/ocr`. 사진 속 문장 인식 |
 | AI 단어 뜻 변환(Claude Haiku) | `/api/admin/gloss/*`. 저장된 영어 단어 뜻 일괄 변환(관리자) |
 | AI 음성 노트 처리(Claude Haiku) | `/api/voice-notes/*`. 요약·퀴즈·대화·개념 연결·이미지 계획 |
-| 음성 인식(OpenAI STT) | `POST /api/voice-notes/transcribe`. 녹음 → 글자 |
+| 음성 인식(OpenAI STT) | `POST /api/voice-notes/transcribe`(음성 학습)와 `POST /api/cmap/concepts/:id/answer/voice`(개념 지도 말로 설명하기). 녹음 → 글자(같은 OpenAI STT, 모델 VOICE_STT_MODEL) |
 | 이미지 생성(OpenAI Images) | `/api/voice-notes/:id/image`. 노트 요약 이미지 |
-| 서버 음성(OpenAI TTS) | `POST /api/tts`(tts-1-hd, tts_cache 캐시, 캐시 미스만 하루 한도 계산) |
+| 서버 음성(OpenAI TTS) | 두 곳에서 OpenAI TTS 를 부른다. (1) `POST /api/tts`: 모델 tts-1-hd, tts_cache 캐시, 캐시 미스만 하루 한도 계산. (2) 관리자 Speak Loop 음성 만들기(`/api/admin/speakloop/audio/preview·generate`): 기본 모델 gpt-4o-mini-tts(환경변수·미리듣기에서 tts-1·tts-1-hd 도 선택 가능), 결과는 speakloop_audio 에 저장(preview 는 저장 안 함) |
 | 저장 음성(Speak Loop) | 관리자가 만들어 speakloop_audio에 저장해 둔 음성만 재생(사용자 경로는 OpenAI 호출 없음) |
 | 기기 음성(speechSynthesis) | 브라우저·폰 내장 음성. 서버 호출 없음 |
 | 기기 글자 인식(Tesseract.js) | 브라우저 안 OCR(jsDelivr에서 받음). 서버 호출 없음 |
 | 간격 반복 복습(SM-2) | `/api/review-*`. 복습일 계산 |
 | 2인 대결 방(서버 메모리) | `/api/versus/rooms…`. DB 없이 서버 메모리(인스턴스 1개 전제) |
+| 서버 메모리 작업 상태 | 중복 실행 방지·횟수 제한용 서버 메모리 상태(인스턴스 1개 전제, 재시작하면 사라짐). 단어 뜻 변환 잠금(gloss_backfill runLocked), Speak Loop 음성 생성 잠금·미리듣기 횟수 제한(speakloop_tts), 음성 학습 지도 만들기 상태(mapBuilds)·연결 분석 중복 방지(linkInFlight), 개념 지도 해설 중복 방지(narrating). 방 정보를 담는 "2인 대결 방(서버 메모리)" 와 별개 이름 |
 | 스펠링 런 게임 엔진(캔버스) | logic.js·game.js. 스펠링 런 전용 |
 | AI 개념 지도 처리(Claude Haiku) | `/api/cmap/*`. 개념 설명·심화(explain·deepen)·지도 해설(narrate)·말로 설명하기 평가(answer). 같은 모델 CMAP_MODEL |
 | 기기 PDF 저장(캔버스) | 브라우저 안에서 지도 그림 → JPEG → 최소 PDF → 파일 다운로드(public/js/cmap/mapPdf.js). 서버 호출 없음 |
@@ -83,3 +85,26 @@ Anthropic API(Claude Haiku) / OpenAI TTS(음성 합성) / OpenAI STT(음성 인�
 학습: 사전, 스펠링 런, 문장 학습, 음성 학습, Speak Loop, 개념 지도
 읽기: 문학 나침반, 한입 독서, 과학, 작가 노트
 관리: 관리자
+
+## 9 파일 이름 고정 목록 (저장소 종류 [파일], 머리말 `파일:이름`)
+이 목록에 없는 이름은 머리말 reads·writes 에 쓸 수 없다(gen 이 멈춘다). 경로는 저장소 루트 기준이며 존재하는 파일이어야 한다. 쓰는 곳은 서버·화면 코드에는 없고(읽기 전용), 개발용 스크립트만 있으면 적었다.
+| 이름 | 경로 | 읽는 곳 | 쓰는 곳 |
+|---|---|---|---|
+| literature_db | public/literature_db.json | 문학 나침반(public/literature_compass.html:818 fetch) | 개발 스크립트 scripts/generate_literature_content.js:340 |
+| digest_db | public/digest_db.json | 한입 독서(public/digest_reading.html:680 fetch) | 개발 스크립트 scripts/generate_literature_content.js:341, scripts/validate_digest.js:133 |
+| science_db | public/science_db.json | 과학(public/science_reading.html:1209 fetch) | 없음 |
+| artist_notes_db | public/artist_notes_db.json | 작가 노트(public/artist_notes.html:531 fetch) | 없음 |
+| ocr_word_list | public/data/ocr-word-list.txt | 사전의 카메라 글자 인식(public/js/ocr/extractEnglishCandidates.js:195 fetch) | 없음 |
+| speakloop_content | data/speakloop/content.json | 서버(lib/speakloop_content.js:88 readFileSync) → Speak Loop·관리자 API | 없음 |
+- public/ 아래 파일은 `express.static`(server.js:57)이 로그인 없이 URL 로 보낸다. 화면의 권한 확인은 데이터를 받기 전 화면 코드가 할 뿐이다. data/ 아래 파일은 정적 폴더 밖이라 URL 로 열리지 않고 API 를 거친다.
+- 새 데이터 파일이 생기면 이 표에 먼저 한 줄 추가한다(엔진·외부 이름 추가 절차와 같다).
+
+## 10 api.md 형식 (API 한 장)
+- 파일: docs/blueprint/api.md. 서버 라우트(server.js·routes/*.js 의 `router|app . get|post|put|patch|delete`)마다 표 한 줄. 줄 모양(`|` 로 나눈 11칸): `METHOD 경로 | 묶음 | 정의 파일:줄 | 인증 | 읽기 | 쓰기 | 엔진 | 외부 | 파일 | 호출 화면 | 근거`.
+- 묶음: 인증·계정 / 관리자 / 사전·단어장 / 문장 학습 / Speak Loop / 스펠링 런 대결 / 음성 학습 / 개념 지도 / 기타.
+- 인증: `공개` / `로그인` / `관리자` / `권한:이름`(권한:can_tts 처럼 users 의 열 이름. 로그인을 포함한다).
+- 읽기·쓰기: `DB:이름`·`캐시:이름`(db.md 에 있는 이름)을 쉼표로. 없으면 `-`. 인증이 공개가 아니면 requireAuth 가 users 를 읽는다(middleware/auth.js:30). 이 읽기는 행에 적지 않고 gen 이 공통 규칙으로 계산한다.
+- 엔진·외부: 이 파일 3·4절 이름 그대로. 파일: 9절 이름. 없으면 `-`.
+- 호출 화면: 5절 화면 이름을 쉼표로. `공용` 은 authGate.js·appHeader.js 가 부르는 것이며 gen 이 화면 머리말 modules 에 authGate.js 가 있는 화면으로 펼쳐 계산한다. 없으면 `-`.
+- 근거: 확인함 / 추정 / 미확인(6절).
+- gen 이 검증한다(위반은 api.md 파일:줄과 함께 오류로 멈춘다): 이름이 db.md·LEGEND 에 없음 / METHOD 경로 중복 / 칸 수 불일치 / 인증 값이 허용 목록 밖 / 정의 줄이 없거나 그 줄 ±3줄에 경로가 없음 / **코드에 있는 라우트가 api.md 에 없음** / api.md 에 있는데 코드에 없음. 오류가 아닌 경고: 화면이 부르는데 api.md 에 없는 경로, 화면 머리말과 api.md 로 계산한 화면별 접근의 차이, 어떤 API 도 접근하지 않는 db.md 항목(`npm run blueprint:gen -- --warn`).

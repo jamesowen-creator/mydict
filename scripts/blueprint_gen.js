@@ -20,7 +20,7 @@ const DBJS = path.join(ROOT, 'lib', 'db.js');
 
 const KEYS = ['screen', 'file', 'engines', 'calls', 'reads', 'writes', 'fallback', 'flows', 'requires', 'navigates', 'externals', 'modules', 'last_checked'];
 const LIST_KEYS = ['engines', 'calls', 'reads', 'writes', 'fallback', 'flows', 'requires', 'navigates', 'externals', 'modules'];
-const STORE_PREFIX = ['DB', '캐시', '기기'];
+const STORE_PREFIX = ['DB', '캐시', '기기', '파일'];   // 작업B-004: 파일 = LEGEND 9절 고정 목록의 데이터 파일(DB 가 아님)
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
 const WARNS = [];   // 흐름 경고(오류 아님): flowOnly(흐름에만 있는 대상) · headerOnly(머리말에만 있고 어떤 흐름에도 안 나오는 대상)
@@ -50,7 +50,12 @@ function loadLegend() {
   const externals = line(sect(4), /^Anthropic API/);
   const screens = line(sect(5), /^홈 \//);
   if (!engines.length || !externals.length || !screens.length) throw new Error('LEGEND.md 의 엔진·외부·화면 목록이 비었습니다');
-  return { engines, externals, screens };
+  const files = new Map();   // 작업B-004: 9절 "| 이름 | 경로 | …" 표 → 이름 → { path, line }
+  const all = text.split('\n'); const h9 = all.findIndex(l => /^## 9 /.test(l));
+  if (h9 < 0) throw new Error('LEGEND.md 에 "## 9" 절(파일 이름 고정 목록)이 없습니다');
+  for (let i = h9 + 1; i < all.length && !/^## \d/.test(all[i]); i++) { const m = all[i].match(/^\| ([a-z][a-z0-9_]*) \| ([^|]+?) \|/); if (m) files.set(m[1], { path: m[2].trim(), line: i + 1 }); }
+  if (!files.size) throw new Error('LEGEND.md 9절의 파일 이름 목록이 비었습니다');
+  return { engines, externals, screens, files };
 }
 
 // ── 화면 파일 머리말 읽기·검증 ──────────────────────────────────────────────
@@ -103,7 +108,12 @@ function validate(o, name, L, errs) {
   for (const c of o.calls || []) { const m = c.match(/^([A-Z]+) (\/\S*)$/); if (!m || !METHODS.includes(m[1])) at('calls', '알 수 없는 호출 표기 "' + c + '" (형식: METHOD /경로, METHOD ∈ ' + METHODS.join('·') + ')'); }
   for (const k of ['reads', 'writes']) for (const s of o[k] || []) {
     const i = s.indexOf(':'), p = i < 0 ? '' : s.slice(0, i), n = i < 0 ? '' : s.slice(i + 1).trim();
-    if (!STORE_PREFIX.includes(p) || !/^[A-Za-z0-9_.-]+$/.test(n)) at(k, '알 수 없는 저장소 표기 "' + s + '" (형식: DB:이름 · 캐시:이름 · 기기:키)');
+    if (!STORE_PREFIX.includes(p) || !/^[A-Za-z0-9_.-]+$/.test(n)) at(k, '알 수 없는 저장소 표기 "' + s + '" (형식: DB:이름 · 캐시:이름 · 기기:키 · 파일:이름)');
+    else if (p === '파일') {   // 작업B-004: LEGEND 9절 목록의 이름이어야 하고 경로가 존재해야 한다
+      const fe = L.files.get(n);
+      if (!fe) at(k, '파일 이름 "' + n + '" 이 LEGEND 9절 파일 목록에 없습니다(목록에 먼저 추가)');
+      else if (!fs.existsSync(path.join(ROOT, fe.path))) at(k, '파일 "' + n + '" 의 경로 "' + fe.path + '" 가 존재하지 않습니다(LEGEND.md:' + fe.line + ')');
+    }
   }
   for (const f of o.fallback || []) {
     const parts = f.split(' ⇢ ');
@@ -159,7 +169,7 @@ function analyzeFlows(o, L) {
       } else if (rel === 'read' || rel === 'write') {
         const key = rel === 'read' ? 'reads' : 'writes';
         const f = findStore(o[key], target);
-        if (f.item) { step = { type: f.item.prefix === 'DB' ? 'db' : f.item.prefix === '캐시' ? 'cache' : 'device', label: f.item.name, store: f.item }; res.used[key].add(f.item.raw); }
+        if (f.item) { step = { type: f.item.prefix === 'DB' ? 'db' : f.item.prefix === '캐시' ? 'cache' : f.item.prefix === '파일' ? 'file' : 'device', label: f.item.name, store: f.item }; res.used[key].add(f.item.raw); }
         else err(line, '동작 "' + name + '": ' + m[1] + ' 대상 "' + target + '" ' + (f.ambiguous ? '이 모호합니다(접두어 DB:·캐시:·기기: 를 붙이세요)' : '이 머리말 ' + key + ' 에 없습니다'));
       } else if (rel === 'move') {
         if (o.navigates.includes(target)) { step = { type: 'screen', label: target }; res.used.navigates.add(target); }
@@ -184,7 +194,7 @@ function analyzeFlows(o, L) {
     res.flows.push(flow);
   }
   // 머리말에만 있고 어떤 흐름에도 나오지 않는 항목(경고)
-  const unused = (group, list, usedSet) => { for (const it of list) if (!usedSet.has(it)) res.warns.push({ kind: 'headerOnly', group, device: group !== 'calls' && it.startsWith('기기:'), text: group + ' ' + it }); };
+  const unused = (group, list, usedSet) => { for (const it of list) if (!usedSet.has(it) && !it.startsWith('파일:')) res.warns.push({ kind: 'headerOnly', group, device: group !== 'calls' && it.startsWith('기기:'), text: group + ' ' + it }); };
   if ((o._items && o._items.flows && o._items.flows.length) || res.flows.length) {
     unused('calls', o.calls, res.used.calls); unused('engines', o.engines, res.used.engines); unused('externals', o.externals, res.used.externals);
     unused('modules', o.modules, res.used.modules); unused('reads', o.reads, res.used.reads); unused('writes', o.writes, res.used.writes); unused('navigates', o.navigates, res.used.navigates);
@@ -253,7 +263,7 @@ function genSection(screens, pages) {
   list('API별 사용 화면 (→호출)', usage(screens, s => s.calls), ([k, v]) => '**' + k + '** — ' + v.join(', '));
   const stores = new Map();   // "DB:x" / "캐시:x" → { r:Set, w:Set }
   for (const s of screens) for (const [k, key] of [['reads', 'r'], ['writes', 'w']]) for (const it of s[k]) {
-    if (it.startsWith('기기:')) continue;
+    if (it.startsWith('기기:') || it.startsWith('파일:')) continue;
     if (!stores.has(it)) stores.set(it, { r: new Set(), w: new Set() });
     stores.get(it)[key].add(s.screen);
   }
@@ -265,6 +275,13 @@ function genSection(screens, pages) {
     dev.get(it)[key].add(s.screen);
   }
   list('기기 저장값별 사용 화면 ([기기] localStorage·sessionStorage 키, 두 화면 이상이 쓰는 키는 공유 키)', [...dev.entries()].sort((a, b) => byCode(a[0], b[0])), ([k, v]) => '**' + storeName(k) + '** — 읽기: ' + ([...v.r].sort(byCode).join(', ') || '-') + ' / 쓰기: ' + ([...v.w].sort(byCode).join(', ') || '-'));
+  const fl = new Map();
+  for (const s of screens) for (const [k, key] of [['reads', 'r'], ['writes', 'w']]) for (const it of s[k]) {
+    if (!it.startsWith('파일:')) continue;
+    if (!fl.has(it)) fl.set(it, { r: new Set(), w: new Set() });
+    fl.get(it)[key].add(s.screen);
+  }
+  list('파일별 사용 화면 ([파일] LEGEND 9절 고정 목록, →읽기 / →쓰기)', [...fl.entries()].sort((a, b) => byCode(a[0], b[0])), ([k, v]) => '**' + storeName(k) + '** — 읽기: ' + ([...v.r].sort(byCode).join(', ') || '-') + ' / 쓰기: ' + ([...v.w].sort(byCode).join(', ') || '-'));
   list('외부 서비스별 사용 화면 ([외부])', usage(screens, s => s.externals), ([k, v]) => '**' + k + '** — ' + v.join(', '));
   list('모듈별 사용 화면 ([모듈])', usage(screens, s => s.modules), ([k, v]) => '**' + k + '** — ' + v.join(', '));
   L.push('### 미작성 화면 (' + todo.length + '개)');
@@ -350,7 +367,7 @@ function loadDbDoc(screens, errs) {
   for (const [k, v] of items) if (!tables.has(v.name)) errs.push('docs/blueprint/db.md:' + v.line + ': 항목 "' + k + '" 이 lib/db.js 의 CREATE TABLE 에 없습니다');
   for (const [n, line] of tables) if (!docNames.has(n)) errs.push('lib/db.js:' + line + ': 테이블 "' + n + '" 이 docs/blueprint/db.md 에 없습니다');
   for (const s of screens) for (const k of ['reads', 'writes']) for (const it of s[k]) {
-    if (it.startsWith('기기:')) continue;
+    if (it.startsWith('기기:') || it.startsWith('파일:')) continue;
     if (!items.has(it)) errs.push(s.path + ':' + ((s._line && s._line[k]) || 1) + ': ' + k + ' "' + it + '" 이 docs/blueprint/db.md 에 없습니다(이름과 DB·캐시 구분을 확인)');
   }
   return items;
@@ -384,7 +401,7 @@ function mapData(screens, pages, groups, dbItems) {
     for (const m of s.modules) { add('m:' + m, 'module', m); edge(me, 'm:' + m, 'call'); }
     for (const [k, relKind] of [['reads', 'read'], ['writes', 'write']]) for (const it of s[k]) {
       const [p, n] = [it.slice(0, it.indexOf(':')), storeName(it)];
-      if (p === '기기') continue;
+      if (p === '기기' || p === '파일') continue;   // 작업B-004: 파일 저장소는 이 보기에 그리지 않는다(이후 작업)
       add((p === 'DB' ? 'd:' : 'c:') + n, p === 'DB' ? 'db' : 'cache', n);
       edge(me, (p === 'DB' ? 'd:' : 'c:') + n, relKind);
     }

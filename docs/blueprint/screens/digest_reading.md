@@ -3,7 +3,7 @@ screen: 한입 독서
 file: public/digest_reading.html
 engines: []
 calls: [GET /api/me]
-reads: [DB:users, 기기:mydict_token, 기기:digest_genre_filter, 기기:digest_conquest_]
+reads: [DB:users, 파일:digest_db, 기기:mydict_token, 기기:digest_genre_filter, 기기:digest_conquest_]
 writes: [기기:digest_genre_filter, 기기:digest_conquest_]
 fallback: []
 flows: [
@@ -44,6 +44,7 @@ last_checked: 49287a8
 - →쓰기: 없음(DB). 기기 저장값은 위 3절.
 - 기기 저장값: localStorage `mydict_token`(읽기), `digest_genre_filter`(:568, 읽기·쓰기·삭제), `digest_conquest_<id>`(:582-588, 작품마다 한 키, 값 'true'/'false').
 - 정적 파일(DB 아님): `GET /digest_db.json`(fetch 'digest_db.json', :680)을 express.static 이 보낸다(server.js:57). 최상위 키 version·last_updated·authors·works(132개 작품). 파일 저장소 후보: 한입 독서 → public/digest_db.json.
+- [파일] →읽기: digest_db(public/digest_db.json, 화면이 fetch 한다 :680). 정적 파일이라 서버 라우트 없이 express.static 이 보낸다(server.js:57).
 
 ## 5 연결
 - [API] GET /api/me. [외부] Google Fonts(:11).
@@ -51,3 +52,4 @@ last_checked: 49287a8
 - [모듈] authGate.js(:6), appHeader.js(:483), dialog.js(:485).
 - [이동] 한입 독서 →이동 홈.
 - [미확인] 상세 화면·캐러셀의 표시 규칙(:1177-1260 이후 렌더링)과 퀴즈 문항 구성 세부.
+- [파일] digest_db(public/digest_db.json, LEGEND 9절).

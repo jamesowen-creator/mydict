@@ -3,7 +3,7 @@ screen: 관리자
 file: public/admin.html
 engines: [AI 단어 뜻 변환(Claude Haiku), 저장 음성(Speak Loop)]
 calls: [GET /api/me, GET /api/admin/users, PATCH /api/admin/users/:id, GET /api/admin/stats, GET /api/admin/speakloop/audio/status, GET /api/admin/speakloop/audio/list, POST /api/admin/speakloop/audio/preview, POST /api/admin/speakloop/audio/generate, GET /api/speakloop/content, GET /api/speakloop/audio/:clipKey, GET /api/admin/gloss/status, POST /api/admin/gloss/sample, POST /api/admin/gloss/run, POST /api/admin/gloss/restore, GET /api/admin/gloss/backup, DELETE /api/tts/cache/entry]
-reads: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 기기:mydict_token, 기기:gl_last_run]
+reads: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 파일:speakloop_content, 기기:mydict_token, 기기:gl_last_run]
 writes: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 캐시:tts_cache, 기기:gl_last_run]
 fallback: []
 flows: [
@@ -50,9 +50,11 @@ last_checked: 8753b0a
 - →읽기: [DB] users(사용자 목록), [DB] api_usage(비용 추정 집계, routes/admin.js:86·96), [DB] wordbook(변환 대상 현황), [DB] gloss_backup(백업·되돌리기), [DB] speakloop_audio(음성 현황·재생).
 - →쓰기: [DB] users(권한), [DB] wordbook(뜻 변환 적용·되돌리기), [DB] gloss_backup(변환 전후 백업), [DB] speakloop_audio(음성 저장), [DB] api_usage(음성·뜻 변환 사용 기록), [캐시] tts_cache(단어 하나 삭제).
 - 결과가 쌓이는 곳: 변환된 뜻은 wordbook(모든 사용자), 백업은 gloss_backup, 음성은 speakloop_audio.
+- [파일] →읽기: speakloop_content(data/speakloop/content.json). Speak Loop 음성 현황·목록·미리듣기·생성의 클립 목록을 서버가 이 파일에서 만든다(lib/speakloop_content.js:88, routes/speakloop.js:108·123·135·176).
 
 ## 5 연결
 - [API] 위 3절(관리자 전용 라우트는 requireAdmin). [외부] Anthropic(뜻 변환 샘플·적용), OpenAI TTS(Speak Loop 음성 생성·미리듣기), Google Fonts.
 - [기기] localStorage `mydict_token`(:374), `gl_last_run`(마지막 변환 실행 번호, 읽기 :933, 쓰기 :793).
 - [모듈] public/js/common/authGate.js, appHeader.js(관리자일 때만 헤더에 '관리자' 링크, appHeader.js:110).
 - 특이점: 발음 캐시 지우기는 tts_cache(서버 음성)만 지운다. Speak Loop 저장 음성(speakloop_audio)은 이 경로로 지워지지 않는다(별도 저장소).
+- [파일] speakloop_content(data/speakloop/content.json, LEGEND 9절).

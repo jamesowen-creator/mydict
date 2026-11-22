@@ -198,6 +198,14 @@
 - **spellrun_view** — 읽기: 스펠링 런 / 쓰기: 스펠링 런
 - **voice_tts_rate** — 읽기: 음성 학습 / 쓰기: 음성 학습
 
+### 파일별 사용 화면 ([파일] LEGEND 9절 고정 목록, →읽기 / →쓰기)
+- **artist_notes_db** — 읽기: 작가 노트 / 쓰기: -
+- **digest_db** — 읽기: 한입 독서 / 쓰기: -
+- **literature_db** — 읽기: 문학 나침반 / 쓰기: -
+- **ocr_word_list** — 읽기: 사전 / 쓰기: -
+- **science_db** — 읽기: 과학 / 쓰기: -
+- **speakloop_content** — 읽기: Speak Loop, 관리자 / 쓰기: -
+
 ### 외부 서비스별 사용 화면 ([외부])
 - **Anthropic API(Claude Haiku)** — 개념 지도, 관리자, 문장 학습, 사전, 음성 학습
 - **Google Fonts** — Speak Loop, 개념 지도, 과학, 관리자, 문장 학습, 문학 나침반, 사전, 스펠링 런, 음성 학습, 작가 노트, 한입 독서
@@ -241,6 +249,7 @@
 | [DB] | 저장소(DB 테이블) | PostgreSQL 테이블 | `reads`·`writes` 의 `DB:이름` |
 | [캐시] | 저장소(서버 캐시) | 같은 결과를 다시 만들지 않으려고 서버가 저장하는 테이블 | `reads`·`writes` 의 `캐시:이름` |
 | [기기] | 저장소(기기 저장값) | 브라우저 localStorage·sessionStorage 키 | `reads`·`writes` 의 `기기:키` |
+| [파일] | 저장소(파일) | DB 가 아닌 데이터 파일. 서버가 읽는 파일(data/ 아래)과 정적으로 내려주는 파일(public/ 아래 JSON·텍스트). 아래 9절 고정 목록의 이름만 쓴다 | `reads`·`writes` 의 `파일:이름` |
 | [외부] | 외부 | 앱 밖의 서비스(아래 4절 고정 목록) | `externals` |
 | [모듈] | 모듈 | 여러 화면이 같이 쓰는 파일(저장소 안 경로, 존재하는 파일이어야 함) | `modules` |
 | [미작성] | 미작성 | 도면이 아직 없는 화면(README 화면 목록·map.html 점선) | (화면 파일 없음) |
@@ -272,14 +281,15 @@
 | AI 사진 문장 인식(Claude Haiku) | `POST /api/jgrammar/ocr`. 사진 속 문장 인식 |
 | AI 단어 뜻 변환(Claude Haiku) | `/api/admin/gloss/*`. 저장된 영어 단어 뜻 일괄 변환(관리자) |
 | AI 음성 노트 처리(Claude Haiku) | `/api/voice-notes/*`. 요약·퀴즈·대화·개념 연결·이미지 계획 |
-| 음성 인식(OpenAI STT) | `POST /api/voice-notes/transcribe`. 녹음 → 글자 |
+| 음성 인식(OpenAI STT) | `POST /api/voice-notes/transcribe`(음성 학습)와 `POST /api/cmap/concepts/:id/answer/voice`(개념 지도 말로 설명하기). 녹음 → 글자(같은 OpenAI STT, 모델 VOICE_STT_MODEL) |
 | 이미지 생성(OpenAI Images) | `/api/voice-notes/:id/image`. 노트 요약 이미지 |
-| 서버 음성(OpenAI TTS) | `POST /api/tts`(tts-1-hd, tts_cache 캐시, 캐시 미스만 하루 한도 계산) |
+| 서버 음성(OpenAI TTS) | 두 곳에서 OpenAI TTS 를 부른다. (1) `POST /api/tts`: 모델 tts-1-hd, tts_cache 캐시, 캐시 미스만 하루 한도 계산. (2) 관리자 Speak Loop 음성 만들기(`/api/admin/speakloop/audio/preview·generate`): 기본 모델 gpt-4o-mini-tts(환경변수·미리듣기에서 tts-1·tts-1-hd 도 선택 가능), 결과는 speakloop_audio 에 저장(preview 는 저장 안 함) |
 | 저장 음성(Speak Loop) | 관리자가 만들어 speakloop_audio에 저장해 둔 음성만 재생(사용자 경로는 OpenAI 호출 없음) |
 | 기기 음성(speechSynthesis) | 브라우저·폰 내장 음성. 서버 호출 없음 |
 | 기기 글자 인식(Tesseract.js) | 브라우저 안 OCR(jsDelivr에서 받음). 서버 호출 없음 |
 | 간격 반복 복습(SM-2) | `/api/review-*`. 복습일 계산 |
 | 2인 대결 방(서버 메모리) | `/api/versus/rooms…`. DB 없이 서버 메모리(인스턴스 1개 전제) |
+| 서버 메모리 작업 상태 | 중복 실행 방지·횟수 제한용 서버 메모리 상태(인스턴스 1개 전제, 재시작하면 사라짐). 단어 뜻 변환 잠금(gloss_backfill runLocked), Speak Loop 음성 생성 잠금·미리듣기 횟수 제한(speakloop_tts), 음성 학습 지도 만들기 상태(mapBuilds)·연결 분석 중복 방지(linkInFlight), 개념 지도 해설 중복 방지(narrating). 방 정보를 담는 "2인 대결 방(서버 메모리)" 와 별개 이름 |
 | 스펠링 런 게임 엔진(캔버스) | logic.js·game.js. 스펠링 런 전용 |
 | AI 개념 지도 처리(Claude Haiku) | `/api/cmap/*`. 개념 설명·심화(explain·deepen)·지도 해설(narrate)·말로 설명하기 평가(answer). 같은 모델 CMAP_MODEL |
 | 기기 PDF 저장(캔버스) | 브라우저 안에서 지도 그림 → JPEG → 최소 PDF → 파일 다운로드(public/js/cmap/mapPdf.js). 서버 호출 없음 |
@@ -312,6 +322,29 @@ Anthropic API(Claude Haiku) / OpenAI TTS(음성 합성) / OpenAI STT(음성 인�
 학습: 사전, 스펠링 런, 문장 학습, 음성 학습, Speak Loop, 개념 지도
 읽기: 문학 나침반, 한입 독서, 과학, 작가 노트
 관리: 관리자
+
+## 9 파일 이름 고정 목록 (저장소 종류 [파일], 머리말 `파일:이름`)
+이 목록에 없는 이름은 머리말 reads·writes 에 쓸 수 없다(gen 이 멈춘다). 경로는 저장소 루트 기준이며 존재하는 파일이어야 한다. 쓰는 곳은 서버·화면 코드에는 없고(읽기 전용), 개발용 스크립트만 있으면 적었다.
+| 이름 | 경로 | 읽는 곳 | 쓰는 곳 |
+|---|---|---|---|
+| literature_db | public/literature_db.json | 문학 나침반(public/literature_compass.html:818 fetch) | 개발 스크립트 scripts/generate_literature_content.js:340 |
+| digest_db | public/digest_db.json | 한입 독서(public/digest_reading.html:680 fetch) | 개발 스크립트 scripts/generate_literature_content.js:341, scripts/validate_digest.js:133 |
+| science_db | public/science_db.json | 과학(public/science_reading.html:1209 fetch) | 없음 |
+| artist_notes_db | public/artist_notes_db.json | 작가 노트(public/artist_notes.html:531 fetch) | 없음 |
+| ocr_word_list | public/data/ocr-word-list.txt | 사전의 카메라 글자 인식(public/js/ocr/extractEnglishCandidates.js:195 fetch) | 없음 |
+| speakloop_content | data/speakloop/content.json | 서버(lib/speakloop_content.js:88 readFileSync) → Speak Loop·관리자 API | 없음 |
+- public/ 아래 파일은 `express.static`(server.js:57)이 로그인 없이 URL 로 보낸다. 화면의 권한 확인은 데이터를 받기 전 화면 코드가 할 뿐이다. data/ 아래 파일은 정적 폴더 밖이라 URL 로 열리지 않고 API 를 거친다.
+- 새 데이터 파일이 생기면 이 표에 먼저 한 줄 추가한다(엔진·외부 이름 추가 절차와 같다).
+
+## 10 api.md 형식 (API 한 장)
+- 파일: docs/blueprint/api.md. 서버 라우트(server.js·routes/*.js 의 `router|app . get|post|put|patch|delete`)마다 표 한 줄. 줄 모양(`|` 로 나눈 11칸): `METHOD 경로 | 묶음 | 정의 파일:줄 | 인증 | 읽기 | 쓰기 | 엔진 | 외부 | 파일 | 호출 화면 | 근거`.
+- 묶음: 인증·계정 / 관리자 / 사전·단어장 / 문장 학습 / Speak Loop / 스펠링 런 대결 / 음성 학습 / 개념 지도 / 기타.
+- 인증: `공개` / `로그인` / `관리자` / `권한:이름`(권한:can_tts 처럼 users 의 열 이름. 로그인을 포함한다).
+- 읽기·쓰기: `DB:이름`·`캐시:이름`(db.md 에 있는 이름)을 쉼표로. 없으면 `-`. 인증이 공개가 아니면 requireAuth 가 users 를 읽는다(middleware/auth.js:30). 이 읽기는 행에 적지 않고 gen 이 공통 규칙으로 계산한다.
+- 엔진·외부: 이 파일 3·4절 이름 그대로. 파일: 9절 이름. 없으면 `-`.
+- 호출 화면: 5절 화면 이름을 쉼표로. `공용` 은 authGate.js·appHeader.js 가 부르는 것이며 gen 이 화면 머리말 modules 에 authGate.js 가 있는 화면으로 펼쳐 계산한다. 없으면 `-`.
+- 근거: 확인함 / 추정 / 미확인(6절).
+- gen 이 검증한다(위반은 api.md 파일:줄과 함께 오류로 멈춘다): 이름이 db.md·LEGEND 에 없음 / METHOD 경로 중복 / 칸 수 불일치 / 인증 값이 허용 목록 밖 / 정의 줄이 없거나 그 줄 ±3줄에 경로가 없음 / **코드에 있는 라우트가 api.md 에 없음** / api.md 에 있는데 코드에 없음. 오류가 아닌 경고: 화면이 부르는데 api.md 에 없는 경로, 화면 머리말과 api.md 로 계산한 화면별 접근의 차이, 어떤 API 도 접근하지 않는 db.md 항목(`npm run blueprint:gen -- --warn`).
 
 =====================================================================
 ### 파일: docs/blueprint/db.md
@@ -395,7 +428,7 @@ screen: 관리자
 file: public/admin.html
 engines: [AI 단어 뜻 변환(Claude Haiku), 저장 음성(Speak Loop)]
 calls: [GET /api/me, GET /api/admin/users, PATCH /api/admin/users/:id, GET /api/admin/stats, GET /api/admin/speakloop/audio/status, GET /api/admin/speakloop/audio/list, POST /api/admin/speakloop/audio/preview, POST /api/admin/speakloop/audio/generate, GET /api/speakloop/content, GET /api/speakloop/audio/:clipKey, GET /api/admin/gloss/status, POST /api/admin/gloss/sample, POST /api/admin/gloss/run, POST /api/admin/gloss/restore, GET /api/admin/gloss/backup, DELETE /api/tts/cache/entry]
-reads: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 기기:mydict_token, 기기:gl_last_run]
+reads: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 파일:speakloop_content, 기기:mydict_token, 기기:gl_last_run]
 writes: [DB:users, DB:api_usage, DB:wordbook, DB:speakloop_audio, DB:gloss_backup, 캐시:tts_cache, 기기:gl_last_run]
 fallback: []
 flows: [
@@ -442,12 +475,14 @@ last_checked: 8753b0a
 - →읽기: [DB] users(사용자 목록), [DB] api_usage(비용 추정 집계, routes/admin.js:86·96), [DB] wordbook(변환 대상 현황), [DB] gloss_backup(백업·되돌리기), [DB] speakloop_audio(음성 현황·재생).
 - →쓰기: [DB] users(권한), [DB] wordbook(뜻 변환 적용·되돌리기), [DB] gloss_backup(변환 전후 백업), [DB] speakloop_audio(음성 저장), [DB] api_usage(음성·뜻 변환 사용 기록), [캐시] tts_cache(단어 하나 삭제).
 - 결과가 쌓이는 곳: 변환된 뜻은 wordbook(모든 사용자), 백업은 gloss_backup, 음성은 speakloop_audio.
+- [파일] →읽기: speakloop_content(data/speakloop/content.json). Speak Loop 음성 현황·목록·미리듣기·생성의 클립 목록을 서버가 이 파일에서 만든다(lib/speakloop_content.js:88, routes/speakloop.js:108·123·135·176).
 
 ## 5 연결
 - [API] 위 3절(관리자 전용 라우트는 requireAdmin). [외부] Anthropic(뜻 변환 샘플·적용), OpenAI TTS(Speak Loop 음성 생성·미리듣기), Google Fonts.
 - [기기] localStorage `mydict_token`(:374), `gl_last_run`(마지막 변환 실행 번호, 읽기 :933, 쓰기 :793).
 - [모듈] public/js/common/authGate.js, appHeader.js(관리자일 때만 헤더에 '관리자' 링크, appHeader.js:110).
 - 특이점: 발음 캐시 지우기는 tts_cache(서버 음성)만 지운다. Speak Loop 저장 음성(speakloop_audio)은 이 경로로 지워지지 않는다(별도 저장소).
+- [파일] speakloop_content(data/speakloop/content.json, LEGEND 9절).
 
 =====================================================================
 ### 파일: docs/blueprint/screens/artist_notes.md
@@ -458,7 +493,7 @@ screen: 작가 노트
 file: public/artist_notes.html
 engines: []
 calls: [GET /api/me]
-reads: [DB:users, 기기:mydict_token, 기기:artist_notes_field_filter, 기기:artist_notes_conquest_]
+reads: [DB:users, 파일:artist_notes_db, 기기:mydict_token, 기기:artist_notes_field_filter, 기기:artist_notes_conquest_]
 writes: [기기:artist_notes_field_filter, 기기:artist_notes_conquest_]
 fallback: []
 flows: [
@@ -499,12 +534,14 @@ last_checked: 49287a8
 - →쓰기: 없음(DB).
 - 기기 저장값: localStorage `mydict_token`(읽기), `artist_notes_field_filter`(:448), `artist_notes_conquest_<id>`(:468-470, 값 'true'/'false'). 읽기·쓰기는 try/catch 로 감싸 저장소를 못 쓰는 환경에서도 멈추지 않는다(lsGet/lsSet :449-450).
 - 정적 파일(DB 아님): `GET /artist_notes_db.json`(fetch 'artist_notes_db.json', :531)을 express.static 이 보낸다(server.js:57). 최상위 키 version·last_updated·artists(12명)·quiz(42문항). 파일 저장소 후보: 작가 노트 → public/artist_notes_db.json.
+- [파일] →읽기: artist_notes_db(public/artist_notes_db.json, 화면이 fetch 한다 :531). 정적 파일이라 서버 라우트 없이 express.static 이 보낸다(server.js:57).
 
 ## 5 연결
 - [API] GET /api/me(게이트·헤더 경유). [외부] Google Fonts(:11).
 - [모듈] authGate.js(:6), appHeader.js(:375), dialog.js(:377).
 - [이동] 작가 노트 →이동 홈.
 - [미확인] 작가 상세·캐러셀 표시 규칙(:929 이후)과 문항 선택 세부(pickBalanced :1044).
+- [파일] artist_notes_db(public/artist_notes_db.json, LEGEND 9절).
 
 =====================================================================
 ### 파일: docs/blueprint/screens/concept_map.md
@@ -574,7 +611,7 @@ screen: 사전
 file: public/english_dictionary.html
 engines: [AI 사전·단어 질의(Claude Haiku), 서버 음성(OpenAI TTS), 기기 음성(speechSynthesis), 기기 글자 인식(Tesseract.js), 간격 반복 복습(SM-2)]
 calls: [GET /api/me, POST /api/ai, GET /api/wordbook, POST /api/wordbook, DELETE /api/wordbook/:id, PATCH /api/wordbook/:id/example, PATCH /api/wordbook/:id/it, DELETE /api/wordbook/:id/it, POST /api/quiz-correct, GET /api/review-due, POST /api/review-result, POST /api/tts]
-reads: [DB:users, DB:wordbook, DB:api_usage, 캐시:tts_cache, 기기:mydict_token, 기기:mydict_wrong, 기기:metis_tts_mode, 기기:spellrun_landing_count]
+reads: [DB:users, DB:wordbook, DB:api_usage, 캐시:tts_cache, 파일:ocr_word_list, 기기:mydict_token, 기기:mydict_wrong, 기기:metis_tts_mode, 기기:spellrun_landing_count]
 writes: [DB:wordbook, DB:review_log, DB:api_usage, 캐시:tts_cache, 기기:mydict_token, 기기:mydict_wrong, 기기:metis_tts_mode, 기기:spellrun_landing_count, 기기:spellrun_ids]
 fallback: [서버 음성(OpenAI TTS) ⇢ 기기 음성(speechSynthesis)]
 flows: [
@@ -624,11 +661,13 @@ last_checked: 8753b0a
 - →읽기: [DB] users(`/api/me`·권한 can_search·can_wordbook·can_tts), [DB] wordbook(단어장·복습 대상), [DB] api_usage(하루 한도 계산: ai·tts), [캐시] tts_cache(발음 캐시 적중).
 - →쓰기: [DB] wordbook(저장·삭제·예문·IT 설명·복습값), [DB] review_log(복습 점수), [DB] api_usage(ai·tts 사용 기록, tts는 캐시 미스만, routes/tts.js:150), [캐시] tts_cache(발음 미스 저장).
 - 결과가 쌓이는 곳: 단어장은 wordbook(사용자별). 검색 결과 자체는 단어장에 저장할 때만 wordbook.data 열에 들어간다. [미확인] 검색 결과의 서버 쪽 별도 캐시는 routes/dictionary.js에서 보이지 않음(없는 것으로 보이나 전체 확인은 안 함).
+- [파일] →읽기: ocr_word_list(public/data/ocr-word-list.txt, 카메라 글자 인식이 영어 단어 목록으로 fetch 한다: public/js/ocr/extractEnglishCandidates.js:195). 정적 파일이다(server.js:57).
 
 ## 5 연결
 - [API] 위 3절. [외부] Anthropic(/api/ai), OpenAI TTS(/api/tts 캐시 미스일 때만), Google Fonts(:23), jsDelivr tesseract.js 5.1.1(:4812).
 - [기기] localStorage `mydict_token`(로그인; 쓰기는 주소 ?token= 처리 :1765), `mydict_wrong`(퀴즈 오답, :1942), `metis_tts_mode`(단어 발음 방식, 스펠링 런과 공용; :4271), `spellrun_landing_count`(스펠링 런 한 번에 풀 단어 수 10|20, :3334; 사전 쪽 키 이름이지만 이름에 spellrun이 들어 있다), sessionStorage `spellrun_ids`(스펠링 런에 넘기는 단어 id). 주소 옵션 `?tts=server|device|reset`.
 - [모듈] public/js/common/authGate.js(진입 시 /api/me 1회 확인·401이면 홈), appHeader.js(헤더·로그인 위젯), dialog.js, public/js/ocr/ocrScanner.js(카메라 글자 인식 패널).
+- [파일] ocr_word_list(public/data/ocr-word-list.txt, LEGEND 9절).
 
 =====================================================================
 ### 파일: docs/blueprint/screens/digest_reading.md
@@ -639,7 +678,7 @@ screen: 한입 독서
 file: public/digest_reading.html
 engines: []
 calls: [GET /api/me]
-reads: [DB:users, 기기:mydict_token, 기기:digest_genre_filter, 기기:digest_conquest_]
+reads: [DB:users, 파일:digest_db, 기기:mydict_token, 기기:digest_genre_filter, 기기:digest_conquest_]
 writes: [기기:digest_genre_filter, 기기:digest_conquest_]
 fallback: []
 flows: [
@@ -680,6 +719,7 @@ last_checked: 49287a8
 - →쓰기: 없음(DB). 기기 저장값은 위 3절.
 - 기기 저장값: localStorage `mydict_token`(읽기), `digest_genre_filter`(:568, 읽기·쓰기·삭제), `digest_conquest_<id>`(:582-588, 작품마다 한 키, 값 'true'/'false').
 - 정적 파일(DB 아님): `GET /digest_db.json`(fetch 'digest_db.json', :680)을 express.static 이 보낸다(server.js:57). 최상위 키 version·last_updated·authors·works(132개 작품). 파일 저장소 후보: 한입 독서 → public/digest_db.json.
+- [파일] →읽기: digest_db(public/digest_db.json, 화면이 fetch 한다 :680). 정적 파일이라 서버 라우트 없이 express.static 이 보낸다(server.js:57).
 
 ## 5 연결
 - [API] GET /api/me. [외부] Google Fonts(:11).
@@ -687,6 +727,7 @@ last_checked: 49287a8
 - [모듈] authGate.js(:6), appHeader.js(:483), dialog.js(:485).
 - [이동] 한입 독서 →이동 홈.
 - [미확인] 상세 화면·캐러셀의 표시 규칙(:1177-1260 이후 렌더링)과 퀴즈 문항 구성 세부.
+- [파일] digest_db(public/digest_db.json, LEGEND 9절).
 
 =====================================================================
 ### 파일: docs/blueprint/screens/home.md
@@ -811,7 +852,7 @@ screen: 문학 나침반
 file: public/literature_compass.html
 engines: []
 calls: [GET /api/me]
-reads: [DB:users, 기기:mydict_token]
+reads: [DB:users, 파일:literature_db, 기기:mydict_token]
 writes: []
 fallback: []
 flows: [
@@ -846,12 +887,14 @@ last_checked: 49287a8
 - →읽기: [DB] users(권한 확인용 /api/me, perm_literature_compass).
 - →쓰기: 없음.
 - 정적 파일(DB 아님): `GET /literature_db.json`(fetch 'literature_db.json', :818)을 express.static 이 public/ 에서 보낸다(server.js:57). 최상위 키 version·last_updated·eras. 파일 저장소 후보: 문학 나침반 → public/literature_db.json.
+- [파일] →읽기: literature_db(public/literature_db.json, 화면이 fetch 한다 :818). 정적 파일이라 서버 라우트 없이 express.static 이 보낸다(server.js:57).
 
 ## 5 연결
 - [API] GET /api/me(위 3절). [외부] Google Fonts(:11).
 - [모듈] public/js/common/authGate.js(:6), appHeader.js(:578), dialog.js(:580, 퀴즈 중단 확인 metisConfirm).
 - [이동] 문학 나침반 →이동 홈·사전.
 - [미확인] 카드 뒤집기·퀴즈 채점의 세부 규칙(1173-1560)은 줄 단위로 읽지 않았다.
+- [파일] literature_db(public/literature_db.json, LEGEND 9절).
 
 =====================================================================
 ### 파일: docs/blueprint/screens/science.md
@@ -862,7 +905,7 @@ screen: 과학
 file: public/science_reading.html
 engines: []
 calls: [GET /api/me]
-reads: [DB:users, 기기:mydict_token, 기기:science_conquest_]
+reads: [DB:users, 파일:science_db, 기기:mydict_token, 기기:science_conquest_]
 writes: [기기:science_conquest_]
 fallback: []
 flows: [
@@ -901,12 +944,14 @@ last_checked: 49287a8
 - →쓰기: 없음(DB).
 - 기기 저장값: localStorage `mydict_token`(읽기), `science_conquest_<id>`(:597-612, 개념마다 한 키, 값 'true'/'false'). 필터 키는 없다(localStorage 호출은 이 두 종류뿐).
 - 정적 파일(DB 아님): `GET /science_db.json`(fetch 'science_db.json', :1209)을 express.static 이 보낸다(server.js:57). 최상위 키 version·last_updated·concepts(32개 개념). 파일 저장소 후보: 과학 → public/science_db.json.
+- [파일] →읽기: science_db(public/science_db.json, 화면이 fetch 한다 :1209). 정적 파일이라 서버 라우트 없이 express.static 이 보낸다(server.js:57).
 
 ## 5 연결
 - [API] GET /api/me. [외부] Google Fonts(:11).
 - [모듈] authGate.js(:6), appHeader.js(:469), dialog.js(:471).
 - [이동] 과학 →이동 홈. 주소 `?field=`·`?tab=conq` 로 같은 화면 안의 보기를 가리키는 history 이동이 있으나(:832, :1091) 다른 화면으로 가지 않는다.
 - [미확인] 캐러셀 표시·관련 개념(related) 규칙의 세부(:664-725, :1274 이후).
+- [파일] science_db(public/science_db.json, LEGEND 9절).
 
 =====================================================================
 ### 파일: docs/blueprint/screens/speak_loop.md
@@ -917,7 +962,7 @@ screen: Speak Loop
 file: public/speakloop.html
 engines: [저장 음성(Speak Loop)]
 calls: [GET /api/me, GET /api/speakloop/content, GET /api/speakloop/audio-index, GET /api/speakloop/audio/:clipKey, GET /api/speakloop/progress, POST /api/speakloop/progress]
-reads: [DB:users, DB:speakloop_audio, DB:speakloop_progress, 기기:mydict_token]
+reads: [DB:users, DB:speakloop_audio, DB:speakloop_progress, 파일:speakloop_content, 기기:mydict_token]
 writes: [DB:speakloop_progress]
 fallback: []
 flows: [
@@ -954,12 +999,14 @@ last_checked: 8753b0a
 - →읽기: [DB] users(권한 perm_speakloop, routes/speakloop.js:18), [DB] speakloop_audio(음성 목록·재생), [DB] speakloop_progress(진행).
 - →쓰기: [DB] speakloop_progress(사용자별 항목 횟수·마지막 평가). 이 화면은 speakloop_audio에 쓰지 않는다(쓰기는 관리자 화면, screens/admin.md 참고).
 - 결과가 쌓이는 곳: 진행은 speakloop_progress. 내 소리 녹음은 저장되지 않는다.
+- [파일] →읽기: speakloop_content(data/speakloop/content.json). 화면이 직접 여는 파일이 아니라 서버가 읽어 GET /api/speakloop/content 로 내려준다(lib/speakloop_content.js:88). data/ 는 정적 폴더 밖이다.
 
 ## 5 연결
 - [API] 위 3절(전부 requireAuth + requireSpeakloopPerm, routes/speakloop.js:28). [외부] Google Fonts(speakloop.html:9-11).
 - [기기] localStorage `mydict_token`(app.js:10). 그 밖의 저장값 없음(speakloop 화면 파일에서 localStorage·sessionStorage 사용은 이 1건만 확인).
 - [모듈] public/js/common/authGate.js, appHeader.js. 화면 전용 스크립트: public/js/speakloop/{core,player,rec,app,idiom}.js.
 - [미확인] 독백 연습 4개 모드 각각의 서버 호출 차이(app.js 전체는 읽지 않음, 호출은 위 6개 API만 grep으로 확인).
+- [파일] speakloop_content(data/speakloop/content.json, LEGEND 9절).
 
 =====================================================================
 ### 파일: docs/blueprint/screens/spelling_run.md

@@ -3,7 +3,7 @@ screen: 작가 노트
 file: public/artist_notes.html
 engines: []
 calls: [GET /api/me]
-reads: [DB:users, 기기:mydict_token, 기기:artist_notes_field_filter, 기기:artist_notes_conquest_]
+reads: [DB:users, 파일:artist_notes_db, 기기:mydict_token, 기기:artist_notes_field_filter, 기기:artist_notes_conquest_]
 writes: [기기:artist_notes_field_filter, 기기:artist_notes_conquest_]
 fallback: []
 flows: [
@@ -44,9 +44,11 @@ last_checked: 49287a8
 - →쓰기: 없음(DB).
 - 기기 저장값: localStorage `mydict_token`(읽기), `artist_notes_field_filter`(:448), `artist_notes_conquest_<id>`(:468-470, 값 'true'/'false'). 읽기·쓰기는 try/catch 로 감싸 저장소를 못 쓰는 환경에서도 멈추지 않는다(lsGet/lsSet :449-450).
 - 정적 파일(DB 아님): `GET /artist_notes_db.json`(fetch 'artist_notes_db.json', :531)을 express.static 이 보낸다(server.js:57). 최상위 키 version·last_updated·artists(12명)·quiz(42문항). 파일 저장소 후보: 작가 노트 → public/artist_notes_db.json.
+- [파일] →읽기: artist_notes_db(public/artist_notes_db.json, 화면이 fetch 한다 :531). 정적 파일이라 서버 라우트 없이 express.static 이 보낸다(server.js:57).
 
 ## 5 연결
 - [API] GET /api/me(게이트·헤더 경유). [외부] Google Fonts(:11).
 - [모듈] authGate.js(:6), appHeader.js(:375), dialog.js(:377).
 - [이동] 작가 노트 →이동 홈.
 - [미확인] 작가 상세·캐러셀 표시 규칙(:929 이후)과 문항 선택 세부(pickBalanced :1044).
+- [파일] artist_notes_db(public/artist_notes_db.json, LEGEND 9절).
