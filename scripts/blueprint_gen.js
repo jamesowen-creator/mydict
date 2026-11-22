@@ -16,6 +16,7 @@ const MAP = path.join(DIR, 'map.html');
 const BOARD = path.join(DIR, 'board.html');
 const BUNDLE = path.join(DIR, '_bundle.md');
 const DBDOC = path.join(DIR, 'db.md');
+const APIDOC = path.join(DIR, 'api.md');
 const DBJS = path.join(ROOT, 'lib', 'db.js');
 
 const KEYS = ['screen', 'file', 'engines', 'calls', 'reads', 'writes', 'fallback', 'flows', 'requires', 'navigates', 'externals', 'modules', 'last_checked'];
@@ -305,13 +306,13 @@ function writeReadme(section, file) {
 
 // ── _bundle.md ──────────────────────────────────────────────────────────────
 function writeBundle(screens) {
-  const files = [README, LEGEND, DBDOC].concat(fs.readdirSync(SCREENS).filter(f => f.endsWith('.md')).sort(byCode).map(f => path.join(SCREENS, f)));
+  const files = [README, LEGEND, DBDOC, APIDOC].concat(fs.readdirSync(SCREENS).filter(f => f.endsWith('.md')).sort(byCode).map(f => path.join(SCREENS, f)));
   const hashes = [...new Set(screens.map(s => s.last_checked))].sort(byCode);
   const out = [];
   out.push('# METIS-3 도면 묶음 (_bundle.md)');
   out.push('');
   out.push('이 파일은 `npm run blueprint:gen` 이 만든다(직접 고치지 않는다). 용도: 이 한 파일을 웹 Claude 에 첨부해 프로젝트 문서로 복사한다.');
-  out.push('순서: README → LEGEND → db → screens(파일 이름 순). 기준 커밋(화면 파일의 last_checked): ' + (hashes.join(', ') || '(없음)'));
+  out.push('순서: README → LEGEND → db → api → screens(파일 이름 순). 기준 커밋(화면 파일의 last_checked): ' + (hashes.join(', ') || '(없음)'));
   out.push('화면 파일 ' + screens.length + '개.');
   for (const f of files) {
     out.push('');
@@ -1216,6 +1217,168 @@ marker.mo path { fill: var(--sel); }
 `;
 }
 
+// ── api.md 대조·생성 구간 (작업B-004) ────────────────────────────────────────
+// api.md 의 줄("| METHOD 경로 | 묶음 | 정의 | 인증 | 읽기 | 쓰기 | 엔진 | 외부 | 파일 | 호출 화면 | 근거 |")을 LEGEND·db.md·코드와 대조한다.
+// 오류(생성 중단): 이름·값 표준 밖, 중복, 칸 수, 정의 줄, 코드에 있는 라우트가 api.md 에 없음, api.md 에 있는데 코드에 없음.
+// 경고(--warn): 화면이 부르는데 api.md 에 없는 경로, 화면 머리말과 api.md 로 계산한 화면별 접근의 차이, 접근하는 API 가 없는 db.md 항목.
+const API_GROUPS = ['인증·계정', '관리자', '사전·단어장', '문장 학습', 'Speak Loop', '스펠링 런 대결', '음성 학습', '개념 지도', '기타'];
+const API_BASIS = ['확인함', '추정', '미확인'];
+const API_ROW = /^\| ([A-Z]+) (\/\S*) \|/;
+const API_WARNS = [];   // { kind: 'noRoute' | 'screenDiff' | 'noApi', text, ... }
+const apiKey = (m, p) => m + ' ' + p;
+
+// 코드의 라우트: server.js 와 routes/*.js 의 router|app . get|post|put|patch|delete('경로'
+function codeRoutes() {
+  const out = new Map();
+  const files = ['server.js'].concat(fs.readdirSync(path.join(ROOT, 'routes')).filter(f => f.endsWith('.js')).sort(byCode).map(f => 'routes/' + f));
+  const re = /\b(?:router|app)\.(get|post|put|patch|delete)\(\s*(['"`])([^'"`]+)\2/;
+  for (const f of files) {
+    lf(fs.readFileSync(path.join(ROOT, f), 'utf8')).split('\n').forEach((ln, i) => {
+      const m = ln.match(re);
+      if (!m) return;
+      const k = apiKey(m[1].toUpperCase(), m[3]);
+      if (!out.has(k)) out.set(k, { file: f, line: i + 1 });
+    });
+  }
+  return out;
+}
+
+function loadApi(L, dbItems, screens, errs) {
+  const lines = lf(fs.readFileSync(APIDOC, 'utf8')).split('\n');
+  const rows = [], byKey = new Map(), noteKeys = [];
+  const at = (i, msg) => errs.push('docs/blueprint/api.md:' + (i + 1) + ': ' + msg);
+  const fileCache = new Map();
+  const fileLines = f => { if (!fileCache.has(f)) fileCache.set(f, fs.existsSync(path.join(ROOT, f)) ? lf(fs.readFileSync(path.join(ROOT, f), 'utf8')).split('\n') : null); return fileCache.get(f); };
+  const list = v => (v === '-' ? [] : splitList(v));
+  lines.forEach((ln, i) => {
+    const nm = ln.match(/^- ([A-Z]+ \/\S*): /);
+    if (nm) { noteKeys.push({ key: nm[1], i }); return; }
+    const m = ln.match(API_ROW);
+    if (!m) return;
+    if (!METHODS.includes(m[1])) { at(i, '알 수 없는 METHOD "' + m[1] + '" (허용: ' + METHODS.join('·') + ')'); return; }
+    const cells = ln.replace(/^\| /, '').replace(/ \|\s*$/, '').split(' | ').map(x => x.trim());
+    const key = apiKey(m[1], m[2]);
+    if (cells.length !== 11) { at(i, '칸 수 오류: ' + key + ' 은 11칸이어야 하는데 ' + cells.length + '칸입니다'); return; }
+    const [, group, def, auth, rd, wr, eng, ext, fil, scr, basis] = cells;
+    if (byKey.has(key)) { at(i, 'API "' + key + '" 가 ' + (byKey.get(key).i + 1) + '줄과 중복됩니다'); return; }
+    const row = { key, method: m[1], path: m[2], group, def, auth, reads: list(rd), writes: list(wr), engines: list(eng), externals: list(ext), files: list(fil), screens: list(scr), basis, i };
+    byKey.set(key, row); rows.push(row);
+    if (!API_GROUPS.includes(group)) at(i, key + ': 묶음 "' + group + '" 은 표준 밖입니다(허용: ' + API_GROUPS.join(', ') + ')');
+    if (!(auth === '공개' || auth === '로그인' || auth === '관리자' || /^권한:[A-Za-z0-9_]+$/.test(auth))) at(i, key + ': 인증 "' + auth + '" 이 허용 목록(공개·로그인·관리자·권한:이름)에 없습니다');
+    for (const [label, arr] of [['읽기', row.reads], ['쓰기', row.writes]]) for (const it of arr) if (!dbItems.has(it)) at(i, key + ': ' + label + ' "' + it + '" 이 docs/blueprint/db.md 에 없습니다(DB:이름 · 캐시:이름)');
+    for (const e of row.engines) if (!L.engines.includes(e)) at(i, key + ': 엔진 "' + e + '" 이 LEGEND 3절 목록에 없습니다');
+    for (const x of row.externals) if (!L.externals.includes(x)) at(i, key + ': 외부 "' + x + '" 이 LEGEND 4절 목록에 없습니다');
+    for (const f of row.files) if (!L.files.has(f)) at(i, key + ': 파일 "' + f + '" 이 LEGEND 9절 파일 목록에 없습니다');
+    for (const s of row.screens) if (s !== '공용' && !L.screens.includes(s)) at(i, key + ': 호출 화면 "' + s + '" 은 LEGEND 5절 화면 이름이 아닙니다(공용 가능)');
+    if (!API_BASIS.includes(basis)) at(i, key + ': 근거 "' + basis + '" 은 확인함·추정·미확인 중 하나여야 합니다');
+    const dm = def.match(/^(\S+\.js):(\d+)$/);
+    if (!dm) at(i, key + ': 정의 "' + def + '" 형식 오류(파일:줄)');
+    else {
+      const fl = fileLines(dm[1]), n = +dm[2];
+      if (!fl) at(i, key + ': 정의 파일 "' + dm[1] + '" 이 없습니다');
+      else if (n < 1 || n > fl.length) at(i, key + ': 정의 줄 ' + dm[1] + ':' + n + ' 이 파일 길이(' + fl.length + '줄)를 넘습니다');
+      else if (!fl.slice(Math.max(0, n - 4), n + 3).join('\n').includes(row.path)) at(i, key + ': 정의 ' + dm[1] + ':' + n + ' 의 앞뒤 3줄에 경로 "' + row.path + '" 가 없습니다');
+    }
+  });
+  for (const n of noteKeys) if (!byKey.has(n.key)) at(n.i, '행별 비고의 "' + n.key + '" 에 해당하는 API 행이 없습니다');
+  if (!rows.length) errs.push('docs/blueprint/api.md:1: API 행이 하나도 없습니다');
+  const code = codeRoutes();
+  for (const [k, v] of code) if (!byKey.has(k)) errs.push(v.file + ':' + v.line + ': 코드의 라우트 "' + k + '" 가 docs/blueprint/api.md 에 없습니다(api.md 에 한 줄을 추가하세요)');
+  for (const r of rows) if (!code.has(r.key)) at(r.i, 'API "' + r.key + '" 가 코드(server.js·routes/*.js)에 없습니다(지워졌거나 이름이 바뀌었는지 확인)');
+  return { rows, byKey };
+}
+
+// 화면 하나가 부르는 API 행들. 공용 = 머리말 modules 에 authGate.js 가 있는 화면. 호출 화면이 없어도 화면 머리말 calls 에 있으면 그 화면에 붙인다
+function apiByScreen(api, screens) {
+  const gated = new Set(screens.filter(s => s.modules.some(m => /(^|\/)authGate\.js$/.test(m))).map(s => s.screen));
+  const map = new Map(screens.map(s => [s.screen, { rows: new Set(), viaCommonOnly: new Set() }]));
+  for (const s of screens) {
+    const e = map.get(s.screen);
+    for (const r of api.rows) {
+      const direct = r.screens.includes(s.screen) || s.calls.includes(r.key);
+      const common = r.screens.includes('공용') && gated.has(s.screen);
+      if (direct || common) { e.rows.add(r); if (!direct) e.viaCommonOnly.add(r); }
+    }
+  }
+  return map;
+}
+const apiReadsUsers = r => r.auth !== '공개' || r.reads.includes('DB:users');
+
+function apiWarnings(api, screens, dbItems) {
+  // (1) 화면(public·home-wheel/src)이 부르는 /api/·/auth/ 문자열 중 api.md 에 없는 경로
+  const paths = api.rows.map(r => r.path);
+  const res = paths.map(p => new RegExp('^' + p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/:[A-Za-z]+/g, '[^/]+') + '$'));
+  const walk = (d, o) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) { if (e.name !== 'node_modules') walk(p, o); } else if (/\.(js|jsx|html)$/.test(e.name) && e.name !== 'sw.js') o.push(p); } return o; };
+  const srcs = [].concat(walk(path.join(ROOT, 'public'), []), fs.existsSync(path.join(ROOT, 'home-wheel', 'src')) ? walk(path.join(ROOT, 'home-wheel', 'src'), []) : []);
+  let literals = 0;
+  for (const f of srcs.sort(byCode)) lf(fs.readFileSync(f, 'utf8')).split('\n').forEach((ln, i) => {
+    if (/^\s*(\/\/|\*|\/\*)/.test(ln)) return;
+    for (const m of ln.matchAll(/(\/(?:api|auth)\/[A-Za-z0-9_\-\/]*)/g)) {
+      const lit = m[1].replace(/\/$/, ''); literals++;
+      const ok = paths.includes(lit) || res.some(re => re.test(lit)) || paths.some(p => p.startsWith(lit + '/'));
+      if (!ok) API_WARNS.push({ kind: 'noRoute', text: rel(f) + ':' + (i + 1) + ' "' + lit + '" 이 api.md 에 없습니다' });
+    }
+  });
+  // (2) 화면 머리말과 api.md 로 계산한 화면별 접근
+  const by = apiByScreen(api, screens);
+  const engAny = new Set(), extAny = new Set(), fileAny = new Set();
+  for (const r of api.rows) { r.engines.forEach(x => engAny.add(x)); r.externals.forEach(x => extAny.add(x)); r.files.forEach(x => fileAny.add('파일:' + x)); }
+  const diffs = [];   // { screen, group, item, side }
+  for (const s of screens) {
+    const e = by.get(s.screen);
+    const rows = [...e.rows];
+    const d = { reads: new Set(), writes: new Set(), engines: new Set(), externals: new Set() };
+    for (const r of rows) {
+      if (apiReadsUsers(r)) d.reads.add('DB:users');
+      r.reads.forEach(x => d.reads.add(x)); r.writes.forEach(x => d.writes.add(x)); r.files.forEach(x => d.reads.add('파일:' + x));
+      if (!e.viaCommonOnly.has(r)) { r.engines.forEach(x => d.engines.add(x)); r.externals.forEach(x => d.externals.add(x)); }
+    }
+    const cmp = (group, derived, header, scope) => {
+      for (const x of derived) if (!header.includes(x)) diffs.push({ screen: s.screen, group, item: x, side: 'api' });
+      for (const x of header) if (scope(x) && !derived.has(x)) diffs.push({ screen: s.screen, group, item: x, side: 'header' });
+    };
+    const store = x => !x.startsWith('기기:') && (!x.startsWith('파일:') || fileAny.has(x));
+    cmp('reads', d.reads, s.reads.filter(store), x => true);
+    cmp('writes', d.writes, s.writes.filter(store), x => true);
+    cmp('engines', d.engines, s.engines, x => engAny.has(x));
+    cmp('externals', d.externals, s.externals, x => extAny.has(x));
+  }
+  diffs.sort((a, b) => byCode(a.group + a.item + a.side + a.screen, b.group + b.item + b.side + b.screen));
+  for (const x of diffs) API_WARNS.push({ kind: 'screenDiff', group: x.group, item: x.item, side: x.side, screen: x.screen });
+  // (3) 접근하는 API 가 없는 db.md 항목
+  const touched = new Set();
+  for (const r of api.rows) { r.reads.forEach(x => touched.add(x)); r.writes.forEach(x => touched.add(x)); if (apiReadsUsers(r)) touched.add('DB:users'); }
+  for (const k of [...dbItems.keys()].sort(byCode)) if (!touched.has(k)) API_WARNS.push({ kind: 'noApi', text: k + ' (db.md:' + dbItems.get(k).line + ') 를 읽거나 쓰는 API 가 api.md 에 없습니다' });
+  return { literals, diffs };
+}
+
+function genApiSection(api, dbItems) {
+  const rows = api.rows;
+  const L = [];
+  const cnt = (arr, fn) => { const m = new Map(); for (const x of arr) { const k = fn(x); m.set(k, (m.get(k) || 0) + 1); } return m; };
+  L.push('> api.md 의 API 행 ' + rows.length + '개에서 만든다. 인증이 공개가 아닌 행은 users 를 읽는 것으로 계산한다(공통 규칙).');
+  L.push('');
+  L.push('### 묶음별 API 수');
+  const g = cnt(rows, r => r.group);
+  for (const n of API_GROUPS) L.push('- ' + n + ': ' + (g.get(n) || 0));
+  L.push('');
+  L.push('### 인증별 API 수');
+  const a = cnt(rows, r => r.auth);
+  for (const [k, v] of [...a.entries()].sort((x, y) => byCode(x[0], y[0]))) L.push('- ' + k + ': ' + v);
+  L.push('');
+  L.push('### 테이블별 읽는·쓰는 API 수 ([DB]·[캐시]; users 읽기는 인증이 공개가 아닌 모든 API 포함)');
+  for (const [k, v] of [...dbItems.entries()].sort((x, y) => byCode(x[1].name, y[1].name))) {
+    const r = rows.filter(x => x.reads.includes(k) || (k === 'DB:users' && apiReadsUsers(x))).length, w = rows.filter(x => x.writes.includes(k)).length;
+    L.push('- **[' + v.kind + '] ' + v.name + '** — 읽는 API ' + r + '개 / 쓰는 API ' + w + '개' + (r || w ? '' : ' (접근하는 API 없음)'));
+  }
+  L.push('');
+  const none = rows.filter(r => !r.screens.length);
+  L.push('### 호출 화면 없는 API (' + none.length + '개)');
+  if (!none.length) L.push('- (없음)');
+  for (const r of none) L.push('- ' + r.key + ' (' + r.auth + ')');
+  return L.join('\n');
+}
+
 function main() {
   const errs = [];
   const L = loadLegend();
@@ -1225,9 +1388,12 @@ function main() {
   if (errs.length) { console.error('blueprint:gen 검증 오류 ' + errs.length + '건 — 파일을 쓰지 않고 멈춥니다\n' + errs.map(e => ' - ' + e).join('\n')); process.exit(1); }
   const groups = loadGroups(L, errs);
   const dbItems = loadDbDoc(screens, errs);
+  const api = loadApi(L, dbItems, screens, errs);
   if (errs.length) { console.error('blueprint:gen 검증 오류 ' + errs.length + '건 — 파일을 쓰지 않고 멈춥니다\n' + errs.map(e => ' - ' + e).join('\n')); process.exit(1); }
   writeReadme(genSection(screens, pages));
   writeReadme(genDbSection(screens, dbItems), DBDOC);
+  writeReadme(genApiSection(api, dbItems), APIDOC);
+  const aw = apiWarnings(api, screens, dbItems);
   fs.writeFileSync(MAP, mapHtml(mapData(screens, pages, groups, dbItems)));
   fs.writeFileSync(BOARD, boardHtml(boardData(mapData(screens, pages, groups, dbItems))));
   const size = writeBundle(screens);
@@ -1236,6 +1402,9 @@ function main() {
   const flowOnly = WARNS.filter(w => w.kind === 'flowOnly'), headerOnly = WARNS.filter(w => w.kind === 'headerOnly');
   console.log('흐름: 동작 ' + nFlows + '개, 단계 ' + nSteps + '개 (' + screens.map(s => s.screen + ' ' + s._flows.length).join(', ') + ')');
   console.log('경고(오류 아님): 흐름에만 있는 대상 ' + flowOnly.length + '건, 머리말에만 있고 흐름에 안 나오는 대상 ' + headerOnly.length + '건(그중 기기 저장값 ' + headerOnly.filter(w => w.device).length + '건)');
+  const apiN = k => API_WARNS.filter(w => w.kind === k).length;
+  console.log('api.md: API ' + api.rows.length + '개. 경고(오류 아님): 화면이 부르는데 api.md 에 없는 경로 ' + apiN('noRoute') + '건(검사한 문자열 ' + aw.literals + '개), 화면 머리말과 api.md 의 접근 차이 ' + apiN('screenDiff') + '건, 접근하는 API 가 없는 db.md 항목 ' + apiN('noApi') + '건');
   if (process.argv.includes('--warn')) for (const w of WARNS) console.log(' - [' + (w.kind === 'flowOnly' ? '흐름에만' : '머리말에만') + '] ' + w.screen + ': ' + w.text);
+  if (process.argv.includes('--warn')) for (const w of API_WARNS) console.log(' - [api.md 경고: ' + (w.kind === 'noRoute' ? '화면에만 있는 경로' : w.kind === 'noApi' ? '접근하는 API 없음' : w.side === 'api' ? 'api.md 에만 있음' : '머리말에만 있음') + '] ' + (w.kind === 'screenDiff' ? w.screen + ': ' + w.group + ' ' + w.item : w.text));
 }
 main();
