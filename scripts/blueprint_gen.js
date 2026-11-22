@@ -14,6 +14,8 @@ const README = path.join(DIR, 'README.md');
 const LEGEND = path.join(DIR, 'LEGEND.md');
 const MAP = path.join(DIR, 'map.html');
 const BUNDLE = path.join(DIR, '_bundle.md');
+const DBDOC = path.join(DIR, 'db.md');
+const DBJS = path.join(ROOT, 'lib', 'db.js');
 
 const KEYS = ['screen', 'file', 'engines', 'calls', 'reads', 'writes', 'fallback', 'flows', 'requires', 'navigates', 'externals', 'modules', 'last_checked'];
 const LIST_KEYS = ['engines', 'calls', 'reads', 'writes', 'fallback', 'flows', 'requires', 'navigates', 'externals', 'modules'];
@@ -272,25 +274,26 @@ function genSection(screens, pages) {
   return L.join('\n');
 }
 
-function writeReadme(section) {
-  const text = fs.readFileSync(README, 'utf8');
+function writeReadme(section, file) {
+  file = file || README;
+  const text = fs.readFileSync(file, 'utf8');
   const eol = text.includes('\r\n') ? '\r\n' : '\n';
   const S = '<!-- gen:start -->', E = '<!-- gen:end -->';
   const a = text.indexOf(S), b = text.indexOf(E);
-  if (a < 0 || b < 0 || b < a) throw new Error('README.md 에 gen:start / gen:end 표시가 없습니다');
+  if (a < 0 || b < 0 || b < a) throw new Error(rel(file) + ' 에 gen:start / gen:end 표시가 없습니다');
   const next = text.slice(0, a + S.length) + eol + section.split('\n').join(eol) + eol + text.slice(b);
-  if (next !== text) fs.writeFileSync(README, next);
+  if (next !== text) fs.writeFileSync(file, next);
 }
 
 // ── _bundle.md ──────────────────────────────────────────────────────────────
 function writeBundle(screens) {
-  const files = [README, LEGEND].concat(fs.readdirSync(SCREENS).filter(f => f.endsWith('.md')).sort(byCode).map(f => path.join(SCREENS, f)));
+  const files = [README, LEGEND, DBDOC].concat(fs.readdirSync(SCREENS).filter(f => f.endsWith('.md')).sort(byCode).map(f => path.join(SCREENS, f)));
   const hashes = [...new Set(screens.map(s => s.last_checked))].sort(byCode);
   const out = [];
   out.push('# METIS-3 도면 묶음 (_bundle.md)');
   out.push('');
   out.push('이 파일은 `npm run blueprint:gen` 이 만든다(직접 고치지 않는다). 용도: 이 한 파일을 웹 Claude 에 첨부해 프로젝트 문서로 복사한다.');
-  out.push('순서: README → LEGEND → screens(파일 이름 순). 기준 커밋(화면 파일의 last_checked): ' + (hashes.join(', ') || '(없음)'));
+  out.push('순서: README → LEGEND → db → screens(파일 이름 순). 기준 커밋(화면 파일의 last_checked): ' + (hashes.join(', ') || '(없음)'));
   out.push('화면 파일 ' + screens.length + '개.');
   for (const f of files) {
     out.push('');
@@ -304,6 +307,38 @@ function writeBundle(screens) {
   const text = out.join('\n');
   if (!fs.existsSync(BUNDLE) || fs.readFileSync(BUNDLE, 'utf8') !== text) fs.writeFileSync(BUNDLE, text);
   return Buffer.byteLength(text, 'utf8');
+}
+
+// ── db.md 대조·생성 구간 ───────────────────────────────────────────────
+// db.md 의 항목 줄("| DB:이름 |" 또는 "| 캐시:이름 |")과 lib/db.js 의 CREATE TABLE 을 서로 대조하고, 화면 머리말의 DB:·캐시: 이름이 db.md 에 있는지 본다. 어긋나면 파일:줄과 함께 오류.
+function loadDbDoc(screens, errs) {
+  const items = new Map();   // 'DB:users' → { line, kind, name }
+  lf(fs.readFileSync(DBDOC, 'utf8')).split('\n').forEach((ln, i) => {
+    const m = ln.match(/^\| (DB|캐시):([A-Za-z0-9_]+) \|/);
+    if (!m) return;
+    const key = m[1] + ':' + m[2];
+    if (items.has(key)) errs.push('docs/blueprint/db.md:' + (i + 1) + ': 항목 "' + key + '" 이 ' + items.get(key).line + '줄과 중복됩니다');
+    else items.set(key, { line: i + 1, kind: m[1], name: m[2] });
+  });
+  const tables = new Map();   // 이름 → lib/db.js 줄
+  lf(fs.readFileSync(DBJS, 'utf8')).split('\n').forEach((ln, i) => { const m = ln.match(/CREATE TABLE IF NOT EXISTS ([A-Za-z0-9_]+)/); if (m && !tables.has(m[1])) tables.set(m[1], i + 1); });
+  const docNames = new Set([...items.values()].map(v => v.name));
+  for (const [k, v] of items) if (!tables.has(v.name)) errs.push('docs/blueprint/db.md:' + v.line + ': 항목 "' + k + '" 이 lib/db.js 의 CREATE TABLE 에 없습니다');
+  for (const [n, line] of tables) if (!docNames.has(n)) errs.push('lib/db.js:' + line + ': 테이블 "' + n + '" 이 docs/blueprint/db.md 에 없습니다');
+  for (const s of screens) for (const k of ['reads', 'writes']) for (const it of s[k]) {
+    if (it.startsWith('기기:')) continue;
+    if (!items.has(it)) errs.push(s.path + ':' + ((s._line && s._line[k]) || 1) + ': ' + k + ' "' + it + '" 이 docs/blueprint/db.md 에 없습니다(이름과 DB·캐시 구분을 확인)');
+  }
+  return items;
+}
+function genDbSection(screens, items) {
+  const rows = [], none = [];
+  for (const [k, v] of [...items.entries()].sort((a, b) => byCode(a[1].name, b[1].name))) {
+    const r = screens.filter(s => s.reads.includes(k)).map(s => s.screen).sort(byCode), w = screens.filter(s => s.writes.includes(k)).map(s => s.screen).sort(byCode);
+    if (!r.length && !w.length) none.push(v.name);
+    rows.push('- **[' + v.kind + '] ' + v.name + '** — ' + (r.length || w.length ? '읽기: ' + (r.join(', ') || '-') + ' / 쓰기: ' + (w.join(', ') || '-') : '화면 연결 없음'));
+  }
+  return ['> 화면 파일 ' + screens.length + '개의 머리말(reads·writes)에서 만든다. 항목 ' + items.size + '개, 화면 연결 없음 ' + none.length + '개.', ''].concat(rows).join('\n');
 }
 
 // ── map.html ────────────────────────────────────────────────────────────────
@@ -590,7 +625,10 @@ function main() {
   if (errs.length) { console.error('blueprint:gen 검증 오류 ' + errs.length + '건 — 파일을 쓰지 않고 멈춥니다\n' + errs.map(e => ' - ' + e).join('\n')); process.exit(1); }
   const pages = publicPages(L, errs);
   if (errs.length) { console.error('blueprint:gen 검증 오류 ' + errs.length + '건 — 파일을 쓰지 않고 멈춥니다\n' + errs.map(e => ' - ' + e).join('\n')); process.exit(1); }
+  const dbItems = loadDbDoc(screens, errs);
+  if (errs.length) { console.error('blueprint:gen 검증 오류 ' + errs.length + '건 — 파일을 쓰지 않고 멈춥니다\n' + errs.map(e => ' - ' + e).join('\n')); process.exit(1); }
   writeReadme(genSection(screens, pages));
+  writeReadme(genDbSection(screens, dbItems), DBDOC);
   fs.writeFileSync(MAP, mapHtml(mapData(screens, pages)));
   const size = writeBundle(screens);
   console.log('blueprint:gen 완료 — 화면 파일 ' + screens.length + '개, 미작성 ' + pages.filter(p => !screens.some(s => s.file === p.file)).length + '개, _bundle.md ' + size + ' bytes');
