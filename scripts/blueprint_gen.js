@@ -1306,7 +1306,7 @@ function genApiSection(api, dbItems) {
 const SVC_TRUNK_KEYS = ['GET /auth/google', 'GET /auth/google/callback', 'GET /api/me'];
 const SVC_GOOGLE = 'Google 로그인(OAuth)';
 const SVC_EVIDENCE = [   // [파일:줄, 그 줄에 있어야 하는 문자열]
-  ['home-wheel/src/HomeWheelApp.jsx:86', '/auth/google'], ['home-wheel/src/HomeWheelApp.jsx:212', '/auth/google'], ['routes/auth.js:67', '/auth/google'], ['routes/auth.js:28', 'GoogleStrategy'],
+  ['home-wheel/src/HomeWheelApp.jsx:93', '/auth/google'], ['home-wheel/src/HomeWheelApp.jsx:219', '/auth/google'], ['routes/auth.js:67', '/auth/google'], ['routes/auth.js:28', 'GoogleStrategy'],
   ['routes/auth.js:72', 'authenticate'], ['routes/auth.js:75', '/auth/google/callback'], ['routes/auth.js:38', 'pool.query'], ['public/js/common/authGate.js:154', '/api/me'],
   ['routes/auth.js:101', '/api/me'], ['middleware/auth.js:30', 'users'],
 ];
@@ -1405,8 +1405,8 @@ function serviceTabData(L, screens, groups, dbItems, api, warnN) {
     if (t.apiN !== rows.length || t.groups.length !== new Set(rows.map(r => r.group)).size) errs.push('대상 "' + t.name + '" 의 API·묶음 개수가 api.md 에서 따로 센 값과 다릅니다');
   });
   const trunk = [
-    { n: 1, items: [{ rel: '시작', kind: 'user', label: '사용자' }], ev: ['home-wheel/src/HomeWheelApp.jsx:86'], note: '홈에서 로그인 전 메뉴를 누르면 로그인으로 보낸다' },
-    { n: 2, items: [{ rel: '누름', kind: 'login', label: '로그인(Google OAuth)' }], ev: ['home-wheel/src/HomeWheelApp.jsx:212'], note: '"Google로 로그인" 링크(홈). 사전·스펠링 런에도 같은 로그인 링크가 있다' },
+    { n: 1, items: [{ rel: '시작', kind: 'user', label: '사용자' }], ev: ['home-wheel/src/HomeWheelApp.jsx:93'], note: '홈에서 로그인 전 메뉴를 누르면 로그인으로 보낸다' },
+    { n: 2, items: [{ rel: '누름', kind: 'login', label: '로그인(Google OAuth)' }], ev: ['home-wheel/src/HomeWheelApp.jsx:219'], note: '"Google로 로그인" 링크(홈). 사전·스펠링 런에도 같은 로그인 링크가 있다' },
     { n: 3, items: [{ rel: '호출', kind: 'api', label: rAuth.key }, { rel: '나감', kind: 'ext', label: SVC_GOOGLE }], ev: ['routes/auth.js:67', 'routes/auth.js:72'], note: '인증 ' + rAuth.auth },
     { n: 4, items: [{ rel: '인증', kind: 'ext', label: SVC_GOOGLE }], ev: ['routes/auth.js:28'], note: 'Google 이 사용자를 확인하고 콜백 주소로 되돌려 보낸다' },
     { n: 5, items: [{ rel: '돌아옴', kind: 'api', label: rCb.key }, { rel: '저장', kind: 'db', label: 'users', tag: '읽기·쓰기' }], ev: ['routes/auth.js:75', 'routes/auth.js:38'], note: '사용자 행을 만들거나 갱신하고 JWT 를 돌려준다. 차단·미승인이면 토큰 없이 안내만' },

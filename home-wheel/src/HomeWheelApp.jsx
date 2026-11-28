@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ThreeDWheelPicker } from './ThreeDWheelPicker.jsx';
 import { getToken, clearToken, fetchMeResult } from './auth.js';
+import { INVESTMENT_BRIEFING_URL } from './externalLinks.js';
 
 // Array-based so adding a future menu item is just adding an entry here.
 // No `icon` field (작업10-a removed the per-item icons - text-only cards now;
@@ -25,6 +26,9 @@ const JGRAMMAR_OPTION = { id: 'jgrammar', name: '문장 학습', description: '�
 // 작업399: Speak Loop(영어 말하기). perm_speakloop 이 true 인 계정과 관리자(role=admin)에게만 보이며, 맨 끝에 놓는다. 기존 항목의 순서는 그대로다.
 const SPEAKLOOP_OPTION = { id: 'speakloop', name: 'Speak Loop', description: '원어민 소리로 듣고 따라 하며 영어 말하기', url: '/speakloop.html' };
 
+// 작업452: 투자 브리핑(별도 서비스 Investment-AI, METIS와 코드·DB·로그인 분리). 관리자(role=admin)에게만, 맨 끝에 보인다. 로그인 전 목록에는 없다. 누르면 새 탭에서 연다(goTo).
+const INVEST_OPTION = { id: 'invest', name: '투자 브리핑', description: '별도 서비스, 새 탭에서 열림', url: INVESTMENT_BRIEFING_URL, external: true };
+
 // 로그인한 사용자 기준 휠 항목: 기본 6개 + (권한자) 일본어 문법(언어 사전 다음) + (권한자) 개념 지도(맨 끝). 로그인 전·권한 없음이면 기본 6개 그대로.
 // 작업406: loggedOut(토큰도 사용자도 없는 로그인 전)이면 9개를 모두 보인다(순서는 로그인 후 목록과 같다). 항목을 누르면 이동 대신 로그인을 시작한다(goTo).
 function buildOptions(user, loggedOut) {
@@ -32,6 +36,7 @@ function buildOptions(user, loggedOut) {
   if (loggedOut || (user && (user.perm_jgrammar === true || user.role === 'admin'))) list.splice(list.findIndex((o) => o.id === 'dictionary') + 1, 0, JGRAMMAR_OPTION);
   if (loggedOut || (user && user.perm_concept_map === true)) list.push(CMAP_OPTION);
   if (loggedOut || (user && (user.perm_speakloop === true || user.role === 'admin'))) list.push(SPEAKLOOP_OPTION);
+  if (!loggedOut && user && user.role === 'admin') list.push(INVEST_OPTION);
   return list;
 }
 
@@ -83,6 +88,8 @@ export default function HomeWheelApp() {
     const target = options.find((o) => o.id === id);
     if (!target) return;
     // 작업406: 로그인 전에는 화면 이동 대신 Google 로그인을 시작한다(405 게이트가 홈으로 되돌리므로). 돌아오는 경로는 보존하지 않는다.
+    // 작업452: 외부 항목은 클릭 처리 안에서 바로 새 탭으로 열고(팝업 차단 회피) 현재 화면은 그대로 둔다.
+    if (target.external) { window.open(target.url, '_blank', 'noopener,noreferrer'); return; }
     window.location.href = loggedOut ? '/auth/google' : target.url;
   };
 
